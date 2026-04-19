@@ -1,7 +1,4 @@
 Subito
-- aggiungere 1 muro -> aggiungere fino a 3 muri
-- no battaglia senza guerrieri in avanguardia
-- vedere tutta la descrizione di una carta premendola
 - vite prese dal mazzo
 - bug game.py BuildingInstance WarriorInstance
 - orda implementata
