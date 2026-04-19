@@ -116,7 +116,7 @@ class TestEffettiMagie:
         sorgiva_inst = make_building_instance("sorgiva_1")
         sorgiva_inst.completed = True
         player.field.village.buildings.append(sorgiva_inst)
-        player.lives = 1
+        player.life_cards = ["dummy_life_1"]
         result = apply_effect("vitalflusso_effect", state, player, prodigy=False)
         assert result["lives_gained"] == 1
         assert player.lives == 2
@@ -126,7 +126,7 @@ class TestEffettiMagie:
     def test_vitalflusso_senza_sorgiva_fallisce(self):
         """Vitalflusso senza Sorgiva completa ritorna errore."""
         state, player, _ = self._setup()
-        player.lives = 1
+        player.life_cards = ["dummy_life_1"]
         result = apply_effect("vitalflusso_effect", state, player, prodigy=False)
         assert "error" in result
         assert player.lives == 1  # Vita invariata
@@ -143,7 +143,7 @@ class TestEffettiMagie:
         sorgiva_opp = make_building_instance("sorgiva_2")
         sorgiva_opp.completed = False  # non deve importare
         opp.field.village.buildings.append(sorgiva_opp)
-        player.lives = 1
+        player.life_cards = ["dummy_life_1"]
         result = apply_effect("vitalflusso_effect", state, player, prodigy=True)
         assert result["lives_gained"] == 1
         # La Sorgiva avversaria deve essere stata scartata

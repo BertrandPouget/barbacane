@@ -749,8 +749,8 @@
       "cost": 3,
       "cost_type": "mana",
       "completion_cost": 3,
-      "base_effect": "A fine turno lancia un D10. Se esce almeno 6, peschi fino ad avere 6 carte in mano.",
-      "complete_effect": "A fine turno peschi fino ad avere 6 carte in mano.",
+      "base_effect": "A fine turno lancia un D10. Se esce almeno 6, peschi fino ad avere 7 carte in mano.",
+      "complete_effect": "A fine turno peschi fino ad avere 7 carte in mano.",
       "effect_id": "granaio_effect",
       "copies": 4
     },

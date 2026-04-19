@@ -258,9 +258,10 @@ def apply_damage_to_bastion(
         state.discard_pile.append(wall.instance_id)
         walls_destroyed += 1
 
-    # Se rimangono danni dopo aver esaurito i muri → perde 1 Vita
-    if remaining > 0:
-        defender.lives -= 1
+    # Se rimangono danni dopo aver esaurito i muri → perde 1 Vita (scarta la prima carta-vita)
+    if remaining > 0 and defender.life_cards:
+        lost_card = defender.life_cards.pop(0)
+        state.discard_pile.append(lost_card)
         life_lost = 1
 
     return {"walls_destroyed": walls_destroyed, "life_lost": life_lost}

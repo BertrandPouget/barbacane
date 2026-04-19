@@ -1,15 +1,16 @@
 Subito
-- vite prese dal mazzo
-- bug game.py BuildingInstance WarriorInstance
-- orda implementata
+- fixare orda: fatta UI e posizionamento, ma mancano condizioni di spegnimento (rimane attiva se riposizioni, si disattiva solo quando la cambi)
+- implementare effetti mancanti (es. D10)
 
 Dopo
-- implementare effetti mancanti (es. D10)
 - giocare online
 - fixare evoluzioni
+- fixare vitalflusso (non aggiunge sorgiva ma una carta dal mazzo)
 
 Opzionale
 - giocare su rete locale, non su computer locale
 - rimuovere azioni da homepage
 - utilizzare logo
 - timer funzionante
+- not defined in game.py BuildingInstance WarriorInstance
+

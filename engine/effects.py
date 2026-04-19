@@ -146,17 +146,17 @@ def estrattore_effect(state: GameState, player: Player, completed: bool = False,
 
 @register_effect("granaio_effect")
 def granaio_effect(state: GameState, player: Player, completed: bool = False, **kwargs) -> dict:
-    """Base: roll D10, se ≥6 pesca fino a hand=6. Complete: sempre pesca fino a hand=6."""
+    """Base: roll D10, se ≥6 pesca fino a hand=7. Complete: sempre pesca fino a hand=7."""
     if completed:
         current = len(player.hand)
-        to_draw = max(0, 6 - current)
+        to_draw = max(0, 7 - current)
         drawn = _draw_cards(state, player, to_draw) if to_draw > 0 else []
         return {"cards_drawn": drawn}
     else:
         roll = _roll_d10()
         if roll >= 6:
             current = len(player.hand)
-            to_draw = max(0, 6 - current)
+            to_draw = max(0, 7 - current)
             drawn = _draw_cards(state, player, to_draw) if to_draw > 0 else []
             return {"roll": roll, "cards_drawn": drawn}
         return {"roll": roll, "cards_drawn": []}
@@ -439,7 +439,16 @@ def vitalflusso_effect(state: GameState, player: Player, prodigy: bool = False, 
     if sorgiva:
         player.field.village.buildings.remove(sorgiva)
         state.discard_pile.append(sorgiva.instance_id)
-        player.lives += 1
+        # Pesca la carta in cima al mazzo come nuova carta-vita
+        if not state.deck and state.discard_pile:
+            import random as _r
+            state.deck = list(state.discard_pile)
+            state.discard_pile.clear()
+            _r.shuffle(state.deck)
+        if state.deck:
+            new_life = state.deck.pop(0)
+            player.life_cards.append(new_life)
+            result["new_life_card"] = new_life
         result["sorgiva_consumed"] = sorgiva.instance_id
         result["lives_gained"] = 1
         result["lives_now"] = player.lives
@@ -1271,10 +1280,11 @@ def plasmarmo_effect(
 
 @register_effect("patrizio_horde")
 def patrizio_horde(state: GameState, player: Player, warrior_iid: Optional[str] = None, **kwargs) -> dict:
-    """Questa carta (il guerriero che ha questo effetto Orda) ottiene +2 GIT fino a fine turno."""
+    """Questa carta ottiene +2 GIT fino al prossimo turno del giocatore."""
     w = _find_warrior(player, warrior_iid)
     if w:
         w.temp_modifiers["git"] = w.temp_modifiers.get("git", 0) + 2
+        player.active_effects.append({"type": "horde_stat_bonus", "warrior_iid": w.instance_id, "git": 2})
         return {"target": w.instance_id, "git_bonus": 2}
     return {}
 
@@ -1304,11 +1314,12 @@ def araminta_horde(state: GameState, player: Player, **kwargs) -> dict:
 
 @register_effect("orfeo_horde")
 def orfeo_horde(state: GameState, player: Player, warrior_iid: Optional[str] = None, **kwargs) -> dict:
-    """Questa carta ottiene +1 ATT e +1 DIF."""
+    """Questa carta ottiene +1 ATT e +1 DIF fino al prossimo turno del giocatore."""
     w = _find_warrior(player, warrior_iid)
     if w:
         w.temp_modifiers["att"] = w.temp_modifiers.get("att", 0) + 1
         w.temp_modifiers["dif"] = w.temp_modifiers.get("dif", 0) + 1
+        player.active_effects.append({"type": "horde_stat_bonus", "warrior_iid": w.instance_id, "att": 1, "dif": 1})
         return {"target": w.instance_id, "att_bonus": 1, "dif_bonus": 1}
     return {}
 
@@ -1371,6 +1382,7 @@ def polemarco_horde(state: GameState, player: Player, warrior_iid: Optional[str]
     w = _find_warrior(player, warrior_iid)
     if w:
         w.temp_modifiers["att"] = w.temp_modifiers.get("att", 0) + umani
+        player.active_effects.append({"type": "horde_stat_bonus", "warrior_iid": w.instance_id, "att": umani})
         return {"target": w.instance_id, "att_bonus": umani, "umani_count": umani}
     return {"umani_count": umani}
 

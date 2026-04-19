@@ -5,7 +5,7 @@ Rappresentano carte, istanze, giocatori e stato di gioco.
 
 from __future__ import annotations
 from typing import Dict, List, Optional, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +135,7 @@ class PlayerField(BaseModel):
 class Player(BaseModel):
     id: str
     name: str
-    lives: int = 3
+    life_cards: List[str] = Field(default_factory=list)  # instance_ids delle carte-vita
     mana: int = 0
     mana_remaining: int = 0
     actions_remaining: int = 2
@@ -145,10 +145,16 @@ class Player(BaseModel):
     skip_mana_next_turn: bool = False  # Dazipazzi
     extra_battles: int = 0  # Eracles horde
     spell_cost_reductions: Dict[str, int] = Field(default_factory=dict)  # school -> reduction
+    horde_used_this_turn: bool = False
+
+    @computed_field
+    @property
+    def lives(self) -> int:
+        return len(self.life_cards)
 
     @property
     def is_alive(self) -> bool:
-        return self.lives > 0
+        return bool(self.life_cards)
 
     def all_warriors(self) -> List[WarriorInstance]:
         """Tutti i Guerrieri del giocatore: Avanscoperta + entrambi i Bastioni."""
@@ -175,17 +181,37 @@ class Player(BaseModel):
             counts[school] = counts.get(school, 0) + 1
         return counts
 
+    def check_horde_with_zones(self) -> List[Dict]:
+        """Ritorna le Orde attive per zona: [{zone, species, warriors}].
+        Un'Orda richiede almeno 3 Guerrieri della stessa Specie nella STESSA Zona."""
+        from engine.cards import CARD_REGISTRY
+        hordes = []
+        zone_map = {
+            "vanguard": self.field.vanguard,
+            "bastion_left": self.field.bastion_left.warriors,
+            "bastion_right": self.field.bastion_right.warriors,
+        }
+        for zone_name, zone_warriors in zone_map.items():
+            by_species: Dict[str, List[WarriorInstance]] = {}
+            for w in zone_warriors:
+                sp = CARD_REGISTRY[w.base_card_id].species
+                by_species.setdefault(sp, []).append(w)
+            for sp, ws in by_species.items():
+                if len(ws) >= 3:
+                    hordes.append({"zone": zone_name, "species": sp, "warriors": ws})
+        return hordes
+
     def check_horde(self) -> Dict[str, List[WarriorInstance]]:
         """
-        Ritorna le Orde attive: dizionario {species: [warrior, warrior, warrior, ...]}.
-        Un'Orda richiede almeno 3 Guerrieri della stessa Specie in qualsiasi Regione.
+        Ritorna le Orde attive: {species: [warriors]} dove i guerrieri
+        sono almeno 3 della stessa Specie nella STESSA Zona.
         """
-        from engine.cards import CARD_REGISTRY
-        by_species: Dict[str, List[WarriorInstance]] = {}
-        for w in self.all_warriors():
-            sp = CARD_REGISTRY[w.base_card_id].species
-            by_species.setdefault(sp, []).append(w)
-        return {sp: ws for sp, ws in by_species.items() if len(ws) >= 3}
+        result: Dict[str, List[WarriorInstance]] = {}
+        for h in self.check_horde_with_zones():
+            sp = h["species"]
+            if sp not in result:
+                result[sp] = h["warriors"]
+        return result
 
 
 # ---------------------------------------------------------------------------

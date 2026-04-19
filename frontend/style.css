@@ -407,9 +407,56 @@ input:focus {
   padding: 2px 4px;
 }
 
-#my-lives { color: var(--red-light); }
-#my-mana  { color: var(--blue-light); }
+#my-mana    { color: var(--blue-light); }
 #my-actions { color: var(--gold); }
+
+/* Carte-vita */
+.life-cards-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.life-label {
+  color: var(--red-light);
+  font-size: 0.85rem;
+}
+
+.life-cards-container {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.life-slot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  transition: transform 0.15s, box-shadow 0.15s;
+  border: 2px solid transparent;
+}
+
+.life-slot-active {
+  background: rgba(176, 48, 48, 0.25);
+  border-color: var(--red);
+  color: var(--red-light);
+}
+
+.life-slot-active:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 8px rgba(176, 48, 48, 0.6);
+  cursor: pointer;
+}
+
+.life-slot-lost {
+  background: rgba(80, 60, 50, 0.2);
+  border-color: var(--border);
+  color: var(--text-dim);
+  font-size: 0.7rem;
+}
 
 /* Mano */
 #hand-area {

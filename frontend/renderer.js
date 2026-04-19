@@ -54,7 +54,7 @@ const Renderer = (() => {
     // Info giocatore
     const info = el('div', { className: 'opp-info' }, [
       el('div', { className: 'opp-name' }, [player.name]),
-      el('div', { className: 'opp-lives' }, [livesHTML(player.lives)]),
+      el('div', { className: 'opp-lives' }, ['❤'.repeat(Math.max(0, player.lives)) + '✕'.repeat(Math.max(0, 3 - player.lives))]),
       el('div', { className: 'opp-hand-count' }, [`Mano: ${player.hand_count} carte`]),
     ]);
 
@@ -120,9 +120,9 @@ const Renderer = (() => {
   // ---------------------------------------------------------------------------
 
   function renderMyField(player, state, myPlayerId) {
-    // Stats
-    document.getElementById('my-lives').textContent = `Vite: ${livesText(player.lives)}`;
-    document.getElementById('my-mana').textContent   = `Mana: ${player.mana_remaining ?? 0}`;
+    // Carte-vita (solo per il proprietario)
+    renderLifeCards(player);
+    document.getElementById('my-mana').textContent    = `Mana: ${player.mana_remaining ?? 0}`;
     document.getElementById('my-actions').textContent = `Azioni: ${player.actions_remaining ?? 0}`;
 
     // Regioni
@@ -173,6 +173,31 @@ const Renderer = (() => {
     (village.buildings || []).forEach(b => {
       container.appendChild(renderBuildingCard(b, true));
     });
+  }
+
+  function renderLifeCards(player) {
+    const container = document.getElementById('my-life-cards');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const lifeCards = player.life_cards || [];
+    const lives = player.lives ?? lifeCards.length;
+
+    // Slot visivi: uno per ogni vita iniziale (3)
+    for (let i = 0; i < 3; i++) {
+      const slot = el('div', { className: `life-slot ${i < lives ? 'life-slot-active' : 'life-slot-lost'}` });
+      if (i < lifeCards.length) {
+        const iid = lifeCards[i];
+        const def = App.getCardDef ? App.getCardDef(iid) : null;
+        slot.title = def ? def.name : iid;
+        slot.textContent = '❤';
+        slot.style.cursor = 'pointer';
+        slot.addEventListener('click', () => App.onCardClick(iid, 'life_card'));
+      } else {
+        slot.textContent = '✕';
+      }
+      container.appendChild(slot);
+    }
   }
 
   function renderHand(cards) {

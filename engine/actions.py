@@ -508,6 +508,10 @@ def activate_horde(
         raise ActionError("Attivazione Orda non disponibile in questa fase.")
 
     player = _require_current_player(state, player_id)
+
+    if player.horde_used_this_turn:
+        raise ActionError("Hai già attivato un'Orda questo turno.")
+
     hordes = player.check_horde()
 
     # Trova la Specie della carta Orda selezionata
@@ -530,6 +534,7 @@ def activate_horde(
     result = apply_effect(horde_effect_id, state, player,
                           warrior_iid=warrior_instance_id, **kwargs)
 
+    player.horde_used_this_turn = True
     state.add_log(player_id, "activate_horde", species=species,
                   horde_card=horde_card_id, effect=horde_effect_id, result=result)
     return {"species": species, "horde_card": horde_card_id, "effect": result}

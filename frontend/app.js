@@ -68,6 +68,7 @@ const App = (() => {
     document.getElementById('btn-start').addEventListener('click', onStartGame);
     document.getElementById('btn-end-turn').addEventListener('click', onEndTurn);
     document.getElementById('btn-battle').addEventListener('click', onBattleClick);
+    document.getElementById('btn-horde').addEventListener('click', onHordeClick);
 
     // Banner azione
     document.getElementById('banner-btn-play').addEventListener('click', enterPlayCardMode);
@@ -278,6 +279,13 @@ const App = (() => {
 
     if (!currentState) return;
     const isMyTurn = currentState.current_player_id === myPlayerId;
+    const player = currentState.players.find(p => p.id === myPlayerId);
+
+    // Horde button: visible when it's my turn, hordes available, not yet used
+    const hasHorde = isMyTurn && player &&
+      player.available_hordes && player.available_hordes.length > 0 &&
+      !player.horde_used_this_turn;
+    document.getElementById('btn-horde').classList.toggle('hidden', !hasHorde);
 
     if (!isMyTurn) {
       document.getElementById('action-banner').classList.add('hidden');
@@ -286,7 +294,6 @@ const App = (() => {
       return;
     }
 
-    const player = currentState.players.find(p => p.id === myPlayerId);
     if (!player || player.actions_remaining <= 0) {
       document.getElementById('action-banner').classList.add('hidden');
       document.getElementById('action-hint').textContent = 'Nessuna azione rimasta. Puoi attaccare o finire il turno.';
@@ -294,6 +301,50 @@ const App = (() => {
     }
 
     _showBanner(player);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Orda
+  // ---------------------------------------------------------------------------
+
+  function onHordeClick() {
+    if (!currentState || currentState.current_player_id !== myPlayerId) return;
+    const player = currentState.players.find(p => p.id === myPlayerId);
+    if (!player) return;
+
+    if (player.horde_used_this_turn) {
+      Renderer.toast("Hai già attivato un'Orda questo turno", 'error');
+      return;
+    }
+
+    const hordes = player.available_hordes || [];
+    if (hordes.length === 0) {
+      Renderer.toast('Nessuna Orda disponibile', 'error');
+      return;
+    }
+
+    const zoneNames = {
+      vanguard: 'Avanscoperta',
+      bastion_left: 'Bastione Sin.',
+      bastion_right: 'Bastione Des.',
+    };
+    const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+
+    const options = [];
+    for (const horde of hordes) {
+      const zoneName = zoneNames[horde.zone] || horde.zone;
+      for (const w of horde.warriors) {
+        options.push({
+          label: `[${cap(horde.species)}, ${zoneName}] ${w.name}: ${w.horde_effect}`,
+          value: `${w.base_card_id}|${w.instance_id}`,
+        });
+      }
+    }
+
+    Renderer.showChoiceModal('Attiva Effetto Orda', options, (choice) => {
+      const [hordeCArId, warriorIId] = choice.split('|');
+      sendAction('horde', { horde_card_id: hordeCArId, warrior_instance_id: warriorIId });
+    });
   }
 
   function _showBanner(player) {
@@ -458,7 +509,7 @@ const App = (() => {
     }
 
     // In tutti gli altri casi: mostra il dettaglio della carta
-    showCardDetail(instanceId, source);
+    showCardDetail(instanceId, source === 'life_card' ? 'life_card' : source);
   }
 
   // Costruisce e mostra il pannello di dettaglio per qualsiasi carta

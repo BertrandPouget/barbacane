@@ -59,7 +59,6 @@ def create_game(player_names: List[str], game_id: Optional[str] = None) -> GameS
         Player(
             id=f"player_{i+1}",
             name=name,
-            lives=3,
             mana=0,
             mana_remaining=0,
             actions_remaining=2,
@@ -80,9 +79,15 @@ def create_game(player_names: List[str], game_id: Optional[str] = None) -> GameS
         battles_remaining=1,
     )
 
-    # Distribuisce 5 carte a ogni giocatore
+    # Distribuisce 3 carte-vita a ogni giocatore (pescate dal mazzo)
     for player in players:
-        draw_cards(state, player.id, 5)
+        for _ in range(3):
+            if state.deck:
+                player.life_cards.append(state.deck.pop(0))
+
+    # Distribuisce 6 carte in mano a ogni giocatore
+    for player in players:
+        draw_cards(state, player.id, 6)
 
     # Assegna il Mana iniziale al primo giocatore
     _begin_turn(state)
@@ -105,11 +110,14 @@ def _begin_turn(state: GameState) -> None:
 
     # Reset stato turno
     player.actions_remaining = 2
+    player.horde_used_this_turn = False
     state.phase = "action"
     state.battle_done_this_turn = False
     state.battles_remaining = 1 + player.extra_battles
     player.extra_battles = 0
 
+    # Rimuovi i bonus stat da effetti Orda del turno precedente
+    _clear_horde_stat_effects(player)
     # Pulisce modificatori temporanei da effetti "end_of_turn" precedenti
     _clear_turn_expired_effects(player)
 
@@ -146,6 +154,22 @@ def _trigger_building_end(state: GameState, player: Player) -> None:
             continue
         if base_id in ("granaio",):
             apply_effect(card.effect_id, state, player, completed=b_inst.completed, trigger="end")
+
+
+def _clear_horde_stat_effects(player: Player) -> None:
+    """Rimuove i bonus stat applicati dall'effetto Orda del turno precedente."""
+    to_remove = []
+    for eff in player.active_effects:
+        if eff.get("type") == "horde_stat_bonus":
+            for w in player.all_warriors():
+                if w.instance_id == eff.get("warrior_iid"):
+                    for stat in ("att", "git", "dif"):
+                        bonus = eff.get(stat, 0)
+                        if bonus:
+                            w.temp_modifiers[stat] = max(0, w.temp_modifiers.get(stat, 0) - bonus)
+            to_remove.append(eff)
+    for eff in to_remove:
+        player.active_effects.remove(eff)
 
 
 def _clear_turn_expired_effects(player: Player) -> None:
@@ -185,9 +209,9 @@ def end_turn(state: GameState) -> GameState:
     # Fase finale: effetti costruzioni a fine turno
     _trigger_building_end(state, player)
 
-    # Pesca fino al limite (5 carte di default)
+    # Pesca fino al limite (6 carte di default)
     from engine.deck import draw_to_hand_limit
-    draw_to_hand_limit(state, player.id, limit=5)
+    draw_to_hand_limit(state, player.id, limit=6)
 
     # Pulisci effetti scaduti a fine turno
     _clear_turn_expired_effects(player)
@@ -320,8 +344,11 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
             "id": p.id,
             "name": p.name,
             "lives": p.lives,
+            "life_cards": p.life_cards if p.id == viewer_player_id else None,
             "mana_remaining": p.mana_remaining if p.id == viewer_player_id else None,
             "actions_remaining": p.actions_remaining if p.id == viewer_player_id else None,
+            "horde_used_this_turn": p.horde_used_this_turn if p.id == viewer_player_id else None,
+            "available_hordes": _available_hordes(p) if p.id == viewer_player_id else None,
             "hand_count": len(p.hand),
             "hand": p.hand if p.id == viewer_player_id else None,
             "field": {
@@ -360,6 +387,33 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
         "winner_id": state.winner_id,
         "battles_remaining": state.battles_remaining,
     }
+
+
+def _available_hordes(player: Player) -> list:
+    """Ritorna le Orde disponibili per il giocatore con info sugli effetti."""
+    result = []
+    for horde in player.check_horde_with_zones():
+        warrior_data = []
+        seen_effects: set = set()
+        for w in horde["warriors"]:
+            card = get_card(w.base_card_id)
+            if not isinstance(card, WarriorCard):
+                continue
+            if card.horde_effect_id and card.horde_effect_id not in seen_effects:
+                seen_effects.add(card.horde_effect_id)
+                warrior_data.append({
+                    "instance_id": w.instance_id,
+                    "base_card_id": w.base_card_id,
+                    "name": card.name,
+                    "horde_effect": card.horde_effect,
+                })
+        if warrior_data:
+            result.append({
+                "species": horde["species"],
+                "zone": horde["zone"],
+                "warriors": warrior_data,
+            })
+    return result
 
 
 def _warrior_view(w: WarriorInstance) -> dict:

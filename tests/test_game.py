@@ -28,16 +28,16 @@ class TestSetup:
         assert len(state.players) == 2
         assert state.turn == 1
         assert state.game_id is not None
-        # Ogni giocatore ha 5 carte
+        # Ogni giocatore ha 6 carte
         for p in state.players:
-            assert len(p.hand) == 5
+            assert len(p.hand) == 6
             assert p.lives == 3
 
     def test_create_game_4_players(self):
         state = create_game(["A", "B", "C", "D"])
         assert len(state.players) == 4
         for p in state.players:
-            assert len(p.hand) == 5
+            assert len(p.hand) == 6
 
     def test_create_game_invalid_players(self):
         with pytest.raises(ValueError):
@@ -101,7 +101,7 @@ class TestTurn:
         end_turn(state)
         assert state.current_player_index != first_idx
 
-    def test_end_turn_draws_to_5(self):
+    def test_end_turn_draws_to_6(self):
         state = create_game(["Alice", "Bob"])
         player = state.current_player
         # Usa tutte le carte

@@ -103,7 +103,10 @@
         <div class="region-label-vert">Bastione Destro</div>
       </div>
       <div id="my-stats" class="player-stats">
-        <span id="my-lives">Vite: 3</span>
+        <div class="life-cards-row">
+          <span class="life-label">Vite:</span>
+          <div id="my-life-cards" class="life-cards-container"></div>
+        </div>
         <span id="my-mana">Mana: 0</span>
         <span id="my-actions">Azioni: 2</span>
       </div>
@@ -145,6 +148,7 @@
 
     <div style="flex:1"></div>
 
+    <button id="btn-horde"    class="btn btn-warning hidden">⚡ Orda</button>
     <button id="btn-battle"   class="btn btn-warning">⚔ Attacca</button>
     <button id="btn-end-turn" class="btn btn-danger">Fine Turno</button>
   </div>
