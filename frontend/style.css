@@ -721,6 +721,193 @@ input:focus {
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-gold); }
 
+/* ==================== CARD DETAIL ==================== */
+
+#card-detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#card-detail-overlay.hidden { display: none !important; }
+
+#card-detail-box {
+  background: var(--bg-medium);
+  border: 2px solid var(--border-gold);
+  border-radius: 10px;
+  padding: 1.5rem;
+  min-width: 300px;
+  max-width: 440px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.card-detail-title {
+  font-size: 1.3rem;
+  color: var(--gold-light);
+  font-weight: bold;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+}
+
+.card-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.detail-meta {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.detail-stats {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 1.1rem;
+  padding: 0.3rem 0;
+}
+
+.detail-section {
+  background: var(--bg-dark);
+  border-radius: 4px;
+  padding: 0.5rem 0.8rem;
+  line-height: 1.5;
+  border-left: 3px solid var(--border);
+}
+
+.detail-prodigy { border-left-color: var(--blue-light); }
+.detail-gold    { border-left-color: var(--gold); }
+
+.detail-dim {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+#card-detail-footer {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  padding-top: 0.3rem;
+}
+
+/* ==================== BANNER AZIONE ==================== */
+
+#action-banner {
+  background: var(--bg-dark);
+  border: 1px solid var(--border-gold);
+  border-radius: 6px;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.banner-label {
+  font-size: 0.7rem;
+  color: var(--gold);
+  font-weight: bold;
+  text-align: center;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.1rem;
+}
+
+.banner-btn {
+  width: 100%;
+  padding: 0.5rem 0.4rem;
+  background: var(--bg-light);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+
+.banner-btn:hover:not(:disabled) {
+  border-color: var(--gold);
+  background: var(--bg-medium);
+  transform: translateX(2px);
+}
+
+.banner-btn:active:not(:disabled) { transform: translateX(1px); }
+
+.banner-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ==================== WALL STAGING ==================== */
+
+#wall-staging {
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.wall-stage-header {
+  font-size: 0.75rem;
+  color: var(--gold);
+  font-weight: bold;
+  text-align: center;
+}
+
+.wall-entry {
+  background: var(--bg-medium);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.3rem 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.wall-entry-name {
+  font-size: 0.7rem;
+  color: var(--gold-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wall-entry-btns {
+  display: flex;
+  gap: 2px;
+}
+
+.wall-entry-btns .btn-small {
+  flex: 1;
+  padding: 0.15rem 0.2rem;
+  font-size: 0.65rem;
+  text-align: center;
+}
+
+/* Carta selezionata come muro (in mano) */
+.card.wall-marked {
+  border-color: #8a6a20;
+  box-shadow: 0 0 6px rgba(138, 106, 32, 0.7);
+  background: #2a1f0f;
+  transform: translateY(-3px);
+}
+
 /* Responsive: se lo schermo è stretto, rendi le carte più piccole */
 @media (max-width: 900px) {
   :root {

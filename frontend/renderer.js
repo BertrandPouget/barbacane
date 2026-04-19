@@ -291,7 +291,15 @@ const Renderer = (() => {
   }
 
   function renderCardSmall(warrior, interactive) {
-    return renderWarriorCard(warrior, true, interactive);
+    const div = renderWarriorCard(warrior, true, interactive);
+    if (!interactive) {
+      div.style.cursor = 'pointer';
+      div.addEventListener('click', (e) => {
+        e.stopPropagation();
+        App.onCardClick(warrior.instance_id, 'opponent');
+      });
+    }
+    return div;
   }
 
   function renderBuildingSmall(b) {
@@ -300,6 +308,11 @@ const Renderer = (() => {
       dataset: { type: 'building', instanceId: b.instance_id }
     });
     div.appendChild(el('div', { className: 'card-name' }, [b.name || b.base_card_id]));
+    div.style.cursor = 'pointer';
+    div.addEventListener('click', (e) => {
+      e.stopPropagation();
+      App.onCardClick(b.instance_id, 'opponent');
+    });
     return div;
   }
 
@@ -322,15 +335,9 @@ const Renderer = (() => {
 
   function updateActionPanel(state, myPlayerId) {
     const isMyTurn = state.current_player_id === myPlayerId;
-    const btnEnd   = document.getElementById('btn-end-turn');
-    const btnBtl   = document.getElementById('btn-battle');
-
-    btnEnd.disabled = !isMyTurn;
-    btnBtl.disabled = !isMyTurn || state.battles_remaining <= 0;
-
-    document.getElementById('action-hint').textContent = isMyTurn
-      ? 'È il tuo turno. Clicca una carta in mano per giocarla.'
-      : `In attesa di ${getPlayerName(state, state.current_player_id)}...`;
+    document.getElementById('btn-end-turn').disabled = !isMyTurn;
+    document.getElementById('btn-battle').disabled   = !isMyTurn || state.battles_remaining <= 0;
+    // action-hint e banner sono gestiti da App._refreshActionUI()
   }
 
   function showTimerWarning(secondsLeft) {
@@ -349,6 +356,33 @@ const Renderer = (() => {
 
   function updateBattleLog(text) {
     document.getElementById('battle-log').textContent = text;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Card detail overlay
+  // ---------------------------------------------------------------------------
+
+  function showCardDetail(title, bodyHTML, actionLabel, onAction) {
+    document.getElementById('card-detail-title').textContent = title;
+    document.getElementById('card-detail-body').innerHTML = bodyHTML;
+
+    const actionBtn = document.getElementById('card-detail-action-btn');
+    if (actionLabel && onAction) {
+      actionBtn.textContent = actionLabel;
+      actionBtn.onclick = onAction;
+      actionBtn.classList.remove('hidden');
+    } else {
+      actionBtn.classList.add('hidden');
+    }
+
+    const overlay = document.getElementById('card-detail-overlay');
+    overlay.classList.remove('hidden');
+    document.getElementById('card-detail-close').onclick = () => overlay.classList.add('hidden');
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.add('hidden'); };
+  }
+
+  function closeCardDetail() {
+    document.getElementById('card-detail-overlay').classList.add('hidden');
   }
 
   // ---------------------------------------------------------------------------
@@ -485,6 +519,8 @@ const Renderer = (() => {
     showScreen,
     showModal,
     showChoiceModal,
+    showCardDetail,
+    closeCardDetail,
     toast,
     showGameOver,
     showTimerWarning,

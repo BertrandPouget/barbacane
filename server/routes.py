@@ -200,8 +200,7 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
         ),
         "add_wall": lambda: add_wall(
             state, player_id,
-            params["instance_id"],
-            params.get("bastion_side", "left"),
+            params["walls"],
         ),
         "reposition": lambda: reposition_warrior(
             state, player_id,

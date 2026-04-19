@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import pytest
 from engine.game import create_game
 from engine.battle import (
+    ActionError,
     calculate_damage,
     attacker_stats,
     defender_stats,
@@ -35,8 +36,12 @@ class TestAdiacenza:
 
     def test_valid_targets(self):
         state = create_game(["A", "B"])
-        targets = get_valid_attack_targets(state)
-        assert len(targets) == 2  # Bastione sinistro e destro dell'avversario
+        # Senza guerrieri in avanscoperta → nessun bersaglio valido
+        assert get_valid_attack_targets(state) == []
+        # Con un guerriero → 2 bersagli (bastione sinistro e destro dell'avversario)
+        w = make_warrior_instance("orfeo_1")
+        state.players[state.current_player_index].field.vanguard.append(w)
+        assert len(get_valid_attack_targets(state)) == 2
 
 
 class TestDanni:
@@ -87,11 +92,10 @@ class TestBattliaCompleta:
 
         return state, attacker, defender
 
-    def test_no_warriors_no_damage(self):
+    def test_no_warriors_cannot_attack(self):
         state, att, deff = self._setup_battle()
-        result = resolve_battle(state, 0, 1, "left")
-        assert result["total_damage"] == 0
-        assert result["life_lost"] == 0
+        with pytest.raises(ActionError):
+            resolve_battle(state, 0, 1, "left")
 
     def test_walls_absorb_damage(self):
         # ATT=4, DIF=0 → danno=4; con 4 muri → 0 vite perse
@@ -112,7 +116,8 @@ class TestBattliaCompleta:
         assert state.players[1].lives == 2
 
     def test_battle_log_recorded(self):
-        state, att, deff = self._setup_battle()
+        w = make_warrior_instance("orfeo_1")
+        state, att, deff = self._setup_battle([w])
         initial_log_len = len(state.log)
         resolve_battle(state, 0, 1, "left")
         assert len(state.log) > initial_log_len

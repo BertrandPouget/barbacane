@@ -484,12 +484,13 @@ def _bot_try_action(state: GameState, player: Player) -> None:
                 except ActionError:
                     continue
 
-    # Ultimo resort: aggiungi un muro
+    # Ultimo resort: aggiungi fino a 3 muri
     if player.hand:
-        iid = random.choice(player.hand)
-        side = random.choice(["left", "right"])
+        n = min(3, len(player.hand))
+        chosen = random.sample(player.hand, n)
+        walls = [{"instance_id": iid, "bastion": random.choice(["left", "right"])} for iid in chosen]
         try:
-            add_wall(state, player.id, iid, side)
+            add_wall(state, player.id, walls)
         except ActionError:
             pass
 

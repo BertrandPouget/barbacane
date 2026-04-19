@@ -4,16 +4,15 @@ Subito
 - vedere tutta la descrizione di una carta premendola
 - vite prese dal mazzo
 - bug game.py BuildingInstance WarriorInstance
+- orda implementata
 
 Dopo
-- implementare effetti mancanti
+- implementare effetti mancanti (es. D10)
 - giocare online
+- fixare evoluzioni
 
 Opzionale
 - giocare su rete locale, non su computer locale
 - rimuovere azioni da homepage
 - utilizzare logo
-
-Ho deciso di cambiare una regola. L'azione aggiungere 1 muro era troppo scarsa. Viene sostituita dall'azione aggiungere fino a 3 muri. Si intende che il giocatore può convertire fino a 3 carte in muri con una singola azione. Le carte possono essere aggiunte ai bastioni in qualsiasi combinazione (quindi per es vale 2+1, 3+0, 1+2, ma anche 1+1 o 0+1 ecc). Devi modificare sia il codice che il file CLAUDE.md dove questa regola era spiegata diversamente.
-
-Inoltre, non è possibile attaccare in battaglia se non si hanno guerrieri in avanguardia (non basta quindi avere una catpulta o un'ariete). Carte come Ardolancio che infliggono Danno continuano a funzionare.
+- timer funzionante

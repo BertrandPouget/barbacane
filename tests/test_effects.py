@@ -340,16 +340,21 @@ class TestAzioni:
 
     def test_add_wall(self):
         state, player = self._setup()
-        card_iid = player.hand[0]
-        add_wall(state, player.id, card_iid, "left")
-        assert len(player.field.bastion_left.walls) == 1
-        assert card_iid not in player.hand
+        c1, c2, c3 = player.hand[0], player.hand[1], player.hand[2]
+        add_wall(state, player.id, [
+            {"instance_id": c1, "bastion": "left"},
+            {"instance_id": c2, "bastion": "right"},
+            {"instance_id": c3, "bastion": "left"},
+        ])
+        assert len(player.field.bastion_left.walls) == 2
+        assert len(player.field.bastion_right.walls) == 1
+        assert c1 not in player.hand
 
     def test_add_wall_no_actions(self):
         state, player = self._setup()
         player.actions_remaining = 0
         with pytest.raises(ActionError):
-            add_wall(state, player.id, player.hand[0], "left")
+            add_wall(state, player.id, [{"instance_id": player.hand[0], "bastion": "left"}])
 
     def test_all_effects_registered(self):
         """Verifica che tutti gli effect_id delle carte abbiano un handler."""

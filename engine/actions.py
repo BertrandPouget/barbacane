@@ -384,37 +384,50 @@ def complete_building(
 
 
 # ---------------------------------------------------------------------------
-# 6. Aggiungi Muro
+# 6. Aggiungi Muri (fino a 3 con una singola azione)
 # ---------------------------------------------------------------------------
 
 def add_wall(
     state: GameState,
     player_id: str,
-    instance_id: str,   # carta dalla mano da usare come Muro
-    bastion_side: str,  # "left" | "right"
+    walls: list,  # [{"instance_id": str, "bastion": "left"|"right"}, ...]  1–3 elementi
 ) -> dict:
     """
-    Usa una carta dalla mano come Muro in un Bastione.
-    La carta perde ogni altra funzione. Consuma 1 Azione. Nessun costo Mana.
+    Converte fino a 3 carte dalla mano in Muri, distribuibili tra i due Bastioni
+    in qualsiasi combinazione. Consuma 1 Azione. Nessun costo Mana.
     """
     player = _require_current_player(state, player_id)
     _require_actions(player)
-    _require_in_hand(player, instance_id)
 
-    if bastion_side not in ("left", "right"):
-        raise ActionError(f"Lato Bastione non valido: {bastion_side}.")
+    if not walls or len(walls) > 3:
+        raise ActionError("Devi specificare da 1 a 3 carte da convertire in Muro.")
 
-    player.hand.remove(instance_id)
+    for entry in walls:
+        if entry.get("bastion") not in ("left", "right"):
+            raise ActionError(f"Lato Bastione non valido: {entry.get('bastion')}.")
+        _require_in_hand(player, entry["instance_id"])
+
+    # Verifica che non ci siano duplicati
+    ids = [e["instance_id"] for e in walls]
+    if len(ids) != len(set(ids)):
+        raise ActionError("Non puoi usare la stessa carta due volte.")
+
     player.actions_remaining -= 1
 
-    wall = make_wall_instance(instance_id)
-    if bastion_side == "left":
-        player.field.bastion_left.walls.append(wall)
-    else:
-        player.field.bastion_right.walls.append(wall)
+    placed = []
+    for entry in walls:
+        iid = entry["instance_id"]
+        side = entry["bastion"]
+        player.hand.remove(iid)
+        wall = make_wall_instance(iid)
+        if side == "left":
+            player.field.bastion_left.walls.append(wall)
+        else:
+            player.field.bastion_right.walls.append(wall)
+        placed.append({"card": iid, "bastion": side})
 
-    state.add_log(player_id, "add_wall", card=instance_id, bastion=bastion_side)
-    return {"card": instance_id, "bastion": bastion_side}
+    state.add_log(player_id, "add_wall", walls=placed)
+    return {"walls": placed}
 
 
 # ---------------------------------------------------------------------------

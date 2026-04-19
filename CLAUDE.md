@@ -280,11 +280,11 @@ Il turno di un giocatore segue questi passi in ordine:
    - Turni 5–6: 3 Mana
    - Turni 7–9: 4 Mana
    - Turni 10+: 5 Mana
-2. **Azione 1** (opzionale): Giocare una carta, Completare una Costruzione, Aggiungere un Muro.
+2. **Azione 1** (opzionale): Giocare una carta, Completare una Costruzione, Aggiungere fino a 3 Muri.
 3. **Azione 2** (opzionale): idem.
 4. **Riposiziona Guerrieri** tra Avanscoperta e Bastioni a piacimento.
 5. **Attiva Orde**: per ogni Orda (3 Guerrieri stessa Specie), scegli quale effetto Orda attivare.
-6. **Battaglia** (opzionale): attacca un Bastione adiacente di un avversario.
+6. **Battaglia** (opzionale): attacca un Bastione adiacente di un avversario. Richiede almeno un Guerriero in Avanscoperta (costruzioni come Ariete/Catapulta non bastano).
 7. **Pesca** fino a 5 carte in mano (o il limite modificato da carte in gioco). Se ne hai già di più, non scarti.
 
 Gli effetti di Costruzioni e Magie si attivano nel momento indicato dalla carta, indipendentemente dai passi.
@@ -293,7 +293,7 @@ Gli effetti di Costruzioni e Magie si attivano nel momento indicato dalla carta,
 
 - **Giocare una carta**: spendi Mana (Guerrieri/Costruzioni) o richiedi Maghe in campo (Magie). Posiziona nelle Regioni appropriate.
 - **Completare una Costruzione**: spendi Mana di completamento, ruota la carta da orizzontale a verticale.
-- **Aggiungere un Muro**: qualsiasi carta dalla mano diventa un Muro a faccia in giù in un Bastione.
+- **Aggiungere fino a 3 Muri**: il giocatore sceglie da 1 a 3 carte dalla mano e le converte in Muri a faccia in giù, distribuendole tra i due Bastioni in qualsiasi combinazione (es. 3+0, 2+1, 1+0, ecc.). L'intera operazione consuma 1 sola Azione.
 
 ### Carte — Tipologie
 

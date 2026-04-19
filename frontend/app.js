@@ -1,6 +1,5 @@
 /**
  * app.js — Logica principale del client Barbacane
- * Gestisce il flusso UI: lobby, attesa, gioco.
  */
 
 const App = (() => {
@@ -15,14 +14,15 @@ const App = (() => {
   let gameId = null;
   let isCreator = false;
   let currentState = null;
-  let cardDefs = {};        // base_card_id → definizione carta
-  let instanceMap = {};     // instance_id → base_card_id
+  let cardDefs = {};
+  let instanceMap = {};
+  let selectedCard = null;
 
-  // Selezione interazione
-  let selectedCard = null;  // { instanceId, source: 'hand'|'field'|'village' }
-  let pendingAction = null; // { type, ... }
+  // Macchina a stati per le azioni del turno
+  let actionMode = null;    // null | 'play_card' | 'complete_building' | 'add_walls'
+  let wallsSelected = [];   // [{instanceId, bastion: 'left'|'right'}]
 
-  // Timer countdown locale
+  // Timer
   let timerInterval = null;
   let timerSecondsLeft = 0;
 
@@ -43,7 +43,6 @@ const App = (() => {
       [...data.warriors, ...data.spells, ...data.buildings].forEach(c => {
         cardDefs[c.id] = c;
       });
-      // Popola instanceMap (per ora solo le copie standard)
       Object.values(cardDefs).forEach(c => {
         for (let i = 1; i <= c.copies; i++) {
           instanceMap[`${c.id}_${i}`] = c.id;
@@ -70,7 +69,13 @@ const App = (() => {
     document.getElementById('btn-end-turn').addEventListener('click', onEndTurn);
     document.getElementById('btn-battle').addEventListener('click', onBattleClick);
 
-    // Normalizza il codice lobby mentre si digita
+    // Banner azione
+    document.getElementById('banner-btn-play').addEventListener('click', enterPlayCardMode);
+    document.getElementById('banner-btn-complete').addEventListener('click', enterCompleteBuildingMode);
+    document.getElementById('banner-btn-wall').addEventListener('click', enterAddWallsMode);
+    document.getElementById('btn-cancel-action').addEventListener('click', cancelActionMode);
+    document.getElementById('wall-confirm-btn').addEventListener('click', confirmWalls);
+
     document.getElementById('join-code').addEventListener('input', e => {
       e.target.value = e.target.value.toUpperCase();
     });
@@ -80,7 +85,6 @@ const App = (() => {
     const name = document.getElementById('create-name').value.trim();
     const timer = parseInt(document.getElementById('create-timer').value) || 120;
     if (!name) { Renderer.toast('Inserisci il tuo nome', 'error'); return; }
-
     try {
       const res = await api('/lobby/create', { player_name: name, turn_timer: timer });
       sessionToken = res.session_token;
@@ -99,7 +103,6 @@ const App = (() => {
     const code = document.getElementById('join-code').value.trim().toUpperCase();
     if (!name) { Renderer.toast('Inserisci il tuo nome', 'error'); return; }
     if (!code) { Renderer.toast('Inserisci il codice lobby', 'error'); return; }
-
     try {
       const res = await api('/lobby/join', { lobby_code: code, player_name: name });
       sessionToken = res.session_token;
@@ -146,15 +149,10 @@ const App = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // WebSocket (usato anche per la sala d'attesa)
+  // WebSocket / polling lobby
   // ---------------------------------------------------------------------------
 
-  function connectWS() {
-    // Per la sala d'attesa usiamo polling leggero (WS si connette solo dopo game_id)
-    // Il WS vero si connette quando la partita inizia
-    // Per aggiornamenti lobby usiamo polling ogni 2s
-    startLobbyPolling();
-  }
+  function connectWS() { startLobbyPolling(); }
 
   let lobbyPollTimer = null;
 
@@ -165,9 +163,6 @@ const App = (() => {
         const lobby = await apiFetch(`/lobby/${lobbyCode}`);
         updateWaitingPlayers(lobby.players);
         document.getElementById('btn-start').disabled = !lobby.can_start;
-
-        // Se la partita è iniziata (il creatore ha premuto Start),
-        // entra automaticamente nella schermata di gioco
         if (lobby.game_id && !gameId) {
           stopLobbyPolling();
           gameId = lobby.game_id;
@@ -178,10 +173,7 @@ const App = (() => {
     }, 2000);
   }
 
-  function stopLobbyPolling() {
-    clearInterval(lobbyPollTimer);
-    lobbyPollTimer = null;
-  }
+  function stopLobbyPolling() { clearInterval(lobbyPollTimer); lobbyPollTimer = null; }
 
   function connectGameWS() {
     if (!gameId || !myPlayerId) return;
@@ -190,28 +182,17 @@ const App = (() => {
     WS.on('state_update', (msg) => {
       if (msg.state) onStateUpdate(msg.state, msg.action, msg.result);
     });
-
     WS.on('game_started', (msg) => {
       if (msg.state) enterGame(msg.state);
     });
-
     WS.on('turn_warning', (msg) => {
       timerSecondsLeft = msg.seconds_left;
       Renderer.showTimerWarning(timerSecondsLeft);
       startLocalTimer(timerSecondsLeft);
     });
-
-    WS.on('player_connected', (msg) => {
-      Renderer.toast(`${msg.player_id} si è connesso`, 'success');
-    });
-
-    WS.on('player_disconnected', (msg) => {
-      Renderer.toast(`${msg.player_id} si è disconnesso`, 'error');
-    });
-
-    WS.on('error', (msg) => {
-      Renderer.toast(msg.message || 'Errore', 'error');
-    });
+    WS.on('player_connected',    (msg) => Renderer.toast(`${msg.player_id} si è connesso`, 'success'));
+    WS.on('player_disconnected', (msg) => Renderer.toast(`${msg.player_id} si è disconnesso`, 'error'));
+    WS.on('error', (msg) => Renderer.toast(msg.message || 'Errore', 'error'));
   }
 
   function onStateUpdate(state, action, result) {
@@ -229,7 +210,6 @@ const App = (() => {
           }
         }
       }
-
       if (action === 'battle' && result) {
         const log = `⚔ ${result.attacker_id} → ${result.defender_id} [${result.defender_bastion}]: `
           + `${result.total_damage} Danni, ${result.walls_destroyed} Muri, ${result.life_lost} Vita`;
@@ -241,10 +221,10 @@ const App = (() => {
       setTimeout(() => Renderer.showGameOver(state), 800);
     }
 
-    // Reset selezione dopo ogni azione
-    clearSelection();
+    // Chiudi eventuale modale aperta e aggiorna la UI azioni
+    document.getElementById('modal-overlay').classList.add('hidden');
+    _refreshActionUI();
 
-    // Aggiorna timer
     if (state.current_player_id === myPlayerId) {
       Renderer.hideTimer();
       stopLocalTimer();
@@ -252,7 +232,7 @@ const App = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Schermata di gioco
+  // Gioco
   // ---------------------------------------------------------------------------
 
   function enterGame(state) {
@@ -262,10 +242,11 @@ const App = (() => {
     connectGameWS();
     Renderer.showScreen('game');
     Renderer.render(state, myPlayerId);
+    _refreshActionUI();
   }
 
   // ---------------------------------------------------------------------------
-  // Timer locale (countdown visuale)
+  // Timer locale
   // ---------------------------------------------------------------------------
 
   function startLocalTimer(seconds) {
@@ -273,18 +254,193 @@ const App = (() => {
     timerSecondsLeft = seconds;
     timerInterval = setInterval(() => {
       timerSecondsLeft--;
-      if (timerSecondsLeft <= 0) {
-        stopLocalTimer();
-        Renderer.hideTimer();
-      } else {
-        Renderer.showTimerWarning(timerSecondsLeft);
-      }
+      if (timerSecondsLeft <= 0) { stopLocalTimer(); Renderer.hideTimer(); }
+      else Renderer.showTimerWarning(timerSecondsLeft);
     }, 1000);
   }
 
-  function stopLocalTimer() {
-    clearInterval(timerInterval);
-    timerInterval = null;
+  function stopLocalTimer() { clearInterval(timerInterval); timerInterval = null; }
+
+  // ---------------------------------------------------------------------------
+  // Macchina a stati per le azioni
+  // ---------------------------------------------------------------------------
+
+  function _refreshActionUI() {
+    // Resetta lo stato azione dopo ogni aggiornamento server
+    actionMode = null;
+    wallsSelected = [];
+    selectedCard = null;
+
+    document.getElementById('wall-staging').classList.add('hidden');
+    document.getElementById('btn-cancel-action').classList.add('hidden');
+    document.getElementById('selection-info').classList.add('hidden');
+    document.querySelectorAll('#hand-cards .card.wall-marked').forEach(c => c.classList.remove('wall-marked'));
+
+    if (!currentState) return;
+    const isMyTurn = currentState.current_player_id === myPlayerId;
+
+    if (!isMyTurn) {
+      document.getElementById('action-banner').classList.add('hidden');
+      const name = (currentState.players.find(p => p.id === currentState.current_player_id) || {}).name || '…';
+      document.getElementById('action-hint').textContent = `In attesa di ${name}…`;
+      return;
+    }
+
+    const player = currentState.players.find(p => p.id === myPlayerId);
+    if (!player || player.actions_remaining <= 0) {
+      document.getElementById('action-banner').classList.add('hidden');
+      document.getElementById('action-hint').textContent = 'Nessuna azione rimasta. Puoi attaccare o finire il turno.';
+      return;
+    }
+
+    _showBanner(player);
+  }
+
+  function _showBanner(player) {
+    const actNum = 3 - player.actions_remaining; // 1 o 2
+    document.getElementById('banner-turn-label').textContent = `Azione ${actNum} di 2`;
+
+    const hasCards = player.hand && player.hand.length > 0;
+    const hasIncomplete = (player.field.village.buildings || []).some(b => !b.completed);
+
+    document.getElementById('banner-btn-play').disabled     = !hasCards;
+    document.getElementById('banner-btn-complete').disabled = !hasIncomplete;
+    document.getElementById('banner-btn-wall').disabled     = !hasCards;
+
+    document.getElementById('action-banner').classList.remove('hidden');
+    document.getElementById('action-hint').textContent = '';
+  }
+
+  function enterPlayCardMode() {
+    if (!currentState || currentState.current_player_id !== myPlayerId) return;
+    actionMode = 'play_card';
+    document.getElementById('action-banner').classList.add('hidden');
+    document.getElementById('btn-cancel-action').classList.remove('hidden');
+    document.getElementById('action-hint').textContent = 'Clicca una carta dalla mano.';
+  }
+
+  function enterCompleteBuildingMode() {
+    if (!currentState || currentState.current_player_id !== myPlayerId) return;
+    const player = currentState.players.find(p => p.id === myPlayerId);
+    const buildings = (player.field.village.buildings || []).filter(b => !b.completed);
+    if (buildings.length === 0) return;
+
+    actionMode = 'complete_building';
+    document.getElementById('action-banner').classList.add('hidden');
+    document.getElementById('btn-cancel-action').classList.remove('hidden');
+    document.getElementById('action-hint').textContent = 'Scegli la costruzione da completare.';
+
+    Renderer.showChoiceModal(
+      'Completa una costruzione',
+      buildings.map(b => {
+        const def = getCardDef(b.instance_id);
+        return {
+          label: `${def ? def.name : b.base_card_id} — ${def ? def.completion_cost : '?'} Mana`,
+          value: b.instance_id,
+        };
+      }),
+      (instanceId) => sendAction('complete_building', { building_instance_id: instanceId }),
+    );
+  }
+
+  function enterAddWallsMode() {
+    if (!currentState || currentState.current_player_id !== myPlayerId) return;
+    actionMode = 'add_walls';
+    wallsSelected = [];
+    document.getElementById('action-banner').classList.add('hidden');
+    document.getElementById('btn-cancel-action').classList.remove('hidden');
+    document.getElementById('wall-staging').classList.remove('hidden');
+    document.getElementById('action-hint').textContent = 'Clicca carte dalla mano (max 3).';
+    renderWallStaging();
+  }
+
+  function cancelActionMode() {
+    actionMode = null;
+    wallsSelected = [];
+    selectedCard = null;
+    document.getElementById('wall-staging').classList.add('hidden');
+    document.getElementById('btn-cancel-action').classList.add('hidden');
+    document.getElementById('action-hint').textContent = '';
+    document.getElementById('selection-info').classList.add('hidden');
+    document.querySelectorAll('#hand-cards .card.wall-marked').forEach(c => c.classList.remove('wall-marked'));
+
+    if (!currentState || currentState.current_player_id !== myPlayerId) return;
+    const player = currentState.players.find(p => p.id === myPlayerId);
+    if (player && player.actions_remaining > 0) _showBanner(player);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Selezione muri
+  // ---------------------------------------------------------------------------
+
+  function toggleWallCard(instanceId) {
+    const idx = wallsSelected.findIndex(w => w.instanceId === instanceId);
+    if (idx >= 0) {
+      wallsSelected.splice(idx, 1);
+    } else {
+      if (wallsSelected.length >= 3) {
+        Renderer.toast('Massimo 3 muri per azione', 'error');
+        return;
+      }
+      wallsSelected.push({ instanceId, bastion: 'left' });
+    }
+    renderWallStaging();
+    _updateWallMarkings();
+  }
+
+  function _updateWallMarkings() {
+    document.querySelectorAll('#hand-cards .card').forEach(card => {
+      card.classList.toggle('wall-marked', !!wallsSelected.find(w => w.instanceId === card.dataset.instanceId));
+    });
+  }
+
+  function renderWallStaging() {
+    const list       = document.getElementById('wall-selected-list');
+    const countEl    = document.getElementById('wall-count');
+    const confirmBtn = document.getElementById('wall-confirm-btn');
+
+    countEl.textContent = wallsSelected.length;
+    confirmBtn.disabled = wallsSelected.length === 0;
+    list.innerHTML = '';
+
+    wallsSelected.forEach(w => {
+      const def = getCardDef(w.instanceId);
+      const row = document.createElement('div');
+      row.className = 'wall-entry';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'wall-entry-name';
+      nameEl.textContent = (def ? def.name : w.instanceId).substring(0, 14);
+      row.appendChild(nameEl);
+
+      const btns = document.createElement('div');
+      btns.className = 'wall-entry-btns';
+
+      const btnL = document.createElement('button');
+      btnL.textContent = 'Sin.';
+      btnL.className = `btn btn-small ${w.bastion === 'left' ? 'btn-primary' : 'btn-secondary'}`;
+      btnL.onclick = () => { w.bastion = 'left'; renderWallStaging(); };
+
+      const btnR = document.createElement('button');
+      btnR.textContent = 'Des.';
+      btnR.className = `btn btn-small ${w.bastion === 'right' ? 'btn-primary' : 'btn-secondary'}`;
+      btnR.onclick = () => { w.bastion = 'right'; renderWallStaging(); };
+
+      const btnX = document.createElement('button');
+      btnX.textContent = '×';
+      btnX.className = 'btn btn-small btn-danger';
+      btnX.onclick = () => { toggleWallCard(w.instanceId); };
+
+      btns.append(btnL, btnR, btnX);
+      row.appendChild(btns);
+      list.appendChild(row);
+    });
+  }
+
+  function confirmWalls() {
+    if (wallsSelected.length === 0) return;
+    const walls = wallsSelected.map(w => ({ instance_id: w.instanceId, bastion: w.bastion }));
+    sendAction('add_wall', { walls });
   }
 
   // ---------------------------------------------------------------------------
@@ -293,85 +449,126 @@ const App = (() => {
 
   function onCardClick(instanceId, source) {
     if (!currentState) return;
-    const isMyTurn = currentState.current_player_id === myPlayerId;
-    if (!isMyTurn) {
-      Renderer.toast('Non è il tuo turno', 'error');
+
+    // In modalità muro, il click sulla mano toglie/aggiunge la carta alla selezione
+    if (source === 'hand' && actionMode === 'add_walls') {
+      if (currentState.current_player_id !== myPlayerId) return;
+      toggleWallCard(instanceId);
       return;
     }
 
-    if (source === 'hand') {
-      onHandCardClick(instanceId);
-    } else if (source === 'field' || source === 'village') {
-      onFieldCardClick(instanceId, source);
-    }
+    // In tutti gli altri casi: mostra il dettaglio della carta
+    showCardDetail(instanceId, source);
   }
 
-  function onHandCardClick(instanceId) {
+  // Costruisce e mostra il pannello di dettaglio per qualsiasi carta
+  function showCardDetail(instanceId, source) {
     const def = getCardDef(instanceId);
-    if (!def) return;
+    const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 
-    // Se c'era già una selezione, deseleziona
-    if (selectedCard && selectedCard.instanceId === instanceId) {
-      clearSelection();
-      return;
-    }
-    clearSelection();
+    // Recupera dati contestuali dallo stato
+    let fieldWarrior = null;
+    let fieldBuilding = null;
+    if (currentState) {
+      for (const player of currentState.players) {
+        const w = [
+          ...(player.field.vanguard || []),
+          ...(player.field.bastion_left.warriors || []),
+          ...(player.field.bastion_right.warriors || []),
+        ].find(w => w.instance_id === instanceId);
+        if (w) { fieldWarrior = w; break; }
 
-    selectedCard = { instanceId, source: 'hand', def };
-
-    // Aggiorna UI selezione
-    const infoEl = document.getElementById('selection-info');
-    infoEl.classList.remove('hidden');
-    infoEl.innerHTML = `<strong>${def.name}</strong><br>${def.type === 'warrior' ? `⚔${def.att} 🏹${def.git} 🛡${def.dif}` : ''}`;
-
-    document.getElementById('action-hint').textContent = getPlayHint(def);
-
-    // Per le carte con destinazione chiara, mostra direttamente il modale
-    showPlayOptions(instanceId, def);
-  }
-
-  function onFieldCardClick(instanceId, source) {
-    const myPlayer = currentState.players.find(p => p.id === myPlayerId);
-    if (!myPlayer) return;
-
-    // Controlla se è una costruzione da completare
-    if (source === 'village') {
-      const building = myPlayer.field.village.buildings.find(b => b.instance_id === instanceId);
-      if (building && !building.completed) {
-        const def = getCardDef(instanceId);
-        Renderer.showModal(
-          `Completa ${def ? def.name : instanceId}`,
-          `Costo completamento: <strong>${def ? def.completion_cost : '?'} Mana</strong><br>${def ? def.complete_effect : ''}`,
-          () => sendAction('complete_building', { building_instance_id: instanceId }),
-        );
+        const b = (player.field.village.buildings || []).find(b => b.instance_id === instanceId);
+        if (b) { fieldBuilding = b; break; }
       }
-      return;
     }
 
-    // Guerriero in campo: permetti riposizionamento
-    Renderer.showChoiceModal(
-      'Riposiziona Guerriero',
-      [
-        { label: 'Avanscoperta', value: 'vanguard' },
-        { label: 'Bastione Sinistro', value: 'bastion_left' },
-        { label: 'Bastione Destro', value: 'bastion_right' },
-      ],
-      (dest) => sendAction('reposition', { warrior_instance_id: instanceId, destination: dest }),
-    );
-  }
+    // Costruisce il corpo HTML del dettaglio
+    let bodyHTML = '';
 
-  // Opzioni muro riutilizzabili
-  const _wallOpts = [
-    { label: '🧱 Muro Bastione Sinistro', value: 'wall_left' },
-    { label: '🧱 Muro Bastione Destro',   value: 'wall_right' },
-  ];
+    if (def && def.type === 'warrior') {
+      const att = fieldWarrior ? fieldWarrior.att : def.att;
+      const git = fieldWarrior ? fieldWarrior.git : def.git;
+      const dif = fieldWarrior ? fieldWarrior.dif : def.dif;
 
-  function _handleWallOrAction(choice, instanceId, actionFn) {
-    if (choice === 'wall_left' || choice === 'wall_right') {
-      sendAction('add_wall', { instance_id: instanceId, bastion_side: choice === 'wall_left' ? 'left' : 'right' });
+      bodyHTML += `<div class="detail-meta">
+        <span class="species-${def.species}">${cap(def.species)}</span>
+        ${def.school ? `· <span>${cap(def.school)}</span>` : ''}
+        · ${def.subtype === 'hero' ? 'Eroe' : 'Recluta'}
+        · ⚡${def.cost} Mana
+      </div>
+      <div class="detail-stats">
+        <span class="stat-att">⚔ ATT ${att}</span>
+        <span class="stat-git">🏹 GIT ${git}</span>
+        <span class="stat-dif">🛡 DIF ${dif}</span>
+      </div>`;
+      if (def.horde_effect) {
+        bodyHTML += `<div class="detail-section"><strong>⚡ Effetto Orda:</strong><br>${def.horde_effect}</div>`;
+      }
+      if (def.evolves_from) bodyHTML += `<div class="detail-dim">Evolve da: ${def.evolves_from}</div>`;
+      if (def.evolves_into) bodyHTML += `<div class="detail-dim">Evolve in: ${def.evolves_into}</div>`;
+
+    } else if (def && def.type === 'spell') {
+      bodyHTML += `<div class="detail-meta">
+        <span class="school-${def.school}">${cap(def.school)}</span> · Magia · 👁 ${def.cost} Maghe
+      </div>
+      <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
+      if (def.prodigy_effect) {
+        bodyHTML += `<div class="detail-section detail-prodigy"><strong>✨ Prodigio:</strong><br>${def.prodigy_effect}</div>`;
+      }
+
+    } else if (def && def.type === 'building') {
+      const status = fieldBuilding ? (fieldBuilding.completed ? ' · <span style="color:var(--gold)">✓ Completata</span>' : ' · Incompleta') : '';
+      bodyHTML += `<div class="detail-meta">Costruzione · ⚡${def.cost} Mana · Comp: ${def.completion_cost} Mana${status}</div>
+      <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
+      if (def.complete_effect) {
+        bodyHTML += `<div class="detail-section detail-gold"><strong>✓ Effetto Completo:</strong><br>${def.complete_effect}</div>`;
+      }
+
     } else {
-      actionFn(choice);
+      bodyHTML = `<div class="detail-dim">${instanceId}</div>`;
     }
+
+    // Bottone contestuale
+    const isMyTurn = currentState && currentState.current_player_id === myPlayerId;
+    let actionLabel = null;
+    let onAction = null;
+
+    if (source === 'hand' && isMyTurn) {
+      if (actionMode === 'play_card') {
+        actionLabel = 'Gioca carta';
+        onAction = () => { Renderer.closeCardDetail(); showPlayOptions(instanceId, def); };
+      } else if (actionMode === null) {
+        const player = currentState.players.find(p => p.id === myPlayerId);
+        if (player && player.actions_remaining > 0) {
+          // Hint visivo: suggerisci di scegliere prima il tipo di azione
+          bodyHTML += `<div class="detail-dim" style="margin-top:0.3rem">Scegli "Gioca carta" dal pannello per giocarla.</div>`;
+        }
+      }
+    } else if (source === 'field' && isMyTurn) {
+      actionLabel = 'Riposiziona';
+      onAction = () => {
+        Renderer.closeCardDetail();
+        Renderer.showChoiceModal(
+          'Riposiziona Guerriero',
+          [
+            { label: 'Avanscoperta',      value: 'vanguard' },
+            { label: 'Bastione Sinistro', value: 'bastion_left' },
+            { label: 'Bastione Destro',   value: 'bastion_right' },
+          ],
+          (dest) => sendAction('reposition', { warrior_instance_id: instanceId, destination: dest }),
+        );
+      };
+    } else if (source === 'village' && isMyTurn && fieldBuilding && !fieldBuilding.completed) {
+      actionLabel = 'Completa costruzione';
+      onAction = () => {
+        Renderer.closeCardDetail();
+        sendAction('complete_building', { building_instance_id: instanceId });
+      };
+    }
+
+    const title = def ? def.name : (fieldWarrior ? (fieldWarrior.name || instanceId) : instanceId);
+    Renderer.showCardDetail(title, bodyHTML, actionLabel, onAction);
   }
 
   function showPlayOptions(instanceId, def) {
@@ -382,30 +579,20 @@ const App = (() => {
         Renderer.showChoiceModal(
           `Gioca ${def.name}`,
           [
-            { label: '⚔ Avanscoperta', value: 'vanguard' },
+            { label: '⚔ Avanscoperta',      value: 'vanguard' },
             { label: '🛡 Bastione Sinistro', value: 'bastion_left' },
-            { label: '🛡 Bastione Destro', value: 'bastion_right' },
-            ..._wallOpts,
+            { label: '🛡 Bastione Destro',   value: 'bastion_right' },
           ],
-          (choice) => _handleWallOrAction(choice, instanceId,
-            (region) => sendAction('play_warrior', { instance_id: instanceId, region }),
-          ),
+          (region) => sendAction('play_warrior', { instance_id: instanceId, region }),
         );
       }
-
     } else if (def.type === 'spell') {
       _showSpellOptions(instanceId, def);
-
     } else if (def.type === 'building') {
-      Renderer.showChoiceModal(
-        `Gioca ${def.name}`,
-        [
-          { label: `🏗 Costruisci in Villaggio (${def.cost} Mana)`, value: 'build' },
-          ..._wallOpts,
-        ],
-        (choice) => _handleWallOrAction(choice, instanceId,
-          () => sendAction('play_building', { instance_id: instanceId }),
-        ),
+      Renderer.showModal(
+        `Costruisci ${def.name}`,
+        `Costo: <strong>${def.cost} Mana</strong><br>${def.base_effect || ''}`,
+        () => sendAction('play_building', { instance_id: instanceId }),
       );
     }
   }
@@ -413,7 +600,7 @@ const App = (() => {
   function _showHeroPlayOptions(instanceId, def) {
     const myPlayer = currentState.players.find(p => p.id === myPlayerId);
     const compatRecruits = [];
-    myPlayer && myPlayer.field && ['vanguard', 'bastion_left', 'bastion_right'].forEach(reg => {
+    myPlayer && ['vanguard', 'bastion_left', 'bastion_right'].forEach(reg => {
       const warriors = reg === 'vanguard'
         ? myPlayer.field.vanguard
         : (reg === 'bastion_left' ? myPlayer.field.bastion_left.warriors : myPlayer.field.bastion_right.warriors);
@@ -425,24 +612,22 @@ const App = (() => {
       });
     });
 
-    const options = [
-      ...compatRecruits,
-      { label: '⚔ Piazza in Avanscoperta', value: 'vanguard' },
-      { label: '🛡 Piazza in Bastione Sinistro', value: 'bastion_left' },
-      { label: '🛡 Piazza in Bastione Destro', value: 'bastion_right' },
-      ..._wallOpts,
-    ];
-
-    Renderer.showChoiceModal(`Gioca ${def.name}`, options, (choice) => {
-      if (choice === 'wall_left' || choice === 'wall_right') {
-        sendAction('add_wall', { instance_id: instanceId, bastion_side: choice === 'wall_left' ? 'left' : 'right' });
-      } else if (['vanguard', 'bastion_left', 'bastion_right'].includes(choice)) {
-        sendAction('play_warrior', { instance_id: instanceId, region: choice });
-      } else {
-        // È un instance_id di Recluta → Evolvi
-        sendAction('evolve', { recruit_instance_id: choice, hero_instance_id: instanceId });
-      }
-    });
+    Renderer.showChoiceModal(
+      `Gioca ${def.name}`,
+      [
+        ...compatRecruits,
+        { label: '⚔ Piazza in Avanscoperta',       value: 'vanguard' },
+        { label: '🛡 Piazza in Bastione Sinistro',  value: 'bastion_left' },
+        { label: '🛡 Piazza in Bastione Destro',    value: 'bastion_right' },
+      ],
+      (choice) => {
+        if (['vanguard', 'bastion_left', 'bastion_right'].includes(choice)) {
+          sendAction('play_warrior', { instance_id: instanceId, region: choice });
+        } else {
+          sendAction('evolve', { recruit_instance_id: choice, hero_instance_id: instanceId });
+        }
+      },
+    );
   }
 
   function _showSpellOptions(instanceId, def) {
@@ -455,33 +640,21 @@ const App = (() => {
     ];
 
     if (!spellsNeedingTarget.includes(def.id) || opponents.length === 0) {
-      // Magia senza target: offri lancio o muro
-      Renderer.showChoiceModal(
+      Renderer.showModal(
         `${def.name}`,
-        [
-          { label: `✨ Lancia (${def.cost} Maghe) — ${def.base_effect}`, value: 'cast' },
-          ..._wallOpts,
-        ],
-        (choice) => _handleWallOrAction(choice, instanceId,
-          () => sendAction('play_spell', { instance_id: instanceId }),
-        ),
+        `Costo: <strong>${def.cost} Maghe</strong><br>${def.base_effect || ''}`,
+        () => sendAction('play_spell', { instance_id: instanceId }),
       );
       return;
     }
 
-    // Magia con target: mostra avversari + opzioni muro
     const options = [];
     opponents.forEach(p => {
       options.push({ label: `🎯 ${p.name} — Bastione Sinistro`, value: `${p.id}:left` });
       options.push({ label: `🎯 ${p.name} — Bastione Destro`,   value: `${p.id}:right` });
     });
-    options.push(..._wallOpts);
 
-    Renderer.showChoiceModal(`${def.name} — bersaglio o muro`, options, (choice) => {
-      if (choice === 'wall_left' || choice === 'wall_right') {
-        sendAction('add_wall', { instance_id: instanceId, bastion_side: choice === 'wall_left' ? 'left' : 'right' });
-        return;
-      }
+    Renderer.showChoiceModal(`${def.name} — scegli bersaglio`, options, (choice) => {
       const [targetId, side] = choice.split(':');
       sendAction('play_spell', {
         instance_id: instanceId,
@@ -489,19 +662,6 @@ const App = (() => {
         target_bastion_side: side,
       });
     });
-  }
-
-  function clearSelection() {
-    selectedCard = null;
-    pendingAction = null;
-    document.getElementById('selection-info').classList.add('hidden');
-  }
-
-  function getPlayHint(def) {
-    if (def.type === 'warrior') return `Scegli dove posizionare ${def.name}.`;
-    if (def.type === 'spell')   return `Scegli il bersaglio per ${def.name}.`;
-    if (def.type === 'building') return `Premi per costruire ${def.name}.`;
-    return '';
   }
 
   // ---------------------------------------------------------------------------
@@ -528,10 +688,9 @@ const App = (() => {
       return;
     }
 
-    // Raccogli i target validi dagli elementi DOM
     const targets = [];
     document.querySelectorAll('.attack-target').forEach(el => {
-      const pid = el.dataset.targetPlayerId;
+      const pid  = el.dataset.targetPlayerId;
       const side = el.dataset.targetSide;
       if (pid && side) {
         const p = currentState.players.find(pp => pp.id === pid);
@@ -564,12 +723,10 @@ const App = (() => {
   // ---------------------------------------------------------------------------
 
   async function sendAction(action, params = {}) {
-    // Prima prova via WS se disponibile
     if (WS && gameId) {
       WS.sendAction(action, params);
       return;
     }
-    // Fallback REST
     try {
       const res = await api('/game/action', {
         game_id: gameId,
@@ -606,7 +763,7 @@ const App = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Utilità globali
+  // Utility
   // ---------------------------------------------------------------------------
 
   function returnToLobby() {
@@ -614,6 +771,8 @@ const App = (() => {
     stopLobbyPolling();
     stopLocalTimer();
     selectedCard = null;
+    actionMode = null;
+    wallsSelected = [];
     currentState = null;
     gameId = null;
     lobbyCode = null;
@@ -628,9 +787,6 @@ const App = (() => {
     ).then(() => Renderer.toast('Codice copiato!', 'success'));
   }
 
-  // ---------------------------------------------------------------------------
-  // Export
-  // ---------------------------------------------------------------------------
   return {
     init,
     getCardDef,
@@ -639,13 +795,11 @@ const App = (() => {
   };
 })();
 
-// Funzioni globali per onclick inline in HTML
-function returnToLobby() { App.returnToLobby && App.returnToLobby(); location.reload(); }
+function returnToLobby() { location.reload(); }
 function copyLobbyCode() {
   navigator.clipboard.writeText(
     document.getElementById('lobby-code-text').textContent
   ).then(() => Renderer.toast('Codice copiato!', 'success'));
 }
 
-// Avvio
 document.addEventListener('DOMContentLoaded', () => App.init());

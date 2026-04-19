@@ -120,10 +120,33 @@
   <!-- Pannello azioni laterale -->
   <div id="action-panel">
     <h3>Azioni</h3>
-    <button id="btn-end-turn" class="btn btn-danger">Fine Turno</button>
-    <button id="btn-battle" class="btn btn-warning">Attacca</button>
+
+    <!-- Banner: scegli tipo di azione -->
+    <div id="action-banner" class="hidden">
+      <div id="banner-turn-label" class="banner-label">Azione 1 di 2</div>
+      <button id="banner-btn-play"     class="banner-btn">🃏 Gioca carta</button>
+      <button id="banner-btn-complete" class="banner-btn">🏗 Completa</button>
+      <button id="banner-btn-wall"     class="banner-btn">🧱 Aggiungi muri</button>
+    </div>
+
+    <!-- Annulla azione corrente -->
+    <button id="btn-cancel-action" class="btn btn-secondary hidden">↩ Annulla</button>
+
+    <!-- Selezione muri -->
+    <div id="wall-staging" class="hidden">
+      <div class="wall-stage-header">Muri: <span id="wall-count">0</span>/3</div>
+      <div id="wall-selected-list"></div>
+      <div class="hint">Clicca carte dalla mano</div>
+      <button id="wall-confirm-btn" class="btn btn-primary btn-small" disabled>Conferma muri</button>
+    </div>
+
     <div id="action-hint" class="hint"></div>
     <div id="selection-info" class="selection-box hidden"></div>
+
+    <div style="flex:1"></div>
+
+    <button id="btn-battle"   class="btn btn-warning">⚔ Attacca</button>
+    <button id="btn-end-turn" class="btn btn-danger">Fine Turno</button>
   </div>
 
   <!-- Modale conferma azione / targeting -->
@@ -134,6 +157,18 @@
       <div id="modal-actions">
         <button id="modal-confirm" class="btn btn-primary">Conferma</button>
         <button id="modal-cancel" class="btn btn-secondary">Annulla</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card detail overlay (lettura carta) -->
+  <div id="card-detail-overlay" class="hidden">
+    <div id="card-detail-box">
+      <div id="card-detail-title" class="card-detail-title"></div>
+      <div id="card-detail-body"  class="card-detail-body"></div>
+      <div id="card-detail-footer">
+        <button id="card-detail-action-btn" class="btn btn-primary hidden"></button>
+        <button id="card-detail-close"      class="btn btn-secondary">Chiudi</button>
       </div>
     </div>
   </div>

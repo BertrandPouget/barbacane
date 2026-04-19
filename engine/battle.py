@@ -68,6 +68,11 @@ def get_valid_attack_targets(state: GameState) -> List[Tuple[int, str]]:
     """
     attacker_index = state.current_player_index
     attacker = state.players[attacker_index]
+
+    # Senza guerrieri in Avanscoperta non si può attaccare
+    if not attacker.field.vanguard:
+        return []
+
     adj = adjacent_bastions(attacker_index, len(state.players))
 
     # Controlla se Guerremoto è attivo (può attaccare qualsiasi bastione)
@@ -274,6 +279,10 @@ def resolve_battle(
     """
     attacker = state.players[attacker_player_index]
     defender = state.players[defender_player_index]
+
+    # Serve almeno un Guerriero in Avanscoperta per attaccare
+    if not attacker.field.vanguard:
+        raise ActionError("Non puoi attaccare senza Guerrieri in Avanscoperta.")
 
     # Statistiche attaccante
     att_att, att_git = attacker_stats(attacker)
