@@ -3,6 +3,7 @@ Subito
 - no battaglia senza guerrieri in avanguardia
 - vedere tutta la descrizione di una carta premendola
 - vite prese dal mazzo
+- bug game.py BuildingInstance WarriorInstance
 
 Dopo
 - implementare effetti mancanti
