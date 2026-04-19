@@ -1,0 +1,734 @@
+/* =========================================================
+   Barbacane — Foglio di stile
+   Palette: pergamena scura, oro, rosso sangue, verde bosco
+   ========================================================= */
+
+:root {
+  --bg-dark:      #1a1410;
+  --bg-medium:    #2a201a;
+  --bg-light:     #3a2e24;
+  --bg-card:      #2e2318;
+  --gold:         #c8a84b;
+  --gold-light:   #e8c86b;
+  --red:          #b03030;
+  --red-light:    #e04040;
+  --green:        #2d6b3a;
+  --green-light:  #4a9a58;
+  --blue:         #2a4a8a;
+  --blue-light:   #4a7aaa;
+  --text:         #e8d8b8;
+  --text-dim:     #a09070;
+  --border:       #5a4530;
+  --border-gold:  #8a6830;
+
+  --card-w: 90px;
+  --card-h: 130px;
+  --card-w-sm: 70px;
+  --card-h-sm: 100px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg-dark);
+  color: var(--text);
+  font-family: 'Georgia', serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ==================== SCHERMATE ==================== */
+
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* ==================== LOBBY ==================== */
+
+.lobby-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  gap: 2rem;
+}
+
+.logo-area { text-align: center; }
+.logo { max-width: 200px; margin-bottom: 1rem; }
+
+.game-title {
+  font-size: 3.5rem;
+  color: var(--gold);
+  text-shadow: 0 0 20px rgba(200, 168, 75, 0.5);
+  letter-spacing: 0.2em;
+}
+
+.game-subtitle {
+  color: var(--text-dim);
+  font-style: italic;
+  margin-top: 0.3rem;
+}
+
+.lobby-panels {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.panel {
+  background: var(--bg-medium);
+  border: 1px solid var(--border-gold);
+  border-radius: 8px;
+  padding: 1.5rem;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.panel h2 {
+  color: var(--gold);
+  font-size: 1.2rem;
+  text-align: center;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+input[type="text"],
+input[type="number"] {
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  padding: 0.5rem 0.7rem;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+/* ==================== SALA D'ATTESA ==================== */
+
+.waiting-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 2rem;
+}
+
+.waiting-container h2 { color: var(--gold); font-size: 1.8rem; }
+
+.lobby-code-display {
+  font-size: 2rem;
+  color: var(--gold-light);
+  background: var(--bg-medium);
+  border: 2px solid var(--border-gold);
+  border-radius: 8px;
+  padding: 0.7rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 300px;
+}
+
+.player-list-item {
+  background: var(--bg-medium);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.player-list-item .dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green-light);
+}
+
+.waiting-hint { color: var(--text-dim); font-style: italic; font-size: 0.9rem; }
+.status-msg { color: var(--text-dim); font-size: 0.85rem; min-height: 1.2rem; }
+
+/* ==================== PULSANTI ==================== */
+
+.btn {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.1s;
+}
+
+.btn:hover { filter: brightness(1.15); }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-primary   { background: var(--gold);        color: var(--bg-dark); font-weight: bold; }
+.btn-secondary { background: var(--bg-light);     color: var(--text);   border: 1px solid var(--border); }
+.btn-danger    { background: var(--red);           color: #fff; }
+.btn-warning   { background: #8a5a20;              color: #fff; }
+.btn-small     { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+
+/* ==================== HEADER GIOCO ==================== */
+
+#game-header {
+  background: var(--bg-medium);
+  border-bottom: 2px solid var(--border-gold);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-left, .header-right {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.header-center {
+  font-size: 1rem;
+  color: var(--gold);
+  font-weight: bold;
+}
+
+.timer {
+  background: var(--red);
+  color: #fff;
+  padding: 0.2rem 0.7rem;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.timer.warning { background: var(--red-light); animation: pulse 1s infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ==================== TAVOLO DI GIOCO ==================== */
+
+#screen-game {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+#game-table {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Area avversari */
+#opponents-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 8px;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--border);
+  min-height: 0;
+}
+
+.opponent-field {
+  background: var(--bg-medium);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: border-color 0.3s;
+}
+
+.opponent-field.active-player { border-color: var(--gold); }
+.opponent-field.damaged { animation: flash-red 0.5s; }
+
+@keyframes flash-red {
+  0%, 100% { border-color: var(--border); }
+  50% { border-color: var(--red-light); background: rgba(176,48,48,0.15); }
+}
+
+.opp-info {
+  min-width: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.opp-name { font-weight: bold; font-size: 0.9rem; color: var(--gold); }
+.opp-lives { font-size: 0.8rem; }
+.opp-lives .heart { color: var(--red-light); }
+.opp-hand-count { font-size: 0.75rem; color: var(--text-dim); }
+
+.opp-regions {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  align-items: center;
+}
+
+.opp-region {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+.opp-region-label { text-align: center; }
+
+.opp-warriors, .opp-buildings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-width: 60px;
+}
+
+.opp-wall-count {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* Barra centrale */
+#center-bar {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 1rem;
+  background: var(--bg-dark);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+
+#battle-log {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+/* Campo locale */
+#my-field {
+  background: var(--bg-medium);
+  border-top: 2px solid var(--border-gold);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.region-label {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  text-align: center;
+  min-width: 50px;
+}
+
+.region-label-vert {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  text-align: center;
+  writing-mode: vertical-rl;
+  min-width: 16px;
+}
+
+.region {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: flex-start;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  padding: 4px;
+  min-height: 70px;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.region.vanguard    { flex: 2; min-width: 120px; }
+.region.bastion     { flex: 1; min-width: 80px; }
+.region.village     { flex: 3; min-width: 160px; }
+
+.region.drop-target {
+  border-color: var(--gold);
+  background: rgba(200, 168, 75, 0.08);
+}
+
+.player-stats {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.85rem;
+  padding: 2px 4px;
+}
+
+#my-lives { color: var(--red-light); }
+#my-mana  { color: var(--blue-light); }
+#my-actions { color: var(--gold); }
+
+/* Mano */
+#hand-area {
+  background: var(--bg-dark);
+  border-top: 2px solid var(--border);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 170px;
+  overflow-y: auto;
+}
+
+.hand-label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+#hand-cards {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+/* ==================== CARTA ==================== */
+
+.card {
+  width: var(--card-w);
+  min-width: var(--card-w);
+  height: var(--card-h);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  position: relative;
+  user-select: none;
+  font-size: 0.65rem;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  border-color: var(--gold);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  z-index: 10;
+}
+
+.card.selected {
+  border-color: var(--gold-light);
+  box-shadow: 0 0 8px rgba(200,168,75,0.6);
+  transform: translateY(-6px);
+}
+
+.card.in-field { cursor: default; }
+.card.in-field:hover { transform: none; }
+
+/* Carta piccola (per campo) */
+.card-sm {
+  width: var(--card-w-sm);
+  min-width: var(--card-w-sm);
+  height: var(--card-h-sm);
+  font-size: 0.6rem;
+}
+
+/* Tipi carta */
+.card[data-type="warrior"]  { border-left: 3px solid var(--red); }
+.card[data-type="spell"]    { border-left: 3px solid var(--blue-light); }
+.card[data-type="building"] { border-left: 3px solid var(--green); }
+.card[data-type="wall"]     { border-left: 3px solid var(--text-dim); background: #1a1a1a; }
+
+/* Costruzione completata: ruotata (verticale = completata) */
+.card[data-type="building"].completed {
+  border-left-color: var(--gold);
+  border-top: 3px solid var(--green);
+}
+
+.card-name {
+  font-weight: bold;
+  color: var(--gold-light);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-species {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+}
+
+.card-stats {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+.stat { color: var(--text-dim); }
+.stat-att { color: var(--red-light); }
+.stat-git { color: #aaa; }
+.stat-dif { color: var(--green-light); }
+.stat-cost { color: var(--blue-light); }
+.stat-mana { color: var(--gold); }
+
+.card-effect {
+  font-size: 0.55rem;
+  color: var(--text-dim);
+  line-height: 1.2;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+/* Muro faccia in giù */
+.wall-card {
+  width: 32px;
+  min-width: 32px;
+  height: 50px;
+  background: #1a1a1a;
+  border: 1px solid var(--text-dim);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+/* Horde indicator */
+.card.horde-active::after {
+  content: '⚡';
+  position: absolute;
+  top: 2px; right: 2px;
+  font-size: 0.7rem;
+}
+
+/* ==================== PANNELLO AZIONI ==================== */
+
+#action-panel {
+  position: fixed;
+  right: 0;
+  top: 40px;
+  bottom: 0;
+  width: 180px;
+  background: var(--bg-medium);
+  border-left: 1px solid var(--border-gold);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  z-index: 50;
+}
+
+#action-panel h3 { color: var(--gold); font-size: 1rem; }
+
+.hint {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  line-height: 1.3;
+  font-style: italic;
+}
+
+.selection-box {
+  background: var(--bg-dark);
+  border: 1px solid var(--border-gold);
+  border-radius: 4px;
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--gold-light);
+}
+
+/* Offset game-table per pannello azioni */
+#game-table { margin-right: 180px; }
+
+/* ==================== MODALE ==================== */
+
+#modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#modal-overlay.hidden { display: none !important; }
+
+#modal-box {
+  background: var(--bg-medium);
+  border: 2px solid var(--border-gold);
+  border-radius: 8px;
+  padding: 1.5rem;
+  min-width: 320px;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+#modal-title {
+  font-size: 1.1rem;
+  color: var(--gold);
+  font-weight: bold;
+}
+
+#modal-body { font-size: 0.9rem; color: var(--text); line-height: 1.4; }
+
+.modal-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.modal-option {
+  background: var(--bg-light);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.modal-option:hover { border-color: var(--gold); background: var(--bg-dark); }
+.modal-option.selected { border-color: var(--gold-light); color: var(--gold-light); }
+
+#modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
+
+/* ==================== TOAST ==================== */
+
+#toast-container {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.toast {
+  background: var(--bg-medium);
+  border: 1px solid var(--border-gold);
+  border-radius: 6px;
+  padding: 0.5rem 1.2rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  animation: toast-in 0.2s ease, toast-out 0.3s ease 2.7s forwards;
+  max-width: 400px;
+  text-align: center;
+}
+
+.toast.error { border-color: var(--red); color: var(--red-light); }
+.toast.success { border-color: var(--green-light); color: var(--green-light); }
+
+@keyframes toast-in  { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes toast-out { from { opacity: 1; } to { opacity: 0; } }
+
+/* ==================== FINE PARTITA ==================== */
+
+.gameover-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+#gameover-title { font-size: 2.5rem; color: var(--gold); }
+#gameover-winner { font-size: 1.4rem; }
+#gameover-scores { font-size: 1rem; color: var(--text-dim); }
+
+/* ==================== UTILITY ==================== */
+
+.hidden { display: none !important; }
+
+.life-heart { color: var(--red-light); }
+.life-empty { color: var(--text-dim); }
+
+/* Specie colori */
+.species-elfo   { color: #7aaa55; }
+.species-nano   { color: #aa8844; }
+.species-maga   { color: #9966cc; }
+.species-umano  { color: #5599cc; }
+
+/* Scuola colori */
+.school-anatema    { color: var(--red-light); }
+.school-sortilegio { color: var(--blue-light); }
+.school-incantesimo { color: #88bbcc; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-dark); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-gold); }
+
+/* Responsive: se lo schermo è stretto, rendi le carte più piccole */
+@media (max-width: 900px) {
+  :root {
+    --card-w: 70px;
+    --card-h: 100px;
+    --card-w-sm: 54px;
+    --card-h-sm: 80px;
+  }
+  #action-panel { width: 140px; }
+  #game-table { margin-right: 140px; }
+}

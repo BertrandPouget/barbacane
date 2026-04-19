@@ -1,0 +1,36 @@
+{
+  "game": {
+    "min_players": 2,
+    "max_players": 4,
+    "initial_lives": 3,
+    "initial_hand_size": 5,
+    "max_hand_size": 5,
+    "actions_per_turn": 2,
+    "turn_timer_seconds": 120,
+    "disconnect_timeout_seconds": 120
+  },
+  "mana_schedule": {
+    "1": 1,
+    "2": 1,
+    "3": 2,
+    "4": 2,
+    "5": 3,
+    "6": 3,
+    "7": 4,
+    "8": 4,
+    "9": 4,
+    "10": 5
+  },
+  "deck": {
+    "total_cards": 200,
+    "warriors": 72,
+    "spells": 68,
+    "buildings": 60
+  },
+  "horde": {
+    "required_same_species": 3
+  },
+  "battle": {
+    "adjacency": "circular"
+  }
+}

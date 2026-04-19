@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: barbacane
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: BARBACANE_DB
+        value: /opt/render/project/src/barbacane.db
+    disk:
+      name: barbacane-data
+      mountPath: /opt/render/project/src
+      sizeGB: 1

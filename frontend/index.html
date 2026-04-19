@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Barbacane</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ===== SCHERMATA: LOBBY ===== -->
+<div id="screen-lobby" class="screen active">
+  <div class="lobby-container">
+    <div class="logo-area">
+      <img src="assets/Logo.png" alt="Barbacane" class="logo" onerror="this.style.display='none'" />
+      <h1 class="game-title">BARBACANE</h1>
+      <p class="game-subtitle">Il gioco di carte fantasy</p>
+    </div>
+
+    <div class="lobby-panels">
+      <!-- Crea Partita -->
+      <div class="panel">
+        <h2>Crea Partita</h2>
+        <label>Il tuo nome
+          <input type="text" id="create-name" placeholder="Nome giocatore" maxlength="20" />
+        </label>
+        <label>Timer turno (secondi, 0 = disattivato)
+          <input type="number" id="create-timer" value="120" min="0" max="600" />
+        </label>
+        <button id="btn-create" class="btn btn-primary">Crea Lobby</button>
+      </div>
+
+      <!-- Unisciti -->
+      <div class="panel">
+        <h2>Unisciti</h2>
+        <label>Il tuo nome
+          <input type="text" id="join-name" placeholder="Nome giocatore" maxlength="20" />
+        </label>
+        <label>Codice Lobby
+          <input type="text" id="join-code" placeholder="BARB-XXXX" maxlength="9" style="text-transform:uppercase" />
+        </label>
+        <button id="btn-join" class="btn btn-secondary">Entra</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCHERMATA: SALA D'ATTESA ===== -->
+<div id="screen-waiting" class="screen">
+  <div class="waiting-container">
+    <h2>Sala d'Attesa</h2>
+    <div class="lobby-code-display">
+      Codice: <span id="lobby-code-text">—</span>
+      <button class="btn btn-small" onclick="copyLobbyCode()">Copia</button>
+    </div>
+    <div id="waiting-players" class="player-list"></div>
+    <p class="waiting-hint">Condividi il codice con i tuoi amici. Servono almeno 2 giocatori.</p>
+    <button id="btn-start" class="btn btn-primary" style="display:none">Avvia Partita</button>
+    <div id="waiting-status" class="status-msg"></div>
+  </div>
+</div>
+
+<!-- ===== SCHERMATA: GIOCO ===== -->
+<div id="screen-game" class="screen">
+
+  <!-- Header: info partita -->
+  <div id="game-header">
+    <div class="header-left">
+      <span id="hdr-turn">Turno 1</span>
+      <span id="hdr-phase">Fase: Azione</span>
+    </div>
+    <div class="header-center">
+      <span id="hdr-current-player">Il turno di: —</span>
+    </div>
+    <div class="header-right">
+      <span id="hdr-deck">Mazzo: —</span>
+      <div id="turn-timer-display" class="timer hidden"></div>
+    </div>
+  </div>
+
+  <!-- Area principale: tavolo da gioco -->
+  <div id="game-table">
+
+    <!-- Campi avversari (sopra) -->
+    <div id="opponents-area"></div>
+
+    <!-- Separatore centrale / log -->
+    <div id="center-bar">
+      <div id="battle-log"></div>
+    </div>
+
+    <!-- Campo del giocatore locale (sotto) -->
+    <div id="my-field">
+      <div class="field-row" id="my-village-row">
+        <div class="region-label">Villaggio</div>
+        <div id="my-village" class="region village"></div>
+      </div>
+      <div class="field-row" id="my-bastions-row">
+        <div class="region-label-vert">Bastione Sinistro</div>
+        <div id="my-bastion-left" class="region bastion" data-side="left"></div>
+        <div id="my-vanguard" class="region vanguard"></div>
+        <div id="my-bastion-right" class="region bastion" data-side="right"></div>
+        <div class="region-label-vert">Bastione Destro</div>
+      </div>
+      <div id="my-stats" class="player-stats">
+        <span id="my-lives">Vite: 3</span>
+        <span id="my-mana">Mana: 0</span>
+        <span id="my-actions">Azioni: 2</span>
+      </div>
+    </div>
+
+    <!-- Mano del giocatore -->
+    <div id="hand-area">
+      <div class="hand-label">Mano (<span id="hand-count">0</span>)</div>
+      <div id="hand-cards"></div>
+    </div>
+
+  </div>
+
+  <!-- Pannello azioni laterale -->
+  <div id="action-panel">
+    <h3>Azioni</h3>
+    <button id="btn-end-turn" class="btn btn-danger">Fine Turno</button>
+    <button id="btn-battle" class="btn btn-warning">Attacca</button>
+    <div id="action-hint" class="hint"></div>
+    <div id="selection-info" class="selection-box hidden"></div>
+  </div>
+
+  <!-- Modale conferma azione / targeting -->
+  <div id="modal-overlay" class="hidden">
+    <div id="modal-box">
+      <div id="modal-title"></div>
+      <div id="modal-body"></div>
+      <div id="modal-actions">
+        <button id="modal-confirm" class="btn btn-primary">Conferma</button>
+        <button id="modal-cancel" class="btn btn-secondary">Annulla</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notifiche -->
+  <div id="toast-container"></div>
+
+</div>
+
+<!-- ===== SCHERMATA: FINE PARTITA ===== -->
+<div id="screen-gameover" class="screen">
+  <div class="gameover-container">
+    <h1 id="gameover-title">Fine Partita</h1>
+    <p id="gameover-winner"></p>
+    <div id="gameover-scores"></div>
+    <button class="btn btn-primary" onclick="returnToLobby()">Torna alla Lobby</button>
+  </div>
+</div>
+
+<script src="ws.js"></script>
+<script src="renderer.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
