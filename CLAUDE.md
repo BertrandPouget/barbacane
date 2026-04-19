@@ -267,7 +267,7 @@ Questa sezione riassume le regole che il motore deve implementare. I file di rif
 - 2-4 giocatori.
 - Ogni giocatore inizia con 3 Vite.
 - Mazzo comune unico di 200 carte (72 Guerrieri, 68 Magie, 60 Costruzioni).
-- Il mazzo viene mescolato. Ogni giocatore pesca 5 carte.
+- Il mazzo viene mescolato. Ogni giocatore pesca 6 carte.
 - Si determina casualmente il primo giocatore.
 
 ### Turno
@@ -285,7 +285,7 @@ Il turno di un giocatore segue questi passi in ordine:
 4. **Riposiziona Guerrieri** tra Avanscoperta e Bastioni a piacimento.
 5. **Attiva Orde**: per ogni Orda (3 Guerrieri stessa Specie), scegli quale effetto Orda attivare.
 6. **Battaglia** (opzionale): attacca un Bastione adiacente di un avversario. Richiede almeno un Guerriero in Avanscoperta (costruzioni come Ariete/Catapulta non bastano).
-7. **Pesca** fino a 5 carte in mano (o il limite modificato da carte in gioco). Se ne hai già di più, non scarti.
+7. **Pesca** fino a 6 carte in mano (o il limite modificato da carte in gioco). Se ne hai già di più, non scarti.
 
 Gli effetti di Costruzioni e Magie si attivano nel momento indicato dalla carta, indipendentemente dai passi.
 
