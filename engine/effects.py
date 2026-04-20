@@ -276,9 +276,8 @@ def arena_effect(
     **kwargs,
 ) -> dict:
     """
-    Base: scarta un tuo Guerriero. Scarta una Recluta avversaria con una Caratteristica inferiore.
-    Complete: scarta un tuo Guerriero. Scarta qualsiasi Guerriero avversario con una Caratteristica inferiore.
-    kwargs: own_warrior_iid, target_warrior_iid, target_player_id.
+    Base: scarta un tuo Guerriero. Scarta un Guerriero avversario con almeno una Caratteristica inferiore.
+    Complete (additivo &): se il bersaglio era un Eroe, scarta anche la sua Recluta e le carte assegnate.
     """
     if not own_warrior_iid:
         return {"error": "Guerriero proprio non specificato"}
@@ -301,17 +300,29 @@ def arena_effect(
                 target_card = get_card(target_w.base_card_id)
                 own_card = get_card(own_w.base_card_id)
 
-                # Verifica che almeno una Caratteristica del bersaglio sia inferiore
                 if isinstance(target_card, WarriorCard) and isinstance(own_card, WarriorCard):
-                    is_recruit = target_card.subtype == "recruit"
-                    if not completed and not is_recruit:
-                        return {"error": "Con Arena base puoi scartare solo Reclute"}
                     own_stats = [own_w.effective_att(), own_w.effective_git(), own_w.effective_dif()]
                     target_stats = [target_w.effective_att(), target_w.effective_git(), target_w.effective_dif()]
                     has_lower = any(ts < os for ts, os in zip(target_stats, own_stats))
                     if has_lower:
+                        # Salva dati del bersaglio prima di scartarlo
+                        target_was_hero = target_card.subtype == "hero"
+                        target_assigned = list(target_w.assigned_cards)
+                        target_evolved_from = target_w.evolved_from
+
                         _discard_warrior_from_player(state, target_player, target_warrior_iid)
                         result["target_discarded"] = target_warrior_iid
+
+                        # Complete additivo: se Eroe, scarta anche Recluta e carte assegnate
+                        if completed and target_was_hero:
+                            for card_iid in target_assigned:
+                                if card_iid not in state.discard_pile:
+                                    state.discard_pile.append(card_iid)
+                            if target_evolved_from and target_evolved_from not in state.discard_pile:
+                                state.discard_pile.append(target_evolved_from)
+                            result["also_discarded"] = target_assigned
+                            if target_evolved_from:
+                                result["recruit_discarded"] = target_evolved_from
                     else:
                         result["error"] = "Il bersaglio non ha Caratteristiche inferiori"
 
@@ -446,7 +457,7 @@ def ardolancio_effect(
 @register_effect("vitalflusso_effect")
 def vitalflusso_effect(state: GameState, player: Player, prodigy: bool = False, **kwargs) -> dict:
     """
-    Base: aggiungi una tua Sorgiva completa alle tue Vite (player.lives += 1, rimuove la Sorgiva).
+    Base: aggiungi una tua Sorgiva completa alle tue Vite (la Sorgiva stessa diventa la carta-vita).
     Prodigio (additivo &): scarta anche una Sorgiva di ogni avversario.
     """
     result: dict = {}
@@ -457,17 +468,8 @@ def vitalflusso_effect(state: GameState, player: Player, prodigy: bool = False, 
     )
     if sorgiva:
         player.field.village.buildings.remove(sorgiva)
-        state.discard_pile.append(sorgiva.instance_id)
-        # Pesca la carta in cima al mazzo come nuova carta-vita
-        if not state.deck and state.discard_pile:
-            import random as _r
-            state.deck = list(state.discard_pile)
-            state.discard_pile.clear()
-            _r.shuffle(state.deck)
-        if state.deck:
-            new_life = state.deck.pop(0)
-            player.life_cards.append(new_life)
-            result["new_life_card"] = new_life
+        # La Sorgiva stessa diventa la carta-vita (non si pesca dal mazzo)
+        player.life_cards.append(sorgiva.instance_id)
         result["sorgiva_consumed"] = sorgiva.instance_id
         result["lives_gained"] = 1
         result["lives_now"] = player.lives

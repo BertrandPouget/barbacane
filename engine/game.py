@@ -439,7 +439,7 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
                     "warriors": [_warrior_view(w) for w in p.field.bastion_right.warriors],
                 },
                 "village": {
-                    "buildings": [_building_view(b) for b in p.field.village.buildings],
+                    "buildings": [_building_view(b, p if p.id == viewer_player_id else None) for b in p.field.village.buildings],
                 },
             },
         }
@@ -503,9 +503,9 @@ def _warrior_view(w: WarriorInstance) -> dict:
     }
 
 
-def _building_view(b: BuildingInstance) -> dict:
+def _building_view(b: BuildingInstance, player=None) -> dict:
     card = get_card(b.base_card_id)
-    return {
+    result = {
         "instance_id": b.instance_id,
         "base_card_id": b.base_card_id,
         "name": card.name if isinstance(card, BuildingCard) else b.base_card_id,
@@ -513,6 +513,12 @@ def _building_view(b: BuildingInstance) -> dict:
         "effect": card.complete_effect if b.completed else card.base_effect
         if isinstance(card, BuildingCard) else "",
     }
+    if b.base_card_id == "arena" and player is not None:
+        result["arena_available"] = not any(
+            e.get("type") == "arena_used" and e.get("building_instance_id") == b.instance_id
+            for e in player.active_effects
+        )
+    return result
 
 
 # ---------------------------------------------------------------------------

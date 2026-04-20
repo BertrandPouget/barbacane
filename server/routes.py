@@ -33,6 +33,7 @@ from engine.actions import (
     recast_spell,
     eracle_destroy,
     discard_card,
+    arena_activate,
 )
 from server.lobby import (
     create_lobby,
@@ -307,6 +308,13 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             state, player_id,
             params["instance_id"],
             params.get("source", "hand"),
+        ),
+        "arena_activate": lambda: arena_activate(
+            state, player_id,
+            params["building_instance_id"],
+            params["own_warrior_iid"],
+            params["target_warrior_iid"],
+            params["target_player_id"],
         ),
         "end_turn": lambda: _end_turn_action(state, player_id),
     }

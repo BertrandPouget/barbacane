@@ -55,14 +55,16 @@ body {
 }
 
 .logo-area { text-align: center; }
-.logo { max-width: 200px; margin-bottom: 1rem; }
+.logo { max-width: 340px; width: 80vw; margin-bottom: 0.5rem; display: block; margin-left: auto; margin-right: auto; }
 
 .game-title {
   font-size: 3.5rem;
   color: var(--gold);
   text-shadow: 0 0 20px rgba(200, 168, 75, 0.5);
   letter-spacing: 0.2em;
+  display: none;
 }
+.game-title.show { display: block; }
 
 .game-subtitle {
   color: var(--text-dim);
@@ -239,7 +241,7 @@ input:focus {
 
 /* ==================== TAVOLO DI GIOCO ==================== */
 
-#screen-game {
+#screen-game.active {
   display: flex;
   flex-direction: column;
   height: 100vh;

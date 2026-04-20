@@ -256,14 +256,21 @@ class Player(BaseModel):
         for eff in self.active_effects:
             if eff.get("type") == "horde_stat_bonus":
                 w_iid = eff.get("warrior_iid")
-                for w in source_list:
-                    if w.instance_id == w_iid:
-                        for stat in ("att", "git", "dif"):
-                            bonus = eff.get(stat, 0)
-                            if bonus:
-                                w.temp_modifiers[stat] = max(0, w.temp_modifiers.get(stat, 0) - bonus)
-                        to_remove.append(eff)
-                        break
+                if w_iid == warrior.instance_id:
+                    # Il guerriero rimosso: i suoi bonus spariscono con lui
+                    to_remove.append(eff)
+                else:
+                    for w in source_list:
+                        if w.instance_id == w_iid:
+                            for stat in ("att", "git", "dif"):
+                                bonus = eff.get(stat, 0)
+                                if bonus:
+                                    w.temp_modifiers[stat] = max(0, w.temp_modifiers.get(stat, 0) - bonus)
+                            to_remove.append(eff)
+                            break
+            elif eff.get("from_horde_key") == horde_key:
+                # Effetto non-stat aggiunto da questa Orda (es. reinhold_discount, araminta_return)
+                to_remove.append(eff)
         for eff in to_remove:
             if eff in self.active_effects:
                 self.active_effects.remove(eff)

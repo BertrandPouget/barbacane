@@ -565,6 +565,83 @@ const App = (() => {
     showCardDetail(instanceId, source === 'life_card' ? 'life_card' : source);
   }
 
+  // ---------------------------------------------------------------------------
+  // Arena helpers
+  // ---------------------------------------------------------------------------
+
+  function _getAllWarriors(player) {
+    return [
+      ...(player.field.vanguard || []),
+      ...(player.field.bastion_left.warriors || []),
+      ...(player.field.bastion_right.warriors || []),
+    ];
+  }
+
+  function _canActivateArena(buildingInstanceId) {
+    if (!currentState || currentState.current_player_id !== myPlayerId) return false;
+    const player = currentState.players.find(p => p.id === myPlayerId);
+    if (!player) return false;
+    const building = player.field.village.buildings.find(b => b.instance_id === buildingInstanceId);
+    if (!building || building.arena_available === false) return false;
+    const myWarriors = _getAllWarriors(player);
+    if (myWarriors.length === 0) return false;
+    const enemies = currentState.players.filter(p => p.id !== myPlayerId && p.lives > 0);
+    for (const ow of myWarriors) {
+      for (const enemy of enemies) {
+        for (const ew of _getAllWarriors(enemy)) {
+          if (ow.att > ew.att || ow.git > ew.git || ow.dif > ew.dif) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function _showArenaFlow(buildingInstanceId) {
+    const player = currentState.players.find(p => p.id === myPlayerId);
+    if (!player) return;
+    const myWarriors = _getAllWarriors(player);
+    const enemies = currentState.players.filter(p => p.id !== myPlayerId && p.lives > 0);
+
+    const myOptions = myWarriors.map(w => ({
+      label: `${w.name} (ATT ${w.att}  GIT ${w.git}  DIF ${w.dif})`,
+      value: w.instance_id,
+    }));
+
+    Renderer.showChoiceModal('Arena — scegli il tuo Guerriero da sacrificare', myOptions, (ownIid) => {
+      const ownW = myWarriors.find(w => w.instance_id === ownIid);
+      if (!ownW) return;
+
+      const validTargets = [];
+      enemies.forEach(p => {
+        _getAllWarriors(p).forEach(ew => {
+          if (ownW.att > ew.att || ownW.git > ew.git || ownW.dif > ew.dif) {
+            validTargets.push({
+              label: `${p.name}: ${ew.name} (ATT ${ew.att}  GIT ${ew.git}  DIF ${ew.dif})`,
+              value: `${p.id}:${ew.instance_id}`,
+            });
+          }
+        });
+      });
+
+      if (validTargets.length === 0) {
+        Renderer.toast('Nessun bersaglio valido per questo guerriero', 'error');
+        return;
+      }
+
+      Renderer.showChoiceModal('Arena — scegli il Guerriero avversario da scartare', validTargets, (choice) => {
+        const colonIdx = choice.indexOf(':');
+        const targetPlayerId = choice.substring(0, colonIdx);
+        const targetWarriorIid = choice.substring(colonIdx + 1);
+        sendAction('arena_activate', {
+          building_instance_id: buildingInstanceId,
+          own_warrior_iid: ownIid,
+          target_warrior_iid: targetWarriorIid,
+          target_player_id: targetPlayerId,
+        });
+      });
+    });
+  }
+
   // Costruisce e mostra il pannello di dettaglio per qualsiasi carta
   function showCardDetail(instanceId, source) {
     const def = getCardDef(instanceId);
@@ -637,6 +714,7 @@ const App = (() => {
     const isMyTurn = currentState && currentState.current_player_id === myPlayerId;
     let actionLabel = null;
     let onAction = null;
+    const extraButtons = [];
 
     if (source === 'hand' && isMyTurn) {
       if (actionMode === 'play_card' || actionMode === null) {
@@ -660,12 +738,25 @@ const App = (() => {
           (dest) => sendAction('reposition', { warrior_instance_id: instanceId, destination: dest }),
         );
       };
-    } else if (source === 'village' && isMyTurn && fieldBuilding && !fieldBuilding.completed) {
-      actionLabel = 'Completa costruzione';
-      onAction = () => {
-        Renderer.closeCardDetail();
-        sendAction('complete_building', { building_instance_id: instanceId });
-      };
+    } else if (source === 'village' && isMyTurn) {
+      // Arena: bottone Attiva (non consuma Azione, appare sempre se disponibile)
+      if (def && def.id === 'arena') {
+        const canActivate = _canActivateArena(instanceId);
+        extraButtons.push({
+          label: '⚔ Attiva Arena',
+          className: 'btn-warning',
+          disabled: !canActivate,
+          onClick: () => { Renderer.closeCardDetail(); _showArenaFlow(instanceId); },
+        });
+      }
+      // Completa costruzione
+      if (fieldBuilding && !fieldBuilding.completed) {
+        actionLabel = 'Completa costruzione';
+        onAction = () => {
+          Renderer.closeCardDetail();
+          sendAction('complete_building', { building_instance_id: instanceId });
+        };
+      }
     }
 
     // Bottone Scarta: disponibile per le proprie carte (mano, campo, villaggio) in qualsiasi momento
@@ -679,7 +770,7 @@ const App = (() => {
     }
 
     const title = def ? def.name : (fieldWarrior ? (fieldWarrior.name || instanceId) : instanceId);
-    Renderer.showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard);
+    Renderer.showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons);
   }
 
   function showPlayOptions(instanceId, def) {

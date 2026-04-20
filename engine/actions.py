@@ -178,6 +178,7 @@ def evolve_warrior(
         evolved_from=recruit_instance_id,
         assigned_cards=list(recruit.assigned_cards),
         temp_modifiers=dict(recruit.temp_modifiers),
+        horde_active=recruit.horde_active,
     )
 
     # Sostituisce la Recluta nella stessa regione
@@ -186,6 +187,11 @@ def evolve_warrior(
             idx = region_list.index(recruit)
             region_list[idx] = hero_inst
             break
+
+    # Aggiorna i riferimenti warrior_iid negli effetti orda stat
+    for eff in player.active_effects:
+        if eff.get("type") == "horde_stat_bonus" and eff.get("warrior_iid") == recruit_instance_id:
+            eff["warrior_iid"] = hero_instance_id
 
     # La Recluta non va negli scarti (rimane "sotto" l'Eroe — gestita come evolved_from)
     state.discard_pile.append(recruit_instance_id)
@@ -600,13 +606,76 @@ def activate_horde(
     for w in horde["warriors"]:
         w.horde_active = (w.base_card_id == horde_card_id)
 
+    # Snapshot per taggare i nuovi effetti con horde_key (usato da deactivate_broken_horde)
+    effects_count_before = len(player.active_effects)
+
     result = apply_effect(horde_effect_id, state, player,
                           warrior_iid=warrior_instance_id, **kwargs)
+
+    for eff in player.active_effects[effects_count_before:]:
+        eff["from_horde_key"] = horde_key
 
     player.hordes_activated_this_turn.append(horde_key)
     state.add_log(player_id, "activate_horde", species=species, zone=horde_zone,
                   horde_card=horde_card_id, effect=horde_effect_id, result=result)
     return {"species": species, "zone": horde_zone, "horde_card": horde_card_id, "effect": result}
+
+
+# ---------------------------------------------------------------------------
+# Arena: effetto attivabile (non consuma Azione)
+# ---------------------------------------------------------------------------
+
+def arena_activate(
+    state: GameState,
+    player_id: str,
+    building_instance_id: str,
+    own_warrior_iid: str,
+    target_warrior_iid: str,
+    target_player_id: str,
+) -> dict:
+    """
+    Attiva l'Arena: scarta un tuo Guerriero e uno avversario con almeno una Caratteristica inferiore.
+    Non consuma Azione. Usabile una sola volta per turno per Arena.
+    """
+    player = _require_current_player(state, player_id)
+
+    arena = next(
+        (b for b in player.field.village.buildings
+         if b.instance_id == building_instance_id and b.base_card_id == "arena"),
+        None,
+    )
+    if arena is None:
+        raise ActionError("Arena non trovata nel Villaggio.")
+
+    already_used = any(
+        e.get("type") == "arena_used" and e.get("building_instance_id") == building_instance_id
+        for e in player.active_effects
+    )
+    if already_used:
+        raise ActionError("Arena già usata questo turno.")
+
+    from engine.effects import apply_effect
+    result = apply_effect(
+        "arena_effect",
+        state,
+        player,
+        completed=arena.completed,
+        own_warrior_iid=own_warrior_iid,
+        target_warrior_iid=target_warrior_iid,
+        target_player_id=target_player_id,
+    )
+
+    if "error" in result:
+        raise ActionError(result["error"])
+
+    player.active_effects.append({
+        "type": "arena_used",
+        "building_instance_id": building_instance_id,
+        "expires": "end_of_turn",
+    })
+
+    state.add_log(player_id, "arena_activate", **result)
+    return result
 
 
 # ---------------------------------------------------------------------------

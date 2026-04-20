@@ -387,7 +387,7 @@ const Renderer = (() => {
   // Card detail overlay
   // ---------------------------------------------------------------------------
 
-  function showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard) {
+  function showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons = []) {
     document.getElementById('card-detail-title').textContent = title;
     document.getElementById('card-detail-body').innerHTML = bodyHTML;
 
@@ -406,6 +406,19 @@ const Renderer = (() => {
       discardBtn.classList.remove('hidden');
     } else {
       discardBtn.classList.add('hidden');
+    }
+
+    const extraContainer = document.getElementById('card-detail-extra-btns');
+    if (extraContainer) {
+      extraContainer.innerHTML = '';
+      extraButtons.forEach(btn => {
+        const el = document.createElement('button');
+        el.textContent = btn.label;
+        el.className = `btn ${btn.className || 'btn-secondary'}`;
+        el.disabled = !!btn.disabled;
+        el.onclick = btn.onClick;
+        extraContainer.appendChild(el);
+      });
     }
 
     const overlay = document.getElementById('card-detail-overlay');

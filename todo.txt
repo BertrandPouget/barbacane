@@ -1,16 +1,11 @@
 Subito
-- fixare orda: fatta UI e posizionamento, ma mancano condizioni di spegnimento (rimane attiva se riposizioni, si disattiva solo quando la cambi)
-- implementare effetti mancanti (es. D10)
-
-Dopo
-- ordine azioni
-- giocare online
-- fixare evoluzioni
-- fixare vitalflusso (non aggiunge sorgiva ma una carta dal mazzo)
 - testare il corretto funzionamento di Telecinesi
 
+Dopo
+- ordine azioni (fasi turno enforced dal server)
+- evoluzioni: verificare corner case UI
+
 Opzionale
-- giocare su rete locale, non su computer locale
 - rimuovere azioni da homepage
 - utilizzare logo
 - timer funzionante

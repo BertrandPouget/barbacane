@@ -12,8 +12,10 @@
 <div id="screen-lobby" class="screen active">
   <div class="lobby-container">
     <div class="logo-area">
-      <img src="assets/logo.png" alt="Barbacane" class="logo" onerror="this.style.display='none'" />
-      <h1 class="game-title">BARBACANE</h1>
+      <img src="assets/logo.png" alt="Barbacane" class="logo"
+           onload="document.getElementById('lobby-title').classList.remove('show')"
+           onerror="this.style.display='none'; document.getElementById('lobby-title').classList.add('show')" />
+      <h1 class="game-title" id="lobby-title">BARBACANE</h1>
       <p class="game-subtitle">Il gioco di carte fantasy</p>
     </div>
 
@@ -171,6 +173,7 @@
       <div id="card-detail-title" class="card-detail-title"></div>
       <div id="card-detail-body"  class="card-detail-body"></div>
       <div id="card-detail-footer">
+        <div id="card-detail-extra-btns"></div>
         <button id="card-detail-action-btn"  class="btn btn-primary hidden"></button>
         <button id="card-detail-discard-btn" class="btn btn-danger hidden">Scarta</button>
         <button id="card-detail-close"       class="btn btn-secondary">Chiudi</button>
