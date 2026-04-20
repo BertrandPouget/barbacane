@@ -45,6 +45,17 @@ def _roll_d10() -> int:
     return random.randint(1, 10)
 
 
+def _apply_scrigno_bonus(player: Player, amount: int) -> int:
+    """Applies Scrigno mana bonus when a non-Scrigno card grants mana. Returns bonus granted."""
+    bonus = 0
+    for b in player.field.village.buildings:
+        if b.base_card_id == "scrigno":
+            extra = amount if b.completed else 1
+            player.mana_remaining += extra
+            bonus += extra
+    return bonus
+
+
 def _add_walls_to_bastion(state: GameState, player: Player, side: str, count: int, durability: int = 1) -> int:
     """Aggiunge `count` Muri al Bastione `side` del giocatore usando carte dal mazzo."""
     from engine.deck import make_wall_instance
@@ -136,12 +147,23 @@ def estrattore_effect(state: GameState, player: Player, completed: bool = False,
     """Base: roll D10, se ≥6 gain +1 mana. Complete: gain +1 mana automaticamente."""
     if completed:
         player.mana_remaining += 1
-        return {"mana_gained": 1}
+        bonus = _apply_scrigno_bonus(player, 1)
+        return {"mana_gained": 1 + bonus}
     else:
         roll = _roll_d10()
         gained = 1 if roll >= 6 else 0
-        player.mana_remaining += gained
-        return {"roll": roll, "mana_gained": gained}
+        if gained:
+            player.mana_remaining += gained
+            bonus = _apply_scrigno_bonus(player, gained)
+            total = gained + bonus
+        else:
+            total = 0
+        state.recent_events.append({
+            "type": "d10", "card": "estrattore",
+            "player_id": player.id, "roll": roll,
+            "mana_gained": total, "triggered": bool(gained),
+        })
+        return {"roll": roll, "mana_gained": total}
 
 
 @register_effect("granaio_effect")
@@ -154,12 +176,19 @@ def granaio_effect(state: GameState, player: Player, completed: bool = False, **
         return {"cards_drawn": drawn}
     else:
         roll = _roll_d10()
-        if roll >= 6:
+        triggered = roll >= 6
+        if triggered:
             current = len(player.hand)
             to_draw = max(0, 7 - current)
             drawn = _draw_cards(state, player, to_draw) if to_draw > 0 else []
-            return {"roll": roll, "cards_drawn": drawn}
-        return {"roll": roll, "cards_drawn": []}
+        else:
+            drawn = []
+        state.recent_events.append({
+            "type": "d10", "card": "granaio",
+            "player_id": player.id, "roll": roll,
+            "cards_drawn": len(drawn), "triggered": triggered,
+        })
+        return {"roll": roll, "cards_drawn": drawn}
 
 
 @register_effect("fucina_effect")
@@ -291,13 +320,8 @@ def arena_effect(
 def scrigno_effect(state: GameState, player: Player, completed: bool = False, **kwargs) -> dict:
     """
     Passivo: quando una carta (non Scrigno) fa ottenere Mana, ottienine 1 (base) o altrettanto (complete) in più.
-    Stored as active_effect.
+    Handled directly via _apply_scrigno_bonus() at each mana-gain site.
     """
-    player.active_effects.append({
-        "type": "scrigno",
-        "completed": completed,
-        "expires": "permanent",
-    })
     return {"passive": True, "completed": completed}
 
 
@@ -305,16 +329,9 @@ def scrigno_effect(state: GameState, player: Player, completed: bool = False, **
 def obelisco_effect(state: GameState, player: Player, completed: bool = False, **kwargs) -> dict:
     """
     Passivo: dopo aver usato una Magia, roll D10. Se ≥8 (base) o ≥6 (complete), la Magia torna in mano.
-    Stored as active_effect, checked in action handler after playing spell.
+    Handled directly in play_spell via building check.
     """
-    threshold = 6 if completed else 8
-    player.active_effects.append({
-        "type": "obelisco",
-        "threshold": threshold,
-        "completed": completed,
-        "expires": "permanent",
-    })
-    return {"passive": True, "threshold": threshold}
+    return {"passive": True, "threshold": 6 if completed else 8}
 
 
 @register_effect("cardo_effect")
@@ -745,7 +762,8 @@ def investimento_effect(state: GameState, player: Player, prodigy: bool = False,
     Prodigio (additivo &): il prossimo turno ottieni anche 2 Mana aggiuntivi.
     """
     player.mana_remaining += 2
-    result: dict = {"mana_gained": 2}
+    bonus = _apply_scrigno_bonus(player, 2)
+    result: dict = {"mana_gained": 2 + bonus}
 
     if prodigy:
         player.active_effects.append({
@@ -949,6 +967,7 @@ def telecinesi_effect(
     prodigy: bool = False,
     source_player_id: Optional[str] = None,
     source_side: str = "left",
+    dest_player_id: Optional[str] = None,
     dest_side: str = "right",
     count: int = 3,
     **kwargs,
@@ -958,7 +977,7 @@ def telecinesi_effect(
     Prodigio (sostituisce): sposta fino a 3 Muri da un Bastione a uno adiacente (qualsiasi giocatore).
     """
     if not prodigy:
-        # Sposta da un tuo bastione all'altro
+        # Sposta da un tuo bastione all'altro (ignora player params)
         src = player.field.bastion_left if source_side == "left" else player.field.bastion_right
         dst = player.field.bastion_left if dest_side == "left" else player.field.bastion_right
         if src is dst:
@@ -971,19 +990,28 @@ def telecinesi_effect(
                 moved.append(wall.instance_id)
         return {"moved_walls": moved, "from": source_side, "to": dest_side}
     else:
-        # Sposta da un bastione a uno adiacente (di qualsiasi giocatore)
+        # Sposta da un bastione a uno qualsiasi (prodigio: può essere di un altro giocatore)
         source_player = state.get_player(source_player_id) if source_player_id else player
         if source_player is None:
             source_player = player
+        dest_player = state.get_player(dest_player_id) if dest_player_id else source_player
+        if dest_player is None:
+            dest_player = source_player
         src = source_player.field.bastion_left if source_side == "left" else source_player.field.bastion_right
-        dst = source_player.field.bastion_left if dest_side == "left" else source_player.field.bastion_right
+        dst = dest_player.field.bastion_left if dest_side == "left" else dest_player.field.bastion_right
+        if src is dst:
+            return {"error": "Bastioni uguali"}
         moved = []
         for _ in range(min(count, len(src.walls))):
             if src.walls:
                 wall = src.walls.pop(0)
                 dst.walls.append(wall)
                 moved.append(wall.instance_id)
-        return {"moved_walls": moved, "player": source_player.id, "from": source_side, "to": dest_side}
+        return {
+            "moved_walls": moved,
+            "from_player": source_player.id, "from": source_side,
+            "to_player": dest_player.id, "to": dest_side,
+        }
 
 
 @register_effect("cercapersone_effect")

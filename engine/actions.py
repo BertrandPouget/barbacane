@@ -29,6 +29,7 @@ from engine.deck import (
     get_base_card_id,
 )
 from engine.effects import apply_effect, EFFECT_REGISTRY
+import random as _random
 
 
 # ---------------------------------------------------------------------------
@@ -258,7 +259,15 @@ def play_spell(
     if mages_count >= cost_to_pay and mages_count > 0:
         mages_by_school = player.mages_by_school()
         same_school_count = mages_by_school.get(school, 0)
-        prodigy = (same_school_count >= cost_to_pay) and (cost_to_pay > 0 or free_effect)
+        # Madeleine horde: incantesimo prodigy triggers with any mage school
+        madeleine_active = any(
+            e.get("type") == "madeleine_prodigy_any_school"
+            for e in player.active_effects
+        )
+        if madeleine_active and school == "incantesimo":
+            prodigy = (mages_count >= cost_to_pay) and (cost_to_pay > 0 or free_effect)
+        else:
+            prodigy = (same_school_count >= cost_to_pay) and (cost_to_pay > 0 or free_effect)
 
     # Rimuovi dalla mano e consuma azione
     player.hand.remove(instance_id)
@@ -267,8 +276,53 @@ def play_spell(
     # Applica effetto
     result = apply_effect(card.effect_id, state, player, prodigy=prodigy, **kwargs)
 
-    # Scarta la Magia (salvo eccezioni future)
+    # Scarta la Magia
     state.discard_pile.append(instance_id)
+
+    # Araminta horde: anatema cost-1 spells return to hand
+    araminta_eff = next(
+        (e for e in player.active_effects
+         if e.get("type") == "araminta_spell_return"
+         and e.get("school") == school
+         and card.cost <= e.get("cost", 1)),
+        None,
+    )
+    if araminta_eff:
+        if instance_id in state.discard_pile:
+            state.discard_pile.remove(instance_id)
+        player.hand.append(instance_id)
+        result["returned_to_hand"] = True
+
+    # Obelisco: after playing a spell, roll D10 and maybe return to hand
+    if not result.get("returned_to_hand"):
+        for b_inst in player.field.village.buildings:
+            if b_inst.base_card_id == "obelisco":
+                roll = _random.randint(1, 10)
+                threshold = 6 if b_inst.completed else 8
+                returned = roll >= threshold
+                if returned:
+                    if instance_id in state.discard_pile:
+                        state.discard_pile.remove(instance_id)
+                    player.hand.append(instance_id)
+                    result["returned_to_hand"] = True
+                state.recent_events.append({
+                    "type": "d10", "card": "obelisco",
+                    "player_id": player.id, "roll": roll,
+                    "threshold": threshold, "returned": returned,
+                })
+                break
+
+    # Evelyn horde: sortilegio cost-1 spells are cast a second time
+    evelyn_eff = next(
+        (e for e in player.active_effects
+         if e.get("type") == "evelyn_spell_double"
+         and e.get("school") == school
+         and card.cost <= e.get("cost", 1)),
+        None,
+    )
+    if evelyn_eff and not result.get("returned_to_hand"):
+        result["needs_recast"] = True
+        result["recast_base_id"] = base_id
 
     state.add_log(player_id, "play_spell", card=instance_id, prodigy=prodigy)
     return {"card": instance_id, "prodigy": prodigy, "effect": result}
@@ -547,3 +601,86 @@ def activate_horde(
 def place_building_free(state: GameState, player: Player, instance_id: str) -> BuildingInstance:
     """Piazza una Costruzione senza costo Mana (usato da Cercapersone + Prodigio)."""
     return _place_building(state, player, instance_id, free=True)
+
+
+# ---------------------------------------------------------------------------
+# 9. Recast Magia (Orda Evelyn)
+# ---------------------------------------------------------------------------
+
+def recast_spell(
+    state: GameState,
+    player_id: str,
+    base_card_id: str,
+    **kwargs: Any,
+) -> dict:
+    """
+    Rigioca una Magia per la seconda volta (Orda Evelyn).
+    Nessun costo Azione o Maghe — l'effetto viene applicato con nuovi parametri di targeting.
+    """
+    player = _require_current_player(state, player_id)
+
+    evelyn_eff = next(
+        (e for e in player.active_effects if e.get("type") == "evelyn_spell_double"),
+        None,
+    )
+    if evelyn_eff is None:
+        raise ActionError("Effetto Evelyn Orda non attivo.")
+
+    card = get_card(base_card_id)
+    if not isinstance(card, SpellCard):
+        raise ActionError(f"{base_card_id} non è una Magia.")
+
+    # Prodigio: stessa logica della prima giocata
+    mages_count = len(player.mages_in_field())
+    prodigy = False
+    if mages_count > 0 and card.cost > 0:
+        mages_by_school = player.mages_by_school()
+        prodigy = mages_by_school.get(card.school, 0) >= card.cost
+
+    result = apply_effect(card.effect_id, state, player, prodigy=prodigy, **kwargs)
+
+    state.add_log(player_id, "recast_spell", card=base_card_id, prodigy=prodigy)
+    return {"card": base_card_id, "prodigy": prodigy, "effect": result, "recast": True}
+
+
+# ---------------------------------------------------------------------------
+# 10. Distruggi Costruzione (Orda Eracle)
+# ---------------------------------------------------------------------------
+
+def eracle_destroy(
+    state: GameState,
+    player_id: str,
+    building_instance_id: str,
+    target_player_id: str,
+) -> dict:
+    """
+    Distrugge una Costruzione avversaria dopo una vittoria in battaglia (Orda Eracle).
+    Consuma l'effetto Eracle attivo.
+    """
+    player = _require_current_player(state, player_id)
+
+    eracle_eff = next(
+        (e for e in player.active_effects if e.get("type") == "eracle_destroy_building"),
+        None,
+    )
+    if eracle_eff is None:
+        raise ActionError("Effetto Eracle Orda non attivo.")
+
+    target = state.get_player(target_player_id)
+    if target is None:
+        raise ActionError("Giocatore bersaglio non trovato.")
+
+    b = next(
+        (b for b in target.field.village.buildings if b.instance_id == building_instance_id),
+        None,
+    )
+    if b is None:
+        raise ActionError("Costruzione non trovata nel Villaggio avversario.")
+
+    target.field.village.buildings.remove(b)
+    state.discard_pile.append(b.instance_id)
+    player.active_effects.remove(eracle_eff)
+
+    state.add_log(player_id, "eracle_destroy",
+                  building=building_instance_id, from_player=target_player_id)
+    return {"destroyed": building_instance_id, "from_player": target_player_id}

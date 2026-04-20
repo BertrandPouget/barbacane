@@ -323,6 +323,21 @@ def resolve_battle(
         walls_destroyed = battle_result["walls_destroyed"]
         life_lost = battle_result["life_lost"]
 
+    # Eracle horde: if damage >= 3 and effect is active, offer building destruction
+    eracle_destroy_triggered = False
+    eracle_targets = []
+    if total_dmg >= 3:
+        eracle_eff = next(
+            (e for e in attacker.active_effects if e.get("type") == "eracle_destroy_building"),
+            None,
+        )
+        if eracle_eff and defender.field.village.buildings:
+            eracle_destroy_triggered = True
+            eracle_targets = [
+                {"instance_id": b.instance_id, "base_card_id": b.base_card_id}
+                for b in defender.field.village.buildings
+            ]
+
     result = {
         "attacker_id": attacker.id,
         "defender_id": defender.id,
@@ -337,6 +352,8 @@ def resolve_battle(
         "damage_bonus": damage_bonus,
         "walls_destroyed": walls_destroyed,
         "life_lost": life_lost,
+        "eracle_destroy_triggered": eracle_destroy_triggered,
+        "eracle_targets": eracle_targets,
     }
 
     state.add_log(

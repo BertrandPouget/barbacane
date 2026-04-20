@@ -201,6 +201,7 @@ const App = (() => {
     Renderer.render(state, myPlayerId);
 
     if (result) {
+      // Flash danno sul campo del difensore
       if (result.life_lost > 0) {
         const defPlayer = state.players.find(p => p.id === result.defender_id);
         if (defPlayer) {
@@ -211,11 +212,54 @@ const App = (() => {
           }
         }
       }
-      if (action === 'battle' && result) {
+
+      // Log battaglia
+      if (action === 'battle') {
         const log = `⚔ ${result.attacker_id} → ${result.defender_id} [${result.defender_bastion}]: `
           + `${result.total_damage} Danni, ${result.walls_destroyed} Muri, ${result.life_lost} Vita`;
         Renderer.updateBattleLog(log);
       }
+
+      // Eracle: distruggi una costruzione avversaria
+      if (action === 'battle' && result.eracle_destroy_triggered && result.eracle_targets && result.eracle_targets.length > 0
+          && state.current_player_id === myPlayerId) {
+        const options = result.eracle_targets.map(b => {
+          const def = getCardDef(b.instance_id);
+          return { label: def ? def.name : b.base_card_id, value: b.instance_id };
+        });
+        Renderer.showChoiceModal('⚡ Eracle — distruggi una Costruzione avversaria', options, (buildingIId) => {
+          sendAction('eracle_destroy', {
+            building_instance_id: buildingIId,
+            target_player_id: result.defender_id,
+          });
+        });
+        return; // non chiudere il modale; la UI si aggiornerà dopo eracle_destroy
+      }
+    }
+
+    // D10 — mostra tutti gli eventi recenti (Estrattore, Granaio, Obelisco, Fucina)
+    if (state.recent_events && state.recent_events.length > 0) {
+      state.recent_events.forEach(ev => {
+        if (ev.type !== 'd10') return;
+        const pName = (state.players.find(p => p.id === ev.player_id) || {}).name || ev.player_id;
+        let msg, good;
+        if (ev.card === 'estrattore') {
+          good = ev.triggered;
+          msg = `🎲 ${pName} — Estrattore: D10=${ev.roll} — ${good ? `✓ +${ev.mana_gained} Mana!` : '✗ Nessun mana'}`;
+        } else if (ev.card === 'granaio') {
+          good = ev.triggered;
+          msg = `🎲 ${pName} — Granaio: D10=${ev.roll} — ${good ? `✓ ${ev.cards_drawn} carta pescata!` : '✗ Nessuna carta'}`;
+        } else if (ev.card === 'obelisco') {
+          good = ev.returned;
+          msg = `🎲 ${pName} — Obelisco: D10=${ev.roll} (soglia ${ev.threshold}) — ${good ? '✓ Magia in mano!' : '✗ Magia scartata'}`;
+        } else if (ev.card === 'fucina') {
+          good = ev.extra_action;
+          msg = `🎲 ${pName} — Fucina: D10=${ev.roll} — ${good ? '✓ Azione extra!' : '✗ Nessuna azione extra'}`;
+        } else {
+          return;
+        }
+        Renderer.toast(msg, good ? 'success' : 'info');
+      });
     }
 
     if (state.winner_id) {
@@ -684,9 +728,15 @@ const App = (() => {
   function _showSpellOptions(instanceId, def) {
     const opponents = currentState.players.filter(p => p.id !== myPlayerId && p.lives > 0);
 
+    // Telecinesi: UI dedicata a 2 step (source bastion → dest bastion)
+    if (def.id === 'telecinesi') {
+      _showTelecinesiOptions(instanceId);
+      return;
+    }
+
     const spellsNeedingTarget = [
       'ardolancio', 'guerremoto', 'cuordipietra', 'incendifesa',
-      'regicidio', 'malcomune', 'telecinesi', 'bastioncontrario',
+      'regicidio', 'malcomune', 'bastioncontrario',
       'dazipazzi', 'cambiamente',
     ];
 
@@ -711,6 +761,39 @@ const App = (() => {
         instance_id: instanceId,
         target_player_id: targetId,
         target_bastion_side: side,
+      });
+    });
+  }
+
+  function _showTelecinesiOptions(instanceId) {
+    if (!currentState) return;
+    const allPlayers = currentState.players.filter(p => p.lives > 0);
+
+    // Construisce la lista di tutti i bastioni con i loro muri
+    const bastionOptions = [];
+    allPlayers.forEach(p => {
+      const isMe = p.id === myPlayerId;
+      const prefix = isMe ? 'Mio' : p.name;
+      ['left', 'right'].forEach(side => {
+        const bastionData = side === 'left' ? p.field.bastion_left : p.field.bastion_right;
+        const walls = bastionData.wall_count != null ? bastionData.wall_count : 0;
+        const label = `${prefix} — Bastione ${side === 'left' ? 'Sinistro' : 'Destro'} (${walls} muri)`;
+        bastionOptions.push({ label, value: `${p.id}:${side}` });
+      });
+    });
+
+    Renderer.showChoiceModal('Telecinesi — bastione di partenza', bastionOptions, (srcChoice) => {
+      const [srcPlayerId, srcSide] = srcChoice.split(':');
+      const destOptions = bastionOptions.filter(o => o.value !== srcChoice);
+      Renderer.showChoiceModal('Telecinesi — bastione di arrivo', destOptions, (dstChoice) => {
+        const [dstPlayerId, dstSide] = dstChoice.split(':');
+        sendAction('play_spell', {
+          instance_id: instanceId,
+          source_player_id: srcPlayerId,
+          source_side: srcSide,
+          dest_player_id: dstPlayerId,
+          dest_side: dstSide,
+        });
       });
     });
   }

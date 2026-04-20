@@ -15,6 +15,7 @@ from engine.game import (
     public_state,
     do_battle,
     end_turn,
+    check_fucina_after_action,
 )
 from engine.actions import (
     ActionError,
@@ -26,6 +27,8 @@ from engine.actions import (
     reposition_warrior,
     activate_horde,
     evolve_warrior,
+    recast_spell,
+    eracle_destroy,
 )
 from server.lobby import (
     create_lobby,
@@ -177,8 +180,12 @@ async def api_game_action(req: GameActionRequest):
     return {"result": result, "state": public_state(state, player_id)}
 
 
+_ACTION_CONSUMING = {"play_warrior", "play_spell", "play_building", "complete_building", "add_wall", "evolve"}
+
+
 def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
     """Smista l'azione al handler appropriato."""
+    state.recent_events = []   # clear D10 events from previous action
     handlers = {
         "play_warrior": lambda: play_warrior(
             state, player_id,
@@ -224,11 +231,31 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             params["defender_player_index"],
             params.get("defender_bastion_side", "left"),
         ),
+        "recast_spell": lambda: recast_spell(
+            state, player_id,
+            params["base_card_id"],
+            **{k: v for k, v in params.items() if k != "base_card_id"},
+        ),
+        "eracle_destroy": lambda: eracle_destroy(
+            state, player_id,
+            params["building_instance_id"],
+            params["target_player_id"],
+        ),
         "end_turn": lambda: _end_turn_action(state, player_id),
     }
     if action not in handlers:
         raise ActionError(f"Azione sconosciuta: {action}")
-    return handlers[action]()
+    result = handlers[action]()
+
+    # Fucina base: after 2nd action used, roll D10 for possible 3rd action
+    if action in _ACTION_CONSUMING:
+        player = state.get_player(player_id)
+        if player and state.current_player.id == player_id:
+            fucina_res = check_fucina_after_action(state, player)
+            if fucina_res:
+                result["fucina"] = fucina_res
+
+    return result
 
 
 def _end_turn_action(state, player_id: str) -> dict:

@@ -72,12 +72,10 @@ class TestEffettiCostruzioni:
         assert result.get("passive") is True
 
     def test_scrigno_passivo(self):
-        """Scrigno è passivo: aggiunge un active_effect, non mana direttamente."""
+        """Scrigno è passivo: _apply_scrigno_bonus gestisce il bonus direttamente dal building."""
         state, player = self._setup()
-        initial_effects = len(player.active_effects)
         result = apply_effect("scrigno_effect", state, player, completed=False)
         assert result.get("passive") is True
-        assert len(player.active_effects) == initial_effects + 1
 
 
 class TestEffettiMagie:

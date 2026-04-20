@@ -36,6 +36,7 @@ from engine.actions import (
     activate_horde,
     evolve_warrior,
 )
+from engine.effects import _apply_scrigno_bonus
 
 
 # ---------------------------------------------------------------------------
@@ -130,8 +131,11 @@ def _begin_turn(state: GameState) -> None:
     player.mana_remaining = mana
     state.add_log(player.id, "receive_mana", amount=mana)
 
-    # Effetti Costruzioni a inizio turno
+    # Effetti Costruzioni a inizio turno (estrattore, biblioteca, fucina completata)
     _trigger_building_start(state, player)
+
+    # Effetti differiti dal turno precedente (investimento prodigio, divinazione)
+    _process_deferred_effects(state, player)
 
 
 def _trigger_building_start(state: GameState, player: Player) -> None:
@@ -141,8 +145,11 @@ def _trigger_building_start(state: GameState, player: Player) -> None:
         card = get_card(base_id)
         if not isinstance(card, BuildingCard):
             continue
-        if base_id in ("estrattore", "biblioteca", "sorgiva", "scrigno", "obelisco"):
+        if base_id in ("estrattore", "biblioteca", "sorgiva"):
             apply_effect(card.effect_id, state, player, completed=b_inst.completed, trigger="start")
+        elif base_id == "fucina" and b_inst.completed:
+            # Fucina completata: 3a Azione garantita ogni turno
+            player.actions_remaining += 1
 
 
 def _trigger_building_end(state: GameState, player: Player) -> None:
@@ -170,6 +177,63 @@ def _clear_horde_stat_effects(player: Player) -> None:
             to_remove.append(eff)
     for eff in to_remove:
         player.active_effects.remove(eff)
+
+
+def _process_deferred_effects(state: GameState, player: Player) -> None:
+    """Processa effetti con expires='start_of_next_own_turn' (Investimento prodigio, Divinazione)."""
+    to_remove = []
+    for eff in player.active_effects:
+        if eff.get("expires") != "start_of_next_own_turn":
+            continue
+        etype = eff.get("type")
+        if etype == "investimento_deferred":
+            mana = eff.get("mana", 2)
+            player.mana_remaining += mana
+            _apply_scrigno_bonus(player, mana)
+        elif etype == "divinazione_incantesimo":
+            count = sum(
+                1 for w in player.mages_in_field()
+                if CARD_REGISTRY.get(w.base_card_id) and
+                getattr(CARD_REGISTRY[w.base_card_id], "school", None) == "incantesimo"
+            )
+            if count > 0:
+                player.mana_remaining += count
+                _apply_scrigno_bonus(player, count)
+        elif etype == "divinazione_all_mage":
+            count = len(player.mages_in_field())
+            if count > 0:
+                player.mana_remaining += count
+                _apply_scrigno_bonus(player, count)
+        to_remove.append(eff)
+    for eff in to_remove:
+        player.active_effects.remove(eff)
+
+
+def check_fucina_after_action(state: GameState, player: Player) -> Optional[dict]:
+    """
+    Controlla se la Fucina base deve concedere una 3a Azione (dopo la 2a usata).
+    Deve essere chiamata dopo ogni azione che consuma un'azione.
+    """
+    if player.actions_remaining != 0:
+        return None
+    if any(e.get("type") == "fucina_base_triggered" for e in player.active_effects):
+        return None
+    has_base_fucina = any(
+        b.base_card_id == "fucina" and not b.completed
+        for b in player.field.village.buildings
+    )
+    if not has_base_fucina:
+        return None
+    roll = random.randint(1, 10)
+    extra = roll >= 6
+    player.active_effects.append({"type": "fucina_base_triggered", "expires": "end_of_turn"})
+    if extra:
+        player.actions_remaining += 1
+    state.recent_events.append({
+        "type": "d10", "card": "fucina",
+        "player_id": player.id, "roll": roll, "extra_action": extra,
+    })
+    return {"fucina_roll": roll, "extra_action": extra}
 
 
 def _clear_turn_expired_effects(player: Player) -> None:
@@ -386,6 +450,7 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
         "discard_count": len(state.discard_pile),
         "winner_id": state.winner_id,
         "battles_remaining": state.battles_remaining,
+        "recent_events": list(state.recent_events),
     }
 
 
