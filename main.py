@@ -31,8 +31,13 @@ app.include_router(router, prefix="")
 _FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
 _DATA_DIR     = os.path.join(os.path.dirname(__file__), "data")
 
+_ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
+
 # Espone /data/ al frontend (cards.json, rules_config.json)
 app.mount("/data", StaticFiles(directory=_DATA_DIR), name="data")
+
+# Espone /assets/ al frontend (logo.png, ecc.)
+app.mount("/assets", StaticFiles(directory=_ASSETS_DIR), name="assets")
 
 # SPA catch-all: serve file statici se esistono, altrimenti index.html
 @app.get("/")
