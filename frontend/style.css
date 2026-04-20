@@ -697,6 +697,61 @@ input:focus {
 
 #modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
 
+/* Ricerca nel mazzo */
+.search-summary {
+  font-size: 0.85rem;
+  color: var(--gold);
+  margin-bottom: 0.6rem;
+}
+
+.search-deck-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+.search-deck-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0.7rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+
+.search-match {
+  background: var(--bg-light);
+  border-color: var(--gold);
+  color: var(--gold);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.search-match:hover { background: var(--bg-dark); border-color: var(--gold-light); }
+
+.search-no-match {
+  background: transparent;
+  opacity: 0.35;
+  cursor: default;
+}
+
+.search-card-name { font-weight: 600; }
+.search-card-type { font-size: 0.75rem; color: #888; }
+
+.search-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  margin-top: 0.7rem;
+}
+
+.search-page-btn { padding: 0.25rem 0.7rem; font-size: 0.85rem; }
+.search-page-btn:disabled { opacity: 0.35; cursor: default; }
+.search-page-info { font-size: 0.85rem; color: var(--gold); min-width: 3rem; text-align: center; }
+
 /* ==================== TOAST ==================== */
 
 #toast-container {

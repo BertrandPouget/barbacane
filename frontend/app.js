@@ -281,13 +281,21 @@ const App = (() => {
     }
 
     // Chiudi eventuale modale aperta e aggiorna la UI azioni
-    document.getElementById('modal-overlay').classList.add('hidden');
+    // (non chiudere se c'è una ricerca in attesa per questo giocatore)
+    if (!(state.pending_search && state.pending_search.player_id === myPlayerId)) {
+      document.getElementById('modal-overlay').classList.add('hidden');
+    }
     _refreshActionUI();
 
     // Reset timer display quando ricevi un state update (il turn_started WS lo riavvierà)
     if (state.current_player_id === myPlayerId) {
       stopLocalTimer();
       Renderer.hideTimer();
+    }
+
+    // Mostra il modale di ricerca se siamo noi a dover scegliere
+    if (state.pending_search && state.pending_search.player_id === myPlayerId && state.search_deck) {
+      _showSearchModal(state.search_deck, state.pending_search);
     }
   }
 
@@ -903,6 +911,90 @@ const App = (() => {
         });
       });
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Modale Ricerca
+  // ---------------------------------------------------------------------------
+
+  function _showSearchModal(deckView, pendingSearch) {
+    const context = pendingSearch.context;
+    const titles = {
+      'cercapersone_base':     'Cercapersone — scegli una Recluta da aggiungere alla mano',
+      'cercapersone_prodigio': 'Cercapersone ✨ — scegli una Recluta da giocare gratuitamente',
+      'giulio_horde':          'Orda di Giulio — cerca Giulio II nel mazzo',
+    };
+    const PAGE_SIZE = 20;
+    const matchCount = deckView.filter(c => c.matches).length;
+    const totalPages = Math.max(1, Math.ceil(deckView.length / PAGE_SIZE));
+
+    const confirmBtn = document.getElementById('modal-confirm');
+    const cancelBtn  = document.getElementById('modal-cancel');
+    confirmBtn.classList.add('hidden');
+    cancelBtn.classList.add('hidden');
+
+    document.getElementById('modal-title').textContent = titles[context] || 'Cerca nel mazzo';
+    const body = document.getElementById('modal-body');
+    body.innerHTML = `
+      <p class="search-summary">${matchCount} carta${matchCount !== 1 ? 'e' : ''} selezionabil${matchCount !== 1 ? 'i' : 'e'} su ${deckView.length} nel mazzo</p>
+      <div id="search-list" class="search-deck-list"></div>
+      <div id="search-pagination" class="search-pagination"></div>
+    `;
+    document.getElementById('modal-overlay').classList.remove('hidden');
+
+    function renderPage(page) {
+      const slice = deckView.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+      const listEl = document.getElementById('search-list');
+      listEl.innerHTML = '';
+      slice.forEach(card => {
+        const typeLabel = card.type === 'warrior' ? (card.subtype === 'recruit' ? 'Recluta' : 'Eroe')
+                        : card.type === 'spell'   ? 'Magia'
+                        : 'Costruzione';
+        const div = document.createElement('div');
+        div.className = `search-deck-card ${card.matches ? 'search-match' : 'search-no-match'}`;
+        div.innerHTML = `<span class="search-card-name">${card.name}</span><span class="search-card-type">${typeLabel}</span>`;
+        if (card.matches) {
+          div.addEventListener('click', async () => {
+            confirmBtn.classList.remove('hidden');
+            cancelBtn.classList.remove('hidden');
+            document.getElementById('modal-overlay').classList.add('hidden');
+            try {
+              await sendAction('resolve_search', { chosen_iid: card.instance_id });
+            } catch (e) {
+              Renderer.toast(e.message || 'Errore nella ricerca', 'error');
+            }
+          });
+        }
+        listEl.appendChild(div);
+      });
+
+      const pagEl = document.getElementById('search-pagination');
+      pagEl.innerHTML = '';
+      if (totalPages > 1) {
+        const prev = document.createElement('button');
+        prev.className = 'btn btn-secondary search-page-btn';
+        prev.textContent = '← Prec';
+        prev.disabled = page === 0;
+        prev.addEventListener('click', () => renderPage(page - 1));
+
+        const info = document.createElement('span');
+        info.className = 'search-page-info';
+        info.textContent = `${page + 1} / ${totalPages}`;
+
+        const next = document.createElement('button');
+        next.className = 'btn btn-secondary search-page-btn';
+        next.textContent = 'Succ →';
+        next.disabled = page === totalPages - 1;
+        next.addEventListener('click', () => renderPage(page + 1));
+
+        pagEl.appendChild(prev);
+        pagEl.appendChild(info);
+        pagEl.appendChild(next);
+      }
+    }
+
+    renderPage(0);
   }
 
   // ---------------------------------------------------------------------------

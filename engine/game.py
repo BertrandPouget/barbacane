@@ -89,7 +89,11 @@ def create_game(player_names: List[str], game_id: Optional[str] = None) -> GameS
                 player.life_cards.append(state.deck.pop(0))
 
     # Distribuisce 6 carte in mano a ogni giocatore
+    # Se un giocatore si chiama "Test", le prime carte pescate sono quelle di test_cards.json
+    _test_cards = _load_test_card_ids()
     for player in players:
+        if player.name == "Test" and _test_cards:
+            _move_to_front(state.deck, _test_cards)
         draw_cards(state, player.id, 6)
 
     # Assegna il Mana iniziale al primo giocatore
@@ -445,6 +449,13 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
         }
         players_view.append(p_view)
 
+    ps = state.pending_search
+    search_deck = (
+        _search_deck_view(state, ps["condition"])
+        if ps and ps.get("player_id") == viewer_player_id
+        else None
+    )
+
     return {
         "game_id": state.game_id,
         "turn": state.turn,
@@ -456,7 +467,64 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
         "winner_id": state.winner_id,
         "battles_remaining": state.battles_remaining,
         "recent_events": list(state.recent_events),
+        "pending_search": ps,
+        "search_deck": search_deck,
     }
+
+
+def _load_test_card_ids() -> list:
+    """Carica la lista di base_card_id da data/test_cards.json, o [] se assente/invalido."""
+    import json, os
+    path = os.path.join(os.path.dirname(__file__), "..", "data", "test_cards.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def _move_to_front(deck: list, base_card_ids: list) -> None:
+    """Sposta in cima al mazzo la prima istanza di ciascun base_card_id richiesto."""
+    from engine.deck import get_base_card_id
+    insert_pos = 0
+    for base_id in base_card_ids:
+        for i in range(insert_pos, len(deck)):
+            if get_base_card_id(deck[i]) == base_id:
+                deck.insert(insert_pos, deck.pop(i))
+                insert_pos += 1
+                break
+
+
+def _search_deck_view(state: GameState, condition: dict) -> list:
+    """Ritorna le carte del mazzo con flag 'matches', ordinate: matching prima."""
+    from engine.deck import get_base_card_id
+    from engine.cards import CARD_REGISTRY, WarriorCard
+
+    ctype = condition.get("type")
+    cvalue = condition.get("value")
+    result = []
+    for iid in state.deck:
+        base_id = get_base_card_id(iid)
+        card = CARD_REGISTRY.get(base_id)
+        if card is None:
+            continue
+        if ctype == "subtype":
+            matches = isinstance(card, WarriorCard) and card.subtype == cvalue
+        elif ctype == "base_card_id":
+            matches = base_id == cvalue
+        else:
+            matches = False
+        result.append({
+            "instance_id": iid,
+            "base_card_id": base_id,
+            "name": card.name,
+            "type": card.type,
+            "subtype": getattr(card, "subtype", None),
+            "matches": matches,
+        })
+    result.sort(key=lambda x: 0 if x["matches"] else 1)
+    return result
 
 
 def _available_hordes(player: Player) -> list:

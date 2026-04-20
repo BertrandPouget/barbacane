@@ -249,6 +249,10 @@ _ACTION_CONSUMING = {"play_warrior", "play_spell", "play_building", "complete_bu
 def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
     """Smista l'azione al handler appropriato."""
     state.recent_events = []   # clear D10 events from previous action
+
+    if state.pending_search and action != "resolve_search":
+        raise ActionError("C'è una ricerca in attesa di risoluzione.")
+
     handlers = {
         "play_warrior": lambda: play_warrior(
             state, player_id,
@@ -309,6 +313,9 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             params["instance_id"],
             params.get("source", "hand"),
         ),
+        "resolve_search": lambda: _resolve_search_action(
+            state, player_id, params.get("chosen_iid"),
+        ),
         "arena_activate": lambda: arena_activate(
             state, player_id,
             params["building_instance_id"],
@@ -330,6 +337,64 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             if fucina_res:
                 result["fucina"] = fucina_res
 
+    return result
+
+
+def _resolve_search_action(state, player_id: str, chosen_iid: Optional[str]) -> dict:
+    ps = state.pending_search
+    if not ps:
+        raise ActionError("Nessuna ricerca in corso.")
+    if ps["player_id"] != player_id:
+        raise ActionError("Non è la tua ricerca.")
+    if not chosen_iid:
+        raise ActionError("Devi scegliere una carta.")
+
+    if chosen_iid not in state.deck:
+        raise ActionError("La carta scelta non è nel mazzo.")
+
+    from engine.deck import get_base_card_id
+    from engine.cards import CARD_REGISTRY
+    from engine.models import WarriorCard
+
+    base_id = get_base_card_id(chosen_iid)
+    card = CARD_REGISTRY.get(base_id)
+    condition = ps["condition"]
+    ctype = condition.get("type")
+    cvalue = condition.get("value")
+
+    if ctype == "subtype":
+        if not (isinstance(card, WarriorCard) and card.subtype == cvalue):
+            raise ActionError("La carta scelta non soddisfa la condizione di ricerca.")
+    elif ctype == "base_card_id":
+        if base_id != cvalue:
+            raise ActionError("La carta scelta non soddisfa la condizione di ricerca.")
+
+    import random as _random
+    state.deck.remove(chosen_iid)
+    _random.shuffle(state.deck)
+
+    player = state.get_player(player_id)
+    context = ps["context"]
+    result: dict = {"resolved_search": chosen_iid, "context": context}
+
+    if context == "cercapersone_base":
+        player.hand.append(chosen_iid)
+        state.add_log(player_id, "search", card=chosen_iid)
+        result["added_to_hand"] = chosen_iid
+
+    elif context == "cercapersone_prodigio":
+        from engine.deck import make_warrior_instance
+        warrior_inst = make_warrior_instance(chosen_iid)
+        player.field.vanguard.append(warrior_inst)
+        state.add_log(player_id, "search_play", card=chosen_iid)
+        result["played_to_vanguard"] = chosen_iid
+
+    elif context == "giulio_horde":
+        player.hand.append(chosen_iid)
+        state.add_log(player_id, "search", card=chosen_iid)
+        result["added_to_hand"] = chosen_iid
+
+    state.pending_search = None
     return result
 
 

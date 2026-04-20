@@ -305,6 +305,7 @@ class GameState(BaseModel):
     battle_done_this_turn: bool = False
     battles_remaining: int = 1  # default 1 per turno, può aumentare
     recent_events: List[Dict[str, Any]] = Field(default_factory=list)  # D10 rolls, cleared each action
+    pending_search: Optional[Dict[str, Any]] = None  # set when a cerca effect awaits player choice
     turn_timer: int = 120  # secondi per turno; 0 = disattivato
 
     @property
