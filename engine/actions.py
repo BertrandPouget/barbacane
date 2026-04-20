@@ -684,3 +684,80 @@ def eracle_destroy(
     state.add_log(player_id, "eracle_destroy",
                   building=building_instance_id, from_player=target_player_id)
     return {"destroyed": building_instance_id, "from_player": target_player_id}
+
+
+# ---------------------------------------------------------------------------
+# 11. Scarta carta (dalla mano o dal campo, senza vincoli di turno)
+# ---------------------------------------------------------------------------
+
+def discard_card(
+    state: GameState,
+    player_id: str,
+    instance_id: str,
+    source: str,  # "hand" | "field" | "village"
+) -> dict:
+    """
+    Scarta una carta dalla mano o dal campo.
+    Non richiede che sia il turno del giocatore. Non consuma Azioni.
+    """
+    player = state.get_player(player_id)
+    if player is None:
+        raise ActionError(f"Giocatore {player_id} non trovato.")
+
+    if source == "hand":
+        if instance_id not in player.hand:
+            raise ActionError(f"La carta {instance_id} non è nella tua mano.")
+        player.hand.remove(instance_id)
+        state.discard_pile.append(instance_id)
+
+    elif source == "field":
+        warrior = None
+        region_name = None
+        for rname, rlist in _warrior_regions(player):
+            for w in rlist:
+                if w.instance_id == instance_id:
+                    warrior = w
+                    region_name = rname
+                    break
+            if warrior:
+                break
+        if warrior is None:
+            raise ActionError(f"Guerriero {instance_id} non trovato in campo.")
+
+        region_list = _get_region(player, region_name)
+        region_list.remove(warrior)
+
+        if warrior.evolved_from:
+            # Eroe scartato: la Recluta torna in campo con le carte assegnate
+            recruit_iid = warrior.evolved_from
+            if recruit_iid in state.discard_pile:
+                state.discard_pile.remove(recruit_iid)
+            recruit_inst = WarriorInstance(
+                instance_id=recruit_iid,
+                base_card_id=get_base_card_id(recruit_iid),
+                assigned_cards=list(warrior.assigned_cards),
+                temp_modifiers={},
+            )
+            region_list.append(recruit_inst)
+        else:
+            # Recluta scartata: anche le carte assegnate vanno negli scarti
+            for ac_iid in warrior.assigned_cards:
+                state.discard_pile.append(ac_iid)
+
+        state.discard_pile.append(instance_id)
+
+    elif source == "village":
+        b_inst = next(
+            (b for b in player.field.village.buildings if b.instance_id == instance_id),
+            None,
+        )
+        if b_inst is None:
+            raise ActionError(f"Costruzione {instance_id} non trovata nel Villaggio.")
+        player.field.village.buildings.remove(b_inst)
+        state.discard_pile.append(instance_id)
+
+    else:
+        raise ActionError(f"Sorgente non valida: {source}.")
+
+    state.add_log(player_id, "discard_card", card=instance_id, source=source)
+    return {"discarded": instance_id, "source": source}

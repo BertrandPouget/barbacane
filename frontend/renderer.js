@@ -387,7 +387,7 @@ const Renderer = (() => {
   // Card detail overlay
   // ---------------------------------------------------------------------------
 
-  function showCardDetail(title, bodyHTML, actionLabel, onAction) {
+  function showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard) {
     document.getElementById('card-detail-title').textContent = title;
     document.getElementById('card-detail-body').innerHTML = bodyHTML;
 
@@ -398,6 +398,14 @@ const Renderer = (() => {
       actionBtn.classList.remove('hidden');
     } else {
       actionBtn.classList.add('hidden');
+    }
+
+    const discardBtn = document.getElementById('card-detail-discard-btn');
+    if (onDiscard) {
+      discardBtn.onclick = onDiscard;
+      discardBtn.classList.remove('hidden');
+    } else {
+      discardBtn.classList.add('hidden');
     }
 
     const overlay = document.getElementById('card-detail-overlay');

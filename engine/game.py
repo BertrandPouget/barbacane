@@ -20,6 +20,8 @@ from engine.models import (
     PlayerField,
     Bastion,
     Village,
+    WarriorInstance,
+    BuildingInstance,
 )
 from engine.cards import CARD_REGISTRY, get_card, WarriorCard, SpellCard, BuildingCard
 from engine.deck import build_deck, draw_cards, get_base_card_id

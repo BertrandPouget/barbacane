@@ -662,8 +662,18 @@ const App = (() => {
       };
     }
 
+    // Bottone Scarta: disponibile per le proprie carte (mano, campo, villaggio) in qualsiasi momento
+    let onDiscard = null;
+    if (source === 'hand' || source === 'field' || source === 'village') {
+      const discardSource = source === 'field' ? 'field' : (source === 'village' ? 'village' : 'hand');
+      onDiscard = () => {
+        Renderer.closeCardDetail();
+        sendAction('discard', { instance_id: instanceId, source: discardSource });
+      };
+    }
+
     const title = def ? def.name : (fieldWarrior ? (fieldWarrior.name || instanceId) : instanceId);
-    Renderer.showCardDetail(title, bodyHTML, actionLabel, onAction);
+    Renderer.showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard);
   }
 
   function showPlayOptions(instanceId, def) {
