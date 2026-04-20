@@ -662,8 +662,23 @@ const App = (() => {
       };
     }
 
+    let onDiscard = null;
+    if (isMyTurn) {
+      if (source === 'hand') {
+        onDiscard = () => {
+          Renderer.closeCardDetail();
+          sendAction('discard_from_hand', { instance_id: instanceId });
+        };
+      } else if (source === 'field' || source === 'village') {
+        onDiscard = () => {
+          Renderer.closeCardDetail();
+          sendAction('discard_from_field', { instance_id: instanceId });
+        };
+      }
+    }
+
     const title = def ? def.name : (fieldWarrior ? (fieldWarrior.name || instanceId) : instanceId);
-    Renderer.showCardDetail(title, bodyHTML, actionLabel, onAction);
+    Renderer.showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard);
   }
 
   function showPlayOptions(instanceId, def) {

@@ -684,3 +684,80 @@ def eracle_destroy(
     state.add_log(player_id, "eracle_destroy",
                   building=building_instance_id, from_player=target_player_id)
     return {"destroyed": building_instance_id, "from_player": target_player_id}
+
+
+# ---------------------------------------------------------------------------
+# 11. Scarta carta dalla mano (senza consumo di azione)
+# ---------------------------------------------------------------------------
+
+def discard_from_hand(
+    state: GameState,
+    player_id: str,
+    instance_id: str,
+) -> dict:
+    """Scarta una carta dalla mano senza consumare azioni né Mana."""
+    player = _require_current_player(state, player_id)
+
+    if instance_id not in player.hand:
+        raise ActionError("Carta non presente in mano.")
+
+    player.hand.remove(instance_id)
+    state.discard_pile.append(instance_id)
+
+    state.add_log(player_id, "discard_from_hand", card=instance_id)
+    return {"discarded": instance_id}
+
+
+# ---------------------------------------------------------------------------
+# 12. Scarta carta dal campo (senza consumo di azione)
+# ---------------------------------------------------------------------------
+
+def discard_from_field(
+    state: GameState,
+    player_id: str,
+    instance_id: str,
+) -> dict:
+    """
+    Scarta una carta dal campo (Guerriero o Costruzione) senza consumare azioni né Mana.
+    - Eroe scartato: la Recluta torna in gioco nella stessa regione con le carte assegnate.
+    - Recluta scartata: le carte assegnate vengono scartate insieme.
+    """
+    player = _require_current_player(state, player_id)
+
+    for region_name, region_list in _warrior_regions(player):
+        for w in region_list:
+            if w.instance_id == instance_id:
+                region_list.remove(w)
+                state.discard_pile.append(instance_id)
+                if w.evolved_from:
+                    # Eroe scartato: ripristina la Recluta nella stessa regione
+                    recruit_base_id = get_base_card_id(w.evolved_from)
+                    recruit_inst = WarriorInstance(
+                        instance_id=w.evolved_from,
+                        base_card_id=recruit_base_id,
+                        assigned_cards=list(w.assigned_cards),
+                        temp_modifiers=dict(w.temp_modifiers),
+                    )
+                    region_list.append(recruit_inst)
+                    state.add_log(player_id, "discard_from_field",
+                                  card=instance_id, region=region_name,
+                                  recruit_restored=w.evolved_from)
+                    return {"discarded": instance_id, "region": region_name,
+                            "recruit_restored": w.evolved_from}
+                else:
+                    for ac in w.assigned_cards:
+                        state.discard_pile.append(ac)
+                    state.add_log(player_id, "discard_from_field",
+                                  card=instance_id, region=region_name)
+                    return {"discarded": instance_id, "region": region_name,
+                            "assigned_discarded": list(w.assigned_cards)}
+
+    for b in player.field.village.buildings:
+        if b.instance_id == instance_id:
+            player.field.village.buildings.remove(b)
+            state.discard_pile.append(instance_id)
+            state.add_log(player_id, "discard_from_field",
+                          card=instance_id, region="village")
+            return {"discarded": instance_id, "region": "village"}
+
+    raise ActionError("Carta non trovata in campo.")

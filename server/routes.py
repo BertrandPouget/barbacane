@@ -29,6 +29,8 @@ from engine.actions import (
     evolve_warrior,
     recast_spell,
     eracle_destroy,
+    discard_from_hand,
+    discard_from_field,
 )
 from server.lobby import (
     create_lobby,
@@ -240,6 +242,14 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             state, player_id,
             params["building_instance_id"],
             params["target_player_id"],
+        ),
+        "discard_from_hand": lambda: discard_from_hand(
+            state, player_id,
+            params["instance_id"],
+        ),
+        "discard_from_field": lambda: discard_from_field(
+            state, player_id,
+            params["instance_id"],
         ),
         "end_turn": lambda: _end_turn_action(state, player_id),
     }

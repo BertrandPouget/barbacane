@@ -6,8 +6,6 @@ Dopo
 - giocare online
 - fixare evoluzioni
 - fixare vitalflusso (non aggiunge sorgiva ma una carta dal mazzo)
-- fixare display risultati del D10 (afferma di mostrarla in public_state --> recent events)
-- testare il corretto funzionamento di Eracle
 - testare il corretto funzionamento di Telecinesi
 
 Opzionale
