@@ -98,15 +98,17 @@ def _is_hero(w: WarriorInstance) -> bool:
 
 def _discard_warrior_from_player(state: GameState, player: Player, warrior_iid: str) -> bool:
     """Rimuove un guerriero dal campo del giocatore e lo mette negli scarti."""
+    region_names = ["vanguard", "bastion_left", "bastion_right"]
     regions = [
         player.field.vanguard,
         player.field.bastion_left.warriors,
         player.field.bastion_right.warriors,
     ]
-    for region in regions:
+    for region_name, region in zip(region_names, regions):
         for w in region:
             if w.instance_id == warrior_iid:
                 region.remove(w)
+                player.deactivate_broken_horde(w, region_name)
                 state.discard_pile.append(w.instance_id)
                 return True
     return False

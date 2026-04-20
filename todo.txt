@@ -3,6 +3,7 @@ Subito
 - implementare effetti mancanti (es. D10)
 
 Dopo
+- ordine azioni
 - giocare online
 - fixare evoluzioni
 - fixare vitalflusso (non aggiunge sorgiva ma una carta dal mazzo)
@@ -13,5 +14,3 @@ Opzionale
 - rimuovere azioni da homepage
 - utilizzare logo
 - timer funzionante
-- not defined in game.py BuildingInstance WarriorInstance
-

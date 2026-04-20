@@ -113,7 +113,10 @@ def _begin_turn(state: GameState) -> None:
 
     # Reset stato turno
     player.actions_remaining = 2
-    player.horde_used_this_turn = False
+    player.hordes_activated_this_turn = []
+    # Pulisce flag horde_active da turni precedenti
+    for w in player.all_warriors():
+        w.horde_active = False
     state.phase = "action"
     state.battle_done_this_turn = False
     state.battles_remaining = 1 + player.extra_battles
@@ -413,7 +416,7 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
             "life_cards": p.life_cards if p.id == viewer_player_id else None,
             "mana_remaining": p.mana_remaining if p.id == viewer_player_id else None,
             "actions_remaining": p.actions_remaining if p.id == viewer_player_id else None,
-            "horde_used_this_turn": p.horde_used_this_turn if p.id == viewer_player_id else None,
+            "hordes_activated_this_turn": p.hordes_activated_this_turn if p.id == viewer_player_id else None,
             "available_hordes": _available_hordes(p) if p.id == viewer_player_id else None,
             "hand_count": len(p.hand),
             "hand": p.hand if p.id == viewer_player_id else None,
@@ -474,11 +477,13 @@ def _available_hordes(player: Player) -> list:
                     "name": card.name,
                     "horde_effect": card.horde_effect,
                 })
+        horde_key = f"{horde['zone']}:{horde['species']}"
         if warrior_data:
             result.append({
                 "species": horde["species"],
                 "zone": horde["zone"],
                 "warriors": warrior_data,
+                "already_activated": horde_key in player.hordes_activated_this_turn,
             })
     return result
 
@@ -630,21 +635,21 @@ def _bot_reposition(state: GameState, player: Player) -> None:
 
 
 def _bot_try_horde(state: GameState, player: Player) -> None:
-    """Attiva un effetto Orda se disponibile."""
-    hordes = player.check_horde()
-    if not hordes:
-        return
-    species = random.choice(list(hordes.keys()))
-    # Sceglie casualmente una carta dell'Orda con effetto
-    warriors = hordes[species]
-    for w in warriors:
-        card = get_card(w.base_card_id)
-        if isinstance(card, WarriorCard) and card.horde_effect_id:
-            try:
-                activate_horde(state, player.id, w.base_card_id, w.instance_id)
-                return
-            except ActionError:
-                continue
+    """Attiva tutte le Orde disponibili (una per zona+specie)."""
+    hordes = player.check_horde_with_zones()
+    for horde in hordes:
+        zone = horde["zone"]
+        species = horde["species"]
+        if f"{zone}:{species}" in player.hordes_activated_this_turn:
+            continue
+        for w in horde["warriors"]:
+            card = get_card(w.base_card_id)
+            if isinstance(card, WarriorCard) and card.horde_effect_id:
+                try:
+                    activate_horde(state, player.id, w.base_card_id, w.instance_id, zone=zone)
+                    break
+                except ActionError:
+                    continue
 
 
 # ---------------------------------------------------------------------------

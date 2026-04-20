@@ -527,9 +527,13 @@ def reposition_warrior(
     # Aggiungi alla destinazione
     _get_region(player, destination).append(warrior)
 
+    # Disattiva l'Orda se il movimento l'ha rotta
+    player.deactivate_broken_horde(warrior, source_region)
+
     state.add_log(player_id, "reposition", warrior=warrior_instance_id,
                   from_region=source_region, to_region=destination)
     return {"warrior": warrior_instance_id, "from": source_region, "to": destination}
+
 
 
 def _get_region(player: Player, region: str):
@@ -551,47 +555,58 @@ def activate_horde(
     player_id: str,
     horde_card_id: str,  # base_card_id della carta al centro dell'Orda
     warrior_instance_id: Optional[str] = None,
+    zone: Optional[str] = None,  # zona specifica; auto-rilevata se assente
     **kwargs: Any,
 ) -> dict:
     """
-    Attiva un effetto Orda.
-    Richiede che esista un'Orda (≥3 Guerrieri stessa Specie) in campo.
-    Il giocatore sceglie quale effetto attivare (quale carta usare come centro).
+    Attiva un effetto Orda per una specifica zona+specie.
+    Ogni Orda (stessa Specie nella stessa Regione) può essere attivata una sola volta per turno.
     """
     if state.phase not in ("horde", "action"):
         raise ActionError("Attivazione Orda non disponibile in questa fase.")
 
     player = _require_current_player(state, player_id)
 
-    if player.horde_used_this_turn:
-        raise ActionError("Hai già attivato un'Orda questo turno.")
-
-    hordes = player.check_horde()
-
-    # Trova la Specie della carta Orda selezionata
     card = get_card(horde_card_id)
     if not isinstance(card, WarriorCard):
         raise ActionError(f"{horde_card_id} non è un Guerriero.")
 
     species = card.species
-    if species not in hordes:
-        raise ActionError(f"Nessuna Orda attiva per la specie {species}.")
-
     horde_effect_id = card.horde_effect_id
     if not horde_effect_id:
         raise ActionError(f"La carta {horde_card_id} non ha effetto Orda.")
 
-    # Segna visivamente la carta al centro dell'Orda
-    for w in hordes[species]:
+    # Trova le Orde valide per questa specie non ancora attivate
+    all_hordes = player.check_horde_with_zones()
+    candidates = [
+        h for h in all_hordes
+        if h["species"] == species
+        and f"{h['zone']}:{species}" not in player.hordes_activated_this_turn
+        and any(w.base_card_id == horde_card_id for w in h["warriors"])
+    ]
+    if not candidates:
+        raise ActionError(f"Nessuna Orda disponibile per la specie {species} con la carta {horde_card_id}.")
+
+    # Scegli la zona specificata o la prima disponibile
+    if zone and any(h["zone"] == zone for h in candidates):
+        horde = next(h for h in candidates if h["zone"] == zone)
+    else:
+        horde = candidates[0]
+
+    horde_zone = horde["zone"]
+    horde_key = f"{horde_zone}:{species}"
+
+    # Segna visivamente la carta al centro dell'Orda (solo nella zona attivata)
+    for w in horde["warriors"]:
         w.horde_active = (w.base_card_id == horde_card_id)
 
     result = apply_effect(horde_effect_id, state, player,
                           warrior_iid=warrior_instance_id, **kwargs)
 
-    player.horde_used_this_turn = True
-    state.add_log(player_id, "activate_horde", species=species,
+    player.hordes_activated_this_turn.append(horde_key)
+    state.add_log(player_id, "activate_horde", species=species, zone=horde_zone,
                   horde_card=horde_card_id, effect=horde_effect_id, result=result)
-    return {"species": species, "horde_card": horde_card_id, "effect": result}
+    return {"species": species, "zone": horde_zone, "horde_card": horde_card_id, "effect": result}
 
 
 # ---------------------------------------------------------------------------
@@ -726,6 +741,7 @@ def discard_card(
 
         region_list = _get_region(player, region_name)
         region_list.remove(warrior)
+        player.deactivate_broken_horde(warrior, region_name)
 
         if warrior.evolved_from:
             # Eroe scartato: la Recluta torna in campo con le carte assegnate

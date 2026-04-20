@@ -146,7 +146,7 @@ class Player(BaseModel):
     skip_mana_next_turn: bool = False  # Dazipazzi
     extra_battles: int = 0  # Eracles horde
     spell_cost_reductions: Dict[str, int] = Field(default_factory=dict)  # school -> reduction
-    horde_used_this_turn: bool = False
+    hordes_activated_this_turn: List[str] = Field(default_factory=list)  # "{zone}:{species}" keys
 
     @computed_field
     @property
@@ -213,6 +213,61 @@ class Player(BaseModel):
             if sp not in result:
                 result[sp] = h["warriors"]
         return result
+
+    def deactivate_broken_horde(self, warrior: "WarriorInstance", source_region: str) -> bool:
+        """
+        Da chiamare DOPO aver rimosso `warrior` da `source_region`.
+        Se l'orda di quella zona era attiva e ora è rotta (<3 della stessa specie),
+        disattiva i flag e i bonus stat. Ritorna True se un'orda è stata disattivata.
+        """
+        from engine.cards import CARD_REGISTRY, WarriorCard
+        card = CARD_REGISTRY.get(warrior.base_card_id)
+        if not isinstance(card, WarriorCard):
+            return False
+        species = card.species
+        horde_key = f"{source_region}:{species}"
+        if horde_key not in self.hordes_activated_this_turn:
+            return False
+
+        zone_map = {
+            "vanguard": self.field.vanguard,
+            "bastion_left": self.field.bastion_left.warriors,
+            "bastion_right": self.field.bastion_right.warriors,
+        }
+        source_list = zone_map.get(source_region, [])
+        same_species_remaining = sum(
+            1 for w in source_list
+            if isinstance(CARD_REGISTRY.get(w.base_card_id), WarriorCard)
+            and CARD_REGISTRY[w.base_card_id].species == species
+        )
+        if same_species_remaining >= 3:
+            return False
+
+        # Orda rotta: disattiva
+        self.hordes_activated_this_turn.remove(horde_key)
+        for w in source_list:
+            c = CARD_REGISTRY.get(w.base_card_id)
+            if isinstance(c, WarriorCard) and c.species == species:
+                w.horde_active = False
+        warrior.horde_active = False
+
+        # Rimuovi i bonus stat dell'Orda da active_effects
+        to_remove = []
+        for eff in self.active_effects:
+            if eff.get("type") == "horde_stat_bonus":
+                w_iid = eff.get("warrior_iid")
+                for w in source_list:
+                    if w.instance_id == w_iid:
+                        for stat in ("att", "git", "dif"):
+                            bonus = eff.get(stat, 0)
+                            if bonus:
+                                w.temp_modifiers[stat] = max(0, w.temp_modifiers.get(stat, 0) - bonus)
+                        to_remove.append(eff)
+                        break
+        for eff in to_remove:
+            if eff in self.active_effects:
+                self.active_effects.remove(eff)
+        return True
 
 
 # ---------------------------------------------------------------------------

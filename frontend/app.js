@@ -325,10 +325,9 @@ const App = (() => {
     const isMyTurn = currentState.current_player_id === myPlayerId;
     const player = currentState.players.find(p => p.id === myPlayerId);
 
-    // Horde button: visible when it's my turn, hordes available, not yet used
+    // Horde button: visible when it's my turn and there's at least one non-activated horde
     const hasHorde = isMyTurn && player &&
-      player.available_hordes && player.available_hordes.length > 0 &&
-      !player.horde_used_this_turn;
+      player.available_hordes && player.available_hordes.some(h => !h.already_activated);
     document.getElementById('btn-horde').classList.toggle('hidden', !hasHorde);
 
     if (!isMyTurn) {
@@ -356,12 +355,7 @@ const App = (() => {
     const player = currentState.players.find(p => p.id === myPlayerId);
     if (!player) return;
 
-    if (player.horde_used_this_turn) {
-      Renderer.toast("Hai già attivato un'Orda questo turno", 'error');
-      return;
-    }
-
-    const hordes = player.available_hordes || [];
+    const hordes = (player.available_hordes || []).filter(h => !h.already_activated);
     if (hordes.length === 0) {
       Renderer.toast('Nessuna Orda disponibile', 'error');
       return;
@@ -380,14 +374,14 @@ const App = (() => {
       for (const w of horde.warriors) {
         options.push({
           label: `[${cap(horde.species)}, ${zoneName}] ${w.name}: ${w.horde_effect}`,
-          value: `${w.base_card_id}|${w.instance_id}`,
+          value: `${w.base_card_id}|${w.instance_id}|${horde.zone}`,
         });
       }
     }
 
     Renderer.showChoiceModal('Attiva Effetto Orda', options, (choice) => {
-      const [hordeCArId, warriorIId] = choice.split('|');
-      sendAction('horde', { horde_card_id: hordeCArId, warrior_instance_id: warriorIId });
+      const [hordeCArId, warriorIId, hZone] = choice.split('|');
+      sendAction('horde', { horde_card_id: hordeCArId, warrior_instance_id: warriorIId, zone: hZone });
     });
   }
 
@@ -630,14 +624,11 @@ const App = (() => {
     let onAction = null;
 
     if (source === 'hand' && isMyTurn) {
-      if (actionMode === 'play_card') {
-        actionLabel = 'Gioca carta';
-        onAction = () => { Renderer.closeCardDetail(); showPlayOptions(instanceId, def); };
-      } else if (actionMode === null) {
+      if (actionMode === 'play_card' || actionMode === null) {
         const player = currentState.players.find(p => p.id === myPlayerId);
         if (player && player.actions_remaining > 0) {
-          // Hint visivo: suggerisci di scegliere prima il tipo di azione
-          bodyHTML += `<div class="detail-dim" style="margin-top:0.3rem">Scegli "Gioca carta" dal pannello per giocarla.</div>`;
+          actionLabel = 'Gioca';
+          onAction = () => { Renderer.closeCardDetail(); showPlayOptions(instanceId, def); };
         }
       }
     } else if (source === 'field' && isMyTurn) {

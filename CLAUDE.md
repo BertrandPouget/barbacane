@@ -204,7 +204,7 @@ Per il regolamento completo consultare `assets/rules.md`. Questa sezione riassum
 2. **Azione 1** (opzionale): Giocare una carta, Completare una Costruzione, o Aggiungere fino a 3 Muri
 3. **Azione 2** (opzionale): idem
 4. **Riposiziona Guerrieri** tra Avanscoperta e Bastioni a piacimento
-5. **Attiva Orde**: per ogni Orda (3 Guerrieri stessa Specie), scegli quale effetto Orda attivare; la carta scelta si posiziona tra le altre due
+5. **Attiva Orde**: per ogni Orda (3 Guerrieri stessa Specie stessa Regione), scegli quale effetto Orda attivare; la carta scelta si posiziona tra le altre due
 6. **Battaglia** (opzionale): attacca un Bastione avversario adiacente; richiede almeno un Guerriero in Avanscoperta
 7. **Pesca** fino a 6 carte in mano (o limite modificato da carte); se ne hai già di più non scarti
 
@@ -258,7 +258,7 @@ Se il mazzo si esaurisce, la pila degli scarti viene mescolata e diventa il nuov
 
 ### Orda
 
-- 3 Guerrieri della stessa Specie in campo (qualsiasi Regione).
+- 3 Guerrieri della stessa Specie nella stessa Regione.
 - A fine turno, il giocatore sceglie quale effetto Orda attivare tra quelli disponibili.
 - Se l'Orda aveva già un effetto attivo, esso viene prima disattivato.
 
