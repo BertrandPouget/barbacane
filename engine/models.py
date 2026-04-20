@@ -55,6 +55,7 @@ class BuildingCard(BaseModel):
     completion_cost: int
     base_effect: str
     complete_effect: str
+    complete_is_additive: bool = False
     effect_id: str
     auto_complete: bool = False  # Cardo, Decumano
     copies: int

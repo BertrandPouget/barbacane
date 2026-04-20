@@ -312,6 +312,7 @@ Gli effetti di Costruzioni e Magie si attivano nel momento indicato dalla carta,
 #### Costruzioni
 - Costo in Mana. Posizionate in Villaggio.
 - Giocate incomplete (orizzontale, effetto Base). Completabili con Azione + Mana (verticale, effetto Completo).
+- Effetto Completo con `&` iniziale: si aggiunge al Base (campo `complete_is_additive: true` in `cards.json`). Senza `&`: sostituisce il Base.
 
 #### Muri
 - Qualsiasi carta può diventare Muro (perde ogni altra funzione).
