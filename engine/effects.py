@@ -1024,41 +1024,15 @@ def cercapersone_effect(
     **kwargs,
 ) -> dict:
     """
-    Base: cerca una Recluta nel mazzo e aggiungila alla mano.
-    Prodigio (sostituisce): cerca una Recluta e giocala immediatamente senza costo.
+    Base: il giocatore sceglie una Recluta dal mazzo e la aggiunge alla mano.
+    Prodigio (sostituisce): il giocatore sceglie una Recluta e la gioca immediatamente senza costo.
     """
-    from engine.deck import search_deck_for_type, get_base_card_id
-    import random as _random
-
-    # Cerca una Recluta nel mazzo
-    from engine.cards import get_card, WarriorCard
-    found_iid = None
-    for i, iid in enumerate(state.deck):
-        base_id = get_base_card_id(iid)
-        try:
-            card = get_card(base_id)
-            if isinstance(card, WarriorCard) and card.subtype == "recruit":
-                found_iid = state.deck.pop(i)
-                break
-        except KeyError:
-            continue
-
-    _random.shuffle(state.deck)  # rimescola dopo la ricerca
-
-    if found_iid is None:
-        return {"recruit_found": None}
-
-    if prodigy:
-        # Gioca immediatamente senza costo
-        from engine.deck import make_warrior_instance
-        warrior_inst = make_warrior_instance(found_iid)
-        player.field.vanguard.append(warrior_inst)
-        state.add_log(player.id, "search_play", card=found_iid)
-        return {"recruit_played": found_iid}
-    else:
-        player.hand.append(found_iid)
-        state.add_log(player.id, "search", card=found_iid)
-        return {"recruit_found": found_iid}
+    state.pending_search = {
+        "player_id": player.id,
+        "context": "cercapersone_prodigio" if prodigy else "cercapersone_base",
+        "condition": {"type": "subtype", "value": "recruit"},
+    }
+    return {"search_pending": True, "prodigy": prodigy}
 
 
 @register_effect("incendifesa_effect")
@@ -1356,23 +1330,13 @@ def orfeo_horde(state: GameState, player: Player, warrior_iid: Optional[str] = N
 
 @register_effect("giulio_horde")
 def giulio_horde(state: GameState, player: Player, **kwargs) -> dict:
-    """Cerca Giulio II nel mazzo e aggiungilo alla mano. Mescola il mazzo dopo."""
-    import random as _random
-    from engine.deck import get_base_card_id
-
-    found_iid = None
-    for i, iid in enumerate(state.deck):
-        base_id = get_base_card_id(iid)
-        if base_id == "giulio_ii":
-            found_iid = state.deck.pop(i)
-            break
-
-    _random.shuffle(state.deck)
-
-    if found_iid:
-        player.hand.append(found_iid)
-        return {"found": found_iid}
-    return {"found": None}
+    """Il giocatore cerca Giulio II nel mazzo e lo aggiunge alla mano."""
+    state.pending_search = {
+        "player_id": player.id,
+        "context": "giulio_horde",
+        "condition": {"type": "base_card_id", "value": "giulio_ii"},
+    }
+    return {"search_pending": True}
 
 
 @register_effect("faust_horde")
