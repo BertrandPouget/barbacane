@@ -298,6 +298,7 @@ class GameState(BaseModel):
     battle_done_this_turn: bool = False
     battles_remaining: int = 1  # default 1 per turno, può aumentare
     recent_events: List[Dict[str, Any]] = Field(default_factory=list)  # D10 rolls, cleared each action
+    turn_timer: int = 120  # secondi per turno; 0 = disattivato
 
     @property
     def current_player(self) -> Player:

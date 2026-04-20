@@ -4,7 +4,10 @@ Endpoint REST e WebSocket di Barbacane.
 
 from __future__ import annotations
 import asyncio
+import logging
 from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
@@ -41,6 +44,56 @@ from server.lobby import (
 from server.ws_manager import manager
 
 router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Timer helpers
+# ---------------------------------------------------------------------------
+
+async def _on_turn_expire(game_id: str, player_id: str) -> None:
+    """Forza la fine del turno allo scadere del timer (120s senza azioni)."""
+    state = load_game(game_id)
+    if state is None or state.winner_id or state.phase == "end":
+        return
+    if state.current_player.id != player_id:
+        return  # turno già passato
+
+    try:
+        end_turn(state)
+        status = "finished" if state.winner_id else "playing"
+        save_game(state, status=status)
+
+        connected = list(manager.connected_players(game_id))
+        for pid in connected:
+            await manager.send_to_player(game_id, pid, {
+                "type": "state_update",
+                "action": "end_turn",
+                "result": {"turn_ended": True, "auto": True},
+                "state": public_state(state, pid),
+            })
+
+        if not state.winner_id:
+            await _start_turn_timer(game_id, state)
+    except Exception as e:
+        logger.error("[timer] Errore nel forzare fine turno %s: %s", game_id, e)
+
+
+async def _start_turn_timer(game_id: str, state) -> None:
+    """Avvia il timer del turno corrente se abilitato."""
+    if state.winner_id or state.turn_timer <= 0:
+        manager.cancel_turn_timer(game_id)
+        return
+    await manager.broadcast(game_id, {
+        "type": "turn_started",
+        "player_id": state.current_player.id,
+        "seconds": state.turn_timer,
+    })
+    await manager.start_turn_timer(
+        game_id,
+        state.current_player.id,
+        seconds=state.turn_timer,
+        on_expire_callback=_on_turn_expire,
+    )
 
 # ---------------------------------------------------------------------------
 # Modelli richiesta
@@ -124,6 +177,9 @@ async def api_start_game(req: StartGameRequest):
             "state": public_state(state, pid),
         })
 
+    # Avvia il timer per il primo turno
+    await _start_turn_timer(state.game_id, state)
+
     return {"game_id": state.game_id, "state": public_state(state, player_id)}
 
 
@@ -169,7 +225,8 @@ async def api_game_action(req: GameActionRequest):
         raise HTTPException(500, f"Errore interno: {e}")
 
     # Salva e invia a ogni giocatore la propria vista personalizzata
-    save_game(state)
+    status = "finished" if state.winner_id else "playing"
+    save_game(state, status=status)
     for pid in manager.connected_players(req.game_id):
         await manager.send_to_player(req.game_id, pid, {
             "type": "state_update",
@@ -177,6 +234,10 @@ async def api_game_action(req: GameActionRequest):
             "result": result,
             "state": public_state(state, pid),
         })
+
+    # Timer: riavvia al cambio turno, cancella se la partita è finita
+    if req.action == "end_turn" or state.winner_id:
+        await _start_turn_timer(req.game_id, state)
 
     return {"result": result, "state": public_state(state, player_id)}
 
@@ -317,17 +378,22 @@ async def _handle_ws_message(game_id: str, player_id: str, data: dict) -> None:
             })
             return
 
+        action = data.get("action")
         try:
-            result = _dispatch_action(state, player_id, data.get("action"), data.get("params", {}))
-            save_game(state)
+            result = _dispatch_action(state, player_id, action, data.get("params", {}))
+            status = "finished" if state.winner_id else "playing"
+            save_game(state, status=status)
             # Invia a ogni giocatore connesso la propria vista personalizzata
             for pid in manager.connected_players(game_id):
                 await manager.send_to_player(game_id, pid, {
                     "type": "state_update",
-                    "action": data.get("action"),
+                    "action": action,
                     "result": result,
                     "state": public_state(state, pid),
                 })
+            # Timer: riavvia al cambio turno, cancella se la partita è finita
+            if action == "end_turn" or state.winner_id:
+                await _start_turn_timer(game_id, state)
         except ActionError as e:
             await manager.send_to_player(game_id, player_id, {
                 "type": "error", "message": str(e)

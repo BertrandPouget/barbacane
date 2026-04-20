@@ -146,6 +146,7 @@ def start_game(lobby_code: str, requester_id: str) -> "GameState":
     player_names = [p.name for p in lobby.players]
     game_id = str(uuid.uuid4())[:8]
     state = create_game(player_names, game_id=game_id)
+    state.turn_timer = lobby.turn_timer
 
     # Allinea i player_id dello stato con quelli della lobby
     for i, lp in enumerate(lobby.players):

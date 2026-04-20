@@ -186,6 +186,20 @@ const App = (() => {
     WS.on('game_started', (msg) => {
       if (msg.state) enterGame(msg.state);
     });
+    WS.on('turn_started', (msg) => {
+      stopLocalTimer();
+      Renderer.hideTimer();
+      if (msg.seconds && msg.seconds > 0) {
+        timerSecondsLeft = msg.seconds;
+        startLocalTimer(msg.seconds);
+        if (msg.player_id !== myPlayerId) {
+          const name = currentState
+            ? ((currentState.players.find(p => p.id === msg.player_id) || {}).name || msg.player_id)
+            : msg.player_id;
+          Renderer.toast(`Turno di ${name} (${msg.seconds}s)`, 'info');
+        }
+      }
+    });
     WS.on('turn_warning', (msg) => {
       timerSecondsLeft = msg.seconds_left;
       Renderer.showTimerWarning(timerSecondsLeft);
@@ -270,9 +284,10 @@ const App = (() => {
     document.getElementById('modal-overlay').classList.add('hidden');
     _refreshActionUI();
 
+    // Reset timer display quando ricevi un state update (il turn_started WS lo riavvierà)
     if (state.current_player_id === myPlayerId) {
-      Renderer.hideTimer();
       stopLocalTimer();
+      Renderer.hideTimer();
     }
   }
 
@@ -824,12 +839,16 @@ const App = (() => {
     }
 
     const targets = [];
+    // Evita duplicati: un bastione può apparire più volte nel DOM
+    const seen = new Set();
     document.querySelectorAll('.attack-target').forEach(el => {
       const pid  = el.dataset.targetPlayerId;
       const side = el.dataset.targetSide;
-      if (pid && side) {
+      const key  = `${pid}:${side}`;
+      if (pid && side && !seen.has(key)) {
         const p = currentState.players.find(pp => pp.id === pid);
         if (p && p.lives > 0) {
+          seen.add(key);
           const idx = currentState.players.indexOf(p);
           targets.push({
             label: `${p.name} — Bastione ${side === 'left' ? 'Sinistro' : 'Destro'}`,
@@ -841,6 +860,13 @@ const App = (() => {
 
     if (targets.length === 0) {
       Renderer.toast('Nessun bersaglio adiacente disponibile', 'error');
+      return;
+    }
+
+    // Un solo bersaglio: attacca direttamente senza modale
+    if (targets.length === 1) {
+      const [idx, side] = targets[0].value.split(':');
+      sendAction('battle', { defender_player_index: parseInt(idx), defender_bastion_side: side });
       return;
     }
 
