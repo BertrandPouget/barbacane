@@ -394,7 +394,8 @@ input:focus {
 }
 
 .region.vanguard    { flex: 2; min-width: 120px; }
-.region.bastion     { flex: 1; min-width: 80px; }
+.region.bastion     { flex: 1; min-width: 80px; cursor: pointer; }
+.region.bastion:hover { border-color: var(--text-dim); }
 .region.village     { flex: 3; min-width: 160px; }
 
 .region.drop-target {
@@ -530,6 +531,11 @@ input:focus {
   font-size: 0.6rem;
 }
 
+/* Carta in campo: nascondi descrizione, ingrandisci stats */
+.card-sm.in-field .card-effect { display: none; }
+.card-sm.in-field .card-name { font-size: 0.7rem; }
+.card-sm.in-field .card-stats { font-size: 0.75rem; margin-top: auto; }
+
 /* Tipi carta */
 .card[data-type="warrior"]  { border-left: 3px solid var(--red); }
 .card[data-type="spell"]    { border-left: 3px solid var(--blue-light); }
@@ -563,6 +569,30 @@ input:focus {
   margin-top: auto;
 }
 
+/* Stats mano */
+.hand-cost-row {
+  font-size: 0.82rem;
+}
+
+/* Guerriero in mano: ATT/GIT/DIF in colonna, spinto verso il basso */
+.card-warrior-attrs {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: auto;
+  font-size: 0.78rem;
+}
+
+/* Riga mana sotto le caratteristiche guerriero */
+.hand-mana-row {
+  display: flex;
+  font-size: 0.78rem;
+  margin-top: 0.25rem;
+}
+
+#hand-cards .card .card-name { font-size: 0.75rem; }
+#hand-cards .card .card-species { font-size: 0.65rem; }
+
 .stat { color: var(--text-dim); }
 .stat-att { color: var(--red-light); }
 .stat-git { color: #aaa; }
@@ -580,7 +610,7 @@ input:focus {
   -webkit-box-orient: vertical;
 }
 
-/* Muro faccia in giù */
+/* Muro faccia in giù (legacy) */
 .wall-card {
   width: 32px;
   min-width: 32px;
@@ -593,6 +623,33 @@ input:focus {
   justify-content: center;
   font-size: 0.7rem;
   color: var(--text-dim);
+}
+
+/* Carta-stack muri (sostituisce le cartine individuali) */
+.card.wall-stack {
+  background: #181818;
+  border-color: var(--text-dim);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+}
+
+.card.in-field.wall-stack:hover {
+  transform: translateY(-3px);
+  border-color: var(--gold);
+}
+
+.wall-stack-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.wall-stack-count {
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--text);
 }
 
 /* Horde indicator */
@@ -854,6 +911,29 @@ input:focus {
   gap: 0.8rem;
 }
 
+.card-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.2rem;
+}
+
+.card-detail-header .card-detail-title {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.card-nav-btn {
+  flex-shrink: 0;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
 .card-detail-title {
   font-size: 1.3rem;
   color: var(--gold-light);
@@ -891,8 +971,8 @@ input:focus {
   border-left: 3px solid var(--border);
 }
 
-.detail-prodigy { border-left-color: var(--blue-light); }
-.detail-gold    { border-left-color: var(--gold); }
+.detail-prodigy { border-left-color: var(--border); }
+.detail-gold    { border-left-color: var(--border); }
 
 .detail-dim {
   color: var(--text-dim);
@@ -905,6 +985,11 @@ input:focus {
   gap: 0.5rem;
   justify-content: flex-end;
   padding-top: 0.3rem;
+}
+
+#card-detail-extra-btns {
+  display: flex;
+  gap: 0.5rem;
 }
 
 /* ==================== BANNER AZIONE ==================== */

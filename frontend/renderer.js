@@ -149,22 +149,45 @@ const Renderer = (() => {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
 
-    // Muri
-    const wallDiv = el('div', { className: 'walls-row', style: 'display:flex;flex-wrap:wrap;gap:2px;' });
-    (bastion.walls || []).forEach(w => {
-      wallDiv.appendChild(renderWall(w));
-    });
-    if (bastion.wall_count > 0 && !(bastion.walls)) {
-      for (let i = 0; i < bastion.wall_count; i++) {
-        wallDiv.appendChild(renderWallBack());
-      }
+    // Muri come carta-stack singola
+    const walls = bastion.walls || [];
+    if (walls.length > 0) {
+      container.appendChild(renderWallStack(walls, side, interactive));
+    } else if (bastion.wall_count > 0) {
+      container.appendChild(renderWallStackOpaque(bastion.wall_count));
     }
-    if (wallDiv.children.length) container.appendChild(wallDiv);
 
     // Guerrieri
     (bastion.warriors || []).forEach(w => {
       container.appendChild(renderWarriorCard(w, true, interactive));
     });
+  }
+
+  function renderWallStack(walls, side, interactive) {
+    const div = el('div', {
+      className: 'card card-sm in-field wall-stack',
+      dataset: { type: 'wall' },
+    });
+    div.appendChild(el('div', { className: 'wall-stack-icon' }, ['🧱']));
+    div.appendChild(el('div', { className: 'wall-stack-count' }, [String(walls.length)]));
+    if (interactive) {
+      div.style.cursor = 'pointer';
+      div.addEventListener('click', (e) => {
+        e.stopPropagation();
+        App.showWallSlideshow(walls, side, 0);
+      });
+    }
+    return div;
+  }
+
+  function renderWallStackOpaque(count) {
+    const div = el('div', {
+      className: 'card card-sm in-field wall-stack',
+      dataset: { type: 'wall' },
+    });
+    div.appendChild(el('div', { className: 'wall-stack-icon' }, ['🧱']));
+    div.appendChild(el('div', { className: 'wall-stack-count' }, [String(count)]));
+    return div;
   }
 
   function renderVillage(containerId, village) {
@@ -215,7 +238,6 @@ const Renderer = (() => {
   function renderHandCard(iid) {
     const div = el('div', { className: 'card', dataset: { instanceId: iid } });
 
-    // Il nome e tipo vengono dal registry locale (App.cardDefs)
     const def = App.getCardDef ? App.getCardDef(iid) : null;
     if (def) {
       div.dataset.type = def.type;
@@ -228,34 +250,30 @@ const Renderer = (() => {
           className: `card-species species-${def.species}`
         }, [`${capitalize(def.species)}${def.school ? ` · ${capitalize(def.school)}` : ''}`]));
 
-        const stats = el('div', { className: 'card-stats' }, [
-          el('span', { className: 'stat stat-cost' }, [`⚡${def.cost}`]),
-          el('span', { className: 'stat stat-att' },  [`⚔${def.att}`]),
-          el('span', { className: 'stat stat-git' },  [`🏹${def.git}`]),
-          el('span', { className: 'stat stat-dif' },  [`🛡${def.dif}`]),
-        ]);
-        div.appendChild(stats);
-
-        if (def.horde_effect) {
-          div.appendChild(el('div', { className: 'card-effect' }, [def.horde_effect]));
-        }
+        // Caratteristiche in colonna (auto-push verso il basso), mana in fondo
+        const attrsDiv = el('div', { className: 'card-warrior-attrs' });
+        attrsDiv.appendChild(el('span', { className: 'stat stat-att' }, [`⚔️ ${def.att}`]));
+        attrsDiv.appendChild(el('span', { className: 'stat stat-git' }, [`🏹 ${def.git}`]));
+        attrsDiv.appendChild(el('span', { className: 'stat stat-dif' }, [`🛡️ ${def.dif}`]));
+        div.appendChild(attrsDiv);
+        div.appendChild(el('div', { className: 'hand-mana-row' }, [
+          el('span', { className: 'stat stat-cost' }, [`💎${def.cost}`]),
+        ]));
 
       } else if (def.type === 'spell') {
         div.appendChild(el('div', {
           className: `card-species school-${def.school}`
         }, [capitalize(def.school)]));
 
-        div.appendChild(el('div', { className: 'card-stats' }, [
-          el('span', { className: 'stat stat-cost' }, [`👁${def.cost} Maghe`]),
+        div.appendChild(el('div', { className: 'card-stats hand-cost-row' }, [
+          el('span', { className: 'stat stat-cost' }, [`🔮${def.cost}`]),
         ]));
-        div.appendChild(el('div', { className: 'card-effect' }, [def.base_effect]));
 
       } else if (def.type === 'building') {
-        div.appendChild(el('div', { className: 'card-stats' }, [
-          el('span', { className: 'stat stat-cost' }, [`⚡${def.cost}`]),
-          el('span', { className: 'stat stat-mana' }, [`Comp:${def.completion_cost}`]),
+        div.appendChild(el('div', { className: 'card-stats hand-cost-row' }, [
+          el('span', { className: 'stat stat-cost' }, [`💎${def.cost}`]),
+          el('span', { className: 'stat stat-mana' }, [`🔨${def.completion_cost}`]),
         ]));
-        div.appendChild(el('div', { className: 'card-effect' }, [def.base_effect]));
       }
     } else {
       div.appendChild(el('div', { className: 'card-name' }, [iid]));
@@ -280,9 +298,9 @@ const Renderer = (() => {
     }, [capitalize(warrior.species || '')]));
 
     const stats = el('div', { className: 'card-stats' });
-    stats.appendChild(el('span', { className: 'stat stat-att' }, [`⚔${warrior.att}`]));
+    stats.appendChild(el('span', { className: 'stat stat-att' }, [`⚔️${warrior.att}`]));
     stats.appendChild(el('span', { className: 'stat stat-git' }, [`🏹${warrior.git}`]));
-    stats.appendChild(el('span', { className: 'stat stat-dif' }, [`🛡${warrior.dif}`]));
+    stats.appendChild(el('span', { className: 'stat stat-dif' }, [`🛡️${warrior.dif}`]));
     div.appendChild(stats);
 
     if (interactive) {
@@ -387,7 +405,7 @@ const Renderer = (() => {
   // Card detail overlay
   // ---------------------------------------------------------------------------
 
-  function showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons = []) {
+  function showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons = [], navOptions = null) {
     document.getElementById('card-detail-title').textContent = title;
     document.getElementById('card-detail-body').innerHTML = bodyHTML;
 
@@ -419,6 +437,23 @@ const Renderer = (() => {
         el.onclick = btn.onClick;
         extraContainer.appendChild(el);
       });
+    }
+
+    const prevBtn = document.getElementById('card-nav-prev');
+    const nextBtn = document.getElementById('card-nav-next');
+    if (prevBtn && nextBtn) {
+      if (navOptions && navOptions.onPrev) {
+        prevBtn.onclick = navOptions.onPrev;
+        prevBtn.classList.remove('hidden');
+      } else {
+        prevBtn.classList.add('hidden');
+      }
+      if (navOptions && navOptions.onNext) {
+        nextBtn.onclick = navOptions.onNext;
+        nextBtn.classList.remove('hidden');
+      } else {
+        nextBtn.classList.add('hidden');
+      }
     }
 
     const overlay = document.getElementById('card-detail-overlay');

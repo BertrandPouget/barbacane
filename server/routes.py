@@ -27,6 +27,8 @@ from engine.actions import (
     play_spell,
     complete_building,
     add_wall,
+    retrieve_wall,
+    discard_wall,
     reposition_warrior,
     activate_horde,
     evolve_warrior,
@@ -307,6 +309,16 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             state, player_id,
             params["building_instance_id"],
             params["target_player_id"],
+        ),
+        "retrieve_wall": lambda: retrieve_wall(
+            state, player_id,
+            params["instance_id"],
+            params.get("bastion_side", "left"),
+        ),
+        "discard_wall": lambda: discard_wall(
+            state, player_id,
+            params["instance_id"],
+            params.get("bastion_side", "left"),
         ),
         "discard": lambda: discard_card(
             state, player_id,

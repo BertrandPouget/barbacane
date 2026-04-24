@@ -69,6 +69,7 @@ const App = (() => {
     document.getElementById('btn-end-turn').addEventListener('click', onEndTurn);
     document.getElementById('btn-battle').addEventListener('click', onBattleClick);
     document.getElementById('btn-horde').addEventListener('click', onHordeClick);
+    bindBastionClickHandlers();
 
     // Banner azione
     document.getElementById('banner-btn-play').addEventListener('click', enterPlayCardMode);
@@ -205,8 +206,18 @@ const App = (() => {
       Renderer.showTimerWarning(timerSecondsLeft);
       startLocalTimer(timerSecondsLeft);
     });
-    WS.on('player_connected',    (msg) => Renderer.toast(`${msg.player_id} si è connesso`, 'success'));
-    WS.on('player_disconnected', (msg) => Renderer.toast(`${msg.player_id} si è disconnesso`, 'error'));
+    WS.on('player_connected', (msg) => {
+      const name = currentState
+        ? ((currentState.players.find(p => p.id === msg.player_id) || {}).name || msg.player_id)
+        : msg.player_id;
+      Renderer.toast(`${name} si è connesso`, 'success');
+    });
+    WS.on('player_disconnected', (msg) => {
+      const name = currentState
+        ? ((currentState.players.find(p => p.id === msg.player_id) || {}).name || msg.player_id)
+        : msg.player_id;
+      Renderer.toast(`${name} si è disconnesso`, 'error');
+    });
     WS.on('error', (msg) => Renderer.toast(msg.message || 'Errore', 'error'));
   }
 
@@ -684,34 +695,42 @@ const App = (() => {
         <span class="species-${def.species}">${cap(def.species)}</span>
         ${def.school ? `· <span>${cap(def.school)}</span>` : ''}
         · ${def.subtype === 'hero' ? 'Eroe' : 'Recluta'}
-        · ⚡${def.cost} Mana
+        · 💎${def.cost} Mana
       </div>
       <div class="detail-stats">
-        <span class="stat-att">⚔ ATT ${att}</span>
+        <span class="stat-att">⚔️ ATT ${att}</span>
         <span class="stat-git">🏹 GIT ${git}</span>
-        <span class="stat-dif">🛡 DIF ${dif}</span>
+        <span class="stat-dif">🛡️ DIF ${dif}</span>
       </div>`;
       if (def.horde_effect) {
         bodyHTML += `<div class="detail-section"><strong>⚡ Effetto Orda:</strong><br>${def.horde_effect}</div>`;
       }
-      if (def.evolves_from) bodyHTML += `<div class="detail-dim">Evolve da: ${def.evolves_from}</div>`;
-      if (def.evolves_into) bodyHTML += `<div class="detail-dim">Evolve in: ${def.evolves_into}</div>`;
+      if (def.evolves_from) bodyHTML += `<div class="detail-dim">Evolve da: ${cardDefs[def.evolves_from]?.name || def.evolves_from}</div>`;
+      if (def.evolves_into) bodyHTML += `<div class="detail-dim">Evolve in: ${cardDefs[def.evolves_into]?.name || def.evolves_into}</div>`;
 
     } else if (def && def.type === 'spell') {
       bodyHTML += `<div class="detail-meta">
-        <span class="school-${def.school}">${cap(def.school)}</span> · Magia · 👁 ${def.cost} Maghe
+        <span class="school-${def.school}">${cap(def.school)}</span> · Magia · 🔮${def.cost}
       </div>
       <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
       if (def.prodigy_effect) {
-        bodyHTML += `<div class="detail-section detail-prodigy"><strong>✨ Prodigio:</strong><br>${def.prodigy_effect}</div>`;
+        bodyHTML += `<div class="detail-section"><strong>Prodigio:</strong><br>${def.prodigy_effect}</div>`;
       }
 
     } else if (def && def.type === 'building') {
-      const status = fieldBuilding ? (fieldBuilding.completed ? ' · <span style="color:var(--gold)">✓ Completata</span>' : ' · Incompleta') : '';
-      bodyHTML += `<div class="detail-meta">Costruzione · ⚡${def.cost} Mana · Comp: ${def.completion_cost} Mana${status}</div>
-      <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
+      const completionStatus = fieldBuilding
+        ? (fieldBuilding.completed ? ' · <span style="color:var(--gold)">✓ Completata</span>' : ' · <span style="color:var(--text-dim)">Incompleta</span>')
+        : '';
+      const baseLabel = (fieldBuilding && !fieldBuilding.completed) ? 'Effetto Base <span style="color:var(--green-light)">(attivo)</span>'
+        : (fieldBuilding && fieldBuilding.completed) ? 'Effetto Base <span style="color:var(--text-dim)">(non attivo)</span>'
+        : 'Effetto Base';
+      const completeLabel = (fieldBuilding && fieldBuilding.completed) ? 'Effetto Completo <span style="color:var(--green-light)">(attivo)</span>'
+        : (fieldBuilding && !fieldBuilding.completed) ? 'Effetto Completo <span style="color:var(--text-dim)">(non attivo)</span>'
+        : 'Effetto Completo';
+      bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🔨${def.completion_cost} Mana${completionStatus}</div>
+      <div class="detail-section"><strong>${baseLabel}:</strong><br>${def.base_effect || '—'}</div>`;
       if (def.complete_effect) {
-        bodyHTML += `<div class="detail-section detail-gold"><strong>✓ Effetto Completo:</strong><br>${def.complete_effect}</div>`;
+        bodyHTML += `<div class="detail-section"><strong>${completeLabel}:</strong><br>${def.complete_effect}</div>`;
       }
 
     } else {
@@ -778,7 +797,22 @@ const App = (() => {
     }
 
     const title = def ? def.name : (fieldWarrior ? (fieldWarrior.name || instanceId) : instanceId);
-    Renderer.showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons);
+
+    // Frecce di navigazione per le carte in mano
+    let navOptions = null;
+    if (source === 'hand') {
+      const myPlayer = currentState ? currentState.players.find(p => p.id === myPlayerId) : null;
+      const hand = myPlayer ? (myPlayer.hand || []) : [];
+      const idx = hand.indexOf(instanceId);
+      if (hand.length > 1 && idx >= 0) {
+        navOptions = {
+          onPrev: idx > 0 ? () => showCardDetail(hand[idx - 1], 'hand') : null,
+          onNext: idx < hand.length - 1 ? () => showCardDetail(hand[idx + 1], 'hand') : null,
+        };
+      }
+    }
+
+    Renderer.showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons, navOptions);
   }
 
   function showPlayOptions(instanceId, def) {
@@ -1131,19 +1165,215 @@ const App = (() => {
     ).then(() => Renderer.toast('Codice copiato!', 'success'));
   }
 
+  // ---------------------------------------------------------------------------
+  // Slideshow muri
+  // ---------------------------------------------------------------------------
+
+  function showWallSlideshow(walls, side, idx) {
+    const iid = walls[idx];
+    const def = getCardDef(iid);
+    const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+
+    let bodyHTML = '';
+    if (def) {
+      if (def.type === 'warrior') {
+        bodyHTML += `<div class="detail-meta">
+          <span class="species-${def.species}">${cap(def.species)}</span>
+          ${def.school ? `· <span>${cap(def.school)}</span>` : ''}
+          · ${def.subtype === 'hero' ? 'Eroe' : 'Recluta'}
+          · 💎${def.cost} Mana
+        </div>
+        <div class="detail-stats">
+          <span class="stat-att">⚔️ ATT ${def.att}</span>
+          <span class="stat-git">🏹 GIT ${def.git}</span>
+          <span class="stat-dif">🛡️ DIF ${def.dif}</span>
+        </div>`;
+        if (def.horde_effect) {
+          bodyHTML += `<div class="detail-section"><strong>⚡ Effetto Orda:</strong><br>${def.horde_effect}</div>`;
+        }
+        if (def.evolves_from) bodyHTML += `<div class="detail-dim">Evolve da: ${cardDefs[def.evolves_from]?.name || def.evolves_from}</div>`;
+        if (def.evolves_into) bodyHTML += `<div class="detail-dim">Evolve in: ${cardDefs[def.evolves_into]?.name || def.evolves_into}</div>`;
+      } else if (def.type === 'spell') {
+        bodyHTML += `<div class="detail-meta">
+          <span class="school-${def.school}">${cap(def.school)}</span> · Magia · 🔮${def.cost}
+        </div>
+        <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
+        if (def.prodigy_effect) {
+          bodyHTML += `<div class="detail-section"><strong>Prodigio:</strong><br>${def.prodigy_effect}</div>`;
+        }
+      } else if (def.type === 'building') {
+        bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🔨${def.completion_cost} Mana</div>
+        <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
+        if (def.complete_effect) {
+          bodyHTML += `<div class="detail-section"><strong>Effetto Completo:</strong><br>${def.complete_effect}</div>`;
+        }
+      }
+    } else {
+      bodyHTML = `<div class="detail-dim">${iid}</div>`;
+    }
+
+    const isMyTurn = currentState && currentState.current_player_id === myPlayerId;
+    const extraButtons = [
+      {
+        label: 'Riprendi',
+        className: 'btn-primary',
+        disabled: !isMyTurn,
+        onClick: () => {
+          Renderer.closeCardDetail();
+          sendAction('retrieve_wall', { instance_id: iid, bastion_side: side });
+        },
+      },
+      {
+        label: 'Scarta',
+        className: 'btn-danger',
+        disabled: !isMyTurn,
+        onClick: () => {
+          Renderer.closeCardDetail();
+          sendAction('discard_wall', { instance_id: iid, bastion_side: side });
+        },
+      },
+    ];
+
+    const navOptions = {
+      onPrev: idx > 0 ? () => showWallSlideshow(walls, side, idx - 1) : null,
+      onNext: idx < walls.length - 1 ? () => showWallSlideshow(walls, side, idx + 1) : null,
+    };
+
+    Renderer.showCardDetail(
+      def ? def.name : iid,
+      bodyHTML,
+      null,
+      null,
+      null,
+      extraButtons,
+      navOptions
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Click bastione
+  // ---------------------------------------------------------------------------
+
+  function bindBastionClickHandlers() {
+    ['my-bastion-left', 'my-bastion-right'].forEach(id => {
+      const region = document.getElementById(id);
+      if (!region) return;
+      region.addEventListener('click', (e) => {
+        if (e.target.closest('.card') || e.target.closest('.wall-card')) return;
+        showBastionContents(id === 'my-bastion-left' ? 'left' : 'right');
+      });
+    });
+  }
+
+  function showBastionContents(side) {
+    if (!currentState) return;
+    const myPlayer = currentState.players.find(p => p.id === myPlayerId);
+    if (!myPlayer) return;
+
+    const sideName = side === 'left' ? 'Sinistro' : 'Destro';
+    const bastion = side === 'left' ? myPlayer.field.bastion_left : myPlayer.field.bastion_right;
+    const walls = bastion.walls || [];
+    const warriors = bastion.warriors || [];
+
+    const body = document.getElementById('modal-body');
+    body.innerHTML = '';
+
+    if (walls.length === 0 && warriors.length === 0) {
+      body.innerHTML = '<p style="color:var(--text-dim);font-style:italic;font-size:0.9rem">Bastione vuoto.</p>';
+    } else {
+      if (walls.length > 0) {
+        const wallHeader = document.createElement('p');
+        wallHeader.className = 'search-summary';
+        wallHeader.textContent = `${walls.length} Muro${walls.length !== 1 ? 'i' : ''}`;
+        body.appendChild(wallHeader);
+
+        const wallList = document.createElement('div');
+        wallList.className = 'search-deck-list';
+        walls.forEach(iid => {
+          const def = getCardDef(iid);
+          const name = def ? def.name : iid;
+          const typeLabel = def
+            ? (def.type === 'warrior' ? 'Guerriero' : def.type === 'spell' ? 'Magia' : 'Costruzione')
+            : 'Carta';
+          const div = document.createElement('div');
+          div.className = 'search-deck-card search-match';
+          div.innerHTML = `<span class="search-card-name">${name}</span><span class="search-card-type">${typeLabel}</span>`;
+          div.addEventListener('click', () => {
+            document.getElementById('modal-overlay').classList.add('hidden');
+            showCardDetail(iid, 'wall');
+          });
+          wallList.appendChild(div);
+        });
+        body.appendChild(wallList);
+      }
+
+      if (warriors.length > 0) {
+        const warriorHeader = document.createElement('p');
+        warriorHeader.className = 'search-summary';
+        if (walls.length > 0) warriorHeader.style.marginTop = '0.7rem';
+        warriorHeader.textContent = `${warriors.length} Guerriero${warriors.length !== 1 ? 'i' : ''}`;
+        body.appendChild(warriorHeader);
+
+        const warriorList = document.createElement('div');
+        warriorList.className = 'search-deck-list';
+        warriors.forEach(w => {
+          const div = document.createElement('div');
+          div.className = 'search-deck-card search-match';
+          div.innerHTML = `<span class="search-card-name">${w.name || w.base_card_id}</span>` +
+            `<span class="search-card-type">⚔️${w.att} 🏹${w.git} 🛡️${w.dif}</span>`;
+          div.addEventListener('click', () => {
+            document.getElementById('modal-overlay').classList.add('hidden');
+            showCardDetail(w.instance_id, 'field');
+          });
+          warriorList.appendChild(div);
+        });
+        body.appendChild(warriorList);
+      }
+    }
+
+    document.getElementById('modal-title').textContent = `Bastione ${sideName}`;
+    document.getElementById('modal-confirm').classList.add('hidden');
+    const cancelBtn = document.getElementById('modal-cancel');
+    cancelBtn.classList.remove('hidden');
+    cancelBtn.textContent = 'Chiudi';
+    cancelBtn.onclick = () => document.getElementById('modal-overlay').classList.add('hidden');
+    document.getElementById('modal-overlay').classList.remove('hidden');
+  }
+
   return {
     init,
     getCardDef,
     onCardClick,
     sendAction,
+    showWallSlideshow,
   };
 })();
 
 function returnToLobby() { location.reload(); }
 function copyLobbyCode() {
-  navigator.clipboard.writeText(
-    document.getElementById('lobby-code-text').textContent
-  ).then(() => Renderer.toast('Codice copiato!', 'success'));
+  const text = document.getElementById('lobby-code-text').textContent.trim();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(() => Renderer.toast('Codice copiato!', 'success'))
+      .catch(() => _copyFallback(text));
+  } else {
+    _copyFallback(text);
+  }
+}
+
+function _copyFallback(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    Renderer.toast('Codice copiato!', 'success');
+  } catch (_) {
+    Renderer.toast(`Codice: ${text}`, '');
+  }
+  document.body.removeChild(ta);
 }
 
 document.addEventListener('DOMContentLoaded', () => App.init());

@@ -490,6 +490,52 @@ def add_wall(
     return {"walls": placed}
 
 
+def retrieve_wall(
+    state: GameState,
+    player_id: str,
+    instance_id: str,
+    bastion_side: str,  # "left" | "right"
+) -> dict:
+    """
+    Riporta un Muro dalla mano (lo toglie dal Bastione).
+    Non consuma Azioni. Richiede che sia il turno del giocatore.
+    """
+    player = _require_current_player(state, player_id)
+    if bastion_side not in ("left", "right"):
+        raise ActionError(f"Lato Bastione non valido: {bastion_side}.")
+    bastion = player.field.bastion_left if bastion_side == "left" else player.field.bastion_right
+    wall = next((w for w in bastion.walls if w.instance_id == instance_id), None)
+    if wall is None:
+        raise ActionError(f"Il muro {instance_id} non è nel Bastione {bastion_side}.")
+    bastion.walls.remove(wall)
+    player.hand.append(instance_id)
+    state.add_log(player_id, "retrieve_wall", card=instance_id, bastion=bastion_side)
+    return {"retrieved": instance_id}
+
+
+def discard_wall(
+    state: GameState,
+    player_id: str,
+    instance_id: str,
+    bastion_side: str,  # "left" | "right"
+) -> dict:
+    """
+    Scarta un Muro dal Bastione (va negli scarti).
+    Non consuma Azioni. Richiede che sia il turno del giocatore.
+    """
+    player = _require_current_player(state, player_id)
+    if bastion_side not in ("left", "right"):
+        raise ActionError(f"Lato Bastione non valido: {bastion_side}.")
+    bastion = player.field.bastion_left if bastion_side == "left" else player.field.bastion_right
+    wall = next((w for w in bastion.walls if w.instance_id == instance_id), None)
+    if wall is None:
+        raise ActionError(f"Il muro {instance_id} non è nel Bastione {bastion_side}.")
+    bastion.walls.remove(wall)
+    state.discard_pile.append(instance_id)
+    state.add_log(player_id, "discard_wall", card=instance_id, bastion=bastion_side)
+    return {"discarded": instance_id}
+
+
 # ---------------------------------------------------------------------------
 # 7. Riposiziona Guerrieri
 # ---------------------------------------------------------------------------

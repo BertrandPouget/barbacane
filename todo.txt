@@ -4,8 +4,3 @@ Subito
 Dopo
 - ordine azioni (fasi turno enforced dal server)
 - evoluzioni: verificare corner case UI
-
-Opzionale
-- rimuovere azioni da homepage
-- utilizzare logo
-- timer funzionante
