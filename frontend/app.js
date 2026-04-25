@@ -22,6 +22,10 @@ const App = (() => {
   let actionMode = null;    // null | 'play_card' | 'complete_building' | 'add_walls'
   let wallsSelected = [];   // [{instanceId, bastion: 'left'|'right'}]
 
+  // Modalità battaglia
+  let battleMode = false;
+  let battleTargets = [];   // [{playerId, playerIndex, side}]
+
   // Timer
   let timerInterval = null;
   let timerSecondsLeft = 0;
@@ -75,8 +79,21 @@ const App = (() => {
     document.getElementById('banner-btn-play').addEventListener('click', enterPlayCardMode);
     document.getElementById('banner-btn-complete').addEventListener('click', enterCompleteBuildingMode);
     document.getElementById('banner-btn-wall').addEventListener('click', enterAddWallsMode);
-    document.getElementById('btn-cancel-action').addEventListener('click', cancelActionMode);
+    document.getElementById('btn-cancel-action').addEventListener('click', onCancelClick);
     document.getElementById('wall-confirm-btn').addEventListener('click', confirmWalls);
+
+    // Click delegato su bastioni avversari (possono stare in top-opponents o nelle strip laterali)
+    document.getElementById('game-table').addEventListener('click', onOpponentBastionClick);
+
+    // Toggle pannello mobile
+    const panelToggle = document.getElementById('panel-toggle');
+    if (panelToggle) {
+      panelToggle.addEventListener('click', () => {
+        const panel = document.getElementById('action-panel');
+        const open = panel.classList.toggle('panel-open');
+        document.getElementById('panel-toggle-label').textContent = open ? '▾ Azioni' : '⚙ Azioni';
+      });
+    }
 
     document.getElementById('join-code').addEventListener('input', e => {
       e.target.value = e.target.value.toUpperCase();
@@ -223,6 +240,7 @@ const App = (() => {
 
   function onStateUpdate(state, action, result) {
     currentState = state;
+    if (battleMode) exitBattleMode();
     Renderer.render(state, myPlayerId);
 
     if (result) {
@@ -1054,9 +1072,9 @@ const App = (() => {
       Renderer.toast('Hai già attaccato questo turno', 'error');
       return;
     }
+    if (battleMode) { exitBattleMode(); return; }
 
     const targets = [];
-    // Evita duplicati: un bastione può apparire più volte nel DOM
     const seen = new Set();
     document.querySelectorAll('.attack-target').forEach(el => {
       const pid  = el.dataset.targetPlayerId;
@@ -1067,10 +1085,7 @@ const App = (() => {
         if (p && p.lives > 0) {
           seen.add(key);
           const idx = currentState.players.indexOf(p);
-          targets.push({
-            label: `${p.name} — Bastione ${side === 'left' ? 'Sinistro' : 'Destro'}`,
-            value: `${idx}:${side}`,
-          });
+          targets.push({ playerId: pid, playerIndex: idx, side });
         }
       }
     });
@@ -1080,20 +1095,49 @@ const App = (() => {
       return;
     }
 
-    // Un solo bersaglio: attacca direttamente senza modale
-    if (targets.length === 1) {
-      const [idx, side] = targets[0].value.split(':');
-      sendAction('battle', { defender_player_index: parseInt(idx), defender_bastion_side: side });
+    enterBattleMode(targets);
+  }
+
+  function enterBattleMode(targets) {
+    battleMode = true;
+    battleTargets = targets;
+    document.getElementById('game-table').classList.add('battle-mode');
+    targets.forEach(t => {
+      document.querySelectorAll(
+        `.attack-target[data-target-player-id="${t.playerId}"][data-target-side="${t.side}"]`
+      ).forEach(el => el.classList.add('attackable'));
+    });
+    document.getElementById('btn-cancel-action').classList.remove('hidden');
+    document.getElementById('action-hint').textContent = '⚔ Clicca un bastione avversario per attaccare';
+  }
+
+  function exitBattleMode() {
+    battleMode = false;
+    battleTargets = [];
+    document.getElementById('game-table').classList.remove('battle-mode');
+    document.querySelectorAll('.attack-target').forEach(el => el.classList.remove('attackable'));
+    document.getElementById('btn-cancel-action').classList.add('hidden');
+    document.getElementById('action-hint').textContent = '';
+  }
+
+  function onOpponentBastionClick(e) {
+    if (!battleMode) return;
+    const bastionEl = e.target.closest('.attack-target');
+    if (!bastionEl) return;
+    const pid  = bastionEl.dataset.targetPlayerId;
+    const side = bastionEl.dataset.targetSide;
+    const target = battleTargets.find(t => t.playerId === pid && t.side === side);
+    if (!target) {
+      Renderer.toast('Non puoi attaccare questo bastione', 'error');
       return;
     }
+    exitBattleMode();
+    sendAction('battle', { defender_player_index: target.playerIndex, defender_bastion_side: target.side });
+  }
 
-    Renderer.showChoiceModal('Scegli il bersaglio', targets, (choice) => {
-      const [idx, side] = choice.split(':');
-      sendAction('battle', {
-        defender_player_index: parseInt(idx),
-        defender_bastion_side: side,
-      });
-    });
+  function onCancelClick() {
+    if (battleMode) exitBattleMode();
+    else cancelActionMode();
   }
 
   // ---------------------------------------------------------------------------

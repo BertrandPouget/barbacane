@@ -82,47 +82,65 @@
   <!-- Area principale: tavolo da gioco -->
   <div id="game-table">
 
-    <!-- Campi avversari (sopra) -->
-    <div id="opponents-area"></div>
+    <!-- Giocatore di fronte:
+         2p = unico avversario (specchiato, piena larghezza)
+         4p = avversario non adiacente (campo completo specchiato)
+         3p = nascosto -->
+    <div id="top-opponents"></div>
 
-    <!-- Separatore centrale / log -->
-    <div id="center-bar">
-      <div id="battle-log"></div>
-    </div>
+    <!-- Layout a tre colonne: strip-sx | centro | strip-dx -->
+    <div id="side-layout">
 
-    <!-- Campo del giocatore locale (sotto) -->
-    <div id="my-field">
-      <div class="field-row" id="my-bastions-row">
-        <div class="region-label-vert">Bastione Sinistro</div>
-        <div id="my-bastion-left" class="region bastion" data-side="left"></div>
-        <div id="my-vanguard" class="region vanguard"></div>
-        <div id="my-bastion-right" class="region bastion" data-side="right"></div>
-        <div class="region-label-vert">Bastione Destro</div>
-      </div>
-      <div class="field-row" id="my-village-row">
-        <div class="region-label">Villaggio</div>
-        <div id="my-village" class="region village"></div>
-      </div>
-      <div id="my-stats" class="player-stats">
-        <div class="life-cards-row">
-          <span class="life-label">Vite:</span>
-          <div id="my-life-cards" class="life-cards-container"></div>
+      <!-- Vicino sinistro (3-4p): B.D. adiacente al mio B.S. -->
+      <div id="left-strip" class="hidden"></div>
+
+      <!-- Colonna centrale -->
+      <div id="center-column">
+        <div id="lane-separator">
+          <div class="lane-col lane-col-bastion">⚔ Fianco S.</div>
+          <div class="lane-col lane-col-center">— VS —</div>
+          <div class="lane-col lane-col-bastion">Fianco D. ⚔</div>
         </div>
-        <span id="my-mana">Mana: 0</span>
-        <span id="my-actions">Azioni: 2</span>
-      </div>
-    </div>
+        <div id="center-bar">
+          <div id="battle-log"></div>
+        </div>
+        <div id="my-field">
+          <div class="field-row" id="my-bastions-row">
+            <div id="my-bastion-left"  class="region bastion" data-side="left"></div>
+            <div id="my-vanguard"      class="region vanguard"></div>
+            <div id="my-bastion-right" class="region bastion" data-side="right"></div>
+          </div>
+          <div class="field-row" id="my-village-row">
+            <div class="region-label">Villaggio</div>
+            <div id="my-village" class="region village"></div>
+          </div>
+          <div id="my-stats" class="player-stats">
+            <div class="life-cards-row">
+              <span class="life-label">Vite:</span>
+              <div id="my-life-cards" class="life-cards-container"></div>
+            </div>
+            <span id="my-mana">Mana: 0</span>
+            <span id="my-actions">Azioni: 2</span>
+          </div>
+        </div>
+        <div id="hand-area">
+          <div class="hand-label">Mano (<span id="hand-count">0</span>)</div>
+          <div id="hand-cards"></div>
+        </div>
+      </div><!-- /center-column -->
 
-    <!-- Mano del giocatore -->
-    <div id="hand-area">
-      <div class="hand-label">Mano (<span id="hand-count">0</span>)</div>
-      <div id="hand-cards"></div>
-    </div>
+      <!-- Vicino destro (3-4p): B.S. adiacente al mio B.D. -->
+      <div id="right-strip" class="hidden"></div>
 
-  </div>
+    </div><!-- /side-layout -->
+
+  </div><!-- /game-table -->
 
   <!-- Pannello azioni laterale -->
   <div id="action-panel">
+    <button id="panel-toggle" aria-label="Apri/chiudi pannello azioni">
+      <span id="panel-toggle-label">⚙ Azioni</span>
+    </button>
     <h3>Azioni</h3>
 
     <!-- Banner: scegli tipo di azione -->

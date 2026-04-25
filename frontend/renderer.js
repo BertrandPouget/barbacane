@@ -9,10 +9,12 @@ const Renderer = (() => {
   // Render dello stato completo
   // ---------------------------------------------------------------------------
 
+  let _myPlayerId = null;
+
   function render(state, myPlayerId) {
     if (!state) return;
+    _myPlayerId = myPlayerId;
 
-    // Header
     document.getElementById('hdr-turn').textContent = `Turno ${state.turn}`;
     document.getElementById('hdr-phase').textContent = `Fase: ${phaseLabel(state.phase)}`;
     document.getElementById('hdr-current-player').textContent =
@@ -20,99 +22,231 @@ const Renderer = (() => {
     document.getElementById('hdr-deck').textContent = `Mazzo: ${state.deck_count}`;
 
     const myPlayer = state.players.find(p => p.id === myPlayerId);
-    const opponents = state.players.filter(p => p.id !== myPlayerId);
 
-    // Campi avversari
-    renderOpponents(opponents, state);
+    renderTableLayout(state, myPlayerId);
 
-    // Il mio campo
-    if (myPlayer) {
-      renderMyField(myPlayer, state, myPlayerId);
-    }
-
-    // Pannello azioni
+    if (myPlayer) renderMyField(myPlayer, state, myPlayerId);
     updateActionPanel(state, myPlayerId);
   }
 
   // ---------------------------------------------------------------------------
-  // Avversari
+  // Layout tavolo — 2 / 3 / 4 giocatori
+  //
+  //   2p: avversario unico in cima (specchiato, piena larghezza); no strip
+  //   3p: no top; vicino S. nella strip sinistra, vicino D. nella strip destra
+  //   4p: giocatore di fronte in cima (campo completo specchiato);
+  //       vicino S. nella strip sinistra, vicino D. nella strip destra
+  //
+  // I vicini laterali mostrano nella strip il bastione adiacente in fondo
+  // (fisicamente vicino al mio campo) e quello non adiacente in cima (dimmer).
   // ---------------------------------------------------------------------------
 
-  function renderOpponents(opponents, state) {
-    const area = document.getElementById('opponents-area');
-    area.innerHTML = '';
-    opponents.forEach(p => {
-      area.appendChild(renderOpponentField(p, state));
-    });
+  function renderTableLayout(state, myPlayerId) {
+    const n        = state.players.length;
+    const myIndex  = state.players.findIndex(p => p.id === myPlayerId);
+    const topArea  = document.getElementById('top-opponents');
+    const leftStrip  = document.getElementById('left-strip');
+    const rightStrip = document.getElementById('right-strip');
+
+    // Svuota sempre tutti e tre i contenitori
+    topArea.innerHTML    = '';
+    leftStrip.innerHTML  = '';
+    rightStrip.innerHTML = '';
+
+    if (n === 2) {
+      const opp = state.players.find(p => p.id !== myPlayerId);
+      topArea.appendChild(renderTopOpponent(opp, state, 'both'));
+      leftStrip.classList.add('hidden');
+      rightStrip.classList.add('hidden');
+
+    } else if (n === 3) {
+      // Nessuno di fronte; vicini ai lati
+      const rn = state.players[(myIndex + 1) % 3]; // vicino destro
+      const ln = state.players[(myIndex + 2) % 3]; // vicino sinistro
+      leftStrip.classList.remove('hidden');
+      rightStrip.classList.remove('hidden');
+      leftStrip.appendChild(renderSideStrip(ln, state, 'left'));
+      rightStrip.appendChild(renderSideStrip(rn, state, 'right'));
+      leftStrip.classList.toggle('active-player-strip',  ln.id === state.current_player_id);
+      rightStrip.classList.toggle('active-player-strip', rn.id === state.current_player_id);
+
+      // Su mobile (strip nascoste dal CSS) mostra i vicini in top-opponents
+      topArea.appendChild(renderTopOpponent(ln, state, 'left-neighbor'));
+      topArea.appendChild(renderTopOpponent(rn, state, 'right-neighbor'));
+
+    } else if (n === 4) {
+      const rn     = state.players[(myIndex + 1) % 4]; // vicino destro
+      const across = state.players[(myIndex + 2) % 4]; // di fronte
+      const ln     = state.players[(myIndex + 3) % 4]; // vicino sinistro
+      topArea.appendChild(renderTopOpponent(across, state, 'across'));
+      leftStrip.classList.remove('hidden');
+      rightStrip.classList.remove('hidden');
+      leftStrip.appendChild(renderSideStrip(ln, state, 'left'));
+      rightStrip.appendChild(renderSideStrip(rn, state, 'right'));
+      leftStrip.classList.toggle('active-player-strip',  ln.id === state.current_player_id);
+      rightStrip.classList.toggle('active-player-strip', rn.id === state.current_player_id);
+    }
   }
 
-  function renderOpponentField(player, state) {
-    const div = document.createElement('div');
-    div.className = 'opponent-field' + (player.id === state.current_player_id ? ' active-player' : '');
-    div.dataset.playerId = player.id;
+  // ---------------------------------------------------------------------------
+  // Campo avversario in cima (top-opponents) — specchiato
+  //
+  // role:
+  //   'both'          → 2p: entrambi i bastioni sono attack-target
+  //   'left-neighbor' → 3p mobile: B.D. (sx nel display) è adj al mio B.S.
+  //   'right-neighbor'→ 3p mobile: B.S. (dx nel display) è adj al mio B.D.
+  //   'across'        → 4p: nessun bastione adj; campo completo visibile ma non attaccabile
+  // ---------------------------------------------------------------------------
 
-    // Info giocatore
-    const info = el('div', { className: 'opp-info' }, [
-      el('div', { className: 'opp-name' }, [player.name]),
-      el('div', { className: 'opp-lives' }, ['❤'.repeat(Math.max(0, player.lives)) + '✕'.repeat(Math.max(0, 3 - player.lives))]),
-      el('div', { className: 'opp-hand-count' }, [`Mano: ${player.hand_count} carte`]),
+  function renderTopOpponent(player, state, role) {
+    const isActive = player.id === state.current_player_id;
+    const div = el('div', { className: `opponent-field${isActive ? ' active-player' : ''}`,
+      dataset: { playerId: player.id } });
+
+    const infoRow = el('div', { className: 'opp-info-row' }, [
+      el('span', { className: 'opp-name' }, [player.name]),
+      el('span', { className: 'opp-lives' },
+        ['❤'.repeat(Math.max(0, player.lives)) + '✕'.repeat(Math.max(0, 3 - player.lives))]),
+      el('span', { className: 'opp-hand-count' }, [`✋ ${player.hand_count}`]),
     ]);
+    if (role === 'across') {
+      infoRow.appendChild(el('span', { className: 'opp-position-badge' }, ['↕ Di fronte']));
+    }
+    const villageEl = renderOppVillageInline(player.field.village);
+    if (villageEl) infoRow.appendChild(villageEl);
+    div.appendChild(infoRow);
 
-    const regions = el('div', { className: 'opp-regions' });
+    // Bastioni SPECCHIATI: B.D. a sinistra, B.S. a destra
+    // isAdj: across → nessuno; both → tutti; left-neighbor → solo sx; right-neighbor → solo dx
+    const leftAdj  = role === 'both' || role === 'left-neighbor';
+    const rightAdj = role === 'both' || role === 'right-neighbor';
 
-    // Bastione sinistro
-    regions.appendChild(renderOppBastion(player.field.bastion_left, 'Bastione S.', player.id, 'left'));
-    // Avanscoperta
-    regions.appendChild(renderOppVanguard(player.field.vanguard));
-    // Bastione destro
-    regions.appendChild(renderOppBastion(player.field.bastion_right, 'Bastione D.', player.id, 'right'));
-    // Villaggio
-    regions.appendChild(renderOppVillage(player.field.village));
+    const row = el('div', { className: 'opp-regions-row' });
+    row.appendChild(renderOppBastionCell(player.field.bastion_right, player.id, 'right', leftAdj));
+    row.appendChild(renderOppVanguardCell(player.field.vanguard));
+    row.appendChild(renderOppBastionCell(player.field.bastion_left,  player.id, 'left',  rightAdj));
+    div.appendChild(row);
 
-    div.appendChild(info);
-    div.appendChild(regions);
     return div;
   }
 
-  function renderOppBastion(bastion, label, playerId, side) {
-    const div = el('div', { className: 'opp-region' });
-    div.appendChild(el('div', { className: 'opp-region-label' }, [label]));
-
-    const walls = el('div', { className: 'opp-wall-count' },
-      [`🧱 ${bastion.wall_count}`]);
-    div.appendChild(walls);
-
+  function renderOppBastionCell(bastion, playerId, side, isAdj) {
+    const div = el('div', { className: `opp-region opp-bastion${isAdj ? ' attack-target' : ' nonadj'}`,
+      dataset: isAdj ? { targetPlayerId: playerId, targetSide: side } : {} });
+    div.appendChild(el('div', { className: 'opp-wall-count' }, [`🧱 ${bastion.wall_count}`]));
     if (bastion.warriors && bastion.warriors.length > 0) {
       const ws = el('div', { className: 'opp-warriors' });
       bastion.warriors.forEach(w => ws.appendChild(renderCardSmall(w, false)));
       div.appendChild(ws);
     }
-
-    // Rende cliccabile per attaccare
-    div.dataset.targetPlayerId = playerId;
-    div.dataset.targetSide = side;
-    div.classList.add('attack-target');
-    div.title = `Attacca Bastione ${side === 'left' ? 'Sinistro' : 'Destro'} di ${playerId}`;
-
     return div;
   }
 
-  function renderOppVanguard(warriors) {
-    const div = el('div', { className: 'opp-region' });
-    div.appendChild(el('div', { className: 'opp-region-label' }, ['Avanscoperta']));
+  function renderOppVanguardCell(warriors) {
+    const div = el('div', { className: 'opp-region opp-vanguard' });
     const ws = el('div', { className: 'opp-warriors' });
     (warriors || []).forEach(w => ws.appendChild(renderCardSmall(w, false)));
     div.appendChild(ws);
     return div;
   }
 
-  function renderOppVillage(village) {
-    const div = el('div', { className: 'opp-region' });
-    div.appendChild(el('div', { className: 'opp-region-label' }, ['Villaggio']));
-    const bs = el('div', { className: 'opp-buildings' });
-    (village.buildings || []).forEach(b => bs.appendChild(renderBuildingSmall(b)));
-    div.appendChild(bs);
-    return div;
+  // ---------------------------------------------------------------------------
+  // Strip laterale — vicino sx o dx
+  //
+  // mySide 'left':  vicino SINISTRO → il suo B.D. (right) è adiacente al mio B.S.
+  // mySide 'right': vicino DESTRO   → il suo B.S. (left)  è adiacente al mio B.D.
+  //
+  // Layout (dall'alto verso il basso):
+  //   header (nome, vite, mano)
+  //   bastione NON adiacente (dimmer)
+  //   avanscoperta (flex:1, si espande)
+  //   bastione ADIACENTE (margin-top:auto, spinto in fondo — vicino al mio campo)
+  // ---------------------------------------------------------------------------
+
+  function renderSideStrip(player, state, mySide) {
+    const isAdj_side = mySide === 'left' ? 'right' : 'left'; // lato del loro bastione adj
+    const adjBastion    = mySide === 'left' ? player.field.bastion_right : player.field.bastion_left;
+    const nonAdjBastion = mySide === 'left' ? player.field.bastion_left  : player.field.bastion_right;
+    const adjLabel = mySide === 'left'
+      ? `⚔ vs Mio B.S.`
+      : `⚔ vs Mio B.D.`;
+    const nonAdjLabel = mySide === 'left' ? 'B.S. loro' : 'B.D. loro';
+    const posLabel = mySide === 'left' ? '◄ Vicino S.' : 'Vicino D. ►';
+
+    const wrapper = el('div', { className: 'strip-player' +
+      (player.id === state.current_player_id ? ' active-player-content' : '') });
+
+    // Header
+    wrapper.appendChild(el('div', { className: 'strip-header' }, [
+      el('div', { className: 'strip-name'  }, [`${posLabel} — ${player.name}`]),
+      el('div', { className: 'strip-lives' },
+        ['❤'.repeat(Math.max(0, player.lives)) + '✕'.repeat(Math.max(0, 3 - player.lives))]),
+      el('div', { className: 'strip-hand'  }, [`✋ ${player.hand_count}`]),
+    ]));
+
+    // Villaggio
+    const buildings = (player.field.village && player.field.village.buildings) || [];
+    if (buildings.length > 0) {
+      const vill = el('div', { className: 'strip-section strip-vanguard',
+        style: 'border-color: var(--border); flex: 0 0 auto;' });
+      vill.appendChild(el('div', { className: 'strip-section-label' }, ['🏛 Villaggio']));
+      buildings.forEach(b => {
+        const badge = el('div', { className: `opp-building-badge${b.completed ? ' completed' : ''}` },
+          [b.name || b.base_card_id]);
+        badge.addEventListener('click', e => { e.stopPropagation(); App.onCardClick(b.instance_id, 'opponent'); });
+        vill.appendChild(badge);
+      });
+      wrapper.appendChild(vill);
+    }
+
+    // Bastione NON adiacente (dimmer, in alto)
+    const nonAdj = el('div', { className: 'strip-section nonadj' });
+    nonAdj.appendChild(el('div', { className: 'strip-section-label' }, [nonAdjLabel]));
+    nonAdj.appendChild(el('div', { className: 'opp-wall-count' }, [`🧱 ${nonAdjBastion.wall_count}`]));
+    if (nonAdjBastion.warriors && nonAdjBastion.warriors.length > 0) {
+      const ws = el('div', { className: 'opp-warriors' });
+      nonAdjBastion.warriors.forEach(w => ws.appendChild(renderCardSmall(w, false)));
+      nonAdj.appendChild(ws);
+    }
+    wrapper.appendChild(nonAdj);
+
+    // Avanscoperta (si espande, occupa lo spazio tra i due bastioni)
+    const vg = el('div', { className: 'strip-section strip-vanguard' });
+    vg.appendChild(el('div', { className: 'strip-section-label' }, ['Avanscoperta']));
+    if (player.field.vanguard && player.field.vanguard.length > 0) {
+      const ws = el('div', { className: 'opp-warriors' });
+      player.field.vanguard.forEach(w => ws.appendChild(renderCardSmall(w, false)));
+      vg.appendChild(ws);
+    }
+    wrapper.appendChild(vg);
+
+    // Bastione ADIACENTE (in fondo, attack-target, margin-top:auto)
+    const adj = el('div', { className: 'strip-section adj attack-target',
+      dataset: { targetPlayerId: player.id, targetSide: isAdj_side } });
+    adj.appendChild(el('div', { className: 'strip-section-label' }, [adjLabel]));
+    adj.appendChild(el('div', { className: 'opp-wall-count' }, [`🧱 ${adjBastion.wall_count}`]));
+    if (adjBastion.warriors && adjBastion.warriors.length > 0) {
+      const ws = el('div', { className: 'opp-warriors' });
+      adjBastion.warriors.forEach(w => ws.appendChild(renderCardSmall(w, false)));
+      adj.appendChild(ws);
+    }
+    wrapper.appendChild(adj);
+
+    return wrapper;
+  }
+
+  function renderOppVillageInline(village) {
+    const buildings = (village && village.buildings) || [];
+    if (buildings.length === 0) return null;
+    const span = el('span', { className: 'opp-village-inline' });
+    span.appendChild(document.createTextNode('🏛 '));
+    buildings.forEach(b => {
+      const badge = el('span', { className: `opp-building-badge${b.completed ? ' completed' : ''}` },
+        [b.name || b.base_card_id]);
+      badge.addEventListener('click', e => { e.stopPropagation(); App.onCardClick(b.instance_id, 'opponent'); });
+      span.appendChild(badge);
+    });
+    return span;
   }
 
   // ---------------------------------------------------------------------------

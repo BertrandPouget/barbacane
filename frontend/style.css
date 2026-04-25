@@ -253,28 +253,134 @@ input:focus {
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  min-height: 0;
 }
 
-/* Area avversari */
-#opponents-area {
+/* Giocatore di fronte (2p: unico avversario; 4p: across player) */
+#top-opponents {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+#top-opponents:empty { display: none; padding: 0; border: none; }
+
+/* ==================== LAYOUT TRE COLONNE ==================== */
+
+#side-layout {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#center-column {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 4px 8px;
-  overflow-y: auto;
-  border-bottom: 1px solid var(--border);
   min-height: 0;
+  overflow: hidden;
+}
+
+/* ==================== STRIP LATERALI ==================== */
+
+#left-strip,
+#right-strip {
+  width: 152px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-medium);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+}
+
+#left-strip  { border-right: 2px solid var(--border-gold); }
+#right-strip { border-left:  2px solid var(--border-gold); }
+#left-strip.hidden, #right-strip.hidden { display: none; }
+
+#left-strip.active-player-strip  { border-right-color: var(--gold); }
+#right-strip.active-player-strip { border-left-color:  var(--gold); }
+
+.strip-player {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 6px 6px 8px;
+  gap: 5px;
+}
+
+.strip-header {
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.strip-name  { font-weight: bold; font-size: 0.9rem; color: var(--gold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.strip-lives { font-size: 0.82rem; color: var(--red-light); }
+.strip-hand  { font-size: 0.72rem; color: var(--text-dim); }
+
+.strip-section {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 5px;
+  border-radius: 4px;
+  border: 1px dashed var(--border);
+}
+
+.strip-section-label {
+  font-size: 0.67rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.strip-section.nonadj { opacity: 0.5; }
+
+.strip-vanguard { flex: 1; border-color: transparent; }
+
+.strip-section.adj {
+  margin-top: auto;
+  border-color: var(--border-gold);
+  background: rgba(90, 50, 20, 0.18);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.strip-section.adj:hover {
+  border-color: var(--gold);
+  background: rgba(200, 168, 75, 0.1);
+}
+.strip-section.adj.attackable {
+  border-color: var(--red-light);
+  background: rgba(176, 48, 48, 0.15);
+  box-shadow: 0 0 8px rgba(224, 64, 64, 0.5);
+  animation: pulse-attack 1.4s ease-in-out infinite;
+  cursor: crosshair;
+}
+
+/* Bastione NON adiacente nel campo specchiato top-opponents */
+.opp-bastion.nonadj { opacity: 0.45; cursor: default; }
+
+/* Badge posizione nel campo avversario (top-opponents in 4p) */
+.opp-position-badge {
+  font-size: 0.65rem;
+  color: var(--border-gold);
+  font-style: italic;
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .opponent-field {
   background: var(--bg-medium);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 6px 10px;
+  padding: 5px 8px;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   transition: border-color 0.3s;
 }
 
@@ -286,57 +392,137 @@ input:focus {
   50% { border-color: var(--red-light); background: rgba(176,48,48,0.15); }
 }
 
-.opp-info {
-  min-width: 100px;
+/* Riga info: nome | vite | mano | villaggio */
+.opp-info-row {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.opp-name { font-weight: bold; font-size: 0.9rem; color: var(--gold); }
-.opp-lives { font-size: 0.8rem; }
-.opp-lives .heart { color: var(--red-light); }
-.opp-hand-count { font-size: 0.75rem; color: var(--text-dim); }
+.opp-name { font-weight: bold; font-size: 0.92rem; color: var(--gold); }
+.opp-lives { font-size: 0.82rem; color: var(--red-light); }
+.opp-hand-count { font-size: 0.78rem; color: var(--text-dim); margin-left: auto; }
+.opp-dim        { font-size: 0.72rem; color: var(--text-dim); font-style: italic; margin-left: 6px; }
 
-.opp-regions {
+.opp-village-inline {
+  font-size: 0.75rem;
+  color: var(--text-dim);
   display: flex;
-  gap: 6px;
-  flex: 1;
   align-items: center;
+  gap: 3px;
+  margin-left: 4px;
+}
+
+.opp-building-badge {
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.opp-building-badge.completed { border-color: var(--gold); color: var(--gold); }
+.opp-building-badge:hover { border-color: var(--text-dim); }
+
+/* Riga regioni — SPECCHIATA: B.D. avversario a sx, Av al centro, B.S. avversario a dx */
+.opp-regions-row {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+  min-height: 50px;
 }
 
 .opp-region {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 2px;
-  font-size: 0.65rem;
+  font-size: 0.78rem;
   color: var(--text-dim);
 }
 
-.opp-region-label { text-align: center; }
+/* Bastioni avversari: stessa proporzione dei miei (flex:1) */
+.opp-region.opp-bastion {
+  flex: 1;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  padding: 3px 4px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.opp-region.opp-bastion:hover { border-color: var(--text-dim); }
+
+/* Avanscoperta avversaria: stessa proporzione della mia (flex:2) */
+.opp-region.opp-vanguard {
+  flex: 2;
+  border: 1px dashed transparent;
+  padding: 3px 4px;
+}
 
 .opp-warriors, .opp-buildings {
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
-  min-width: 60px;
 }
 
 .opp-wall-count {
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   color: var(--text-dim);
+}
+
+/* Bastione attaccabile in modalità battaglia */
+.opp-region.opp-bastion.attackable {
+  border-color: var(--red-light);
+  background: rgba(176, 48, 48, 0.12);
+  box-shadow: 0 0 8px rgba(224, 64, 64, 0.45);
+  animation: pulse-attack 1.4s ease-in-out infinite;
+  cursor: crosshair;
+}
+
+@keyframes pulse-attack {
+  0%, 100% { box-shadow: 0 0 6px rgba(224, 64, 64, 0.4); }
+  50%       { box-shadow: 0 0 14px rgba(224, 64, 64, 0.75); }
+}
+
+/* Evidenzia la colonna di attacco sul game-table in battaglia */
+#game-table.battle-mode #my-bastion-right,
+#game-table.battle-mode #my-bastion-left {
+  border-style: solid;
+  border-color: rgba(224, 64, 64, 0.4);
+}
+
+/* ==================== LANE SEPARATOR ==================== */
+
+#lane-separator {
+  display: flex;
+  align-items: center;
+  background: var(--bg-dark);
+  border-top: 1px solid var(--border-gold);
+  border-bottom: 1px solid var(--border-gold);
+  padding: 3px 8px;
+  user-select: none;
+}
+
+.lane-col {
+  font-size: 0.72rem;
+  color: var(--border-gold);
+  font-style: italic;
+  letter-spacing: 0.04em;
   text-align: center;
 }
 
-/* Barra centrale */
+.lane-col-bastion { flex: 1; }
+.lane-col-center  { flex: 2; color: var(--text-dim); }
+
+/* Barra centrale / log */
 #center-bar {
-  height: 40px;
+  height: 34px;
   display: flex;
   align-items: center;
   padding: 0 1rem;
   background: var(--bg-dark);
-  border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   overflow: hidden;
 }
@@ -367,18 +553,10 @@ input:focus {
 }
 
 .region-label {
-  font-size: 0.65rem;
+  font-size: 0.78rem;
   color: var(--text-dim);
   text-align: center;
   min-width: 50px;
-}
-
-.region-label-vert {
-  font-size: 0.6rem;
-  color: var(--text-dim);
-  text-align: center;
-  writing-mode: vertical-rl;
-  min-width: 16px;
 }
 
 .region {
@@ -528,13 +706,13 @@ input:focus {
   width: var(--card-w-sm);
   min-width: var(--card-w-sm);
   height: var(--card-h-sm);
-  font-size: 0.6rem;
+  font-size: 0.68rem;
 }
 
 /* Carta in campo: nascondi descrizione, ingrandisci stats */
 .card-sm.in-field .card-effect { display: none; }
-.card-sm.in-field .card-name { font-size: 0.7rem; }
-.card-sm.in-field .card-stats { font-size: 0.75rem; margin-top: auto; }
+.card-sm.in-field .card-name { font-size: 0.78rem; }
+.card-sm.in-field .card-stats { font-size: 0.8rem; margin-top: auto; }
 
 /* Tipi carta */
 .card[data-type="warrior"]  { border-left: 3px solid var(--red); }
@@ -590,8 +768,8 @@ input:focus {
   margin-top: 0.25rem;
 }
 
-#hand-cards .card .card-name { font-size: 0.75rem; }
-#hand-cards .card .card-species { font-size: 0.65rem; }
+#hand-cards .card .card-name { font-size: 0.82rem; }
+#hand-cards .card .card-species { font-size: 0.72rem; }
 
 .stat { color: var(--text-dim); }
 .stat-att { color: var(--red-light); }
@@ -601,9 +779,9 @@ input:focus {
 .stat-mana { color: var(--gold); }
 
 .card-effect {
-  font-size: 0.55rem;
+  font-size: 0.7rem;
   color: var(--text-dim);
-  line-height: 1.2;
+  line-height: 1.25;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -1097,14 +1275,88 @@ input:focus {
   transform: translateY(-3px);
 }
 
-/* Responsive: se lo schermo è stretto, rendi le carte più piccole */
+/* ==================== RESPONSIVE ==================== */
+
 @media (max-width: 900px) {
   :root {
-    --card-w: 70px;
-    --card-h: 100px;
-    --card-w-sm: 54px;
-    --card-h-sm: 80px;
+    --card-w: 72px;
+    --card-h: 104px;
+    --card-w-sm: 56px;
+    --card-h-sm: 82px;
   }
-  #action-panel { width: 140px; }
-  #game-table { margin-right: 140px; }
+  #action-panel { width: 148px; }
+  #game-table { margin-right: 148px; }
 }
+
+/* Mobile — pannello azioni diventa drawer dal basso */
+@media (max-width: 600px) {
+  :root {
+    --card-w: 62px;
+    --card-h: 92px;
+    --card-w-sm: 48px;
+    --card-h-sm: 72px;
+  }
+
+  /* Su mobile le strip spariscono; le mostriamo in top-opponents */
+  #left-strip, #right-strip { display: none !important; }
+  #top-opponents { max-height: 35vh; overflow-y: auto; }
+
+  #action-panel {
+    position: fixed;
+    left: 0; right: 0;
+    bottom: 0; top: auto;
+    width: 100%;
+    border-left: none;
+    border-top: 2px solid var(--border-gold);
+    border-radius: 14px 14px 0 0;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0 0.6rem 0.6rem;
+    max-height: 46px;
+    overflow: hidden;
+    transition: max-height 0.32s ease;
+    z-index: 80;
+  }
+
+  #action-panel.panel-open {
+    max-height: 65vh;
+    overflow-y: auto;
+  }
+
+  #panel-toggle {
+    display: flex;
+    order: -1;
+    width: 100%;
+    padding: 0.55rem 0;
+    background: transparent;
+    border: none;
+    color: var(--gold);
+    font-size: 0.88rem;
+    font-family: inherit;
+    cursor: pointer;
+    justify-content: center;
+    align-items: center;
+    gap: 0.4rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.3rem;
+  }
+
+  #action-panel h3 { display: none; }
+
+  #game-table {
+    margin-right: 0;
+    margin-bottom: 46px;
+  }
+
+  .banner-btn { padding: 0.4rem 0.3rem; font-size: 0.78rem; }
+  .btn-danger, .btn-warning { flex: 1; min-width: 80px; }
+
+  #hdr-phase, #hdr-deck { display: none; }
+  #game-header { padding: 0.3rem 0.6rem; }
+
+  #lane-separator { padding: 2px 6px; }
+  .lane-col { font-size: 0.65rem; }
+}
+
+#panel-toggle { display: none; }
