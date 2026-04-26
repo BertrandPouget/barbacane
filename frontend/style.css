@@ -496,6 +496,12 @@ input:focus {
 /* ==================== LANE SEPARATOR ==================== */
 
 
+/* Spazio tavolo centrale — spinge il campo del giocatore in basso */
+#table-surface {
+  flex: 1;
+  min-height: 40px;
+}
+
 /* Barra centrale / log */
 #center-bar {
   height: 34px;
@@ -537,6 +543,21 @@ input:focus {
   color: var(--text-dim);
   text-align: center;
   min-width: 50px;
+}
+
+/* Etichette regioni del giocatore — via ::before per sopravvivere a innerHTML='' */
+#my-bastion-left::before,
+#my-vanguard::before,
+#my-bastion-right::before {
+  content: attr(data-label);
+  display: block;
+  width: 100%;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  text-align: center;
+  padding-bottom: 2px;
+  pointer-events: none;
+  font-style: italic;
 }
 
 .region {
