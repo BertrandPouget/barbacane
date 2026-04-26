@@ -495,26 +495,6 @@ input:focus {
 
 /* ==================== LANE SEPARATOR ==================== */
 
-#lane-separator {
-  display: flex;
-  align-items: center;
-  background: var(--bg-dark);
-  border-top: 1px solid var(--border-gold);
-  border-bottom: 1px solid var(--border-gold);
-  padding: 3px 8px;
-  user-select: none;
-}
-
-.lane-col {
-  font-size: 0.72rem;
-  color: var(--border-gold);
-  font-style: italic;
-  letter-spacing: 0.04em;
-  text-align: center;
-}
-
-.lane-col-bastion { flex: 1; }
-.lane-col-center  { flex: 2; color: var(--text-dim); }
 
 /* Barra centrale / log */
 #center-bar {
@@ -1355,8 +1335,6 @@ input:focus {
   #hdr-phase, #hdr-deck { display: none; }
   #game-header { padding: 0.3rem 0.6rem; }
 
-  #lane-separator { padding: 2px 6px; }
-  .lane-col { font-size: 0.65rem; }
 }
 
 #panel-toggle { display: none; }

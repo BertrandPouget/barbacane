@@ -70,10 +70,6 @@ const Renderer = (() => {
       leftStrip.classList.toggle('active-player-strip',  ln.id === state.current_player_id);
       rightStrip.classList.toggle('active-player-strip', rn.id === state.current_player_id);
 
-      // Su mobile (strip nascoste dal CSS) mostra i vicini in top-opponents
-      topArea.appendChild(renderTopOpponent(ln, state, 'left-neighbor'));
-      topArea.appendChild(renderTopOpponent(rn, state, 'right-neighbor'));
-
     } else if (n === 4) {
       const rn     = state.players[(myIndex + 1) % 4]; // vicino destro
       const across = state.players[(myIndex + 2) % 4]; // di fronte
@@ -168,17 +164,15 @@ const Renderer = (() => {
     const adjBastion    = mySide === 'left' ? player.field.bastion_right : player.field.bastion_left;
     const nonAdjBastion = mySide === 'left' ? player.field.bastion_left  : player.field.bastion_right;
     const adjLabel = mySide === 'left'
-      ? `⚔ vs Mio B.S.`
-      : `⚔ vs Mio B.D.`;
-    const nonAdjLabel = mySide === 'left' ? 'B.S. loro' : 'B.D. loro';
-    const posLabel = mySide === 'left' ? '◄ Vicino S.' : 'Vicino D. ►';
-
+      ? `⚔ vs Mio Bastione S.`
+      : `⚔ vs Mio Bastione D.`;
+    const nonAdjLabel = mySide === 'left' ? 'Bastione S.' : 'Bastione D.';
     const wrapper = el('div', { className: 'strip-player' +
       (player.id === state.current_player_id ? ' active-player-content' : '') });
 
     // Header
     wrapper.appendChild(el('div', { className: 'strip-header' }, [
-      el('div', { className: 'strip-name'  }, [`${posLabel} — ${player.name}`]),
+      el('div', { className: 'strip-name'  }, [player.name]),
       el('div', { className: 'strip-lives' },
         ['❤'.repeat(Math.max(0, player.lives)) + '✕'.repeat(Math.max(0, 3 - player.lives))]),
       el('div', { className: 'strip-hand'  }, [`✋ ${player.hand_count}`]),
