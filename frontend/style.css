@@ -469,6 +469,12 @@ input:focus {
   gap: 2px;
 }
 
+.opp-bastion-label {
+  font-size: 0.62rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
 .opp-wall-count {
   font-size: 0.78rem;
   color: var(--text-dim);
@@ -849,21 +855,19 @@ input:focus {
 /* ==================== PANNELLO AZIONI ==================== */
 
 #action-panel {
-  position: fixed;
-  right: 0;
-  top: 40px;
-  bottom: 0;
-  width: 180px;
-  background: var(--bg-medium);
-  border-left: 1px solid var(--border-gold);
-  padding: 1rem;
   display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-  z-index: 50;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  background: var(--bg-medium);
+  border-top: 1px solid var(--border-gold);
+  border-bottom: 1px solid var(--border-gold);
+  flex-shrink: 0;
 }
 
-#action-panel h3 { color: var(--gold); font-size: 1rem; }
+#action-panel h3 { display: none; }
 
 .hint {
   font-size: 0.75rem;
@@ -881,8 +885,6 @@ input:focus {
   color: var(--gold-light);
 }
 
-/* Offset game-table per pannello azioni */
-#game-table { margin-right: 180px; }
 
 /* ==================== MODALE ==================== */
 
@@ -1181,12 +1183,9 @@ input:focus {
 /* ==================== BANNER AZIONE ==================== */
 
 #action-banner {
-  background: var(--bg-dark);
-  border: 1px solid var(--border-gold);
-  border-radius: 6px;
-  padding: 0.6rem;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   gap: 0.4rem;
 }
 
@@ -1194,14 +1193,13 @@ input:focus {
   font-size: 0.7rem;
   color: var(--gold);
   font-weight: bold;
-  text-align: center;
   letter-spacing: 0.05em;
-  margin-bottom: 0.1rem;
+  white-space: nowrap;
 }
 
 .banner-btn {
-  width: 100%;
-  padding: 0.5rem 0.4rem;
+  width: auto;
+  padding: 0.35rem 0.6rem;
   background: var(--bg-light);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -1209,17 +1207,17 @@ input:focus {
   font-family: inherit;
   font-size: 0.8rem;
   cursor: pointer;
-  text-align: left;
+  white-space: nowrap;
   transition: border-color 0.15s, background 0.15s, transform 0.1s;
 }
 
 .banner-btn:hover:not(:disabled) {
   border-color: var(--gold);
   background: var(--bg-medium);
-  transform: translateX(2px);
+  transform: translateY(-1px);
 }
 
-.banner-btn:active:not(:disabled) { transform: translateX(1px); }
+.banner-btn:active:not(:disabled) { transform: translateY(0); }
 
 .banner-btn:disabled {
   opacity: 0.35;
@@ -1229,20 +1227,23 @@ input:focus {
 /* ==================== WALL STAGING ==================== */
 
 #wall-staging {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
   background: var(--bg-dark);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
 }
+
+#wall-staging .hint { display: none; }
 
 .wall-stage-header {
   font-size: 0.75rem;
   color: var(--gold);
   font-weight: bold;
-  text-align: center;
+  white-space: nowrap;
 }
 
 .wall-entry {
@@ -1294,8 +1295,6 @@ input:focus {
     --card-w-hand: 81px;
     --card-h-hand: 117px;
   }
-  #action-panel { width: 148px; }
-  #game-table { margin-right: 148px; }
 }
 
 /* Mobile — pannello azioni diventa drawer dal basso */
@@ -1357,7 +1356,6 @@ input:focus {
   #action-panel h3 { display: none; }
 
   #game-table {
-    margin-right: 0;
     margin-bottom: 46px;
   }
 

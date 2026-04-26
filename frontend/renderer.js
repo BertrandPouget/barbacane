@@ -105,9 +105,6 @@ const Renderer = (() => {
         ['❤'.repeat(Math.max(0, player.lives)) + '✕'.repeat(Math.max(0, 3 - player.lives))]),
       el('span', { className: 'opp-hand-count' }, [`✋ ${player.hand_count}`]),
     ]);
-    if (role === 'across') {
-      infoRow.appendChild(el('span', { className: 'opp-position-badge' }, ['↕ Di fronte']));
-    }
     const villageEl = renderOppVillageInline(player.field.village);
     if (villageEl) infoRow.appendChild(villageEl);
     div.appendChild(infoRow);
@@ -129,6 +126,9 @@ const Renderer = (() => {
   function renderOppBastionCell(bastion, playerId, side, isAdj) {
     const div = el('div', { className: `opp-region opp-bastion${isAdj ? ' attack-target' : ' nonadj'}`,
       dataset: isAdj ? { targetPlayerId: playerId, targetSide: side } : {} });
+    const sideLabel = side === 'right' ? 'D.' : 'S.';
+    const bastionLabel = isAdj ? `Bastione ${sideLabel} (Possibile Bersaglio)` : `Bastione ${sideLabel}`;
+    div.appendChild(el('div', { className: 'opp-bastion-label' }, [bastionLabel]));
     div.appendChild(el('div', { className: 'opp-wall-count' }, [`🧱 ${bastion.wall_count}`]));
     if (bastion.warriors && bastion.warriors.length > 0) {
       const ws = el('div', { className: 'opp-warriors' });
@@ -163,9 +163,7 @@ const Renderer = (() => {
     const isAdj_side = mySide === 'left' ? 'right' : 'left'; // lato del loro bastione adj
     const adjBastion    = mySide === 'left' ? player.field.bastion_right : player.field.bastion_left;
     const nonAdjBastion = mySide === 'left' ? player.field.bastion_left  : player.field.bastion_right;
-    const adjLabel = mySide === 'left'
-      ? `⚔ vs Mio Bastione S.`
-      : `⚔ vs Mio Bastione D.`;
+    const adjLabel    = mySide === 'left' ? 'Bastione D. (Possibile Bersaglio)' : 'Bastione S. (Possibile Bersaglio)';
     const nonAdjLabel = mySide === 'left' ? 'Bastione S.' : 'Bastione D.';
     const wrapper = el('div', { className: 'strip-player' +
       (player.id === state.current_player_id ? ' active-player-content' : '') });
@@ -252,6 +250,14 @@ const Renderer = (() => {
     renderLifeCards(player);
     document.getElementById('my-mana').textContent    = `Mana: ${player.mana_remaining ?? 0}`;
     document.getElementById('my-actions').textContent = `Azioni: ${player.actions_remaining ?? 0}`;
+
+    // Etichette bastioni con nome del vicino che li minaccia
+    const n = state.players.length;
+    const myIndex = state.players.findIndex(p => p.id === myPlayerId);
+    const leftNeighbor  = state.players[(myIndex - 1 + n) % n];
+    const rightNeighbor = state.players[(myIndex + 1) % n];
+    document.getElementById('my-bastion-left').dataset.label  = `Bastione S. (Esposto a ${leftNeighbor.name})`;
+    document.getElementById('my-bastion-right').dataset.label = `Bastione D. (Esposto a ${rightNeighbor.name})`;
 
     // Regioni
     renderRegion('my-vanguard', player.field.vanguard, 'warrior', true);

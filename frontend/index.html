@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Barbacane</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧱</text></svg>" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -100,6 +101,43 @@
         <div id="center-bar">
           <div id="battle-log"></div>
         </div>
+
+        <!-- Barra azioni centrale -->
+        <div id="action-panel">
+          <button id="panel-toggle" aria-label="Apri/chiudi pannello azioni">
+            <span id="panel-toggle-label">⚙ Azioni</span>
+          </button>
+          <h3>Azioni</h3>
+
+          <!-- Banner: scegli tipo di azione -->
+          <div id="action-banner" class="hidden">
+            <div id="banner-turn-label" class="banner-label">Azione 1 di 2</div>
+            <button id="banner-btn-play"     class="banner-btn">🃏 Gioca carta</button>
+            <button id="banner-btn-complete" class="banner-btn">🏗 Completa</button>
+            <button id="banner-btn-wall"     class="banner-btn">🧱 Aggiungi muri</button>
+          </div>
+
+          <!-- Annulla azione corrente -->
+          <button id="btn-cancel-action" class="btn btn-secondary hidden">↩ Annulla</button>
+
+          <!-- Selezione muri -->
+          <div id="wall-staging" class="hidden">
+            <div class="wall-stage-header">Muri: <span id="wall-count">0</span>/3</div>
+            <div id="wall-selected-list"></div>
+            <div class="hint">Clicca carte dalla mano</div>
+            <button id="wall-confirm-btn" class="btn btn-primary btn-small" disabled>Conferma muri</button>
+          </div>
+
+          <div id="action-hint" class="hint"></div>
+          <div id="selection-info" class="selection-box hidden"></div>
+
+          <div style="flex:1"></div>
+
+          <button id="btn-horde"    class="btn btn-warning hidden">⚡ Orda</button>
+          <button id="btn-battle"   class="btn btn-warning">⚔ Attacca</button>
+          <button id="btn-end-turn" class="btn btn-danger">Fine Turno</button>
+        </div>
+
         <div id="my-field">
           <div class="field-row" id="my-bastions-row">
             <div id="my-bastion-left"  class="region bastion" data-side="left"  data-label="Bastione S."></div>
@@ -131,42 +169,6 @@
     </div><!-- /side-layout -->
 
   </div><!-- /game-table -->
-
-  <!-- Pannello azioni laterale -->
-  <div id="action-panel">
-    <button id="panel-toggle" aria-label="Apri/chiudi pannello azioni">
-      <span id="panel-toggle-label">⚙ Azioni</span>
-    </button>
-    <h3>Azioni</h3>
-
-    <!-- Banner: scegli tipo di azione -->
-    <div id="action-banner" class="hidden">
-      <div id="banner-turn-label" class="banner-label">Azione 1 di 2</div>
-      <button id="banner-btn-play"     class="banner-btn">🃏 Gioca carta</button>
-      <button id="banner-btn-complete" class="banner-btn">🏗 Completa</button>
-      <button id="banner-btn-wall"     class="banner-btn">🧱 Aggiungi muri</button>
-    </div>
-
-    <!-- Annulla azione corrente -->
-    <button id="btn-cancel-action" class="btn btn-secondary hidden">↩ Annulla</button>
-
-    <!-- Selezione muri -->
-    <div id="wall-staging" class="hidden">
-      <div class="wall-stage-header">Muri: <span id="wall-count">0</span>/3</div>
-      <div id="wall-selected-list"></div>
-      <div class="hint">Clicca carte dalla mano</div>
-      <button id="wall-confirm-btn" class="btn btn-primary btn-small" disabled>Conferma muri</button>
-    </div>
-
-    <div id="action-hint" class="hint"></div>
-    <div id="selection-info" class="selection-box hidden"></div>
-
-    <div style="flex:1"></div>
-
-    <button id="btn-horde"    class="btn btn-warning hidden">⚡ Orda</button>
-    <button id="btn-battle"   class="btn btn-warning">⚔ Attacca</button>
-    <button id="btn-end-turn" class="btn btn-danger">Fine Turno</button>
-  </div>
 
   <!-- Modale conferma azione / targeting -->
   <div id="modal-overlay" class="hidden">
