@@ -25,6 +25,8 @@
   --card-h: 130px;
   --card-w-sm: 70px;
   --card-h-sm: 100px;
+  --card-w-hand: 99px;
+  --card-h-hand: 143px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -644,12 +646,12 @@ input:focus {
 #hand-area {
   background: var(--bg-dark);
   border-top: 2px solid var(--border);
-  padding: 6px 8px;
+  padding: 8px 8px 6px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 170px;
-  overflow-y: auto;
+  max-height: 192px;
+  overflow: visible;
 }
 
 .hand-label {
@@ -769,6 +771,11 @@ input:focus {
   margin-top: 0.25rem;
 }
 
+#hand-cards .card {
+  width: var(--card-w-hand);
+  min-width: var(--card-w-hand);
+  height: var(--card-h-hand);
+}
 #hand-cards .card .card-name { font-size: 0.82rem; }
 #hand-cards .card .card-species { font-size: 0.72rem; }
 
@@ -1284,6 +1291,8 @@ input:focus {
     --card-h: 104px;
     --card-w-sm: 56px;
     --card-h-sm: 82px;
+    --card-w-hand: 81px;
+    --card-h-hand: 117px;
   }
   #action-panel { width: 148px; }
   #game-table { margin-right: 148px; }
@@ -1296,6 +1305,8 @@ input:focus {
     --card-h: 92px;
     --card-w-sm: 48px;
     --card-h-sm: 72px;
+    --card-w-hand: 71px;
+    --card-h-hand: 105px;
   }
 
   /* Su mobile le strip spariscono; le mostriamo in top-opponents */

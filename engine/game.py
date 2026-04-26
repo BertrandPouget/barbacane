@@ -294,6 +294,9 @@ def end_turn(state: GameState) -> GameState:
     # Pulisci effetti scaduti a fine turno
     _clear_turn_expired_effects(player)
 
+    # Registra che il giocatore ha completato un turno
+    player.turns_completed += 1
+
     # Verifica condizione di vittoria prima di passare
     winner = _check_winner(state)
     if winner:

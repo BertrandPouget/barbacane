@@ -90,6 +90,8 @@ def get_valid_attack_targets(state: GameState) -> List[Tuple[int, str]]:
         for i, p in enumerate(state.players):
             if i == attacker_index or not p.is_alive:
                 continue
+            if p.turns_completed < 1:
+                continue
             for side in ["left", "right"]:
                 if not _fossato_blocks(p, side, att_git):
                     targets.append((i, side))
@@ -101,6 +103,8 @@ def get_valid_attack_targets(state: GameState) -> List[Tuple[int, str]]:
             continue
         defender = state.players[defender_index]
         if not defender.is_alive:
+            continue
+        if defender.turns_completed < 1:
             continue
         # Verifica Fossato
         if _fossato_blocks(defender, side, att_git):
@@ -284,6 +288,9 @@ def resolve_battle(
     # Serve almeno un Guerriero in Avanscoperta per attaccare
     if not attacker.field.vanguard:
         raise ActionError("Non puoi attaccare senza Guerrieri in Avanscoperta.")
+
+    if defender.turns_completed < 1:
+        raise ActionError("Non puoi attaccare un giocatore che non ha ancora completato almeno un turno.")
 
     # Statistiche attaccante
     att_att, att_git = attacker_stats(attacker)

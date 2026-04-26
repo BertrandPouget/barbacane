@@ -605,6 +605,8 @@ const Renderer = (() => {
 
     const confirmBtn = document.getElementById('modal-confirm');
     const cancelBtn  = document.getElementById('modal-cancel');
+    confirmBtn.classList.remove('hidden');
+    cancelBtn.classList.remove('hidden');
 
     const cleanup = () => {
       document.getElementById('modal-overlay').classList.add('hidden');
@@ -637,11 +639,16 @@ const Renderer = (() => {
     body.appendChild(optionsDiv);
     overlay.classList.remove('hidden');
 
-    document.getElementById('modal-confirm').onclick = () => {
+    const confirmBtn = document.getElementById('modal-confirm');
+    const cancelBtn  = document.getElementById('modal-cancel');
+    confirmBtn.classList.remove('hidden');
+    cancelBtn.classList.remove('hidden');
+
+    confirmBtn.onclick = () => {
       overlay.classList.add('hidden');
       if (selected !== null) onChoice(selected);
     };
-    document.getElementById('modal-cancel').onclick = () => {
+    cancelBtn.onclick = () => {
       overlay.classList.add('hidden');
     };
   }

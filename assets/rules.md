@@ -52,7 +52,7 @@ Durante la partita, le carte vengono posizionate nelle varie Regioni e rimangono
 3. Il giocatore può svolgere una seconda Azione (Giocare una carta, Completare una carta o Aggiungere fino a 3 Muri).  
 4. Il giocatore posiziona i propri Guerrieri a suo piacimento tra Avanscoperta e Bastioni.  
 5. Per ogni Orda formata, il giocatore sceglie quale effetto Orda attivare. Se la stessa Orda aveva un altro effetto Orda già attivo, esso viene prima disattivato. La carta selezionata viene posizionata tra le altre due.  
-6. Il giocatore può attaccare un avversario in Battaglia.  
+6. Il giocatore può attaccare un avversario in Battaglia, purché tale avversario abbia già completato almeno un turno.  
 7. Il giocatore pesca fino ad avere 6 carte in mano, salvo diversa indicazione di una carta in gioco. Se il giocatore aveva già più di 6 carte in mano, non ne deve scartare.  
 
 Inoltre, gli effetti di Costruzioni e Magie in gioco si attivano nel momento indicato dalla carta stessa, indipendentemente dai passi elencati.
@@ -60,7 +60,7 @@ Inoltre, gli effetti di Costruzioni e Magie in gioco si attivano nel momento ind
 ## Battaglia
 Alla fine del proprio turno, dopo aver schierato i Guerrieri tra Avanscoperta e Bastioni, il giocatore attivo può dichiarare una Battaglia contro un avversario. Dopo la risoluzione, i Guerrieri rimangono nelle rispettive posizioni fino all’inizio del turno successivo.
 
-Per iniziare la Battaglia, l’attaccante sceglie uno dei Bastioni avversari adiacenti ai propri come bersaglio. Non è possibile attaccare se non si possiede almeno un Guerriero in Avanscoperta.
+Per iniziare la Battaglia, l’attaccante sceglie uno dei Bastioni avversari adiacenti ai propri come bersaglio. Non è possibile attaccare se non si possiede almeno un Guerriero in Avanscoperta. Inoltre, non è permesso attaccare un giocatore che non abbia giocato almeno un turno.
 
 Si determinano quindi i valori in campo. L’attaccante utilizza il valore più alto di ATT tra i Guerrieri in Avanscoperta e il valore più alto di GIT tra le stesse carte. Il difensore utilizza il valore più alto di DIF tra i Guerrieri presenti nel Bastione bersaglio e il valore più alto di GIT tra quelle carte.
 

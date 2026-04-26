@@ -147,6 +147,7 @@ class Player(BaseModel):
     extra_battles: int = 0  # Eracles horde
     spell_cost_reductions: Dict[str, int] = Field(default_factory=dict)  # school -> reduction
     hordes_activated_this_turn: List[str] = Field(default_factory=list)  # "{zone}:{species}" keys
+    turns_completed: int = 0
 
     @computed_field
     @property
