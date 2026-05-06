@@ -1,6 +1,5 @@
-Subito
-- testare il corretto funzionamento di Telecinesi
-
-Dopo
-- ordine azioni (fasi turno enforced dal server)
-- evoluzioni: verificare corner case UI
+Appunti chat 08/05
+- se provi ad attaccare senza avanscoperta il log è una frase senza senso
+- log combattimento ha ancora i player chiamati player_i e i bastioni in inglese
+- tutti i log vanno messi in centro perché durano troppo poco (es d10 non si capisce un cazzo di cosa sia uscito)
+- attiva arena è decentrato & cambiare simboletto
