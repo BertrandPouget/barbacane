@@ -11,6 +11,8 @@ const WS = (() => {
   let reconnectTimer = null;
   let reconnectDelay = 1000;
   const MAX_RECONNECT_DELAY = 30000;
+  let keepaliveTimer = null;
+  const KEEPALIVE_INTERVAL = 30000;
 
   const handlers = {};
 
@@ -31,11 +33,13 @@ const WS = (() => {
       console.log('[WS] Connesso');
       reconnectDelay = 1000;
       clearTimeout(reconnectTimer);
+      _startKeepalive();
       _dispatch('connected', {});
     };
 
     socket.onclose = (e) => {
       console.log('[WS] Disconnesso', e.code);
+      _stopKeepalive();
       _dispatch('disconnected', { code: e.code });
       _scheduleReconnect();
     };
@@ -52,6 +56,20 @@ const WS = (() => {
         console.error('[WS] Messaggio non valido', e.data);
       }
     };
+  }
+
+  function _startKeepalive() {
+    _stopKeepalive();
+    keepaliveTimer = setInterval(() => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, KEEPALIVE_INTERVAL);
+  }
+
+  function _stopKeepalive() {
+    clearInterval(keepaliveTimer);
+    keepaliveTimer = null;
   }
 
   function _scheduleReconnect() {
@@ -91,6 +109,7 @@ const WS = (() => {
   }
 
   function disconnect() {
+    _stopKeepalive();
     clearTimeout(reconnectTimer);
     if (socket) socket.close();
     socket = null;
