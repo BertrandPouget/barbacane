@@ -483,6 +483,11 @@ async def _handle_ws_message(game_id: str, player_id: str, data: dict) -> None:
             await manager.send_to_player(game_id, player_id, {
                 "type": "error", "message": str(e)
             })
+        except Exception as e:
+            logger.error("[ws] Errore interno action=%s game=%s: %s", action, game_id, e)
+            await manager.send_to_player(game_id, player_id, {
+                "type": "error", "message": f"Errore interno: {e}"
+            })
 
     elif msg_type == "ping":
         await manager.send_to_player(game_id, player_id, {"type": "pong"})

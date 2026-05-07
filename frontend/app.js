@@ -227,13 +227,13 @@ const App = (() => {
       const name = currentState
         ? ((currentState.players.find(p => p.id === msg.player_id) || {}).name || msg.player_id)
         : msg.player_id;
-      Renderer.toast(`${name} si è connesso`, 'success');
+      Renderer.updateBattleLog(`${name} si è connesso`);
     });
     WS.on('player_disconnected', (msg) => {
       const name = currentState
         ? ((currentState.players.find(p => p.id === msg.player_id) || {}).name || msg.player_id)
         : msg.player_id;
-      Renderer.toast(`${name} si è disconnesso`, 'error');
+      Renderer.updateBattleLog(`${name} si è disconnesso`);
     });
     WS.on('error', (msg) => Renderer.toast(msg.message || 'Errore', 'error'));
   }
@@ -258,7 +258,10 @@ const App = (() => {
 
       // Log battaglia
       if (action === 'battle') {
-        const log = `⚔ ${result.attacker_id} → ${result.defender_id} [${result.defender_bastion}]: `
+        const attName = (state.players.find(p => p.id === result.attacker_id) || {}).name || result.attacker_id;
+        const defName = (state.players.find(p => p.id === result.defender_id) || {}).name || result.defender_id;
+        const bastionSide = result.defender_bastion === 'left' ? 'Sinistro' : 'Destro';
+        const log = `⚔ ${attName} → ${defName} [Bastione ${bastionSide}]: `
           + `${result.total_damage} Danni, ${result.walls_destroyed} Muri, ${result.life_lost} Vita`;
         Renderer.updateBattleLog(log);
       }
@@ -285,23 +288,19 @@ const App = (() => {
       state.recent_events.forEach(ev => {
         if (ev.type !== 'd10') return;
         const pName = (state.players.find(p => p.id === ev.player_id) || {}).name || ev.player_id;
-        let msg, good;
+        let msg;
         if (ev.card === 'estrattore') {
-          good = ev.triggered;
-          msg = `🎲 ${pName} — Estrattore: D10=${ev.roll} — ${good ? `✓ +${ev.mana_gained} Mana!` : '✗ Nessun mana'}`;
+          msg = `🎲 ${pName} — Estrattore: D10=${ev.roll} — ${ev.triggered ? `+${ev.mana_gained} Mana` : 'nessun mana'}`;
         } else if (ev.card === 'granaio') {
-          good = ev.triggered;
-          msg = `🎲 ${pName} — Granaio: D10=${ev.roll} — ${good ? `✓ ${ev.cards_drawn} carta pescata!` : '✗ Nessuna carta'}`;
+          msg = `🎲 ${pName} — Granaio: D10=${ev.roll} — ${ev.triggered ? `${ev.cards_drawn} carta pescata` : 'nessuna carta'}`;
         } else if (ev.card === 'obelisco') {
-          good = ev.returned;
-          msg = `🎲 ${pName} — Obelisco: D10=${ev.roll} (soglia ${ev.threshold}) — ${good ? '✓ Magia in mano!' : '✗ Magia scartata'}`;
+          msg = `🎲 ${pName} — Obelisco: D10=${ev.roll} (soglia ${ev.threshold}) — ${ev.returned ? 'Magia in mano' : 'Magia scartata'}`;
         } else if (ev.card === 'fucina') {
-          good = ev.extra_action;
-          msg = `🎲 ${pName} — Fucina: D10=${ev.roll} — ${good ? '✓ Azione extra!' : '✗ Nessuna azione extra'}`;
+          msg = `🎲 ${pName} — Fucina: D10=${ev.roll} — ${ev.extra_action ? 'azione extra' : 'nessuna azione extra'}`;
         } else {
           return;
         }
-        Renderer.toast(msg, good ? 'success' : 'info');
+        Renderer.updateBattleLog(msg);
       });
     }
 
@@ -788,7 +787,7 @@ const App = (() => {
       if (def && def.id === 'arena') {
         const canActivate = _canActivateArena(instanceId);
         extraButtons.push({
-          label: '⚔ Attiva Arena',
+          label: 'Attiva Arena',
           className: 'btn-warning',
           disabled: !canActivate,
           onClick: () => { Renderer.closeCardDetail(); _showArenaFlow(instanceId); },
@@ -1070,6 +1069,11 @@ const App = (() => {
     if (!currentState || currentState.current_player_id !== myPlayerId) return;
     if (currentState.battles_remaining <= 0) {
       Renderer.toast('Hai già attaccato questo turno', 'error');
+      return;
+    }
+    const _myP = currentState.players.find(p => p.id === myPlayerId);
+    if (!_myP || !_myP.field.vanguard || _myP.field.vanguard.length === 0) {
+      Renderer.toast('Non hai Guerrieri in Avanscoperta', 'error');
       return;
     }
     if (battleMode) { exitBattleMode(); return; }

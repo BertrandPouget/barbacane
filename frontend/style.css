@@ -528,6 +528,7 @@ input:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
+  text-align: center;
 }
 
 /* Campo locale */
@@ -1178,6 +1179,7 @@ input:focus {
 #card-detail-extra-btns {
   display: flex;
   gap: 0.5rem;
+  align-items: center;
 }
 
 /* ==================== BANNER AZIONE ==================== */
