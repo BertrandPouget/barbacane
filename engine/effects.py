@@ -461,35 +461,38 @@ def vitalflusso_effect(state: GameState, player: Player, prodigy: bool = False, 
     Prodigio (additivo &): scarta anche una Sorgiva di ogni avversario.
     """
     result: dict = {}
-    # Trova una Sorgiva completa nel Villaggio
+    # Effetto base: consuma una propria Sorgiva completa come Vita
     sorgiva = next(
         (b for b in player.field.village.buildings if b.base_card_id == "sorgiva" and b.completed),
         None,
     )
     if sorgiva:
         player.field.village.buildings.remove(sorgiva)
-        # La Sorgiva stessa diventa la carta-vita (non si pesca dal mazzo)
         player.life_cards.append(sorgiva.instance_id)
         result["sorgiva_consumed"] = sorgiva.instance_id
         result["lives_gained"] = 1
         result["lives_now"] = player.lives
     else:
-        result["error"] = "Nessuna Sorgiva completa disponibile"
-        return result
+        result["no_own_sorgiva"] = True
 
+    # Effetto prodigio (additivo): scarta una Sorgiva di ogni avversario
     if prodigy:
         discarded = []
         for p in state.players:
             if p.id == player.id or not p.is_alive:
                 continue
             enemy_sorgiva = next(
+                (b for b in p.field.village.buildings if b.base_card_id == "sorgiva" and b.completed),
+                None,
+            ) or next(
                 (b for b in p.field.village.buildings if b.base_card_id == "sorgiva"),
                 None,
             )
             if enemy_sorgiva:
                 p.field.village.buildings.remove(enemy_sorgiva)
                 state.discard_pile.append(enemy_sorgiva.instance_id)
-                discarded.append({"player": p.id, "sorgiva": enemy_sorgiva.instance_id})
+                discarded.append({"player_id": p.id, "player_name": p.name,
+                                  "sorgiva": enemy_sorgiva.instance_id})
         result["enemy_sorgive_discarded"] = discarded
 
     return result

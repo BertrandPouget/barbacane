@@ -92,7 +92,7 @@ def create_game(player_names: List[str], game_id: Optional[str] = None) -> GameS
     # Se un giocatore si chiama "Test", le prime carte pescate sono quelle di test_cards.json
     _test_cards = _load_test_card_ids()
     for player in players:
-        if player.name == "Test" and _test_cards:
+        if player.name in ("Test", "Test2") and _test_cards:
             _move_to_front(state.deck, _test_cards)
         draw_cards(state, player.id, 6)
 
@@ -141,7 +141,7 @@ def _begin_turn(state: GameState) -> None:
     state.add_log(player.id, "receive_mana", amount=mana)
 
     # Modalità test: mana e azioni illimitate per il giocatore "Test"
-    if player.name == "Test":
+    if player.name in ("Test", "Test2"):
         player.mana_remaining = 10
         player.actions_remaining = 5
 

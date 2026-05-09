@@ -275,6 +275,24 @@ def play_spell(
         else:
             prodigy = (same_school_count >= cost_to_pay) and (cost_to_pay > 0 or free_effect)
 
+    # Pre-validazione: vitalflusso richiede una Sorgiva completa propria
+    # oppure, se il prodigio è attivo, almeno una Sorgiva avversaria da eliminare
+    if base_id == "vitalflusso":
+        has_own_sorgiva = any(
+            b.base_card_id == "sorgiva" and b.completed
+            for b in player.field.village.buildings
+        )
+        if not has_own_sorgiva:
+            if not prodigy:
+                raise ActionError("Non hai nessuna Sorgiva completa in campo.")
+            has_enemy_sorgiva = any(
+                b.base_card_id == "sorgiva"
+                for p in state.players if p.id != player.id and p.is_alive
+                for b in p.field.village.buildings
+            )
+            if not has_enemy_sorgiva:
+                raise ActionError("Non hai nessuna Sorgiva completa in campo e nessun avversario ha Sorgive.")
+
     # Rimuovi dalla mano e consuma azione
     player.hand.remove(instance_id)
     player.actions_remaining -= 1

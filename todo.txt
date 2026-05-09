@@ -3,3 +3,6 @@ Appunti chat 08/05
 - log combattimento ha ancora i player chiamati player_i e i bastioni in inglese
 - tutti i log vanno messi in centro perché durano troppo poco (es d10 non si capisce un cazzo di cosa sia uscito)
 - arena: è corretto che ci sia il pulsante attiva arena ma è decentrato e non ha senso che abbia il simboletto delle due spade, basta la parola
+
+Note
+- temo che nel codice il prodigio sia definito come "tutte le maghe sono della stessa scuola", da controllare

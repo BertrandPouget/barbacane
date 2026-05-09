@@ -333,28 +333,24 @@ const Renderer = (() => {
   }
 
   function renderLifeCards(player) {
-    const container = document.getElementById('my-life-cards');
+    const container = document.getElementById('my-life-deck');
     if (!container) return;
     container.innerHTML = '';
 
     const lifeCards = player.life_cards || [];
     const lives = player.lives ?? lifeCards.length;
 
-    // Slot visivi: uno per ogni vita iniziale (3)
-    for (let i = 0; i < 3; i++) {
-      const slot = el('div', { className: `life-slot ${i < lives ? 'life-slot-active' : 'life-slot-lost'}` });
-      if (i < lifeCards.length) {
-        const iid = lifeCards[i];
-        const def = App.getCardDef ? App.getCardDef(iid) : null;
-        slot.title = def ? def.name : iid;
-        slot.textContent = '❤';
-        slot.style.cursor = 'pointer';
-        slot.addEventListener('click', () => App.onCardClick(iid, 'life_card'));
-      } else {
-        slot.textContent = '✕';
-      }
-      container.appendChild(slot);
+    if (lives === 0) return;
+
+    const stack = el('div', { className: 'card card-sm in-field life-stack' });
+    stack.appendChild(el('div', { className: 'life-stack-icon' }, ['❤']));
+    stack.appendChild(el('div', { className: 'life-stack-count' }, [String(lives)]));
+    if (lifeCards.length > 0) {
+      stack.style.cursor = 'pointer';
+      stack.addEventListener('click', () => App.showLifeSlideshow(lifeCards, 0));
     }
+
+    container.appendChild(stack);
   }
 
   function renderHand(cards) {

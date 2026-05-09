@@ -266,6 +266,20 @@ const App = (() => {
         Renderer.updateBattleLog(log);
       }
 
+      // Vitalflusso: log prodigio (Sorgive avversarie scartate)
+      if (action === 'play_spell' && result.effect) {
+        const eff = result.effect;
+        if (eff.sorgiva_consumed) {
+          const myName = (state.players.find(p => p.id === myPlayerId) || {}).name || 'Tu';
+          Renderer.updateBattleLog(`✨ ${myName} ha usato Vitalflusso: +1 Vita`);
+        }
+        if (eff.enemy_sorgive_discarded && eff.enemy_sorgive_discarded.length > 0) {
+          eff.enemy_sorgive_discarded.forEach(d => {
+            Renderer.updateBattleLog(`✨ Prodigio Vitalflusso: Sorgiva di ${d.player_name} scartata`);
+          });
+        }
+      }
+
       // Eracle: distruggi una costruzione avversaria
       if (action === 'battle' && result.eracle_destroy_triggered && result.eracle_targets && result.eracle_targets.length > 0
           && state.current_player_id === myPlayerId) {
@@ -1299,6 +1313,67 @@ const App = (() => {
   }
 
   // ---------------------------------------------------------------------------
+  // Slideshow vite
+  // ---------------------------------------------------------------------------
+
+  function showLifeSlideshow(lifeCards, idx) {
+    const iid = lifeCards[idx];
+    const def = getCardDef(iid);
+    const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+
+    let bodyHTML = '';
+    if (def) {
+      if (def.type === 'warrior') {
+        bodyHTML += `<div class="detail-meta">
+          <span class="species-${def.species}">${cap(def.species)}</span>
+          ${def.school ? `· <span>${cap(def.school)}</span>` : ''}
+          · ${def.subtype === 'hero' ? 'Eroe' : 'Recluta'}
+          · 💎${def.cost} Mana
+        </div>
+        <div class="detail-stats">
+          <span class="stat-att">⚔️ ATT ${def.att}</span>
+          <span class="stat-git">🏹 GIT ${def.git}</span>
+          <span class="stat-dif">🛡️ DIF ${def.dif}</span>
+        </div>`;
+        if (def.horde_effect) {
+          bodyHTML += `<div class="detail-section"><strong>⚡ Effetto Orda:</strong><br>${def.horde_effect}</div>`;
+        }
+      } else if (def.type === 'spell') {
+        bodyHTML += `<div class="detail-meta">
+          <span class="school-${def.school}">${cap(def.school)}</span> · Magia · 🔮${def.cost}
+        </div>
+        <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
+        if (def.prodigy_effect) {
+          bodyHTML += `<div class="detail-section"><strong>Prodigio:</strong><br>${def.prodigy_effect}</div>`;
+        }
+      } else if (def.type === 'building') {
+        bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🔨${def.completion_cost} Mana</div>
+        <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
+        if (def.complete_effect) {
+          bodyHTML += `<div class="detail-section"><strong>Effetto Completo:</strong><br>${def.complete_effect}</div>`;
+        }
+      }
+    } else {
+      bodyHTML = `<div class="detail-dim">${iid}</div>`;
+    }
+
+    const navOptions = {
+      onPrev: idx > 0 ? () => showLifeSlideshow(lifeCards, idx - 1) : null,
+      onNext: idx < lifeCards.length - 1 ? () => showLifeSlideshow(lifeCards, idx + 1) : null,
+    };
+
+    Renderer.showCardDetail(
+      `❤ Vita ${idx + 1} / ${lifeCards.length}${def ? ' — ' + def.name : ''}`,
+      bodyHTML,
+      null,
+      null,
+      null,
+      [],
+      navOptions,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // Click bastione
   // ---------------------------------------------------------------------------
 
@@ -1394,6 +1469,7 @@ const App = (() => {
     onCardClick,
     sendAction,
     showWallSlideshow,
+    showLifeSlideshow,
   };
 })();
 
