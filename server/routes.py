@@ -255,6 +255,9 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
     if state.pending_search and action != "resolve_search":
         raise ActionError("C'è una ricerca in attesa di risoluzione.")
 
+    if state.pending_interactions and action != "resolve_biblioteca":
+        raise ActionError("C'è un'interazione Biblioteca in attesa di risoluzione.")
+
     handlers = {
         "play_warrior": lambda: play_warrior(
             state, player_id,
@@ -327,6 +330,9 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
         ),
         "resolve_search": lambda: _resolve_search_action(
             state, player_id, params.get("chosen_iid"),
+        ),
+        "resolve_biblioteca": lambda: _resolve_biblioteca_action(
+            state, player_id, params,
         ),
         "arena_activate": lambda: arena_activate(
             state, player_id,
@@ -407,6 +413,55 @@ def _resolve_search_action(state, player_id: str, chosen_iid: Optional[str]) -> 
         result["added_to_hand"] = chosen_iid
 
     state.pending_search = None
+    return result
+
+
+def _resolve_biblioteca_action(state, player_id: str, params: dict) -> dict:
+    if not state.pending_interactions:
+        raise ActionError("Nessuna interazione Biblioteca in corso.")
+    pending = state.pending_interactions[0]
+    if pending["player_id"] != player_id:
+        raise ActionError("Non è la tua interazione.")
+
+    player = state.get_player(player_id)
+    result: dict = {}
+
+    if pending["type"] == "biblioteca_discard":
+        discard_iid = params.get("discard_iid")
+        if not discard_iid and not player.hand:
+            # Mano vuota: nessuna carta da scartare, interazione risolta automaticamente
+            state.pending_interactions.pop(0)
+            return {"skipped": True, "reason": "mano vuota"}
+        if not discard_iid:
+            raise ActionError("Devi scegliere una carta da scartare.")
+        if discard_iid not in player.hand:
+            raise ActionError("La carta scelta non è in mano.")
+        player.hand.remove(discard_iid)
+        state.discard_pile.append(discard_iid)
+        state.add_log(player_id, "biblioteca_discard", card=discard_iid)
+        result["discarded"] = discard_iid
+
+    elif pending["type"] == "biblioteca_wall":
+        wall_card_iid = params.get("wall_card_iid")
+        wall_bastion_side = params.get("wall_bastion_side")
+        if not wall_card_iid and not player.hand:
+            state.pending_interactions.pop(0)
+            return {"skipped": True, "reason": "mano vuota"}
+        if not wall_card_iid or not wall_bastion_side:
+            raise ActionError("Devi scegliere una carta e un Bastione.")
+        if wall_card_iid not in player.hand:
+            raise ActionError("La carta scelta non è in mano.")
+        if wall_bastion_side not in ("left", "right"):
+            raise ActionError("Bastione non valido.")
+        from engine.deck import make_wall_instance
+        player.hand.remove(wall_card_iid)
+        bastion = player.field.bastion_left if wall_bastion_side == "left" else player.field.bastion_right
+        bastion.walls.append(make_wall_instance(wall_card_iid))
+        state.add_log(player_id, "biblioteca_wall", card=wall_card_iid, bastion=wall_bastion_side)
+        result["wall_added"] = wall_card_iid
+        result["bastion"] = wall_bastion_side
+
+    state.pending_interactions.pop(0)
     return result
 
 

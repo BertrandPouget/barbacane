@@ -235,7 +235,14 @@ const App = (() => {
         : msg.player_id;
       Renderer.updateBattleLog(`${name} si è disconnesso`);
     });
-    WS.on('error', (msg) => Renderer.toast(msg.message || 'Errore', 'error'));
+    WS.on('error', (msg) => {
+      Renderer.toast(msg.message || 'Errore', 'error');
+      // Se il blocco è dovuto a un'interazione Biblioteca in attesa, mostra il modale
+      if (msg.message && msg.message.includes('Biblioteca') && currentState) {
+        const myPending = currentState.pending_interactions && currentState.pending_interactions.find(i => i.player_id === myPlayerId);
+        if (myPending) _showBibliotecaModal(myPending, currentState);
+      }
+    });
   }
 
   function onStateUpdate(state, action, result) {
@@ -323,8 +330,9 @@ const App = (() => {
     }
 
     // Chiudi eventuale modale aperta e aggiorna la UI azioni
-    // (non chiudere se c'è una ricerca in attesa per questo giocatore)
-    if (!(state.pending_search && state.pending_search.player_id === myPlayerId)) {
+    // (non chiudere se c'è una ricerca o interazione biblioteca in attesa per questo giocatore)
+    const myPendingInteraction = state.pending_interactions && state.pending_interactions.find(i => i.player_id === myPlayerId);
+    if (!(state.pending_search && state.pending_search.player_id === myPlayerId) && !myPendingInteraction) {
       document.getElementById('modal-overlay').classList.add('hidden');
     }
     _refreshActionUI();
@@ -338,6 +346,11 @@ const App = (() => {
     // Mostra il modale di ricerca se siamo noi a dover scegliere
     if (state.pending_search && state.pending_search.player_id === myPlayerId && state.search_deck) {
       _showSearchModal(state.search_deck, state.pending_search);
+    }
+
+    // Mostra il modale di interazione Biblioteca se siamo noi a dover scegliere
+    if (myPendingInteraction) {
+      _showBibliotecaModal(myPendingInteraction, state);
     }
   }
 
@@ -353,6 +366,9 @@ const App = (() => {
     Renderer.showScreen('game');
     Renderer.render(state, myPlayerId);
     _refreshActionUI();
+    // Mostra modale Biblioteca se c'è un'interazione in attesa (es. riconnessione)
+    const myPending = state.pending_interactions && state.pending_interactions.find(i => i.player_id === myPlayerId);
+    if (myPending) _showBibliotecaModal(myPending, state);
   }
 
   // ---------------------------------------------------------------------------
@@ -399,6 +415,15 @@ const App = (() => {
       document.getElementById('action-banner').classList.add('hidden');
       const name = (currentState.players.find(p => p.id === currentState.current_player_id) || {}).name || '…';
       document.getElementById('action-hint').textContent = `In attesa di ${name}…`;
+      return;
+    }
+
+    // Se c'è un'interazione Biblioteca in attesa, mostra messaggio e ri-apri il modale
+    const myPendingInteraction = currentState.pending_interactions && currentState.pending_interactions.find(i => i.player_id === myPlayerId);
+    if (myPendingInteraction) {
+      document.getElementById('action-banner').classList.add('hidden');
+      document.getElementById('action-hint').textContent = '📚 Biblioteca: scegli una carta prima di continuare.';
+      _showBibliotecaModal(myPendingInteraction, currentState);
       return;
     }
 
@@ -1060,6 +1085,45 @@ const App = (() => {
     }
 
     renderPage(0);
+  }
+
+  function _showBibliotecaModal(interaction, state) {
+    const isWall = interaction.type === 'biblioteca_wall';
+    const title = isWall
+      ? '📚 Biblioteca — scegli una carta da aggiungere come Muro'
+      : '📚 Biblioteca — scegli una carta da scartare';
+
+    const myPlayer = state.players.find(p => p.id === myPlayerId);
+    const hand = (myPlayer && myPlayer.hand) || [];
+
+    if (hand.length === 0) {
+      // Mano vuota: il server risolve automaticamente l'interazione
+      sendAction('resolve_biblioteca', {}).catch(() => {});
+      return;
+    }
+
+    const options = hand.map(iid => {
+      const def = getCardDef(iid);
+      return { label: def ? def.name : iid, value: iid };
+    });
+
+    if (isWall) {
+      Renderer.showChoiceModal(title, options, (chosenIid) => {
+        const bastionOptions = [
+          { label: 'Bastione Sinistro', value: 'left' },
+          { label: 'Bastione Destro', value: 'right' },
+        ];
+        Renderer.showChoiceModal('Scegli il Bastione', bastionOptions, (side) => {
+          sendAction('resolve_biblioteca', { wall_card_iid: chosenIid, wall_bastion_side: side })
+            .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
+        });
+      });
+    } else {
+      Renderer.showChoiceModal(title, options, (chosenIid) => {
+        sendAction('resolve_biblioteca', { discard_iid: chosenIid })
+          .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
+      });
+    }
   }
 
   // ---------------------------------------------------------------------------

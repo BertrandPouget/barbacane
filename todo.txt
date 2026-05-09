@@ -5,4 +5,3 @@ Appunti chat 08/05
 - arena: è corretto che ci sia il pulsante attiva arena ma è decentrato e non ha senso che abbia il simboletto delle due spade, basta la parola
 
 Note
-- temo che nel codice il prodigio sia definito come "tutte le maghe sono della stessa scuola", da controllare

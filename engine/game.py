@@ -148,8 +148,21 @@ def _begin_turn(state: GameState) -> None:
     # Effetti Costruzioni a inizio turno (estrattore, biblioteca, fucina completata)
     _trigger_building_start(state, player)
 
+    # Rimuovi effetti "next_own_turn" ora che le costruzioni hanno verificato i vincoli
+    _clear_next_own_turn_effects(player)
+
     # Effetti differiti dal turno precedente (investimento prodigio, divinazione)
     _process_deferred_effects(state, player)
+
+
+def _is_biblioteca_suppressed(state: GameState, player: Player) -> bool:
+    """Controlla se un avversario ha attivo faust_biblioteca_suppress contro questo giocatore."""
+    for opp in state.players:
+        if opp.id == player.id:
+            continue
+        if any(e.get("type") == "faust_biblioteca_suppress" for e in opp.active_effects):
+            return True
+    return False
 
 
 def _trigger_building_start(state: GameState, player: Player) -> None:
@@ -160,7 +173,18 @@ def _trigger_building_start(state: GameState, player: Player) -> None:
         if not isinstance(card, BuildingCard):
             continue
         if base_id in ("estrattore", "biblioteca", "sorgiva"):
-            apply_effect(card.effect_id, state, player, completed=b_inst.completed, trigger="start")
+            if base_id == "biblioteca":
+                if _is_biblioteca_suppressed(state, player):
+                    state.add_log(player.id, "biblioteca_suppressed")
+                    continue
+                result = apply_effect(card.effect_id, state, player, completed=b_inst.completed, trigger="start")
+                if result.get("needs_discard") or result.get("needs_wall_choice"):
+                    state.pending_interactions.append({
+                        "type": "biblioteca_wall" if b_inst.completed else "biblioteca_discard",
+                        "player_id": player.id,
+                    })
+            else:
+                apply_effect(card.effect_id, state, player, completed=b_inst.completed, trigger="start")
         elif base_id == "fucina" and b_inst.completed:
             # Fucina completata: 3a Azione garantita ogni turno
             player.actions_remaining += 1
@@ -250,6 +274,13 @@ def check_fucina_after_action(state: GameState, player: Player) -> Optional[dict
     return {"fucina_roll": roll, "extra_action": extra}
 
 
+def _clear_next_own_turn_effects(player: Player) -> None:
+    """Rimuove effetti con expires='next_own_turn' all'inizio del turno del giocatore."""
+    to_remove = [e for e in player.active_effects if e.get("expires") == "next_own_turn"]
+    for eff in to_remove:
+        player.active_effects.remove(eff)
+
+
 def _clear_turn_expired_effects(player: Player) -> None:
     """Rimuove effetti temporanei scaduti a fine turno."""
     to_remove = []
@@ -291,8 +322,9 @@ def end_turn(state: GameState) -> GameState:
     from engine.deck import draw_to_hand_limit
     draw_to_hand_limit(state, player.id, limit=6)
 
-    # Pulisci effetti scaduti a fine turno
+    # Pulisci effetti scaduti a fine turno e interazioni pendenti
     _clear_turn_expired_effects(player)
+    state.pending_interactions.clear()
 
     # Registra che il giocatore ha completato un turno
     player.turns_completed += 1
@@ -477,6 +509,7 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
         "recent_events": list(state.recent_events),
         "pending_search": ps,
         "search_deck": search_deck,
+        "pending_interactions": state.pending_interactions,
     }
 
 
