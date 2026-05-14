@@ -509,12 +509,20 @@ const App = (() => {
     document.getElementById('btn-cancel-action').classList.remove('hidden');
     document.getElementById('action-hint').textContent = 'Scegli la costruzione da completare.';
 
+    const myPlayer = currentState.players.find(p => p.id === myPlayerId);
+    const activeEffects = (myPlayer && myPlayer.active_effects) || [];
+    const reinholdDiscount = activeEffects.find(e => e.type === 'reinhold_sorgiva_discount');
+
     Renderer.showChoiceModal(
       'Completa una costruzione',
       buildings.map(b => {
         const def = getCardDef(b.instance_id);
+        const baseCost = def ? def.completion_cost : null;
+        const discount = (reinholdDiscount && b.base_card_id === 'sorgiva') ? reinholdDiscount.discount : 0;
+        const effectiveCost = baseCost !== null ? Math.max(0, baseCost - discount) : '?';
+        const costLabel = (discount > 0) ? `${baseCost}→${effectiveCost}` : `${effectiveCost}`;
         return {
-          label: `${def ? def.name : b.base_card_id} — ${def ? def.completion_cost : '?'} Mana`,
+          label: `${def ? def.name : b.base_card_id} — ${costLabel} Mana`,
           value: b.instance_id,
         };
       }),
@@ -783,7 +791,12 @@ const App = (() => {
       const completeLabel = (fieldBuilding && fieldBuilding.completed) ? 'Effetto Completo <span style="color:var(--green-light)">(attivo)</span>'
         : (fieldBuilding && !fieldBuilding.completed) ? 'Effetto Completo <span style="color:var(--text-dim)">(non attivo)</span>'
         : 'Effetto Completo';
-      bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🔨${def.completion_cost} Mana${completionStatus}</div>
+      const myActiveEffects = currentState ? ((currentState.players.find(p => p.id === myPlayerId) || {}).active_effects || []) : [];
+      const reinholdDiscount = myActiveEffects.find(e => e.type === 'reinhold_sorgiva_discount');
+      const rawCompletionCost = def.completion_cost;
+      const effectiveCompletionCost = (reinholdDiscount && def.id === 'sorgiva') ? Math.max(0, rawCompletionCost - reinholdDiscount.discount) : rawCompletionCost;
+      const completionCostLabel = (effectiveCompletionCost !== rawCompletionCost) ? `${rawCompletionCost}→${effectiveCompletionCost}` : `${rawCompletionCost}`;
+      bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🔨${completionCostLabel} Mana${completionStatus}</div>
       <div class="detail-section"><strong>${baseLabel}:</strong><br>${def.base_effect || '—'}</div>`;
       if (def.complete_effect) {
         bodyHTML += `<div class="detail-section"><strong>${completeLabel}:</strong><br>${def.complete_effect}</div>`;

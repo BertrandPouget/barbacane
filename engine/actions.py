@@ -450,6 +450,11 @@ def complete_building(
         raise ActionError("Carta non valida.")
 
     cost = card.completion_cost
+    if base_id == "sorgiva":
+        for eff in player.active_effects:
+            if eff.get("type") == "reinhold_sorgiva_discount":
+                cost = max(0, cost - eff.get("discount", 0))
+                break
     if player.mana_remaining < cost:
         raise ActionError(f"Mana insufficiente per completamento: {player.mana_remaining}/{cost}.")
 
