@@ -558,7 +558,8 @@ input:focus {
 #my-bastion-left::before,
 #my-vanguard::before,
 #my-bastion-right::before,
-#my-life-deck::before {
+#my-life-deck::before,
+#my-village::before {
   content: attr(data-label);
   display: block;
   width: 100%;

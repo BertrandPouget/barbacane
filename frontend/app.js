@@ -952,10 +952,38 @@ const App = (() => {
       return;
     }
 
+    // Cambiamente: scegli un guerriero avversario
+    if (def.id === 'cambiamente') {
+      const options = [];
+      opponents.forEach(p => {
+        const zones = [
+          { warriors: p.field.vanguard, label: 'Avanscoperta' },
+          { warriors: p.field.bastion_left.warriors, label: 'Bastione Sinistro' },
+          { warriors: p.field.bastion_right.warriors, label: 'Bastione Destro' },
+        ];
+        zones.forEach(({ warriors, label }) => {
+          (warriors || []).forEach(w => {
+            const wDef = getCardDef(w.instance_id);
+            const wName = wDef ? wDef.name : w.instance_id;
+            options.push({ label: `${p.name} — ${label} — ${wName}`, value: `${p.id}:${w.instance_id}` });
+          });
+        });
+      });
+      if (options.length === 0) {
+        Renderer.toast('Nessun Guerriero avversario disponibile.', 'error');
+        return;
+      }
+      Renderer.showChoiceModal(`${def.name} — scegli un Guerriero`, options, (choice) => {
+        const [targetPlayerId, targetWarriorIid] = choice.split(':');
+        sendAction('play_spell', { instance_id: instanceId, target_player_id: targetPlayerId, target_warrior_iid: targetWarriorIid });
+      });
+      return;
+    }
+
     const spellsNeedingTarget = [
       'ardolancio', 'guerremoto', 'cuordipietra', 'incendifesa',
       'regicidio', 'malcomune', 'bastioncontrario',
-      'dazipazzi', 'cambiamente',
+      'dazipazzi',
     ];
 
     if (!spellsNeedingTarget.includes(def.id) || opponents.length === 0) {
