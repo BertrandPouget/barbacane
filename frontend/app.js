@@ -913,6 +913,7 @@ const App = (() => {
   function _showHeroPlayOptions(instanceId, def) {
     const myPlayer = currentState.players.find(p => p.id === myPlayerId);
     const compatRecruits = [];
+    const regionLabels = { vanguard: 'Avanscoperta', bastion_left: 'Bastione Sin.', bastion_right: 'Bastione Des.' };
     myPlayer && ['vanguard', 'bastion_left', 'bastion_right'].forEach(reg => {
       const warriors = reg === 'vanguard'
         ? myPlayer.field.vanguard
@@ -920,26 +921,20 @@ const App = (() => {
       (warriors || []).forEach(w => {
         const wDef = getCardDef(w.instance_id);
         if (wDef && wDef.evolves_into === def.id) {
-          compatRecruits.push({ label: `Evolvi ${wDef.name} (${reg})`, value: w.instance_id });
+          compatRecruits.push({ label: `Evolvi ${wDef.name} (${regionLabels[reg]})`, value: w.instance_id });
         }
       });
     });
 
+    if (compatRecruits.length === 0) {
+      Renderer.toast(`Nessuna Recluta compatibile in campo per evolvere ${def.name}.`, 'error');
+      return;
+    }
+
     Renderer.showChoiceModal(
-      `Gioca ${def.name}`,
-      [
-        ...compatRecruits,
-        { label: '⚔ Piazza in Avanscoperta',       value: 'vanguard' },
-        { label: '🛡 Piazza in Bastione Sinistro',  value: 'bastion_left' },
-        { label: '🛡 Piazza in Bastione Destro',    value: 'bastion_right' },
-      ],
-      (choice) => {
-        if (['vanguard', 'bastion_left', 'bastion_right'].includes(choice)) {
-          sendAction('play_warrior', { instance_id: instanceId, region: choice });
-        } else {
-          sendAction('evolve', { recruit_instance_id: choice, hero_instance_id: instanceId });
-        }
-      },
+      `Evolvi in ${def.name}`,
+      compatRecruits,
+      (recruitIId) => sendAction('evolve', { recruit_instance_id: recruitIId, hero_instance_id: instanceId }),
     );
   }
 

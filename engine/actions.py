@@ -85,6 +85,8 @@ def play_warrior(
     card = get_card(base_id)
     if not isinstance(card, WarriorCard):
         raise ActionError(f"{instance_id} non è un Guerriero.")
+    if card.subtype == "hero":
+        raise ActionError(f"{instance_id} è un Eroe e può essere giocato solo come evoluzione di una Recluta.")
 
     if region not in ("vanguard", "bastion_left", "bastion_right"):
         raise ActionError(f"Regione non valida: {region}.")
