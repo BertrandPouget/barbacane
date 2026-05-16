@@ -190,15 +190,24 @@ def _trigger_building_start(state: GameState, player: Player) -> None:
             player.actions_remaining += 1
 
 
-def _trigger_building_end(state: GameState, player: Player) -> None:
-    """Attiva gli effetti di Costruzione che si attivano a fine turno."""
-    for b_inst in player.field.village.buildings:
-        base_id = b_inst.base_card_id
-        card = get_card(base_id)
-        if not isinstance(card, BuildingCard):
-            continue
-        if base_id in ("granaio",):
-            apply_effect(card.effect_id, state, player, completed=b_inst.completed, trigger="end")
+def _trigger_building_end(state: GameState, player: Player) -> int:
+    """Attiva gli effetti di Costruzione a fine turno. Ritorna il bonus al limite di mano da Granai."""
+    complete_granai = [b for b in player.field.village.buildings
+                       if b.base_card_id == "granaio" and b.completed]
+    base_granai = [b for b in player.field.village.buildings
+                   if b.base_card_id == "granaio" and not b.completed]
+
+    bonus = len(complete_granai)
+    for _ in base_granai:
+        roll = random.randint(1, 10)
+        triggered = roll >= 6
+        if triggered:
+            bonus += 1
+        state.recent_events.append({
+            "type": "d10", "card": "granaio",
+            "player_id": player.id, "roll": roll, "triggered": triggered,
+        })
+    return bonus
 
 
 def _clear_horde_stat_effects(player: Player) -> None:
@@ -249,29 +258,30 @@ def _process_deferred_effects(state: GameState, player: Player) -> None:
 
 def check_fucina_after_action(state: GameState, player: Player) -> Optional[dict]:
     """
-    Controlla se la Fucina base deve concedere una 3a Azione (dopo la 2a usata).
-    Deve essere chiamata dopo ogni azione che consuma un'azione.
+    Controlla se le Fucine base devono concedere Azioni aggiuntive (dopo aver esaurito le azioni).
+    Ogni Fucina base in campo fa un roll indipendente. Chiamata dopo ogni azione che consuma un'azione.
     """
     if player.actions_remaining != 0:
         return None
     if any(e.get("type") == "fucina_base_triggered" for e in player.active_effects):
         return None
-    has_base_fucina = any(
-        b.base_card_id == "fucina" and not b.completed
-        for b in player.field.village.buildings
-    )
-    if not has_base_fucina:
+    base_fucine = [b for b in player.field.village.buildings
+                   if b.base_card_id == "fucina" and not b.completed]
+    if not base_fucine:
         return None
-    roll = random.randint(1, 10)
-    extra = roll >= 6
     player.active_effects.append({"type": "fucina_base_triggered", "expires": "end_of_turn"})
-    if extra:
-        player.actions_remaining += 1
-    state.recent_events.append({
-        "type": "d10", "card": "fucina",
-        "player_id": player.id, "roll": roll, "extra_action": extra,
-    })
-    return {"fucina_roll": roll, "extra_action": extra}
+    rolls = []
+    for _ in base_fucine:
+        roll = random.randint(1, 10)
+        extra = roll >= 6
+        if extra:
+            player.actions_remaining += 1
+        state.recent_events.append({
+            "type": "d10", "card": "fucina",
+            "player_id": player.id, "roll": roll, "extra_action": extra,
+        })
+        rolls.append({"roll": roll, "extra_action": extra})
+    return {"fucina_rolls": rolls}
 
 
 def _clear_next_own_turn_effects(player: Player) -> None:
@@ -316,11 +326,11 @@ def end_turn(state: GameState) -> GameState:
     player = state.current_player
 
     # Fase finale: effetti costruzioni a fine turno
-    _trigger_building_end(state, player)
+    granaio_bonus = _trigger_building_end(state, player)
 
-    # Pesca fino al limite (6 carte di default)
+    # Pesca fino al limite (6 + bonus Granai)
     from engine.deck import draw_to_hand_limit
-    draw_to_hand_limit(state, player.id, limit=6)
+    draw_to_hand_limit(state, player.id, limit=6 + granaio_bonus)
 
     # Pulisci effetti scaduti a fine turno e interazioni pendenti
     _clear_turn_expired_effects(player)

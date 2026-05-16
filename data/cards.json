@@ -749,8 +749,8 @@
       "cost": 3,
       "cost_type": "mana",
       "completion_cost": 3,
-      "base_effect": "A fine turno lancia un D10. Se esce almeno 6, peschi fino ad avere 7 carte in mano.",
-      "complete_effect": "A fine turno peschi fino ad avere 7 carte in mano.",
+      "base_effect": "A fine turno lancia un D10. Se esce almeno 6, la mano massima questo turno aumenta di uno.",
+      "complete_effect": "La mano massima a fine turno aumenta di uno.",
       "effect_id": "granaio_effect",
       "copies": 4
     },
@@ -761,8 +761,8 @@
       "cost": 3,
       "cost_type": "mana",
       "completion_cost": 3,
-      "base_effect": "Dopo la seconda Azione lancia un D10. Se esce almeno 6, questo turno puoi svolgerne una terza.",
-      "complete_effect": "Puoi svolgere una terza Azione tutti i turni.",
+      "base_effect": "Dopo l'ultima Azione, lancia un D10. Se esce almeno 6, ottieni un'Azione aggiuntiva questo turno.",
+      "complete_effect": "Ottieni un'Azione aggiuntiva ogni turno.",
       "effect_id": "fucina_effect",
       "copies": 4
     },

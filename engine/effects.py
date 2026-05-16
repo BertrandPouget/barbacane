@@ -170,27 +170,8 @@ def estrattore_effect(state: GameState, player: Player, completed: bool = False,
 
 @register_effect("granaio_effect")
 def granaio_effect(state: GameState, player: Player, completed: bool = False, **kwargs) -> dict:
-    """Base: roll D10, se ≥6 pesca fino a hand=7. Complete: sempre pesca fino a hand=7."""
-    if completed:
-        current = len(player.hand)
-        to_draw = max(0, 7 - current)
-        drawn = _draw_cards(state, player, to_draw) if to_draw > 0 else []
-        return {"cards_drawn": drawn}
-    else:
-        roll = _roll_d10()
-        triggered = roll >= 6
-        if triggered:
-            current = len(player.hand)
-            to_draw = max(0, 7 - current)
-            drawn = _draw_cards(state, player, to_draw) if to_draw > 0 else []
-        else:
-            drawn = []
-        state.recent_events.append({
-            "type": "d10", "card": "granaio",
-            "player_id": player.id, "roll": roll,
-            "cards_drawn": len(drawn), "triggered": triggered,
-        })
-        return {"roll": roll, "cards_drawn": drawn}
+    # Logica gestita direttamente in game._trigger_building_end (effetto cumulativo).
+    return {"passive": True}
 
 
 @register_effect("fucina_effect")

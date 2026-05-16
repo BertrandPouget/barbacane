@@ -476,6 +476,10 @@ def complete_building(
     player.actions_remaining -= 1
     b_inst.completed = True
 
+    # Fucina completata mid-turno: concede subito l'azione aggiuntiva
+    if base_id == "fucina":
+        player.actions_remaining += 1
+
     state.add_log(player_id, "complete_building", card=building_instance_id, mana_spent=cost)
     return {"card": building_instance_id, "mana_spent": cost}
 
