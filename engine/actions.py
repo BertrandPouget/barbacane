@@ -78,7 +78,9 @@ def play_warrior(
     - Consuma 1 Azione.
     """
     player = _require_current_player(state, player_id)
-    _require_actions(player)
+    is_ethereal = player.ethereal_card == instance_id
+    if not is_ethereal:
+        _require_actions(player)
     _require_in_hand(player, instance_id)
 
     base_id = get_base_card_id(instance_id)
@@ -91,15 +93,16 @@ def play_warrior(
     if region not in ("vanguard", "bastion_left", "bastion_right"):
         raise ActionError(f"Regione non valida: {region}.")
 
-    # Costo Mana
-    cost = card.cost
+    # Costo Mana (azzerato se eterea)
+    cost = card.cost if not is_ethereal else 0
     if player.mana_remaining < cost:
         raise ActionError(f"Mana insufficiente: {player.mana_remaining}/{cost}.")
 
-    # Pagamento e rimozione dalla mano
     player.mana_remaining -= cost
     player.hand.remove(instance_id)
-    player.actions_remaining -= 1
+    if not is_ethereal:
+        player.actions_remaining -= 1
+    player.ethereal_card = None
 
     # Crea l'istanza e posiziona
     w_inst = make_warrior_instance(instance_id)
@@ -226,7 +229,9 @@ def play_spell(
     Consuma 1 Azione.
     """
     player = _require_current_player(state, player_id)
-    _require_actions(player)
+    is_ethereal = player.ethereal_card == instance_id
+    if not is_ethereal:
+        _require_actions(player)
     _require_in_hand(player, instance_id)
 
     base_id = get_base_card_id(instance_id)
@@ -234,48 +239,48 @@ def play_spell(
     if not isinstance(card, SpellCard):
         raise ActionError(f"{instance_id} non è una Magia.")
 
-    # Conta Maghe in campo e verifica il costo
-    mages = player.mages_in_field()
-    mages_count = len(mages)
-
-    # Applica sconti da Orde o effetti attivi
     cost = card.cost
     school = card.school
 
-    # Controlla effetti "spell_free" (da Araminta, Madeleine ordes)
-    free_effect = None
-    for eff in player.active_effects:
-        if eff.get("type") == "spell_free" and eff.get("school") == school and eff.get("uses", 0) > 0:
-            free_effect = eff
-            break
-
-    if free_effect:
-        # Magia gratuita
+    if is_ethereal:
         cost_to_pay = 0
-        free_effect["uses"] -= 1
-        if free_effect["uses"] <= 0:
-            player.active_effects.remove(free_effect)
+        prodigy = False
     else:
-        # Applica sconti normali
-        discount = player.spell_cost_reductions.get(school, 0)
-        cost_to_pay = max(0, cost - discount)
-        if mages_count < cost_to_pay:
-            raise ActionError(f"Maghe insufficienti: {mages_count} disponibili, {cost_to_pay} richieste.")
+        # Conta Maghe in campo e verifica il costo
+        mages = player.mages_in_field()
+        mages_count = len(mages)
 
-    # Verifica Prodigio: tutte le Maghe in campo sono della stessa scuola della Magia
-    prodigy = False
-    if mages_count >= cost_to_pay and mages_count > 0:
-        mages_by_school = player.mages_by_school()
-        same_school_count = mages_by_school.get(school, 0)
-        # Madeleine horde: incantesimo prodigy triggers with any mage school
-        madeleine_active = any(
-            e.get("type") == "madeleine_prodigy_any_school"
-            for e in player.active_effects
-        )
-        if madeleine_active and school == "incantesimo":
-            prodigy = (mages_count >= cost_to_pay) and (cost_to_pay > 0 or free_effect)
+        # Controlla effetti "spell_free" (da Araminta, Madeleine ordes)
+        free_effect = None
+        for eff in player.active_effects:
+            if eff.get("type") == "spell_free" and eff.get("school") == school and eff.get("uses", 0) > 0:
+                free_effect = eff
+                break
+
+        if free_effect:
+            cost_to_pay = 0
+            free_effect["uses"] -= 1
+            if free_effect["uses"] <= 0:
+                player.active_effects.remove(free_effect)
         else:
-            prodigy = (same_school_count >= cost_to_pay) and (cost_to_pay > 0 or free_effect)
+            discount = player.spell_cost_reductions.get(school, 0)
+            cost_to_pay = max(0, cost - discount)
+            if mages_count < cost_to_pay:
+                raise ActionError(f"Maghe insufficienti: {mages_count} disponibili, {cost_to_pay} richieste.")
+
+        # Verifica Prodigio
+        prodigy = False
+        if mages_count >= cost_to_pay and mages_count > 0:
+            mages_by_school = player.mages_by_school()
+            same_school_count = mages_by_school.get(school, 0)
+            madeleine_active = any(
+                e.get("type") == "madeleine_prodigy_any_school"
+                for e in player.active_effects
+            )
+            if madeleine_active and school == "incantesimo":
+                prodigy = (mages_count >= cost_to_pay) and (cost_to_pay > 0 or free_effect)
+            else:
+                prodigy = (same_school_count >= cost_to_pay) and (cost_to_pay > 0 or free_effect)
 
     # Pre-validazione: vitalflusso richiede una Sorgiva completa propria
     # oppure, se il prodigio è attivo, almeno una Sorgiva avversaria da eliminare
@@ -297,7 +302,9 @@ def play_spell(
 
     # Rimuovi dalla mano e consuma azione
     player.hand.remove(instance_id)
-    player.actions_remaining -= 1
+    if not is_ethereal:
+        player.actions_remaining -= 1
+    player.ethereal_card = None
 
     # Applica effetto
     result = apply_effect(card.effect_id, state, player, prodigy=prodigy, **kwargs)
@@ -369,7 +376,9 @@ def play_building(
     Cardo/Decumano si completano automaticamente (completion_cost = 0).
     """
     player = _require_current_player(state, player_id)
-    _require_actions(player)
+    is_ethereal = player.ethereal_card == instance_id
+    if not is_ethereal:
+        _require_actions(player)
     _require_in_hand(player, instance_id)
 
     base_id = get_base_card_id(instance_id)
@@ -377,13 +386,15 @@ def play_building(
     if not isinstance(card, BuildingCard):
         raise ActionError(f"{instance_id} non è una Costruzione.")
 
-    cost = card.cost
+    cost = card.cost if not is_ethereal else 0
     if player.mana_remaining < cost:
         raise ActionError(f"Mana insufficiente: {player.mana_remaining}/{cost}.")
 
     player.mana_remaining -= cost
     player.hand.remove(instance_id)
-    player.actions_remaining -= 1
+    if not is_ethereal:
+        player.actions_remaining -= 1
+    player.ethereal_card = None
 
     b_inst = _place_building(state, player, instance_id)
     state.add_log(player_id, "play_building", card=instance_id, completed=b_inst.completed)

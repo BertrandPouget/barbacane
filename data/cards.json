@@ -680,8 +680,8 @@
       "school": "incantesimo",
       "cost": 2,
       "cost_type": "maga",
-      "base_effect": "Aggiungi un Muro casuale da un tuo Bastione alla tua mano.",
-      "prodigy_effect": "Aggiungi un Muro a tua scelta da un tuo Bastione alla tua mano.",
+      "base_effect": "Scegli un tuo Bastione. Aggiungi un Muro casuale da esso alla tua mano.",
+      "prodigy_effect": "Scegli un tuo Bastione. Aggiungi un Muro a tua scelta da esso alla tua mano.",
       "prodigy_is_additive": false,
       "effect_id": "plasmattone_effect",
       "copies": 3
@@ -722,8 +722,8 @@
       "school": "incantesimo",
       "cost": 3,
       "cost_type": "maga",
-      "base_effect": "Aggiungi un Muro a tua scelta da un tuo Bastione alla tua mano.",
-      "prodigy_effect": "& Giocalo senza pagarne il costo.",
+      "base_effect": "Scegli un tuo Bastione. Aggiungi un Muro a tua scelta da esso alla tua mano.",
+      "prodigy_effect": "& Puoi giocarlo immediatamente senza pagarne il costo.",
       "prodigy_is_additive": true,
       "effect_id": "plasmarmo_effect",
       "copies": 2

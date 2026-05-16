@@ -701,6 +701,12 @@ input:focus {
 .card.in-field { cursor: default; }
 .card.in-field:hover { transform: none; }
 
+.card.ethereal {
+  border-color: #ffffff !important;
+  box-shadow: 0 0 10px rgba(255,255,255,0.45);
+}
+.ethereal-cost { color: #ffffff; font-weight: bold; }
+
 /* Carta piccola (per campo) */
 .card-sm {
   width: var(--card-w-sm);

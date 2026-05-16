@@ -1110,8 +1110,8 @@ def plasmattone_effect(
     **kwargs,
 ) -> dict:
     """
-    Base: aggiungi un Muro casuale da un tuo Bastione alla mano.
-    Prodigio (sostituisce): scegli quale Muro prendere.
+    Base: scegli un Bastione, prendi un Muro casuale da esso.
+    Prodigio (sostituisce): scegli un Bastione, poi scegli quale Muro specifico prendere.
     """
     src = player.field.bastion_left if bastion_side == "left" else player.field.bastion_right
     if not src.walls:
@@ -1231,8 +1231,8 @@ def plasmarmo_effect(
     **kwargs,
 ) -> dict:
     """
-    Base: scegli un tuo Muro da un Bastione e aggiungilo alla mano.
-    Prodigio (additivo &): giocalo immediatamente senza costo.
+    Base: scegli un Bastione, poi scegli quale Muro specifico prendere.
+    Prodigio (additivo &): la carta scelta diventa eterea — giocabile senza costo né azione.
     """
     src = player.field.bastion_left if bastion_side == "left" else player.field.bastion_right
     if not src.walls:
@@ -1251,34 +1251,12 @@ def plasmarmo_effect(
     if wall is None:
         return {"error": "Muro non trovato"}
 
+    player.hand.append(wall.instance_id)
     result: dict = {"wall_taken": wall.instance_id, "from_bastion": bastion_side}
 
     if prodigy:
-        # Gioca immediatamente in base al tipo della carta muro
-        from engine.deck import get_base_card_id
-        from engine.cards import get_card, WarriorCard, SpellCard, BuildingCard
-        base_id = get_base_card_id(wall.instance_id)
-        try:
-            card = get_card(base_id)
-            if isinstance(card, WarriorCard):
-                from engine.deck import make_warrior_instance
-                w_inst = make_warrior_instance(wall.instance_id)
-                player.field.vanguard.append(w_inst)
-                result["played_as"] = "warrior"
-            elif isinstance(card, BuildingCard):
-                from engine.deck import make_building_instance
-                b_inst = make_building_instance(wall.instance_id)
-                player.field.village.buildings.append(b_inst)
-                result["played_as"] = "building"
-            else:
-                # Spell: aggiunta alla mano (non può essere giocata senza kwarg bersaglio)
-                player.hand.append(wall.instance_id)
-                result["played_as"] = "hand_spell"
-        except KeyError:
-            player.hand.append(wall.instance_id)
-            result["played_as"] = "hand_unknown"
-    else:
-        player.hand.append(wall.instance_id)
+        player.ethereal_card = wall.instance_id
+        result["ethereal"] = wall.instance_id
 
     return result
 

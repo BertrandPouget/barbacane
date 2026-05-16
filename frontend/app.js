@@ -815,7 +815,8 @@ const App = (() => {
     if (source === 'hand' && isMyTurn) {
       if (actionMode === 'play_card' || actionMode === null) {
         const player = currentState.players.find(p => p.id === myPlayerId);
-        if (player && player.actions_remaining > 0) {
+        const isEtherealCard = player && player.ethereal_card === instanceId;
+        if (player && (player.actions_remaining > 0 || isEtherealCard)) {
           actionLabel = 'Gioca';
           onAction = () => { Renderer.closeCardDetail(); showPlayOptions(instanceId, def); };
         }
@@ -938,12 +939,69 @@ const App = (() => {
     );
   }
 
+  function _computeSpellProdigy(def) {
+    if (!currentState) return false;
+    const me = currentState.players.find(p => p.id === myPlayerId);
+    if (!me) return false;
+
+    const allWarriors = [
+      ...(me.field.vanguard || []),
+      ...(me.field.bastion_left.warriors || []),
+      ...(me.field.bastion_right.warriors || []),
+    ];
+    const sameSchoolMages = allWarriors.filter(
+      w => getCardDef(w.instance_id)?.school === def.school
+    ).length;
+    return sameSchoolMages >= def.cost && def.cost > 0;
+  }
+
   function _showSpellOptions(instanceId, def) {
     const opponents = currentState.players.filter(p => p.id !== myPlayerId && p.lives > 0);
 
     // Telecinesi: UI dedicata a 2 step (source bastion → dest bastion)
     if (def.id === 'telecinesi') {
       _showTelecinesiOptions(instanceId);
+      return;
+    }
+
+    // Plasmattone: base = bastione → muro casuale; prodigio = bastione → scegli muro
+    if (def.id === 'plasmattone') {
+      const me = currentState.players.find(p => p.id === myPlayerId);
+      const bastionOptions = [
+        { label: `Bastione Sinistro (${me.field.bastion_left.wall_count ?? 0} muri)`, value: 'left' },
+        { label: `Bastione Destro (${me.field.bastion_right.wall_count ?? 0} muri)`, value: 'right' },
+      ].filter(o => (o.value === 'left' ? me.field.bastion_left : me.field.bastion_right).wall_count > 0);
+      if (bastionOptions.length === 0) {
+        Renderer.toast('Nessun Muro nei tuoi Bastioni.', 'error');
+        return;
+      }
+      const prodigy = _computeSpellProdigy(def);
+      Renderer.showChoiceModal(`${def.name} — scegli un Bastione`, bastionOptions, (side) => {
+        if (prodigy) {
+          const walls = (side === 'left' ? me.field.bastion_left : me.field.bastion_right).walls || [];
+          _showSpellWallPicker(walls, side, instanceId, 0);
+        } else {
+          sendAction('play_spell', { instance_id: instanceId, bastion_side: side });
+        }
+      });
+      return;
+    }
+
+    // Plasmarmo: bastione → scegli muro (prodigio: la carta diventa eterea, gestito dal server)
+    if (def.id === 'plasmarmo') {
+      const me = currentState.players.find(p => p.id === myPlayerId);
+      const bastionOptions = [
+        { label: `Bastione Sinistro (${me.field.bastion_left.wall_count ?? 0} muri)`, value: 'left' },
+        { label: `Bastione Destro (${me.field.bastion_right.wall_count ?? 0} muri)`, value: 'right' },
+      ].filter(o => (o.value === 'left' ? me.field.bastion_left : me.field.bastion_right).wall_count > 0);
+      if (bastionOptions.length === 0) {
+        Renderer.toast('Nessun Muro nei tuoi Bastioni.', 'error');
+        return;
+      }
+      Renderer.showChoiceModal(`${def.name} — scegli un Bastione`, bastionOptions, (side) => {
+        const walls = (side === 'left' ? me.field.bastion_left : me.field.bastion_right).walls || [];
+        _showSpellWallPicker(walls, side, instanceId, 0);
+      });
       return;
     }
 
@@ -1037,6 +1095,65 @@ const App = (() => {
         });
       });
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Selettore muro per magie (Plasmattone prodigio, Plasmarmo)
+  // ---------------------------------------------------------------------------
+
+  function _showSpellWallPicker(walls, side, spellInstanceId, idx) {
+    if (!walls.length) return;
+    const iid = walls[idx];
+    const def = getCardDef(iid);
+    const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+
+    let bodyHTML = '';
+    if (def) {
+      if (def.type === 'warrior') {
+        bodyHTML += `<div class="detail-meta">
+          <span class="species-${def.species}">${cap(def.species)}</span>
+          ${def.school ? `· <span>${cap(def.school)}</span>` : ''}
+          · ${def.subtype === 'hero' ? 'Eroe' : 'Recluta'}
+          · 💎${def.cost} Mana
+        </div>
+        <div class="detail-stats">
+          <span class="stat-att">⚔️ ATT ${def.att}</span>
+          <span class="stat-git">🏹 GIT ${def.git}</span>
+          <span class="stat-dif">🛡️ DIF ${def.dif}</span>
+        </div>`;
+        if (def.horde_effect) bodyHTML += `<div class="detail-section"><strong>⚡ Effetto Orda:</strong><br>${def.horde_effect}</div>`;
+        if (def.evolves_from) bodyHTML += `<div class="detail-dim">Evolve da: ${cardDefs[def.evolves_from]?.name || def.evolves_from}</div>`;
+        if (def.evolves_into) bodyHTML += `<div class="detail-dim">Evolve in: ${cardDefs[def.evolves_into]?.name || def.evolves_into}</div>`;
+      } else if (def.type === 'spell') {
+        bodyHTML += `<div class="detail-meta"><span class="school-${def.school}">${cap(def.school)}</span> · Magia · 🔮${def.cost}</div>
+        <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
+        if (def.prodigy_effect) bodyHTML += `<div class="detail-section"><strong>Prodigio:</strong><br>${def.prodigy_effect}</div>`;
+      } else if (def.type === 'building') {
+        bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🔨${def.completion_cost} Mana</div>
+        <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
+        if (def.complete_effect) bodyHTML += `<div class="detail-section"><strong>Effetto Completo:</strong><br>${def.complete_effect}</div>`;
+      }
+    } else {
+      bodyHTML = `<div class="detail-dim">${iid}</div>`;
+    }
+
+    Renderer.showCardDetail(
+      def ? def.name : iid,
+      bodyHTML,
+      null, null, null,
+      [{
+        label: 'Scegli',
+        className: 'btn-primary',
+        onClick: () => {
+          Renderer.closeCardDetail();
+          sendAction('play_spell', { instance_id: spellInstanceId, bastion_side: side, wall_instance_id: iid });
+        },
+      }],
+      {
+        onPrev: idx > 0 ? () => _showSpellWallPicker(walls, side, spellInstanceId, idx - 1) : null,
+        onNext: idx < walls.length - 1 ? () => _showSpellWallPicker(walls, side, spellInstanceId, idx + 1) : null,
+      }
+    );
   }
 
   // ---------------------------------------------------------------------------

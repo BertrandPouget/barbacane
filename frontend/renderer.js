@@ -266,7 +266,7 @@ const Renderer = (() => {
     renderVillage('my-village', player.field.village);
 
     // Mano
-    renderHand(player.hand || []);
+    renderHand(player.hand || [], player.ethereal_card || null);
     document.getElementById('hand-count').textContent = (player.hand || []).length;
   }
 
@@ -353,11 +353,11 @@ const Renderer = (() => {
     container.appendChild(stack);
   }
 
-  function renderHand(cards) {
+  function renderHand(cards, etherealIid) {
     const container = document.getElementById('hand-cards');
     container.innerHTML = '';
     cards.forEach(iid => {
-      container.appendChild(renderHandCard(iid));
+      container.appendChild(renderHandCard(iid, etherealIid));
     });
   }
 
@@ -365,8 +365,9 @@ const Renderer = (() => {
   // Carte
   // ---------------------------------------------------------------------------
 
-  function renderHandCard(iid) {
-    const div = el('div', { className: 'card', dataset: { instanceId: iid } });
+  function renderHandCard(iid, etherealIid) {
+    const isEthereal = !!etherealIid && iid === etherealIid;
+    const div = el('div', { className: isEthereal ? 'card ethereal' : 'card', dataset: { instanceId: iid } });
 
     const def = App.getCardDef ? App.getCardDef(iid) : null;
     if (def) {
@@ -386,8 +387,9 @@ const Renderer = (() => {
         attrsDiv.appendChild(el('span', { className: 'stat stat-git' }, [`🏹 ${def.git}`]));
         attrsDiv.appendChild(el('span', { className: 'stat stat-dif' }, [`🛡️ ${def.dif}`]));
         div.appendChild(attrsDiv);
+        const wCostClass = isEthereal ? 'stat stat-cost ethereal-cost' : 'stat stat-cost';
         div.appendChild(el('div', { className: 'hand-mana-row' }, [
-          el('span', { className: 'stat stat-cost' }, [`💎${def.cost}`]),
+          el('span', { className: wCostClass }, [isEthereal ? '💎0' : `💎${def.cost}`]),
         ]));
 
       } else if (def.type === 'spell') {
@@ -395,13 +397,15 @@ const Renderer = (() => {
           className: `card-species school-${def.school}`
         }, [capitalize(def.school)]));
 
+        const sCostClass = isEthereal ? 'stat stat-cost ethereal-cost' : 'stat stat-cost';
         div.appendChild(el('div', { className: 'card-stats hand-cost-row' }, [
-          el('span', { className: 'stat stat-cost' }, [`🔮${def.cost}`]),
+          el('span', { className: sCostClass }, [isEthereal ? '🔮0' : `🔮${def.cost}`]),
         ]));
 
       } else if (def.type === 'building') {
+        const bCostClass = isEthereal ? 'stat stat-cost ethereal-cost' : 'stat stat-cost';
         div.appendChild(el('div', { className: 'card-stats hand-cost-row' }, [
-          el('span', { className: 'stat stat-cost' }, [`💎${def.cost}`]),
+          el('span', { className: bCostClass }, [isEthereal ? '💎0' : `💎${def.cost}`]),
           el('span', { className: 'stat stat-mana' }, [`🔨${def.completion_cost}`]),
         ]));
       }

@@ -463,6 +463,7 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
             "hordes_activated_this_turn": p.hordes_activated_this_turn if p.id == viewer_player_id else None,
             "available_hordes": _available_hordes(p) if p.id == viewer_player_id else None,
             "active_effects": p.active_effects if p.id == viewer_player_id else None,
+            "ethereal_card": p.ethereal_card if p.id == viewer_player_id else None,
             "hand_count": len(p.hand),
             "hand": p.hand if p.id == viewer_player_id else None,
             "field": {

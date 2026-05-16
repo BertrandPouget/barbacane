@@ -250,7 +250,17 @@ _ACTION_CONSUMING = {"play_warrior", "play_spell", "play_building", "complete_bu
 
 def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
     """Smista l'azione al handler appropriato."""
-    state.recent_events = []   # clear D10 events from previous action
+    state.recent_events = []
+
+    # Azzera carta eterea se il giocatore fa un'azione diversa dal giocarla
+    _player = state.get_player(player_id)
+    if _player and _player.ethereal_card:
+        _playing_ethereal = (
+            action in ("play_warrior", "play_spell", "play_building")
+            and params.get("instance_id") == _player.ethereal_card
+        )
+        if not _playing_ethereal:
+            _player.ethereal_card = None
 
     if state.pending_search and action != "resolve_search":
         raise ActionError("C'è una ricerca in attesa di risoluzione.")
