@@ -242,14 +242,14 @@ def play_spell(
     cost = card.cost
     school = card.school
 
+    # Conta Maghe in campo (serve anche per il prodigio delle carte eteree)
+    mages = player.mages_in_field()
+    mages_count = len(mages)
+
     if is_ethereal:
         cost_to_pay = 0
-        prodigy = False
+        free_effect = None
     else:
-        # Conta Maghe in campo e verifica il costo
-        mages = player.mages_in_field()
-        mages_count = len(mages)
-
         # Controlla effetti "spell_free" (da Araminta, Madeleine ordes)
         free_effect = None
         for eff in player.active_effects:
@@ -268,19 +268,20 @@ def play_spell(
             if mages_count < cost_to_pay:
                 raise ActionError(f"Maghe insufficienti: {mages_count} disponibili, {cost_to_pay} richieste.")
 
-        # Verifica Prodigio
-        prodigy = False
-        if mages_count >= cost_to_pay and mages_count > 0:
-            mages_by_school = player.mages_by_school()
-            same_school_count = mages_by_school.get(school, 0)
-            madeleine_active = any(
-                e.get("type") == "madeleine_prodigy_any_school"
-                for e in player.active_effects
-            )
-            if madeleine_active and school == "incantesimo":
-                prodigy = (mages_count >= cost_to_pay) and (cost_to_pay > 0 or free_effect)
-            else:
-                prodigy = (same_school_count >= cost_to_pay) and (cost_to_pay > 0 or free_effect)
+    # Verifica Prodigio (basato sulle Maghe in campo, indipendentemente dall'eterea)
+    prodigy = False
+    if mages_count > 0:
+        mages_by_school = player.mages_by_school()
+        same_school_count = mages_by_school.get(school, 0)
+        madeleine_active = any(
+            e.get("type") == "madeleine_prodigy_any_school"
+            for e in player.active_effects
+        )
+        effective_cost = cost if is_ethereal else cost_to_pay
+        if madeleine_active and school == "incantesimo":
+            prodigy = (mages_count >= effective_cost) and (effective_cost > 0 or free_effect or is_ethereal)
+        else:
+            prodigy = (same_school_count >= effective_cost) and (effective_cost > 0 or free_effect or is_ethereal)
 
     # Pre-validazione: vitalflusso richiede una Sorgiva completa propria
     # oppure, se il prodigio è attivo, almeno una Sorgiva avversaria da eliminare

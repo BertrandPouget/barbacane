@@ -117,7 +117,7 @@ Magia: Tipologia di carta. Fanno parte delle Magie, gli Anatemi, i Sortilegi e g
 Mana: Costo per giocare o completare carte che non siano Magie. È indicato sulla carta stessa, in alto a destra.  
 Muro: Singola carta parte di un Bastione. Qualsiasi carta può essere resa Muro tramite un’Azione Aggiungere fino a 3 Muri. Tale Azione permette aggiungere le carte ai Bastioni in qualsiasi combinazione.  
 Orda: Insieme di tre Guerrieri della stessa Specie nella stessa regione. A fine turno, per ogni Orda che ha in campo, sia essa presso un Bastione o in Avanscoperta, il giocatore può attivare uno degli effetti Orda posseduti dai Guerrieri che ne fanno parte.  
-(Effetto) Prodigio: Effetto secondario di una Magia, che si attiva quando il giocatore ha in campo un numero sufficiente di Maghe della Scuola corretta. Se la descrizione inizia con una ‘&’ significa che esso va aggiunto all’effetto Base, altrimenti lo sostituisce.  
+(Effetto) Prodigio: Effetto secondario di una Magia, che si attiva quando il giocatore ha in campo un numero sufficiente di Maghe della Scuola corretta. Se la descrizione inizia con una ‘&’ significa che esso va aggiunto all’effetto Base, altrimenti lo sostituisce. Il numero di Maghe necessario per attivare un Prodigio è indipendente da eventuali riduzioni di costo.  
 Recluta: Guerriero che evolve in Eroe. Ha delle Caratteristiche limitate rispetto al suo Eroe e un effetto Orda.  
 Regione: Una delle 4 aree che compongono il campo di gioco di un giocatore. Le Regioni sono Avanscoperta, Bastioni (destro e sinistro) e Villaggio.  
 Scuola: Tipologia di Magia e di Maga. Le possibili Scuole sono Anatemi, Sortilegi ed Incantesimi.  
