@@ -252,9 +252,14 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
     """Smista l'azione al handler appropriato."""
     state.recent_events = []
 
-    # Azzera carta eterea se il giocatore fa un'azione diversa dal giocarla
+    # Azzera carta eterea se il giocatore consuma un'azione senza giocarla
+    _ETHEREAL_BREAKING = {
+        "play_warrior", "play_spell", "play_building",
+        "complete_building", "add_wall", "evolve",
+        "battle", "end_turn",
+    }
     _player = state.get_player(player_id)
-    if _player and _player.ethereal_card:
+    if _player and _player.ethereal_card and action in _ETHEREAL_BREAKING:
         _playing_ethereal = (
             action in ("play_warrior", "play_spell", "play_building")
             and params.get("instance_id") == _player.ethereal_card
