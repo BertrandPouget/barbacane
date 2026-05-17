@@ -362,16 +362,3 @@ Il client invia solo intenzioni; il server valida tutto (turno, azioni rimanenti
 ### Animazioni Frontend
 
 Transizioni CSS leggere. Nessuna libreria esterna.
-
----
-
-## Decisioni Finali
-
-| Tema | Decisione |
-|---|---|
-| **Numero giocatori** | 2–4 |
-| **Timer per turno** | 120s, disattivabile in lobby |
-| **Spettatori** | Non supportati |
-| **Immagini carte** | No — carte renderizzate a testo/CSS |
-| **Tutorial in-game** | Sì, in Fase 5 contro avversario fittizio preconfigurato |
-| **Animazioni** | Minimaliste, transizioni CSS, nessuna libreria esterna |
