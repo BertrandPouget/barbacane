@@ -103,7 +103,7 @@ const Renderer = (() => {
       el('span', { className: 'opp-name' }, [player.name]),
       el('span', { className: 'opp-lives' },
         ['❤'.repeat(Math.max(0, player.lives)) + '✕'.repeat(Math.max(0, 3 - player.lives))]),
-      el('span', { className: 'opp-hand-count' }, [`✋ ${player.hand_count}`]),
+      el('span', { className: 'opp-hand-count' }, [`🃏 ${player.hand_count}`]),
     ]);
     const villageEl = renderOppVillageInline(player.field.village);
     if (villageEl) infoRow.appendChild(villageEl);
@@ -173,7 +173,7 @@ const Renderer = (() => {
       el('div', { className: 'strip-name'  }, [player.name]),
       el('div', { className: 'strip-lives' },
         ['❤'.repeat(Math.max(0, player.lives)) + '✕'.repeat(Math.max(0, 3 - player.lives))]),
-      el('div', { className: 'strip-hand'  }, [`✋ ${player.hand_count}`]),
+      el('div', { className: 'strip-hand'  }, [`🃏 ${player.hand_count}`]),
     ]));
 
     // Villaggio
@@ -181,7 +181,7 @@ const Renderer = (() => {
     if (buildings.length > 0) {
       const vill = el('div', { className: 'strip-section strip-vanguard',
         style: 'border-color: var(--border); flex: 0 0 auto;' });
-      vill.appendChild(el('div', { className: 'strip-section-label' }, ['🏛 Villaggio']));
+      vill.appendChild(el('div', { className: 'strip-section-label' }, ['🏰 Villaggio']));
       buildings.forEach(b => {
         const badge = el('div', { className: `opp-building-badge${b.completed ? ' completed' : ''}` },
           [b.name || b.base_card_id]);
@@ -231,7 +231,7 @@ const Renderer = (() => {
     const buildings = (village && village.buildings) || [];
     if (buildings.length === 0) return null;
     const span = el('span', { className: 'opp-village-inline' });
-    span.appendChild(document.createTextNode('🏛 '));
+    span.appendChild(document.createTextNode('🏰 '));
     buildings.forEach(b => {
       const badge = el('span', { className: `opp-building-badge${b.completed ? ' completed' : ''}` },
         [b.name || b.base_card_id]);
@@ -383,7 +383,7 @@ const Renderer = (() => {
 
         // Caratteristiche in colonna (auto-push verso il basso), mana in fondo
         const attrsDiv = el('div', { className: 'card-warrior-attrs' });
-        attrsDiv.appendChild(el('span', { className: 'stat stat-att' }, [`⚔️ ${def.att}`]));
+        attrsDiv.appendChild(el('span', { className: 'stat stat-att' }, [`🗡️ ${def.att}`]));
         attrsDiv.appendChild(el('span', { className: 'stat stat-git' }, [`🏹 ${def.git}`]));
         attrsDiv.appendChild(el('span', { className: 'stat stat-dif' }, [`🛡️ ${def.dif}`]));
         div.appendChild(attrsDiv);
@@ -406,7 +406,7 @@ const Renderer = (() => {
         const bCostClass = isEthereal ? 'stat stat-cost ethereal-cost' : 'stat stat-cost';
         div.appendChild(el('div', { className: 'card-stats hand-cost-row' }, [
           el('span', { className: bCostClass }, [isEthereal ? '💎0' : `💎${def.cost}`]),
-          el('span', { className: 'stat stat-mana' }, [`🔨${def.completion_cost}`]),
+          el('span', { className: 'stat stat-mana' }, [`🏗️${def.completion_cost}`]),
         ]));
       }
     } else {
@@ -432,7 +432,7 @@ const Renderer = (() => {
     }, [capitalize(warrior.species || '')]));
 
     const stats = el('div', { className: 'card-stats' });
-    stats.appendChild(el('span', { className: 'stat stat-att' }, [`⚔️${warrior.att}`]));
+    stats.appendChild(el('span', { className: 'stat stat-att' }, [`🗡️${warrior.att}`]));
     stats.appendChild(el('span', { className: 'stat stat-git' }, [`🏹${warrior.git}`]));
     stats.appendChild(el('span', { className: 'stat stat-dif' }, [`🛡️${warrior.dif}`]));
     div.appendChild(stats);

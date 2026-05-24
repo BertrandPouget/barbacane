@@ -774,19 +774,19 @@ const App = (() => {
         · 💎${def.cost} Mana
       </div>
       <div class="detail-stats">
-        <span class="stat-att">⚔️ ATT ${att}</span>
+        <span class="stat-att">🗡️ ATT ${att}</span>
         <span class="stat-git">🏹 GIT ${git}</span>
         <span class="stat-dif">🛡️ DIF ${dif}</span>
       </div>`;
       if (def.horde_effect) {
-        bodyHTML += `<div class="detail-section"><strong>⚡ Effetto Orda:</strong><br>${def.horde_effect}</div>`;
+        bodyHTML += `<div class="detail-section"><strong>Effetto Orda:</strong><br>${def.horde_effect}</div>`;
       }
       if (def.evolves_from) bodyHTML += `<div class="detail-dim">Evolve da: ${cardDefs[def.evolves_from]?.name || def.evolves_from}</div>`;
       if (def.evolves_into) bodyHTML += `<div class="detail-dim">Evolve in: ${cardDefs[def.evolves_into]?.name || def.evolves_into}</div>`;
 
     } else if (def && def.type === 'spell') {
       bodyHTML += `<div class="detail-meta">
-        <span class="school-${def.school}">${cap(def.school)}</span> · Magia · 🔮${def.cost}
+        <span class="school-${def.school}">${cap(def.school)}</span> · Magia · 🔮${def.cost} Maghe
       </div>
       <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
       if (def.prodigy_effect) {
@@ -808,7 +808,7 @@ const App = (() => {
       const rawCompletionCost = def.completion_cost;
       const effectiveCompletionCost = (reinholdDiscount && def.id === 'sorgiva') ? Math.max(0, rawCompletionCost - reinholdDiscount.discount) : rawCompletionCost;
       const completionCostLabel = (effectiveCompletionCost !== rawCompletionCost) ? `${rawCompletionCost}→${effectiveCompletionCost}` : `${rawCompletionCost}`;
-      bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🔨${completionCostLabel} Mana${completionStatus}</div>
+      bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🏗️${completionCostLabel} Mana${completionStatus}</div>
       <div class="detail-section"><strong>${baseLabel}:</strong><br>${def.base_effect || '—'}</div>`;
       if (def.complete_effect) {
         bodyHTML += `<div class="detail-section"><strong>${completeLabel}:</strong><br>${def.complete_effect}</div>`;
@@ -1130,19 +1130,19 @@ const App = (() => {
           · 💎${def.cost} Mana
         </div>
         <div class="detail-stats">
-          <span class="stat-att">⚔️ ATT ${def.att}</span>
+          <span class="stat-att">🗡️ ATT ${def.att}</span>
           <span class="stat-git">🏹 GIT ${def.git}</span>
           <span class="stat-dif">🛡️ DIF ${def.dif}</span>
         </div>`;
-        if (def.horde_effect) bodyHTML += `<div class="detail-section"><strong>⚡ Effetto Orda:</strong><br>${def.horde_effect}</div>`;
+        if (def.horde_effect) bodyHTML += `<div class="detail-section"><strong>Effetto Orda:</strong><br>${def.horde_effect}</div>`;
         if (def.evolves_from) bodyHTML += `<div class="detail-dim">Evolve da: ${cardDefs[def.evolves_from]?.name || def.evolves_from}</div>`;
         if (def.evolves_into) bodyHTML += `<div class="detail-dim">Evolve in: ${cardDefs[def.evolves_into]?.name || def.evolves_into}</div>`;
       } else if (def.type === 'spell') {
-        bodyHTML += `<div class="detail-meta"><span class="school-${def.school}">${cap(def.school)}</span> · Magia · 🔮${def.cost}</div>
+        bodyHTML += `<div class="detail-meta"><span class="school-${def.school}">${cap(def.school)}</span> · Magia · 🔮${def.cost} Maghe</div>
         <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
         if (def.prodigy_effect) bodyHTML += `<div class="detail-section"><strong>Prodigio:</strong><br>${def.prodigy_effect}</div>`;
       } else if (def.type === 'building') {
-        bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🔨${def.completion_cost} Mana</div>
+        bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🏗️${def.completion_cost} Mana</div>
         <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
         if (def.complete_effect) bodyHTML += `<div class="detail-section"><strong>Effetto Completo:</strong><br>${def.complete_effect}</div>`;
       }
@@ -1491,25 +1491,25 @@ const App = (() => {
           · 💎${def.cost} Mana
         </div>
         <div class="detail-stats">
-          <span class="stat-att">⚔️ ATT ${def.att}</span>
+          <span class="stat-att">🗡️ ATT ${def.att}</span>
           <span class="stat-git">🏹 GIT ${def.git}</span>
           <span class="stat-dif">🛡️ DIF ${def.dif}</span>
         </div>`;
         if (def.horde_effect) {
-          bodyHTML += `<div class="detail-section"><strong>⚡ Effetto Orda:</strong><br>${def.horde_effect}</div>`;
+          bodyHTML += `<div class="detail-section"><strong>Effetto Orda:</strong><br>${def.horde_effect}</div>`;
         }
         if (def.evolves_from) bodyHTML += `<div class="detail-dim">Evolve da: ${cardDefs[def.evolves_from]?.name || def.evolves_from}</div>`;
         if (def.evolves_into) bodyHTML += `<div class="detail-dim">Evolve in: ${cardDefs[def.evolves_into]?.name || def.evolves_into}</div>`;
       } else if (def.type === 'spell') {
         bodyHTML += `<div class="detail-meta">
-          <span class="school-${def.school}">${cap(def.school)}</span> · Magia · 🔮${def.cost}
+          <span class="school-${def.school}">${cap(def.school)}</span> · Magia · 🔮${def.cost} Maghe
         </div>
         <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
         if (def.prodigy_effect) {
           bodyHTML += `<div class="detail-section"><strong>Prodigio:</strong><br>${def.prodigy_effect}</div>`;
         }
       } else if (def.type === 'building') {
-        bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🔨${def.completion_cost} Mana</div>
+        bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🏗️${def.completion_cost} Mana</div>
         <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
         if (def.complete_effect) {
           bodyHTML += `<div class="detail-section"><strong>Effetto Completo:</strong><br>${def.complete_effect}</div>`;
@@ -1576,23 +1576,23 @@ const App = (() => {
           · 💎${def.cost} Mana
         </div>
         <div class="detail-stats">
-          <span class="stat-att">⚔️ ATT ${def.att}</span>
+          <span class="stat-att">🗡️ ATT ${def.att}</span>
           <span class="stat-git">🏹 GIT ${def.git}</span>
           <span class="stat-dif">🛡️ DIF ${def.dif}</span>
         </div>`;
         if (def.horde_effect) {
-          bodyHTML += `<div class="detail-section"><strong>⚡ Effetto Orda:</strong><br>${def.horde_effect}</div>`;
+          bodyHTML += `<div class="detail-section"><strong>Effetto Orda:</strong><br>${def.horde_effect}</div>`;
         }
       } else if (def.type === 'spell') {
         bodyHTML += `<div class="detail-meta">
-          <span class="school-${def.school}">${cap(def.school)}</span> · Magia · 🔮${def.cost}
+          <span class="school-${def.school}">${cap(def.school)}</span> · Magia · 🔮${def.cost} Maghe
         </div>
         <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
         if (def.prodigy_effect) {
           bodyHTML += `<div class="detail-section"><strong>Prodigio:</strong><br>${def.prodigy_effect}</div>`;
         }
       } else if (def.type === 'building') {
-        bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🔨${def.completion_cost} Mana</div>
+        bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🏗️${def.completion_cost} Mana</div>
         <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
         if (def.complete_effect) {
           bodyHTML += `<div class="detail-section"><strong>Effetto Completo:</strong><br>${def.complete_effect}</div>`;
@@ -1688,7 +1688,7 @@ const App = (() => {
           const div = document.createElement('div');
           div.className = 'search-deck-card search-match';
           div.innerHTML = `<span class="search-card-name">${w.name || w.base_card_id}</span>` +
-            `<span class="search-card-type">⚔️${w.att} 🏹${w.git} 🛡️${w.dif}</span>`;
+            `<span class="search-card-type">🗡️${w.att} 🏹${w.git} 🛡️${w.dif}</span>`;
           div.addEventListener('click', () => {
             document.getElementById('modal-overlay').classList.add('hidden');
             showCardDetail(w.instance_id, 'field');
