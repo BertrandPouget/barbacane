@@ -26,9 +26,9 @@ Le Magie producono effetti immediati e, salvo diversa indicazione, vengono scart
 
 Le Costruzioni rappresentano effetti che restano nel tempo. Quando vengono giocate non sono complete e vengono posizionate in orizzontale, fornendo solo il loro effetto Base. Spendendo un’Azione e il Mana richiesto è possibile completarle: la carta viene ruotata in verticale e si attiva il suo effetto Completo.
 
-Infine, qualsiasi carta può essere utilizzata come Muro tramite un’Azione. In quel caso perde ogni altra funzione e viene considerata solo come difesa.
+Qualsiasi carta può essere inoltre utilizzata come Muro tramite un’Azione. In quel caso perde ogni altra funzione e viene considerata solo come difesa.
 
-Nel caso il mazzo comune dovesse terminare, la pila degli scarti viene mescolata e diventa il nuovo mazzo comune.
+Infine, alcune carte possono conferire a un'altra carta in mano la proprietà Eterea. Una carta Eterea può essere giocata immediatamente senza pagarne il costo (in Mana o in Maghe) e senza consumare un'Azione. La proprietà decade non appena si utilizza un'Azione, si dichiara Battaglia o si termina il turno.
 
 ## Campo da Gioco
 Il campo da gioco di ogni giocatore è diviso in quattro Regioni: Avanscoperta, Bastione sinistro, Bastione destro e Villaggio.
@@ -72,7 +72,7 @@ Il Danno Totale è la somma dei due valori.
 
 Il difensore perde un numero di Muri nel Bastione pari al Danno Totale. Se il Danno Totale è maggiore di zero ma i Muri presenti non sono sufficienti ad assorbirlo interamente, il difensore perde una Vita; eventuali danni residui vengono ignorati.
 
-## Esempio di Battaglia
+### Esempio di Battaglia
 Il giocatore A siede alla destra del giocatore B e decide di attaccarne il Bastione sinistro, che attualmente possiede solo 1 Muro. Occorre notare che non avrebbe potuto attaccare il Bastione destro perché non sarebbe stato adiacente a uno dei propri.
 
 In Avanscoperta, il giocatore A ha:  
@@ -110,6 +110,7 @@ Costruzione: Tipologia di carta. Si usa per effetti vari che agevolano il giocat
 Danno: Unità del danno inflitto dall’attaccante al difensore dopo una Battaglia. Si parla di Danno da Attacco, Danno da Gittata e Danno Totale (o solo Danno) per la somma dei due. Alcune carte possono infliggere Danno direttamente a un Bastione: in tal caso i Guerrieri presenti presso di esso vengono ignorati ai fini del calcolo, e il Danno viene applicato ai Muri seguendo le stesse regole della Battaglia.  
 Difesa (DIF): Caratteristica di un Guerriero da considerare quando si è il difensore in una Battaglia.  
 Eroe: Guerriero che evolve da una Recluta. Ha Caratteristiche più potenti della sua Recluta, ne eredita l’effetto Orda e carte assegnate. Se viene scartato per effetto di una carta, la sua Recluta rimane in gioco con eventuali carte assegnate.  
+(Carta) Eterea: carta che, se giocata immediatamente, non richiede il pagamento del proprio costo (in Mana o in Maghe) né l'utilizzo di un'Azione. La proprietà decade non appena si utilizza un'Azione, si dichiara Battaglia o si termina il turno.  
 Gittata (GIT): Caratteristica di un Guerriero da considerare sia che si sia l’attaccante che il difensore in una Battaglia.  
 Guerriero: Tipologia di carta. Si usa per attaccare se posizionata in Avanscoperta o per difendere se posizionata presso un Bastione. Fanno parte dei Guerrieri, le Reclute e gli Eroi. Ogni Guerriero è dotato di Caratteristiche, Specie, linea evolutiva ed effetto Orda. Le carte di Specie Maga hanno inoltre una Scuola.  
 Incantesimo: Magia appartenente all'omonima Scuola. Ha effetti di supporto: potenzia il giocatore, genera risorse o modifica le proprie carte.  

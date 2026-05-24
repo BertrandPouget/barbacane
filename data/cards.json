@@ -708,8 +708,8 @@
       "school": "sortilegio",
       "cost": 3,
       "cost_type": "maga",
-      "base_effect": "Gioca immediatamente una Costruzione dalla tua mano senza pagarne il costo.",
-      "prodigy_effect": "& Puoi completarla immediatamente senza pagarne il costo.",
+      "base_effect": "Rendi Eterea una Costruzione nella tua mano.",
+      "prodigy_effect": "& Puoi completarla senza pagarne il costo e senza consumare un'Azione.",
       "prodigy_is_additive": true,
       "effect_id": "velocemento_effect",
       "copies": 2
@@ -723,7 +723,7 @@
       "cost": 3,
       "cost_type": "maga",
       "base_effect": "Scegli un tuo Bastione. Aggiungi un Muro a tua scelta da esso alla tua mano.",
-      "prodigy_effect": "& Puoi giocarlo immediatamente senza pagarne il costo.",
+      "prodigy_effect": "& Quella carta diventa Eterea.",
       "prodigy_is_additive": true,
       "effect_id": "plasmarmo_effect",
       "copies": 2

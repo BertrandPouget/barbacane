@@ -1169,8 +1169,8 @@ def velocemento_effect(
     **kwargs,
 ) -> dict:
     """
-    Base: rende eteree tutte le Costruzioni in mano (giocabili gratis, senza azione).
-    Prodigio (additivo &): dopo aver giocato la Costruzione, il giocatore può completarla gratis.
+    Base: rende Eteree le Costruzioni in mano, così il giocatore può sceglierne una e giocarla senza costo né azione.
+    Prodigio (additivo &): dopo aver giocato la Costruzione, il giocatore può completarla senza costo né azione.
     """
     from engine.deck import get_base_card_id
     from engine.cards import get_card, BuildingCard
@@ -1206,7 +1206,7 @@ def plasmarmo_effect(
 ) -> dict:
     """
     Base: scegli un Bastione, poi scegli quale Muro specifico prendere.
-    Prodigio (additivo &): la carta scelta diventa eterea — giocabile senza costo né azione.
+    Prodigio (additivo &): la carta scelta diventa Eterea — giocabile senza costo né azione.
     """
     src = player.field.bastion_left if bastion_side == "left" else player.field.bastion_right
     if not src.walls:
