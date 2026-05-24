@@ -1036,7 +1036,6 @@ const App = (() => {
     const spellsNeedingTarget = [
       'ardolancio', 'guerremoto', 'cuordipietra', 'incendifesa',
       'regicidio', 'malcomune', 'bastioncontrario',
-      'dazipazzi',
     ];
 
     if (!spellsNeedingTarget.includes(def.id) || opponents.length === 0) {
