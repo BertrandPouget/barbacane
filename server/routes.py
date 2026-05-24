@@ -252,27 +252,44 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
     """Smista l'azione al handler appropriato."""
     state.recent_events = []
 
-    # Azzera carte eteree se il giocatore consuma un'azione senza giocarle
+    # Azzera carta eterea se il giocatore consuma un'azione senza giocarla
     _ETHEREAL_BREAKING = {
         "play_warrior", "play_spell", "play_building",
         "complete_building", "add_wall", "evolve",
         "battle", "end_turn",
     }
     _player = state.get_player(player_id)
-    if _player and _player.ethereal_cards and action in _ETHEREAL_BREAKING:
+    if _player and _player.ethereal_card and action in _ETHEREAL_BREAKING:
         _playing_ethereal = (
             action in ("play_warrior", "play_spell", "play_building")
-            and params.get("instance_id") in _player.ethereal_cards
+            and params.get("instance_id") == _player.ethereal_card
         )
         if not _playing_ethereal:
-            _player.ethereal_cards = []
-            _player.pending_velocemento_complete = False
+            _player.ethereal_card = None
+
+    # Azzera ethereal_complete se il giocatore fa altro invece di completare quella costruzione.
+    # Esenzioni: complete_building sulla costruzione corretta (passo finale),
+    #            play_building sulla stessa carta (passo intermedio: la carta viene piazzata prima di poter essere completata).
+    if _player and _player.ethereal_complete and action in _ETHEREAL_BREAKING:
+        _completing_ethereal = (
+            action == "complete_building"
+            and params.get("building_instance_id") == _player.ethereal_complete
+        )
+        _playing_to_complete = (
+            action == "play_building"
+            and params.get("instance_id") == _player.ethereal_complete
+        )
+        if not _completing_ethereal and not _playing_to_complete:
+            _player.ethereal_complete = None
 
     if state.pending_search and action != "resolve_search":
         raise ActionError("C'è una ricerca in attesa di risoluzione.")
 
     if state.pending_interactions and action != "resolve_biblioteca":
         raise ActionError("C'è un'interazione Biblioteca in attesa di risoluzione.")
+
+    if _player and _player.pending_velocemento_buildings and action != "resolve_velocemento":
+        raise ActionError("Devi scegliere una Costruzione da rendere Eterea (Velocemento).")
 
     handlers = {
         "play_warrior": lambda: play_warrior(
@@ -485,33 +502,26 @@ def _resolve_biblioteca_action(state, player_id: str, params: dict) -> dict:
 
 
 def _resolve_velocemento_action(state, player_id: str, params: dict) -> dict:
-    """Risolve l'interazione del prodigio Velocemento: il giocatore sceglie se completare gratis la Costruzione appena giocata."""
+    """Il giocatore sceglie quale Costruzione in mano rendere Eterea dopo aver giocato Velocemento."""
     player = state.get_player(player_id)
-    if not player or not player.velocemento_pending_iid:
-        raise ActionError("Nessun completamento Velocemento disponibile.")
+    if not player or not player.pending_velocemento_buildings:
+        raise ActionError("Nessuna scelta Velocemento in attesa.")
 
-    building_iid = player.velocemento_pending_iid
-    player.velocemento_pending_iid = None
+    building_iid = params.get("building_instance_id")
+    if not building_iid:
+        raise ActionError("Parametro building_instance_id mancante.")
+    if building_iid not in player.pending_velocemento_buildings:
+        raise ActionError("Costruzione non valida per Velocemento.")
+    if building_iid not in player.hand:
+        raise ActionError("La carta non è più in mano.")
 
-    if not params.get("complete", False):
-        return {"velocemento_skipped": True}
-
-    # Trova la costruzione nel villaggio e completala gratis
-    for b_inst in player.field.village.buildings:
-        if b_inst.instance_id == building_iid:
-            if b_inst.completed:
-                return {"velocemento_already_complete": True}
-            b_inst.completed = True
-            from engine.cards import get_card
-            from engine.deck import get_base_card_id
-            from engine.effects import apply_effect
-            base_id = get_base_card_id(building_iid)
-            card = get_card(base_id)
-            apply_effect(card.effect_id, state, player, completed=True)
-            state.add_log(player_id, "velocemento_complete", building=building_iid)
-            return {"velocemento_completed": building_iid}
-
-    raise ActionError("Costruzione non trovata nel villaggio.")
+    player.pending_velocemento_buildings = []
+    player.ethereal_card = building_iid
+    if player.pending_velocemento_prodigy:
+        player.ethereal_complete = building_iid
+        player.pending_velocemento_prodigy = False
+    state.add_log(player_id, "velocemento_ethereal", building=building_iid)
+    return {"ethereal_card": building_iid, "ethereal_complete": player.ethereal_complete}
 
 
 def _end_turn_action(state, player_id: str) -> dict:

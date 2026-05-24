@@ -1169,8 +1169,8 @@ def velocemento_effect(
     **kwargs,
 ) -> dict:
     """
-    Base: rende Eteree le Costruzioni in mano, così il giocatore può sceglierne una e giocarla senza costo né azione.
-    Prodigio (additivo &): dopo aver giocato la Costruzione, il giocatore può completarla senza costo né azione.
+    Base: elenca le Costruzioni in mano; il giocatore ne sceglie una che diventa Eterea.
+    Prodigio (additivo &): TBD.
     """
     from engine.deck import get_base_card_id
     from engine.cards import get_card, BuildingCard
@@ -1186,13 +1186,12 @@ def velocemento_effect(
             continue
 
     if not building_iids:
-        return {"error": "Nessuna Costruzione in mano"}
+        return {"error": "Nessuna Costruzione in mano"}  # non dovrebbe mai arrivare qui (pre-validato in actions.py)
 
-    player.ethereal_cards = building_iids
+    player.pending_velocemento_buildings = building_iids
     if prodigy:
-        player.pending_velocemento_complete = True
-
-    return {"ethereal_buildings": building_iids, "prodigy": prodigy}
+        player.pending_velocemento_prodigy = True
+    return {"available_buildings": building_iids, "requires_choice": True}
 
 
 @register_effect("plasmarmo_effect")
@@ -1229,7 +1228,7 @@ def plasmarmo_effect(
     result: dict = {"wall_taken": wall.instance_id, "from_bastion": bastion_side}
 
     if prodigy:
-        player.ethereal_cards = [wall.instance_id]
+        player.ethereal_card = wall.instance_id
         result["ethereal"] = wall.instance_id
 
     return result

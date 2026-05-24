@@ -306,6 +306,21 @@ def ardolancio_effect(state, player, prodigy=False, target_player_id=None, ...):
 
 Ariete, Catapulta, Saracinesca, Fossato, Obelisco, Scrigno sono passivi: la loro funzione registrata ritorna `{"passive": True}`, e il comportamento è gestito direttamente in `battle.py` o `actions.py` controllando le costruzioni in campo.
 
+### Pre-validazione prima del lancio di una Magia
+
+Se una Magia richiede condizioni specifiche per poter essere giocata (es. "devi avere almeno una Costruzione in mano"), la validazione va fatta in `actions.py` → `play_spell()`, nel blocco dedicato **prima** della riga `player.hand.remove(instance_id)`. Usare `raise ActionError(...)`, non `return {"error": ...}` dall'effetto: l'effetto viene chiamato dopo che la carta è già stata consumata, quindi un errore ritornato lì non impedisce il gioco della carta.
+
+Il pattern da seguire, modellato su Vitalflusso e Velocemento:
+
+```python
+# In play_spell(), prima di "Rimuovi dalla mano e consuma azione"
+if base_id == "nome_carta":
+    if not <condizione_soddisfatta>:
+        raise ActionError("Messaggio di errore leggibile dal giocatore.")
+```
+
+Questo garantisce che la carta resti in mano e l'azione non venga consumata se le condizioni non sono rispettate.
+
 ---
 
 ## Flusso Multiplayer

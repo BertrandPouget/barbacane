@@ -303,11 +303,6 @@ const App = (() => {
         return; // non chiudere il modale; la UI si aggiornerà dopo eracle_destroy
       }
 
-      // Velocemento prodigio: mostra il modale Sì/No per il completamento gratuito
-      if (result.velocemento_pending && state.current_player_id === myPlayerId) {
-        _showVelocementoModal(result.velocemento_building_name || 'la Costruzione');
-        return;
-      }
     }
 
     // D10 — mostra tutti gli eventi recenti (Estrattore, Granaio, Obelisco, Fucina)
@@ -338,7 +333,9 @@ const App = (() => {
     // Chiudi eventuale modale aperta e aggiorna la UI azioni
     // (non chiudere se c'è una ricerca o interazione biblioteca in attesa per questo giocatore)
     const myPendingInteraction = state.pending_interactions && state.pending_interactions.find(i => i.player_id === myPlayerId);
-    if (!(state.pending_search && state.pending_search.player_id === myPlayerId) && !myPendingInteraction) {
+    const myPlayer = state.players && state.players.find(p => p.id === myPlayerId);
+    const myPendingVelocemento = myPlayer && myPlayer.pending_velocemento_buildings && myPlayer.pending_velocemento_buildings.length > 0;
+    if (!(state.pending_search && state.pending_search.player_id === myPlayerId) && !myPendingInteraction && !myPendingVelocemento) {
       document.getElementById('modal-overlay').classList.add('hidden');
     }
     _refreshActionUI();
@@ -358,6 +355,11 @@ const App = (() => {
     if (myPendingInteraction) {
       _showBibliotecaModal(myPendingInteraction, state);
     }
+
+    // Mostra il modale di scelta Velocemento se siamo noi a dover scegliere
+    if (myPendingVelocemento) {
+      _showVelocementoChoiceModal(myPlayer.pending_velocemento_buildings);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -372,9 +374,13 @@ const App = (() => {
     Renderer.showScreen('game');
     Renderer.render(state, myPlayerId);
     _refreshActionUI();
-    // Mostra modale Biblioteca se c'è un'interazione in attesa (es. riconnessione)
+    // Mostra modali in attesa (es. riconnessione)
     const myPending = state.pending_interactions && state.pending_interactions.find(i => i.player_id === myPlayerId);
     if (myPending) _showBibliotecaModal(myPending, state);
+    const myP = state.players && state.players.find(p => p.id === myPlayerId);
+    if (myP && myP.pending_velocemento_buildings && myP.pending_velocemento_buildings.length > 0) {
+      _showVelocementoChoiceModal(myP.pending_velocemento_buildings);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -821,7 +827,7 @@ const App = (() => {
     if (source === 'hand' && isMyTurn) {
       if (actionMode === 'play_card' || actionMode === null) {
         const player = currentState.players.find(p => p.id === myPlayerId);
-        const isEtherealCard = player && player.ethereal_cards && player.ethereal_cards.includes(instanceId);
+        const isEtherealCard = player && player.ethereal_card === instanceId;
         if (player && (player.actions_remaining > 0 || isEtherealCard)) {
           actionLabel = 'Gioca';
           onAction = () => { Renderer.closeCardDetail(); showPlayOptions(instanceId, def); };
@@ -854,7 +860,9 @@ const App = (() => {
       }
       // Completa costruzione
       if (fieldBuilding && !fieldBuilding.completed) {
-        actionLabel = 'Completa costruzione';
+        const player = currentState.players.find(p => p.id === myPlayerId);
+        const isEtherealComplete = player && player.ethereal_complete === instanceId;
+        actionLabel = isEtherealComplete ? 'Completa gratis (Velocemento)' : 'Completa costruzione';
         onAction = () => {
           Renderer.closeCardDetail();
           sendAction('complete_building', { building_instance_id: instanceId });
@@ -1245,29 +1253,18 @@ const App = (() => {
     renderPage(0);
   }
 
-  function _showVelocementoModal(buildingName) {
-    const name = buildingName || 'la Costruzione';
-    Renderer.showModal(
-      '⚡ Velocemento — Prodigio',
-      `Vuoi completare <strong>${name}</strong> immediatamente e gratuitamente?`,
-      [
-        {
-          label: '✅ Sì, completa',
-          onClick: () => {
-            Renderer.closeModal();
-            sendAction('resolve_velocemento', { complete: true })
-              .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
-          },
-        },
-        {
-          label: '❌ No, lascia incompleta',
-          onClick: () => {
-            Renderer.closeModal();
-            sendAction('resolve_velocemento', { complete: false })
-              .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
-          },
-        },
-      ]
+  function _showVelocementoChoiceModal(buildingIids) {
+    const options = buildingIids.map(iid => {
+      const def = getCardDef(iid);
+      return { label: def ? def.name : iid, value: iid };
+    });
+    Renderer.showChoiceModal(
+      '⚡ Velocemento — scegli la Costruzione da rendere Eterea',
+      options,
+      (chosenIid) => {
+        sendAction('resolve_velocemento', { building_instance_id: chosenIid })
+          .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
+      }
     );
   }
 

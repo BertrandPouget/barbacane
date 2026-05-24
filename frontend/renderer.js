@@ -263,10 +263,10 @@ const Renderer = (() => {
     renderRegion('my-vanguard', player.field.vanguard, 'warrior', true);
     renderBastionRegion('my-bastion-left',  player.field.bastion_left,  'left',  true);
     renderBastionRegion('my-bastion-right', player.field.bastion_right, 'right', true);
-    renderVillage('my-village', player.field.village);
+    renderVillage('my-village', player.field.village, player.ethereal_complete || null);
 
     // Mano
-    renderHand(player.hand || [], player.ethereal_cards || []);
+    renderHand(player.hand || [], player.ethereal_card || null);
     document.getElementById('hand-count').textContent = (player.hand || []).length;
   }
 
@@ -324,11 +324,11 @@ const Renderer = (() => {
     return div;
   }
 
-  function renderVillage(containerId, village) {
+  function renderVillage(containerId, village, etherealComplete) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
     (village.buildings || []).forEach(b => {
-      container.appendChild(renderBuildingCard(b, true));
+      container.appendChild(renderBuildingCard(b, true, etherealComplete));
     });
   }
 
@@ -353,11 +353,11 @@ const Renderer = (() => {
     container.appendChild(stack);
   }
 
-  function renderHand(cards, etherealIids) {
+  function renderHand(cards, etherealCard) {
     const container = document.getElementById('hand-cards');
     container.innerHTML = '';
     cards.forEach(iid => {
-      container.appendChild(renderHandCard(iid, etherealIids));
+      container.appendChild(renderHandCard(iid, etherealCard));
     });
   }
 
@@ -365,8 +365,8 @@ const Renderer = (() => {
   // Carte
   // ---------------------------------------------------------------------------
 
-  function renderHandCard(iid, etherealIids) {
-    const isEthereal = Array.isArray(etherealIids) && etherealIids.includes(iid);
+  function renderHandCard(iid, etherealCard) {
+    const isEthereal = etherealCard === iid;
     const div = el('div', { className: isEthereal ? 'card ethereal' : 'card', dataset: { instanceId: iid } });
 
     const def = App.getCardDef ? App.getCardDef(iid) : null;
@@ -444,8 +444,9 @@ const Renderer = (() => {
     return div;
   }
 
-  function renderBuildingCard(building, inField) {
-    const div = el('div', { className: `card card-sm in-field${building.completed ? ' completed' : ''}`,
+  function renderBuildingCard(building, inField, etherealComplete) {
+    const isEtherealComplete = etherealComplete === building.instance_id;
+    const div = el('div', { className: `card card-sm in-field${building.completed ? ' completed' : ''}${isEtherealComplete ? ' ethereal' : ''}`,
       dataset: { type: 'building', instanceId: building.instance_id, baseId: building.base_card_id }
     });
 

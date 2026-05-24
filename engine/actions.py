@@ -78,7 +78,7 @@ def play_warrior(
     - Consuma 1 Azione.
     """
     player = _require_current_player(state, player_id)
-    is_ethereal = instance_id in player.ethereal_cards
+    is_ethereal = player.ethereal_card == instance_id
     if not is_ethereal:
         _require_actions(player)
     _require_in_hand(player, instance_id)
@@ -102,7 +102,7 @@ def play_warrior(
     player.hand.remove(instance_id)
     if not is_ethereal:
         player.actions_remaining -= 1
-    player.ethereal_cards = []
+    player.ethereal_card = None
 
     # Crea l'istanza e posiziona
     w_inst = make_warrior_instance(instance_id)
@@ -229,7 +229,7 @@ def play_spell(
     Consuma 1 Azione.
     """
     player = _require_current_player(state, player_id)
-    is_ethereal = instance_id in player.ethereal_cards
+    is_ethereal = player.ethereal_card == instance_id
     if not is_ethereal:
         _require_actions(player)
     _require_in_hand(player, instance_id)
@@ -301,11 +301,20 @@ def play_spell(
             if not has_enemy_sorgiva:
                 raise ActionError("Non hai nessuna Sorgiva completa in campo e nessun avversario ha Sorgive.")
 
+    # Pre-validazione: velocemento richiede almeno una Costruzione in mano
+    if base_id == "velocemento":
+        has_building = any(
+            isinstance(get_card(get_base_card_id(iid)), BuildingCard)
+            for iid in player.hand if iid != instance_id
+        )
+        if not has_building:
+            raise ActionError("Non hai nessuna Costruzione in mano.")
+
     # Rimuovi dalla mano e consuma azione
     player.hand.remove(instance_id)
     if not is_ethereal:
         player.actions_remaining -= 1
-    player.ethereal_cards = []
+    player.ethereal_card = None
 
     # Applica effetto
     result = apply_effect(card.effect_id, state, player, prodigy=prodigy, **kwargs)
@@ -377,7 +386,7 @@ def play_building(
     Cardo/Decumano si completano automaticamente (completion_cost = 0).
     """
     player = _require_current_player(state, player_id)
-    is_ethereal = instance_id in player.ethereal_cards
+    is_ethereal = player.ethereal_card == instance_id
     if not is_ethereal:
         _require_actions(player)
     _require_in_hand(player, instance_id)
@@ -391,29 +400,15 @@ def play_building(
     if player.mana_remaining < cost:
         raise ActionError(f"Mana insufficiente: {player.mana_remaining}/{cost}.")
 
-    # Cattura il flag prodigio Velocemento PRIMA di azzerarlo
-    velocemento_prodigy = is_ethereal and player.pending_velocemento_complete
-
     player.mana_remaining -= cost
     player.hand.remove(instance_id)
     if not is_ethereal:
         player.actions_remaining -= 1
-    player.ethereal_cards = []
-    player.pending_velocemento_complete = False
+    player.ethereal_card = None
 
     b_inst = _place_building(state, player, instance_id)
     state.add_log(player_id, "play_building", card=instance_id, completed=b_inst.completed)
-
-    result: dict = {"card": instance_id, "completed": b_inst.completed}
-
-    # Prodigio Velocemento: se la costruzione non è già completata (es. auto_complete),
-    # salva l'iid sul player e segnalalo nel risultato (il frontend mostrerà il modale).
-    if velocemento_prodigy and not b_inst.completed:
-        player.velocemento_pending_iid = instance_id
-        result["velocemento_pending"] = True
-        result["velocemento_building_name"] = card.name
-
-    return result
+    return {"card": instance_id, "completed": b_inst.completed}
 
 
 def _place_building(
@@ -459,7 +454,9 @@ def complete_building(
     Costo: Mana di completamento. Consuma 1 Azione.
     """
     player = _require_current_player(state, player_id)
-    _require_actions(player)
+    is_ethereal_complete = player.ethereal_complete == building_instance_id
+    if not is_ethereal_complete:
+        _require_actions(player)
 
     # Trova la costruzione
     b_inst = None
@@ -477,17 +474,22 @@ def complete_building(
     if not isinstance(card, BuildingCard):
         raise ActionError("Carta non valida.")
 
-    cost = card.completion_cost
-    if base_id == "sorgiva":
-        for eff in player.active_effects:
-            if eff.get("type") == "reinhold_sorgiva_discount":
-                cost = max(0, cost - eff.get("discount", 0))
-                break
+    if is_ethereal_complete:
+        cost = 0
+    else:
+        cost = card.completion_cost
+        if base_id == "sorgiva":
+            for eff in player.active_effects:
+                if eff.get("type") == "reinhold_sorgiva_discount":
+                    cost = max(0, cost - eff.get("discount", 0))
+                    break
     if player.mana_remaining < cost:
         raise ActionError(f"Mana insufficiente per completamento: {player.mana_remaining}/{cost}.")
 
     player.mana_remaining -= cost
-    player.actions_remaining -= 1
+    if not is_ethereal_complete:
+        player.actions_remaining -= 1
+    player.ethereal_complete = None
     b_inst.completed = True
 
     # Fucina completata mid-turno: concede subito l'azione aggiuntiva
