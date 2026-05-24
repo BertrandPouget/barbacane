@@ -708,9 +708,9 @@
       "school": "sortilegio",
       "cost": 3,
       "cost_type": "maga",
-      "base_effect": "Gioca una Costruzione dalla tua mano senza pagarne il costo.",
-      "prodigy_effect": "Gioca e completa una Costruzione dalla tua mano senza pagarne il costo.",
-      "prodigy_is_additive": false,
+      "base_effect": "Gioca immediatamente una Costruzione dalla tua mano senza pagarne il costo.",
+      "prodigy_effect": "& Puoi completarla immediatamente senza pagarne il costo.",
+      "prodigy_is_additive": true,
       "effect_id": "velocemento_effect",
       "copies": 2
     },

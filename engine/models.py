@@ -148,7 +148,9 @@ class Player(BaseModel):
     spell_cost_reductions: Dict[str, int] = Field(default_factory=dict)  # school -> reduction
     hordes_activated_this_turn: List[str] = Field(default_factory=list)  # "{zone}:{species}" keys
     turns_completed: int = 0
-    ethereal_card: Optional[str] = None  # instance_id della carta eterea (costo 0, azione 0)
+    ethereal_cards: List[str] = Field(default_factory=list)  # instance_ids carte eteree (costo 0, azione 0)
+    pending_velocemento_complete: bool = False  # prodigio Velocemento: flag per play_building
+    velocemento_pending_iid: Optional[str] = None  # iid della costruzione completabile gratis (prodigio Velocemento)
 
     @computed_field
     @property

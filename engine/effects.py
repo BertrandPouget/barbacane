@@ -1166,40 +1166,33 @@ def velocemento_effect(
     state: GameState,
     player: Player,
     prodigy: bool = False,
-    building_instance_id: Optional[str] = None,
     **kwargs,
 ) -> dict:
     """
-    Base: gioca una Costruzione dalla mano senza pagare il costo.
-    Prodigio (sostituisce): gioca e completa una Costruzione dalla mano senza costo.
+    Base: rende eteree tutte le Costruzioni in mano (giocabili gratis, senza azione).
+    Prodigio (additivo &): dopo aver giocato la Costruzione, il giocatore può completarla gratis.
     """
-    if not building_instance_id:
-        # Cerca la prima Costruzione in mano
-        from engine.deck import get_base_card_id
-        from engine.cards import get_card, BuildingCard
-        for iid in player.hand:
-            base_id = get_base_card_id(iid)
-            try:
-                card = get_card(base_id)
-                if isinstance(card, BuildingCard):
-                    building_instance_id = iid
-                    break
-            except KeyError:
-                continue
+    from engine.deck import get_base_card_id
+    from engine.cards import get_card, BuildingCard
 
-    if not building_instance_id or building_instance_id not in player.hand:
-        return {"error": "Costruzione non trovata in mano"}
+    building_iids = []
+    for iid in player.hand:
+        base_id = get_base_card_id(iid)
+        try:
+            card = get_card(base_id)
+            if isinstance(card, BuildingCard):
+                building_iids.append(iid)
+        except KeyError:
+            continue
 
-    player.hand.remove(building_instance_id)
-    from engine.deck import make_building_instance, get_base_card_id
-    b_inst = make_building_instance(building_instance_id)
+    if not building_iids:
+        return {"error": "Nessuna Costruzione in mano"}
 
+    player.ethereal_cards = building_iids
     if prodigy:
-        b_inst.completed = True
+        player.pending_velocemento_complete = True
 
-    player.field.village.buildings.append(b_inst)
-    state.add_log(player.id, "play_building_free", building=building_instance_id, completed=prodigy)
-    return {"building_played": building_instance_id, "completed": prodigy}
+    return {"ethereal_buildings": building_iids, "prodigy": prodigy}
 
 
 @register_effect("plasmarmo_effect")
@@ -1236,7 +1229,7 @@ def plasmarmo_effect(
     result: dict = {"wall_taken": wall.instance_id, "from_bastion": bastion_side}
 
     if prodigy:
-        player.ethereal_card = wall.instance_id
+        player.ethereal_cards = [wall.instance_id]
         result["ethereal"] = wall.instance_id
 
     return result

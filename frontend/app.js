@@ -302,6 +302,12 @@ const App = (() => {
         });
         return; // non chiudere il modale; la UI si aggiornerà dopo eracle_destroy
       }
+
+      // Velocemento prodigio: mostra il modale Sì/No per il completamento gratuito
+      if (result.velocemento_pending && state.current_player_id === myPlayerId) {
+        _showVelocementoModal(result.velocemento_building_name || 'la Costruzione');
+        return;
+      }
     }
 
     // D10 — mostra tutti gli eventi recenti (Estrattore, Granaio, Obelisco, Fucina)
@@ -815,7 +821,7 @@ const App = (() => {
     if (source === 'hand' && isMyTurn) {
       if (actionMode === 'play_card' || actionMode === null) {
         const player = currentState.players.find(p => p.id === myPlayerId);
-        const isEtherealCard = player && player.ethereal_card === instanceId;
+        const isEtherealCard = player && player.ethereal_cards && player.ethereal_cards.includes(instanceId);
         if (player && (player.actions_remaining > 0 || isEtherealCard)) {
           actionLabel = 'Gioca';
           onAction = () => { Renderer.closeCardDetail(); showPlayOptions(instanceId, def); };
@@ -1237,6 +1243,32 @@ const App = (() => {
     }
 
     renderPage(0);
+  }
+
+  function _showVelocementoModal(buildingName) {
+    const name = buildingName || 'la Costruzione';
+    Renderer.showModal(
+      '⚡ Velocemento — Prodigio',
+      `Vuoi completare <strong>${name}</strong> immediatamente e gratuitamente?`,
+      [
+        {
+          label: '✅ Sì, completa',
+          onClick: () => {
+            Renderer.closeModal();
+            sendAction('resolve_velocemento', { complete: true })
+              .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
+          },
+        },
+        {
+          label: '❌ No, lascia incompleta',
+          onClick: () => {
+            Renderer.closeModal();
+            sendAction('resolve_velocemento', { complete: false })
+              .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
+          },
+        },
+      ]
+    );
   }
 
   function _showBibliotecaModal(interaction, state) {

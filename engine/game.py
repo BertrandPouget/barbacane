@@ -118,6 +118,9 @@ def _begin_turn(state: GameState) -> None:
     # Reset stato turno
     player.actions_remaining = 2
     player.hordes_activated_this_turn = []
+    player.ethereal_cards = []
+    player.pending_velocemento_complete = False
+    player.velocemento_pending_iid = None
     # Pulisce flag horde_active da turni precedenti
     for w in player.all_warriors():
         w.horde_active = False
@@ -473,7 +476,8 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
             "hordes_activated_this_turn": p.hordes_activated_this_turn if p.id == viewer_player_id else None,
             "available_hordes": _available_hordes(p) if p.id == viewer_player_id else None,
             "active_effects": p.active_effects if p.id == viewer_player_id else None,
-            "ethereal_card": p.ethereal_card if p.id == viewer_player_id else None,
+            "ethereal_cards": p.ethereal_cards if p.id == viewer_player_id else [],
+            "velocemento_pending_iid": p.velocemento_pending_iid if p.id == viewer_player_id else None,
             "hand_count": len(p.hand),
             "hand": p.hand if p.id == viewer_player_id else None,
             "field": {

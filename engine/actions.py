@@ -78,7 +78,7 @@ def play_warrior(
     - Consuma 1 Azione.
     """
     player = _require_current_player(state, player_id)
-    is_ethereal = player.ethereal_card == instance_id
+    is_ethereal = instance_id in player.ethereal_cards
     if not is_ethereal:
         _require_actions(player)
     _require_in_hand(player, instance_id)
@@ -102,7 +102,7 @@ def play_warrior(
     player.hand.remove(instance_id)
     if not is_ethereal:
         player.actions_remaining -= 1
-    player.ethereal_card = None
+    player.ethereal_cards = []
 
     # Crea l'istanza e posiziona
     w_inst = make_warrior_instance(instance_id)
@@ -229,7 +229,7 @@ def play_spell(
     Consuma 1 Azione.
     """
     player = _require_current_player(state, player_id)
-    is_ethereal = player.ethereal_card == instance_id
+    is_ethereal = instance_id in player.ethereal_cards
     if not is_ethereal:
         _require_actions(player)
     _require_in_hand(player, instance_id)
@@ -305,7 +305,7 @@ def play_spell(
     player.hand.remove(instance_id)
     if not is_ethereal:
         player.actions_remaining -= 1
-    player.ethereal_card = None
+    player.ethereal_cards = []
 
     # Applica effetto
     result = apply_effect(card.effect_id, state, player, prodigy=prodigy, **kwargs)
@@ -377,7 +377,7 @@ def play_building(
     Cardo/Decumano si completano automaticamente (completion_cost = 0).
     """
     player = _require_current_player(state, player_id)
-    is_ethereal = player.ethereal_card == instance_id
+    is_ethereal = instance_id in player.ethereal_cards
     if not is_ethereal:
         _require_actions(player)
     _require_in_hand(player, instance_id)
@@ -391,15 +391,29 @@ def play_building(
     if player.mana_remaining < cost:
         raise ActionError(f"Mana insufficiente: {player.mana_remaining}/{cost}.")
 
+    # Cattura il flag prodigio Velocemento PRIMA di azzerarlo
+    velocemento_prodigy = is_ethereal and player.pending_velocemento_complete
+
     player.mana_remaining -= cost
     player.hand.remove(instance_id)
     if not is_ethereal:
         player.actions_remaining -= 1
-    player.ethereal_card = None
+    player.ethereal_cards = []
+    player.pending_velocemento_complete = False
 
     b_inst = _place_building(state, player, instance_id)
     state.add_log(player_id, "play_building", card=instance_id, completed=b_inst.completed)
-    return {"card": instance_id, "completed": b_inst.completed}
+
+    result: dict = {"card": instance_id, "completed": b_inst.completed}
+
+    # Prodigio Velocemento: se la costruzione non è già completata (es. auto_complete),
+    # salva l'iid sul player e segnalalo nel risultato (il frontend mostrerà il modale).
+    if velocemento_prodigy and not b_inst.completed:
+        player.velocemento_pending_iid = instance_id
+        result["velocemento_pending"] = True
+        result["velocemento_building_name"] = card.name
+
+    return result
 
 
 def _place_building(

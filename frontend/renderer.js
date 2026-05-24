@@ -266,7 +266,7 @@ const Renderer = (() => {
     renderVillage('my-village', player.field.village);
 
     // Mano
-    renderHand(player.hand || [], player.ethereal_card || null);
+    renderHand(player.hand || [], player.ethereal_cards || []);
     document.getElementById('hand-count').textContent = (player.hand || []).length;
   }
 
@@ -353,11 +353,11 @@ const Renderer = (() => {
     container.appendChild(stack);
   }
 
-  function renderHand(cards, etherealIid) {
+  function renderHand(cards, etherealIids) {
     const container = document.getElementById('hand-cards');
     container.innerHTML = '';
     cards.forEach(iid => {
-      container.appendChild(renderHandCard(iid, etherealIid));
+      container.appendChild(renderHandCard(iid, etherealIids));
     });
   }
 
@@ -365,8 +365,8 @@ const Renderer = (() => {
   // Carte
   // ---------------------------------------------------------------------------
 
-  function renderHandCard(iid, etherealIid) {
-    const isEthereal = !!etherealIid && iid === etherealIid;
+  function renderHandCard(iid, etherealIids) {
+    const isEthereal = Array.isArray(etherealIids) && etherealIids.includes(iid);
     const div = el('div', { className: isEthereal ? 'card ethereal' : 'card', dataset: { instanceId: iid } });
 
     const def = App.getCardDef ? App.getCardDef(iid) : null;
