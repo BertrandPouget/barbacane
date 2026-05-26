@@ -198,8 +198,7 @@ def evolve_warrior(
         if eff.get("type") == "horde_stat_bonus" and eff.get("warrior_iid") == recruit_instance_id:
             eff["warrior_iid"] = hero_instance_id
 
-    # La Recluta non va negli scarti (rimane "sotto" l'Eroe — gestita come evolved_from)
-    state.discard_pile.append(recruit_instance_id)
+    # La Recluta rimane "sotto" l'Eroe — tracciata da evolved_from, non negli scarti né in campo
 
     state.add_log(player_id, "evolve_warrior",
                   recruit=recruit_instance_id, hero=hero_instance_id, region=recruit_region)
@@ -918,8 +917,6 @@ def discard_card(
         if warrior.evolved_from:
             # Eroe scartato: la Recluta torna in campo con le carte assegnate
             recruit_iid = warrior.evolved_from
-            if recruit_iid in state.discard_pile:
-                state.discard_pile.remove(recruit_iid)
             recruit_inst = WarriorInstance(
                 instance_id=recruit_iid,
                 base_card_id=get_base_card_id(recruit_iid),

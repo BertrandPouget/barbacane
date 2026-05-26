@@ -273,19 +273,6 @@ const App = (() => {
         Renderer.updateBattleLog(log);
       }
 
-      // Vitalflusso: log prodigio (Sorgive avversarie scartate)
-      if (action === 'play_spell' && result.effect) {
-        const eff = result.effect;
-        if (eff.sorgiva_consumed) {
-          const myName = (state.players.find(p => p.id === myPlayerId) || {}).name || 'Tu';
-          Renderer.updateBattleLog(`✨ ${myName} ha usato Vitalflusso: +1 Vita`);
-        }
-        if (eff.enemy_sorgive_discarded && eff.enemy_sorgive_discarded.length > 0) {
-          eff.enemy_sorgive_discarded.forEach(d => {
-            Renderer.updateBattleLog(`✨ Prodigio Vitalflusso: Sorgiva di ${d.player_name} scartata`);
-          });
-        }
-      }
 
       // Eracle: distruggi una costruzione avversaria
       if (action === 'battle' && result.eracle_destroy_triggered && result.eracle_targets && result.eracle_targets.length > 0
@@ -305,24 +292,79 @@ const App = (() => {
 
     }
 
-    // D10 — mostra tutti gli eventi recenti (Estrattore, Granaio, Obelisco, Fucina)
+    // Log eventi recenti — tutti i tipi
     if (state.recent_events && state.recent_events.length > 0) {
       state.recent_events.forEach(ev => {
-        if (ev.type !== 'd10') return;
         const pName = (state.players.find(p => p.id === ev.player_id) || {}).name || ev.player_id;
-        let msg;
-        if (ev.card === 'estrattore') {
-          msg = `🎲 ${pName} — Estrattore: D10=${ev.roll} — ${ev.triggered ? `+${ev.mana_gained} Mana` : 'nessun mana'}`;
-        } else if (ev.card === 'granaio') {
-          msg = `🎲 ${pName} — Granaio: D10=${ev.roll} — ${ev.triggered ? `${ev.cards_drawn} carta pescata` : 'nessuna carta'}`;
-        } else if (ev.card === 'obelisco') {
-          msg = `🎲 ${pName} — Obelisco: D10=${ev.roll} (soglia ${ev.threshold}) — ${ev.returned ? 'Magia in mano' : 'Magia scartata'}`;
-        } else if (ev.card === 'fucina') {
-          msg = `🎲 ${pName} — Fucina: D10=${ev.roll} — ${ev.extra_action ? 'azione extra' : 'nessuna azione extra'}`;
-        } else {
-          return;
+        const cardName = ev.card ? ev.card.charAt(0).toUpperCase() + ev.card.slice(1) : '';
+        let msg = null;
+
+        if (ev.type === 'd10') {
+          if (ev.card === 'estrattore') {
+            msg = `${pName} — Estrattore: D10=${ev.roll} — ${ev.triggered ? `+${ev.mana_gained} Mana` : 'nessun mana'}`;
+          } else if (ev.card === 'granaio') {
+            msg = `${pName} — Granaio: D10=${ev.roll} — ${ev.triggered ? 'carta pescata' : 'nessuna carta'}`;
+          } else if (ev.card === 'obelisco') {
+            msg = `${pName} — Obelisco: D10=${ev.roll} (soglia ${ev.threshold}) — ${ev.returned ? 'Magia in mano' : 'Magia scartata'}`;
+          } else if (ev.card === 'fucina') {
+            msg = `${pName} — Fucina: D10=${ev.roll} — ${ev.extra_action ? 'azione extra' : 'nessuna azione extra'}`;
+          }
+        } else if (ev.type === 'mana') {
+          msg = `${pName} — ${cardName}: +${ev.mana_gained} Mana`;
+        } else if (ev.type === 'damage') {
+          const defName = (state.players.find(p => p.id === ev.target_player_id) || {}).name || ev.target_player_id;
+          const side = ev.target_bastion_side === 'left' ? 'Sin.' : 'Des.';
+          msg = `${pName} — ${cardName}: ${ev.damage} Danni a ${defName} [${side}]`;
+        } else if (ev.type === 'draw') {
+          const n = ev.cards_drawn ? ev.cards_drawn.length : 0;
+          msg = `${pName} — ${cardName}: ${n} carta${n !== 1 ? ' pescate' : ' pescata'}`;
+        } else if (ev.type === 'life_gained') {
+          msg = `${pName} — ${cardName}: +${ev.lives_gained || 0} Vita`;
+        } else if (ev.type === 'warrior_discarded') {
+          msg = `${pName} — ${cardName}: guerriero scartato`;
+        } else if (ev.type === 'warrior_moved') {
+          msg = `${pName} — ${cardName}: guerriero spostato`;
+        } else if (ev.type === 'wall_moved') {
+          const n = ev.moved_walls ? ev.moved_walls.length : 0;
+          msg = `${pName} — ${cardName}: ${n} Muro${n !== 1 ? 'i' : ''} spostato${n !== 1 ? 'i' : ''}`;
+        } else if (ev.type === 'wall_taken') {
+          msg = `${pName} — ${cardName}: Muro in mano`;
+        } else if (ev.type === 'search') {
+          msg = `${pName} — ${cardName}: ricerca nel mazzo`;
+        } else if (ev.type === 'ethereal') {
+          msg = `${pName} — ${cardName}: carta eterea`;
+        } else if (ev.type === 'discard') {
+          msg = `${pName} — ${cardName}: scartato`;
+        } else if (ev.type === 'horde') {
+          if (ev.card === 'patrizio') msg = `${pName} — Orda Patrizio: +2 GIT`;
+          else if (ev.card === 'orfeo') msg = `${pName} — Orda Orfeo: +1 ATT +1 DIF`;
+          else if (ev.card === 'polemarco') msg = `${pName} — Orda Polemarco: +${ev.att_bonus} ATT`;
+          else if (ev.card === 'reinhold') msg = `${pName} — Orda Reinhold: sconto Sorgive -2`;
+          else if (ev.card === 'araminta') msg = `${pName} — Orda Araminta: Anatemi tornano in mano`;
+          else if (ev.card === 'evelyn') msg = `${pName} — Orda Evelyn: Sortilegi raddoppiati`;
+          else if (ev.card === 'faust') msg = `${pName} — Orda Faust: Biblioteche avversarie bloccate`;
+          else if (ev.card === 'giulio') msg = `${pName} — Orda Giulio: ricerca nel mazzo`;
+          else if (ev.card === 'madeleine') msg = `${pName} — Orda Madeleine: Prodigi liberi da Scuola`;
+          else if (ev.card === 'decimo') msg = `${pName} — Orda Decimo: anti-Fossato`;
+          else if (ev.card === 'joseph') msg = `${pName} — Orda Joseph: ${ev.has_trono ? 'Troni avversari scartati' : 'nessun Trono assegnato'}`;
+          else if (ev.card === 'eracle') msg = `${pName} — Orda Eracle: distruggi Costruzione se ≥3 Danni`;
+          else msg = `${pName} — Orda ${cardName}`;
+        } else if (ev.type === 'effect') {
+          if (ev.card === 'magiscudo') msg = `${pName} — Magiscudo: immune alle Magie`;
+          else if (ev.card === 'guerremoto') msg = `${pName} — Guerremoto: attacco a qualsiasi Bastione${ev.damage_bonus ? ` +${ev.damage_bonus} Danni` : ''}`;
+          else if (ev.card === 'divinazione') msg = `${pName} — Divinazione: Mana extra al prossimo turno`;
+          else if (ev.card === 'dazipazzi') msg = `${pName} — Dazipazzi: ${ev.reset_buildings ? ev.reset_buildings.length : 0} costruzioni ripristinate`;
+          else if (ev.card === 'fucina') msg = `${pName} — Fucina: ${ev.extra_action ? 'azione extra' : 'azione extra (D10)'}`;
+          else if (ev.card === 'cardo') msg = `${pName} — Cardo: spostamento guerriero attivato`;
+          else if (ev.card === 'decumano') msg = `${pName} — Decumano: completamento Cardo gratuito`;
+          else if (ev.card === 'trono') msg = `${pName} — Trono: assegnato a guerriero`;
+          else if (ev.card === 'biblioteca') msg = `${pName} — Biblioteca: carta pescata`;
+          else if (ev.card === 'equipotenza') msg = `${pName} — Equipotenza: statistiche equiparate`;
+          else if (ev.card === 'bastioncontrario') msg = `${pName} — Bastioncontrario: Bastioni scambiati`;
+          else msg = `${pName} — ${cardName}`;
         }
-        Renderer.updateBattleLog(msg);
+
+        if (msg) Renderer.updateBattleLog(msg);
       });
     }
 

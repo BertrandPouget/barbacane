@@ -532,8 +532,13 @@ const Renderer = (() => {
     timerEl.classList.remove('warning');
   }
 
+  const _battleLogHistory = [];
+
   function updateBattleLog(text) {
-    document.getElementById('battle-log').textContent = text;
+    _battleLogHistory.push(text);
+    if (_battleLogHistory.length > 3) _battleLogHistory.shift();
+    const el = document.getElementById('battle-log');
+    el.innerHTML = _battleLogHistory.map(t => `<div class="battle-log-entry">${t}</div>`).join('');
   }
 
   // ---------------------------------------------------------------------------
