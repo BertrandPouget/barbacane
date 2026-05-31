@@ -639,8 +639,8 @@
       "cost": 2,
       "cost_type": "maga",
       "base_effect": "Cerca una Recluta nel mazzo e aggiungila alla tua mano.",
-      "prodigy_effect": "Cerca una Recluta nel mazzo e giocala immediatamente senza pagarne il costo.",
-      "prodigy_is_additive": false,
+      "prodigy_effect": "& Quella carta diventa Eterea.",
+      "prodigy_is_additive": true,
       "effect_id": "cercapersone_effect",
       "copies": 3
     },

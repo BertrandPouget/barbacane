@@ -1125,7 +1125,7 @@ def cercapersone_effect(
 ) -> dict:
     """
     Base: il giocatore sceglie una Recluta dal mazzo e la aggiunge alla mano.
-    Prodigio (sostituisce): il giocatore sceglie una Recluta e la gioca immediatamente senza costo.
+    Prodigio (additivo): come base, ma la carta diventa Eterea.
     """
     state.pending_search = {
         "player_id": player.id,

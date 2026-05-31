@@ -1006,6 +1006,8 @@ input:focus {
 .search-page-btn:disabled { opacity: 0.35; cursor: default; }
 .search-page-info { font-size: 0.85rem; color: var(--gold); min-width: 3rem; text-align: center; }
 
+.search-exit-row { display: flex; justify-content: center; margin-top: 1rem; }
+
 /* ==================== TOAST ==================== */
 
 #toast-container {

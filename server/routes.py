@@ -401,7 +401,10 @@ def _resolve_search_action(state, player_id: str, chosen_iid: Optional[str]) -> 
     if ps["player_id"] != player_id:
         raise ActionError("Non è la tua ricerca.")
     if not chosen_iid:
-        raise ActionError("Devi scegliere una carta.")
+        import random as _random
+        _random.shuffle(state.deck)
+        state.pending_search = None
+        return {"cancelled": True}
 
     if chosen_iid not in state.deck:
         raise ActionError("La carta scelta non è nel mazzo.")
@@ -437,11 +440,11 @@ def _resolve_search_action(state, player_id: str, chosen_iid: Optional[str]) -> 
         result["added_to_hand"] = chosen_iid
 
     elif context == "cercapersone_prodigio":
-        from engine.deck import make_warrior_instance
-        warrior_inst = make_warrior_instance(chosen_iid)
-        player.field.vanguard.append(warrior_inst)
-        state.add_log(player_id, "search_play", card=chosen_iid)
-        result["played_to_vanguard"] = chosen_iid
+        player.hand.append(chosen_iid)
+        player.ethereal_card = chosen_iid
+        state.add_log(player_id, "search", card=chosen_iid)
+        result["added_to_hand"] = chosen_iid
+        result["ethereal"] = chosen_iid
 
     elif context == "giulio_horde":
         player.hand.append(chosen_iid)

@@ -1219,7 +1219,7 @@ const App = (() => {
     const context = pendingSearch.context;
     const titles = {
       'cercapersone_base':     'Cercapersone — scegli una Recluta da aggiungere alla mano',
-      'cercapersone_prodigio': 'Cercapersone ✨ — scegli una Recluta da giocare gratuitamente',
+      'cercapersone_prodigio': 'Cercapersone ✨ — scegli una Recluta (diventerà Eterea)',
       'giulio_horde':          'Orda di Giulio — cerca Giulio II nel mazzo',
     };
     const PAGE_SIZE = 20;
@@ -1234,9 +1234,12 @@ const App = (() => {
     document.getElementById('modal-title').textContent = titles[context] || 'Cerca nel mazzo';
     const body = document.getElementById('modal-body');
     body.innerHTML = `
-      <p class="search-summary">${matchCount} carta${matchCount !== 1 ? 'e' : ''} selezionabil${matchCount !== 1 ? 'i' : 'e'} su ${deckView.length} nel mazzo</p>
+      <p class="search-summary">${matchCount} carte selezionabili su ${deckView.length} nel mazzo</p>
       <div id="search-list" class="search-deck-list"></div>
       <div id="search-pagination" class="search-pagination"></div>
+      <div class="search-exit-row">
+        <button id="search-exit-btn" class="btn btn-secondary">Esci</button>
+      </div>
     `;
     document.getElementById('modal-overlay').classList.remove('hidden');
 
@@ -1293,6 +1296,17 @@ const App = (() => {
     }
 
     renderPage(0);
+
+    document.getElementById('search-exit-btn').addEventListener('click', async () => {
+      confirmBtn.classList.remove('hidden');
+      cancelBtn.classList.remove('hidden');
+      document.getElementById('modal-overlay').classList.add('hidden');
+      try {
+        await sendAction('resolve_search', {});
+      } catch (e) {
+        Renderer.toast(e.message || 'Errore nella ricerca', 'error');
+      }
+    });
   }
 
   function _showVelocementoChoiceModal(buildingIids) {
