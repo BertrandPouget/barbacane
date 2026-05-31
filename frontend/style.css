@@ -1192,6 +1192,46 @@ input:focus {
   align-items: center;
 }
 
+/* ==================== PHASE BAR ==================== */
+
+#phase-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.72rem;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.phase-step {
+  color: var(--text-dim);
+  white-space: nowrap;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  transition: color 0.2s;
+}
+
+.phase-step.active {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.phase-step.done {
+  color: var(--text-dim);
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.phase-sep {
+  color: var(--border);
+  font-size: 0.65rem;
+}
+
 /* ==================== BANNER AZIONE ==================== */
 
 #action-banner {

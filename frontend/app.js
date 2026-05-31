@@ -73,6 +73,7 @@ const App = (() => {
     document.getElementById('btn-end-turn').addEventListener('click', onEndTurn);
     document.getElementById('btn-battle').addEventListener('click', onBattleClick);
     document.getElementById('btn-horde').addEventListener('click', onHordeClick);
+    document.getElementById('btn-next-phase').addEventListener('click', onNextPhase);
     bindBastionClickHandlers();
 
     // Banner azione
@@ -393,9 +394,13 @@ const App = (() => {
       _showSearchModal(state.search_deck, state.pending_search);
     }
 
-    // Mostra il modale di interazione Biblioteca se siamo noi a dover scegliere
+    // Mostra il modale di interazione in attesa (Biblioteca o Cardo)
     if (myPendingInteraction) {
-      _showBibliotecaModal(myPendingInteraction, state);
+      if (myPendingInteraction.type === 'cardo_move') {
+        _showCardoMoveModal(state);
+      } else {
+        _showBibliotecaModal(myPendingInteraction, state);
+      }
     }
 
     // Mostra il modale di scelta Velocemento se siamo noi a dover scegliere
@@ -418,7 +423,10 @@ const App = (() => {
     _refreshActionUI();
     // Mostra modali in attesa (es. riconnessione)
     const myPending = state.pending_interactions && state.pending_interactions.find(i => i.player_id === myPlayerId);
-    if (myPending) _showBibliotecaModal(myPending, state);
+    if (myPending) {
+      if (myPending.type === 'cardo_move') _showCardoMoveModal(state);
+      else _showBibliotecaModal(myPending, state);
+    }
     const myP = state.players && state.players.find(p => p.id === myPlayerId);
     if (myP && myP.pending_velocemento_buildings && myP.pending_velocemento_buildings.length > 0) {
       _showVelocementoChoiceModal(myP.pending_velocemento_buildings);
@@ -456,38 +464,77 @@ const App = (() => {
     document.getElementById('selection-info').classList.add('hidden');
     document.querySelectorAll('#hand-cards .card.wall-marked').forEach(c => c.classList.remove('wall-marked'));
 
+    const hide = id => document.getElementById(id).classList.add('hidden');
+    const show = id => document.getElementById(id).classList.remove('hidden');
+
+    hide('phase-bar');
+    hide('action-banner');
+    hide('btn-horde');
+    hide('btn-next-phase');
+    hide('btn-battle');
+    hide('btn-end-turn');
+    document.getElementById('action-hint').textContent = '';
+
     if (!currentState) return;
     const isMyTurn = currentState.current_player_id === myPlayerId;
     const player = currentState.players.find(p => p.id === myPlayerId);
 
-    // Horde button: visible when it's my turn and there's at least one non-activated horde
-    const hasHorde = isMyTurn && player &&
-      player.available_hordes && player.available_hordes.some(h => !h.already_activated);
-    document.getElementById('btn-horde').classList.toggle('hidden', !hasHorde);
-
     if (!isMyTurn) {
-      document.getElementById('action-banner').classList.add('hidden');
       const name = (currentState.players.find(p => p.id === currentState.current_player_id) || {}).name || '…';
       document.getElementById('action-hint').textContent = `In attesa di ${name}…`;
       return;
     }
 
-    // Se c'è un'interazione Biblioteca in attesa, mostra messaggio e ri-apri il modale
-    const myPendingInteraction = currentState.pending_interactions && currentState.pending_interactions.find(i => i.player_id === myPlayerId);
+    // Interazioni in attesa (Biblioteca, Cardo): mostrano solo il modale, bloccano tutto
+    const myPendingInteraction = currentState.pending_interactions &&
+      currentState.pending_interactions.find(i => i.player_id === myPlayerId);
     if (myPendingInteraction) {
-      document.getElementById('action-banner').classList.add('hidden');
-      document.getElementById('action-hint').textContent = '📚 Biblioteca: scegli una carta prima di continuare.';
-      _showBibliotecaModal(myPendingInteraction, currentState);
+      if (myPendingInteraction.type === 'cardo_move') {
+        document.getElementById('action-hint').textContent = '🛤 Cardo: scegli un Guerriero da spostare prima di pescare.';
+        _showCardoMoveModal(currentState);
+      } else {
+        document.getElementById('action-hint').textContent = '📚 Biblioteca: scegli una carta prima di continuare.';
+        _showBibliotecaModal(myPendingInteraction, currentState);
+      }
       return;
     }
 
-    if (!player || player.actions_remaining <= 0) {
-      document.getElementById('action-banner').classList.add('hidden');
-      document.getElementById('action-hint').textContent = 'Nessuna azione rimasta. Puoi attaccare o finire il turno.';
-      return;
-    }
+    const phase = currentState.phase;
 
-    _showBanner(player);
+    // Aggiorna indicatore fase
+    show('phase-bar');
+    ['action', 'schieramento', 'battaglia'].forEach((p, i) => {
+      const el = document.getElementById(`pstep-${p}`);
+      if (p === phase) { el.className = 'phase-step active'; }
+      else if (['action', 'schieramento', 'battaglia'].indexOf(p) < ['action', 'schieramento', 'battaglia'].indexOf(phase)) {
+        el.className = 'phase-step done';
+      } else {
+        el.className = 'phase-step';
+      }
+    });
+
+    if (phase === 'action') {
+      if (player && player.actions_remaining > 0) {
+        _showBanner(player);
+      } else {
+        document.getElementById('action-hint').textContent = 'Nessuna azione rimasta.';
+      }
+      show('btn-next-phase');
+      document.getElementById('btn-next-phase').textContent = 'Schieramento →';
+
+    } else if (phase === 'schieramento') {
+      document.getElementById('action-hint').textContent = 'Sposta i Guerrieri e attiva le Orde.';
+      const hasHorde = player && player.available_hordes &&
+        player.available_hordes.some(h => !h.already_activated);
+      if (hasHorde) show('btn-horde');
+      show('btn-next-phase');
+      document.getElementById('btn-next-phase').textContent = 'Battaglia →';
+
+    } else if (phase === 'battaglia') {
+      document.getElementById('action-hint').textContent = 'Attacca un avversario o termina il turno.';
+      show('btn-battle');
+      show('btn-end-turn');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -530,8 +577,10 @@ const App = (() => {
   }
 
   function _showBanner(player) {
-    const actNum = 3 - player.actions_remaining; // 1 o 2
-    document.getElementById('banner-turn-label').textContent = `Azione ${actNum} di 2`;
+    const maxActions = (player.name === 'Test' || player.name === 'Test2') ? 5 : 2;
+    const actNum = maxActions - player.actions_remaining + 1;
+    document.getElementById('banner-turn-label').textContent =
+      `Azione ${actNum} · ${player.actions_remaining} rimast${player.actions_remaining === 1 ? 'a' : 'e'}`;
 
     const hasCards = player.hand && player.hand.length > 0;
     const hasIncomplete = (player.field.village.buildings || []).some(b => !b.completed);
@@ -875,16 +924,16 @@ const App = (() => {
           onAction = () => { Renderer.closeCardDetail(); showPlayOptions(instanceId, def); };
         }
       }
-    } else if (source === 'field' && isMyTurn) {
+    } else if (source === 'field' && isMyTurn && currentState.phase === 'schieramento') {
       actionLabel = 'Riposiziona';
       onAction = () => {
         Renderer.closeCardDetail();
         Renderer.showChoiceModal(
           'Riposiziona Guerriero',
           [
-            { label: 'Avanscoperta',      value: 'vanguard' },
-            { label: 'Bastione Sinistro', value: 'bastion_left' },
-            { label: 'Bastione Destro',   value: 'bastion_right' },
+            { label: '⚔ Avanscoperta',      value: 'vanguard' },
+            { label: '🛡 Bastione Sinistro', value: 'bastion_left' },
+            { label: '🛡 Bastione Destro',   value: 'bastion_right' },
           ],
           (dest) => sendAction('reposition', { warrior_instance_id: instanceId, destination: dest }),
         );
@@ -1363,9 +1412,57 @@ const App = (() => {
     }
   }
 
+  function _showCardoMoveModal(state) {
+    const myPlayer = state.players.find(p => p.id === myPlayerId);
+    if (!myPlayer) return;
+
+    const zoneLabels = { vanguard: 'Avanscoperta', bastion_left: 'Bastione Sinistro', bastion_right: 'Bastione Destro' };
+    const allWarriors = [];
+    for (const [zoneKey, label] of Object.entries(zoneLabels)) {
+      const zone = myPlayer.field[zoneKey];
+      const warriors = zone ? (zone.warriors || zone) : [];
+      warriors.forEach(w => allWarriors.push({ ...w, zoneKey, zoneLabel: label }));
+    }
+
+    const warriorOptions = allWarriors.map(w => ({
+      label: `${w.name} (${w.zoneLabel})`,
+      value: w.instance_id,
+    }));
+
+    Renderer.showChoiceModal('🛤 Cardo — sposta un Guerriero (opzionale)', warriorOptions, (chosen) => {
+      const destOptions = [
+        { label: 'Avanscoperta', value: 'vanguard' },
+        { label: 'Bastione Sinistro', value: 'bastion_left' },
+        { label: 'Bastione Destro', value: 'bastion_right' },
+      ];
+      Renderer.showChoiceModal('Scegli la destinazione', destOptions, (dest) => {
+        sendAction('resolve_cardo_move', { warrior_iid: chosen, destination: dest })
+          .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
+      });
+    });
+
+    // Trasforma il pulsante Annulla in "Salta" che conclude il turno senza spostare
+    const cancelBtn = document.getElementById('modal-cancel');
+    cancelBtn.textContent = 'Salta';
+    cancelBtn.onclick = () => {
+      cancelBtn.textContent = 'Annulla';
+      document.getElementById('modal-overlay').classList.add('hidden');
+      sendAction('resolve_cardo_move', {}).catch(e => Renderer.toast(e.message || 'Errore', 'error'));
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // Fine Turno
   // ---------------------------------------------------------------------------
+
+  async function onNextPhase() {
+    if (!currentState || currentState.current_player_id !== myPlayerId) return;
+    try {
+      await sendAction('next_phase', {});
+    } catch (e) {
+      Renderer.toast(e.message, 'error');
+    }
+  }
 
   async function onEndTurn() {
     if (!currentState || currentState.current_player_id !== myPlayerId) return;

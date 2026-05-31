@@ -238,14 +238,27 @@ async def api_game_action(req: GameActionRequest):
             "state": public_state(state, pid),
         })
 
-    # Timer: riavvia al cambio turno, cancella se la partita è finita
-    if req.action == "end_turn" or result.get("auto_end_turn") or state.winner_id:
+    # Timer: riavvia quando il turno cambia davvero (non se cardo_move è in attesa)
+    if result.get("turn_ended") or result.get("auto_end_turn") or state.winner_id:
         await _start_turn_timer(req.game_id, state)
 
     return {"result": result, "state": public_state(state, player_id)}
 
 
 _ACTION_CONSUMING = {"play_warrior", "play_spell", "play_building", "complete_building", "add_wall", "evolve"}
+
+# Mappa delle fasi richieste per le azioni principali
+_PHASE_REQUIRED = {
+    "play_warrior":       "action",
+    "play_spell":         "action",
+    "play_building":      "action",
+    "complete_building":  "action",
+    "add_wall":           "action",
+    "evolve":             "action",
+    "reposition":         "schieramento",
+    "horde":              "schieramento",
+    "battle":             "battaglia",
+}
 
 
 def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
@@ -256,7 +269,7 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
     _ETHEREAL_BREAKING = {
         "play_warrior", "play_spell", "play_building",
         "complete_building", "add_wall", "evolve",
-        "battle", "end_turn",
+        "battle", "end_turn", "next_phase",
     }
     _player = state.get_player(player_id)
     if _player and _player.ethereal_card and action in _ETHEREAL_BREAKING:
@@ -285,11 +298,30 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
     if state.pending_search and action != "resolve_search":
         raise ActionError("C'è una ricerca in attesa di risoluzione.")
 
-    if state.pending_interactions and action != "resolve_biblioteca":
-        raise ActionError("C'è un'interazione Biblioteca in attesa di risoluzione.")
+    if state.pending_interactions:
+        _pending_type = state.pending_interactions[0].get("type", "")
+        _allowed = {
+            "biblioteca_discard": "resolve_biblioteca",
+            "biblioteca_wall": "resolve_biblioteca",
+            "cardo_move": "resolve_cardo_move",
+        }.get(_pending_type)
+        if _allowed and action != _allowed:
+            if _pending_type in ("biblioteca_discard", "biblioteca_wall"):
+                raise ActionError("C'è un'interazione Biblioteca in attesa di risoluzione.")
+            else:
+                raise ActionError("C'è un'interazione Cardo in attesa di risoluzione.")
 
     if _player and _player.pending_velocemento_buildings and action != "resolve_velocemento":
         raise ActionError("Devi scegliere una Costruzione da rendere Eterea (Velocemento).")
+
+    # Verifica che l'azione sia disponibile nella fase corrente del turno
+    _required_phase = _PHASE_REQUIRED.get(action)
+    if _required_phase and state.phase != _required_phase:
+        _phase_names = {"action": "Azioni", "schieramento": "Schieramento", "battaglia": "Battaglia"}
+        raise ActionError(
+            f"Azione non disponibile in fase {_phase_names.get(state.phase, state.phase)}. "
+            f"Richiesta fase: {_phase_names.get(_required_phase, _required_phase)}."
+        )
 
     handlers = {
         "play_warrior": lambda: play_warrior(
@@ -377,6 +409,10 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             params["target_warrior_iid"],
             params["target_player_id"],
         ),
+        "resolve_cardo_move": lambda: _resolve_cardo_move_action(
+            state, player_id, params,
+        ),
+        "next_phase": lambda: _next_phase_action(state, player_id),
         "end_turn": lambda: _end_turn_action(state, player_id),
     }
     if action not in handlers:
@@ -397,7 +433,10 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
         eracle_pending = action == "battle" and result.get("eracle_destroy_triggered", False)
         if state.battles_remaining <= 0 and not eracle_pending:
             end_turn(state)
-            result["auto_end_turn"] = True
+            # Se end_turn ha aggiunto cardo_move, il turno non è ancora cambiato
+            cardo_move_added = any(i.get("type") == "cardo_move" for i in state.pending_interactions)
+            if not cardo_move_added:
+                result["auto_end_turn"] = True
 
     return result
 
@@ -535,11 +574,56 @@ def _resolve_velocemento_action(state, player_id: str, params: dict) -> dict:
     return {"ethereal_card": building_iid, "ethereal_complete": player.ethereal_complete}
 
 
+def _next_phase_action(state, player_id: str) -> dict:
+    if state.current_player.id != player_id:
+        raise ActionError("Non è il tuo turno.")
+    if state.phase == "action":
+        state.phase = "schieramento"
+        return {"phase": "schieramento"}
+    elif state.phase == "schieramento":
+        state.phase = "battaglia"
+        return {"phase": "battaglia"}
+    raise ActionError("Non puoi avanzare la fase da questa posizione.")
+
+
 def _end_turn_action(state, player_id: str) -> dict:
     if state.current_player.id != player_id:
         raise ActionError("Non è il tuo turno.")
     end_turn(state)
+    if any(i.get("type") == "cardo_move" for i in state.pending_interactions):
+        return {"cardo_move_pending": True}
     return {"turn_ended": True}
+
+
+def _resolve_cardo_move_action(state, player_id: str, params: dict) -> dict:
+    if not state.pending_interactions:
+        raise ActionError("Nessuna interazione Cardo in corso.")
+    pending = state.pending_interactions[0]
+    if pending.get("type") != "cardo_move":
+        raise ActionError("L'interazione in attesa non è Cardo.")
+    if pending["player_id"] != player_id:
+        raise ActionError("Non è la tua interazione.")
+
+    state.pending_interactions.pop(0)
+
+    # Marca che il movimento Cardo è stato risolto questo turno (evita re-trigger in end_turn)
+    player = state.get_player(player_id)
+    player.active_effects.append({"type": "cardo_move_done", "expires": "end_of_turn"})
+
+    warrior_iid = params.get("warrior_iid")
+    destination = params.get("destination")
+    result: dict = {}
+
+    if warrior_iid and destination:
+        reposition_warrior(state, player_id, warrior_iid, destination)
+        result["moved"] = warrior_iid
+        result["destination"] = destination
+    else:
+        result["skipped"] = True
+
+    end_turn(state)
+    result["turn_ended"] = True
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -601,8 +685,8 @@ async def _handle_ws_message(game_id: str, player_id: str, data: dict) -> None:
                     "result": result,
                     "state": public_state(state, pid),
                 })
-            # Timer: riavvia al cambio turno, cancella se la partita è finita
-            if action == "end_turn" or result.get("auto_end_turn") or state.winner_id:
+            # Timer: riavvia quando il turno cambia davvero (non se cardo_move è in attesa)
+            if result.get("turn_ended") or result.get("auto_end_turn") or state.winner_id:
                 await _start_turn_timer(game_id, state)
         except ActionError as e:
             await manager.send_to_player(game_id, player_id, {

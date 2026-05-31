@@ -110,7 +110,16 @@
           </button>
           <h3>Azioni</h3>
 
-          <!-- Banner: scegli tipo di azione -->
+          <!-- Indicatore fase turno -->
+          <div id="phase-bar" class="hidden">
+            <span class="phase-step" id="pstep-action">1 Azioni</span>
+            <span class="phase-sep">›</span>
+            <span class="phase-step" id="pstep-schieramento">2 Schieramento</span>
+            <span class="phase-sep">›</span>
+            <span class="phase-step" id="pstep-battaglia">3 Battaglia</span>
+          </div>
+
+          <!-- Banner: scegli tipo di azione (fase Azioni) -->
           <div id="action-banner" class="hidden">
             <div id="banner-turn-label" class="banner-label">Azione 1 di 2</div>
             <button id="banner-btn-play"     class="banner-btn">🃏 Gioca carta</button>
@@ -134,9 +143,10 @@
 
           <div style="flex:1"></div>
 
-          <button id="btn-horde"    class="btn btn-warning hidden">Orda</button>
-          <button id="btn-battle"   class="btn btn-warning">Attacca</button>
-          <button id="btn-end-turn" class="btn btn-danger">Fine Turno</button>
+          <button id="btn-horde"      class="btn btn-warning hidden">Orda</button>
+          <button id="btn-next-phase" class="btn btn-secondary hidden">Avanza Fase →</button>
+          <button id="btn-battle"     class="btn btn-warning hidden">Attacca</button>
+          <button id="btn-end-turn"   class="btn btn-danger hidden">Fine Turno</button>
         </div>
 
         <div id="my-field">

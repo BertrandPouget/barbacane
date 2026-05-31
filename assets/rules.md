@@ -42,18 +42,24 @@ Il Villaggio è la Regione posteriore. Qui vengono giocate le Costruzioni e veng
 Durante la partita, le carte vengono posizionate nelle varie Regioni e rimangono in gioco finché non vengono rimosse o scartate. La disposizione delle carte è fondamentale: non conta solo cosa si gioca, ma anche dove viene giocato.
 
 ## Turno
-1. Il giocatore riceve Mana secondo la seguente regola:  
-   a. Turni 1-2: 1 Mana  
-   b. Turni 3-4: 2 Mana  
-   c. Turni 5-6: 3 Mana  
-   d. Turni 7-9: 4 Mana  
-   e. Turni 10-: 5 Mana  
-2. Il giocatore può svolgere una prima Azione (Giocare una carta, Completare una carta o Aggiungere fino a 3 Muri).  
-3. Il giocatore può svolgere una seconda Azione (Giocare una carta, Completare una carta o Aggiungere fino a 3 Muri).  
-4. Il giocatore posiziona i propri Guerrieri a suo piacimento tra Avanscoperta e Bastioni.  
-5. Per ogni Orda formata, il giocatore sceglie quale effetto Orda attivare. Se la stessa Orda aveva un altro effetto Orda già attivo, esso viene prima disattivato. La carta selezionata viene posizionata tra le altre due.  
-6. Il giocatore può attaccare un avversario in Battaglia, purché tale avversario abbia già completato almeno un turno.  
-7. Il giocatore pesca fino ad avere 6 carte in mano, salvo diversa indicazione di una carta in gioco. Se il giocatore aveva già più di 6 carte in mano, non ne deve scartare.  
+1. Fase iniziale:
+   - Il giocatore riceve Mana secondo la seguente regola:
+     - Turni 1-2: 1 Mana
+     - Turni 3-4: 2 Mana
+     - Turni 5-6: 3 Mana
+     - Turni 7-9: 4 Mana
+     - Turni 10+: 5 Mana
+2. Fase delle Azioni:
+   - Il giocatore può svolgere una prima Azione (Giocare una carta, Completare una carta o Aggiungere fino a 3 Muri).
+   - Il giocatore può svolgere una seconda Azione.
+   - (Opzionale) Se il giocatore possiede carte che lo permettono, può svolgere ulteriori Azioni.
+3. Fase dello Schieramento:
+   - Il giocatore posiziona i propri Guerrieri a suo piacimento tra Avanscoperta e Bastioni.
+   - Per ogni Orda formata, il giocatore sceglie quale effetto Orda attivare. Se la stessa Orda aveva un altro effetto Orda già attivo, esso viene prima disattivato. La carta selezionata viene posizionata tra le altre due.
+4. Fase della Battaglia:
+   - Il giocatore può attaccare un avversario in Battaglia, purché tale avversario abbia già completato almeno un turno.
+5. Fase finale:
+   - Il giocatore pesca fino ad avere 6 carte in mano, salvo diversa indicazione di una carta in gioco. Se il giocatore aveva già più di 6 carte in mano, non ne deve scartare.
 
 Inoltre, gli effetti di Costruzioni e Magie in gioco si attivano nel momento indicato dalla carta stessa, indipendentemente dai passi elencati.
 
@@ -121,6 +127,7 @@ Orda: Insieme di tre Guerrieri della stessa Specie nella stessa regione. A fine 
 (Effetto) Prodigio: Effetto secondario di una Magia, che si attiva quando il giocatore ha in campo un numero sufficiente di Maghe della Scuola corretta. Se la descrizione inizia con una ‘&’ significa che esso va aggiunto all’effetto Base, altrimenti lo sostituisce. Il numero di Maghe necessario per attivare un Prodigio è indipendente da eventuali riduzioni di costo.  
 Recluta: Guerriero che evolve in Eroe. Ha delle Caratteristiche limitate rispetto al suo Eroe e un effetto Orda.  
 Regione: Una delle 4 aree che compongono il campo di gioco di un giocatore. Le Regioni sono Avanscoperta, Bastioni (destro e sinistro) e Villaggio.  
+Schieramento: Fase di gioco in cui il giocatore posiziona i propri Guerrieri tra le sue Regioni e seleziona gli eventuali effetti Orda.
 Scuola: Tipologia di Magia e di Maga. Le possibili Scuole sono Anatemi, Sortilegi ed Incantesimi.  
 Sortilegio: Magia appartenente all'omonima Scuola. Ha effetti manipolativi: agisce su Muri, Costruzioni, Bastioni o Vite.  
 Specie: Tipologia assegnata a ogni Guerriero. Le possibili Specie sono Elfi, Nani, Umani e Maghe. Sulla base della Specie, si può formare un’Orda.  

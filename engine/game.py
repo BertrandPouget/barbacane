@@ -326,8 +326,25 @@ def _clear_turn_expired_effects(player: Player) -> None:
 def end_turn(state: GameState) -> GameState:
     """
     Termina il turno del giocatore corrente e passa al successivo.
+    Se Cardo completato + Decumano in villaggio, aggiunge una pending_interaction
+    cardo_move e ritorna early (il turno riprende dopo resolve_cardo_move).
     """
     player = state.current_player
+
+    # Cardo completato + Decumano → offri spostamento guerriero prima di pescare
+    has_cardo_complete = any(
+        b.base_card_id == "cardo" and b.completed
+        for b in player.field.village.buildings
+    )
+    has_decumano = any(
+        b.base_card_id == "decumano"
+        for b in player.field.village.buildings
+    )
+    cardo_move_pending = any(i.get("type") == "cardo_move" for i in state.pending_interactions)
+    cardo_move_done = any(e.get("type") == "cardo_move_done" for e in player.active_effects)
+    if has_cardo_complete and has_decumano and not cardo_move_pending and not cardo_move_done:
+        state.pending_interactions.append({"type": "cardo_move", "player_id": player.id})
+        return state
 
     # Fase finale: effetti costruzioni a fine turno
     granaio_bonus = _trigger_building_end(state, player)

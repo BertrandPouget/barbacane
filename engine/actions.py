@@ -451,18 +451,15 @@ def complete_building(
     """
     Completa una Costruzione nel Villaggio.
     Costo: Mana di completamento. Consuma 1 Azione.
+    Eccezione: Cardo con Decumano in villaggio → gratuito, senza consumare Azione.
     """
     player = _require_current_player(state, player_id)
-    is_ethereal_complete = player.ethereal_complete == building_instance_id
-    if not is_ethereal_complete:
-        _require_actions(player)
 
-    # Trova la costruzione
-    b_inst = None
-    for b in player.field.village.buildings:
-        if b.instance_id == building_instance_id:
-            b_inst = b
-            break
+    # Trova la costruzione prima dei check (serve per determinare se Decumano è applicabile)
+    b_inst = next(
+        (b for b in player.field.village.buildings if b.instance_id == building_instance_id),
+        None,
+    )
     if b_inst is None:
         raise ActionError(f"Costruzione {building_instance_id} non trovata nel Villaggio.")
     if b_inst.completed:
@@ -473,7 +470,17 @@ def complete_building(
     if not isinstance(card, BuildingCard):
         raise ActionError("Carta non valida.")
 
-    if is_ethereal_complete:
+    is_ethereal_complete = player.ethereal_complete == building_instance_id
+    # Decumano in villaggio → completamento Cardo gratuito (nessuna Azione, nessun Mana)
+    is_decumano_free = (
+        base_id == "cardo"
+        and any(b.base_card_id == "decumano" for b in player.field.village.buildings)
+    )
+
+    if not is_ethereal_complete and not is_decumano_free:
+        _require_actions(player)
+
+    if is_ethereal_complete or is_decumano_free:
         cost = 0
     else:
         cost = card.completion_cost
@@ -486,7 +493,7 @@ def complete_building(
         raise ActionError(f"Mana insufficiente per completamento: {player.mana_remaining}/{cost}.")
 
     player.mana_remaining -= cost
-    if not is_ethereal_complete:
+    if not is_ethereal_complete and not is_decumano_free:
         player.actions_remaining -= 1
     player.ethereal_complete = None
     b_inst.completed = True
@@ -495,8 +502,9 @@ def complete_building(
     if base_id == "fucina":
         player.actions_remaining += 1
 
-    state.add_log(player_id, "complete_building", card=building_instance_id, mana_spent=cost)
-    return {"card": building_instance_id, "mana_spent": cost}
+    state.add_log(player_id, "complete_building", card=building_instance_id, mana_spent=cost,
+                  decumano_free=is_decumano_free)
+    return {"card": building_instance_id, "mana_spent": cost, "decumano_free": is_decumano_free}
 
 
 # ---------------------------------------------------------------------------
@@ -606,8 +614,6 @@ def reposition_warrior(
     Sposta un Guerriero tra Avanscoperta e Bastioni.
     Disponibile nella fase 'reposition', senza costo.
     """
-    if state.phase not in ("reposition", "action"):
-        raise ActionError("Riposizionamento non disponibile in questa fase.")
 
     player = _require_current_player(state, player_id)
     if destination not in ("vanguard", "bastion_left", "bastion_right"):
@@ -670,8 +676,6 @@ def activate_horde(
     Attiva un effetto Orda per una specifica zona+specie.
     Ogni Orda (stessa Specie nella stessa Regione) può essere attivata una sola volta per turno.
     """
-    if state.phase not in ("horde", "action"):
-        raise ActionError("Attivazione Orda non disponibile in questa fase.")
 
     player = _require_current_player(state, player_id)
 
