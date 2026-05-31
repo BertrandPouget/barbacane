@@ -490,7 +490,7 @@ const App = (() => {
       currentState.pending_interactions.find(i => i.player_id === myPlayerId);
     if (myPendingInteraction) {
       if (myPendingInteraction.type === 'cardo_move') {
-        document.getElementById('action-hint').textContent = '🛤 Cardo: scegli un Guerriero da spostare prima di pescare.';
+        document.getElementById('action-hint').textContent = '🛞 Cardo: scegli un Guerriero da spostare prima di pescare.';
         _showCardoMoveModal(currentState);
       } else {
         document.getElementById('action-hint').textContent = '📚 Biblioteca: scegli una carta prima di continuare.';
@@ -1416,39 +1416,67 @@ const App = (() => {
     const myPlayer = state.players.find(p => p.id === myPlayerId);
     if (!myPlayer) return;
 
-    const zoneLabels = { vanguard: 'Avanscoperta', bastion_left: 'Bastione Sinistro', bastion_right: 'Bastione Destro' };
+    const zoneLabels = {
+      vanguard: '⚔ Avanscoperta',
+      bastion_left: '🛡 Bastione Sinistro',
+      bastion_right: '🛡 Bastione Destro',
+    };
     const allWarriors = [];
-    for (const [zoneKey, label] of Object.entries(zoneLabels)) {
+    for (const [zoneKey, zoneLabel] of Object.entries(zoneLabels)) {
       const zone = myPlayer.field[zoneKey];
       const warriors = zone ? (zone.warriors || zone) : [];
-      warriors.forEach(w => allWarriors.push({ ...w, zoneKey, zoneLabel: label }));
+      warriors.forEach(w => allWarriors.push({ ...w, zoneKey, zoneLabel }));
     }
 
-    const warriorOptions = allWarriors.map(w => ({
-      label: `${w.name} (${w.zoneLabel})`,
-      value: w.instance_id,
-    }));
-
-    Renderer.showChoiceModal('🛤 Cardo — sposta un Guerriero (opzionale)', warriorOptions, (chosen) => {
-      const destOptions = [
-        { label: 'Avanscoperta', value: 'vanguard' },
-        { label: 'Bastione Sinistro', value: 'bastion_left' },
-        { label: 'Bastione Destro', value: 'bastion_right' },
-      ];
-      Renderer.showChoiceModal('Scegli la destinazione', destOptions, (dest) => {
-        sendAction('resolve_cardo_move', { warrior_iid: chosen, destination: dest })
-          .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
-      });
-    });
-
-    // Trasforma il pulsante Annulla in "Salta" che conclude il turno senza spostare
+    const overlay = document.getElementById('modal-overlay');
+    const confirmBtn = document.getElementById('modal-confirm');
     const cancelBtn = document.getElementById('modal-cancel');
+
+    function _showDestModal(warriorIid) {
+      document.getElementById('modal-title').textContent = '🛞 Cardo — scegli la destinazione';
+      const body = document.getElementById('modal-body');
+      body.innerHTML = '';
+      const opts = document.createElement('div');
+      opts.className = 'modal-options';
+      for (const [zoneKey, zoneLabel] of Object.entries(zoneLabels)) {
+        const btn = document.createElement('div');
+        btn.className = 'modal-option';
+        btn.textContent = zoneLabel;
+        btn.addEventListener('click', () => {
+          overlay.classList.add('hidden');
+          confirmBtn.classList.remove('hidden');
+          cancelBtn.textContent = 'Annulla';
+          sendAction('resolve_cardo_move', { warrior_iid: warriorIid, destination: zoneKey })
+            .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
+        });
+        opts.appendChild(btn);
+      }
+      body.appendChild(opts);
+    }
+
+    document.getElementById('modal-title').textContent = '🛞 Cardo — sposta un Guerriero (opzionale)';
+    const body = document.getElementById('modal-body');
+    body.innerHTML = '';
+    const opts = document.createElement('div');
+    opts.className = 'modal-options';
+    for (const w of allWarriors) {
+      const btn = document.createElement('div');
+      btn.className = 'modal-option';
+      btn.textContent = `${w.name} (${w.zoneLabel})`;
+      btn.addEventListener('click', () => _showDestModal(w.instance_id));
+      opts.appendChild(btn);
+    }
+    body.appendChild(opts);
+
+    confirmBtn.classList.add('hidden');
     cancelBtn.textContent = 'Salta';
     cancelBtn.onclick = () => {
       cancelBtn.textContent = 'Annulla';
-      document.getElementById('modal-overlay').classList.add('hidden');
+      confirmBtn.classList.remove('hidden');
+      overlay.classList.add('hidden');
       sendAction('resolve_cardo_move', {}).catch(e => Renderer.toast(e.message || 'Errore', 'error'));
     };
+    overlay.classList.remove('hidden');
   }
 
   // ---------------------------------------------------------------------------
