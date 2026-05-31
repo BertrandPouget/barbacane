@@ -463,20 +463,24 @@ def ardolancio_effect(
     target_bastion_side: str = "left",
     **kwargs,
 ) -> dict:
-    """Base: 2 danni a un Bastione. Prodigio (sostituisce): 4 danni."""
-    from engine.battle import apply_damage_to_bastion
-    damage = 4 if prodigy else 2
+    """Base: scarta fino a 2 Muri casuali da un Bastione avversario. Prodigio: fino a 4."""
     target = state.get_player(target_player_id) if target_player_id else None
-    if target is None:
-        return {"error": "Bersaglio non valido"}
-    result = apply_damage_to_bastion(state, target, target_bastion_side, damage)
+    if target is None or target.id == player.id:
+        return {"error": "Devi scegliere un Bastione avversario"}
+    bastion = target.field.bastion_left if target_bastion_side == "left" else target.field.bastion_right
+    max_walls = 4 if prodigy else 2
+    walls_to_remove = random.sample(bastion.walls, min(max_walls, len(bastion.walls)))
+    for wall in walls_to_remove:
+        bastion.walls.remove(wall)
+        state.discard_pile.append(wall.instance_id)
+    walls_discarded = len(walls_to_remove)
     state.recent_events.append({
-        "type": "damage", "card": "ardolancio",
+        "type": "effect", "card": "ardolancio",
         "player_id": player.id, "prodigy": prodigy,
         "target_player_id": target_player_id, "target_bastion_side": target_bastion_side,
-        "damage": damage, **result,
+        "walls_discarded": walls_discarded,
     })
-    return {"damage": damage, **result}
+    return {"walls_discarded": walls_discarded}
 
 
 @register_effect("vitalflusso_effect")

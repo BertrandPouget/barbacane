@@ -442,8 +442,8 @@
       "school": "anatema",
       "cost": 1,
       "cost_type": "maga",
-      "base_effect": "Infliggi 2 Danni a un Bastione a tua scelta.",
-      "prodigy_effect": "Infliggi 4 Danni a un Bastione a tua scelta.",
+      "base_effect": "Scegli un Bastione avversario. Scarta fino a 2 Muri casuali da esso.",
+      "prodigy_effect": "Scegli un Bastione avversario. Scarta fino a 4 Muri casuali da esso.",
       "prodigy_is_additive": false,
       "effect_id": "ardolancio_effect",
       "copies": 4
