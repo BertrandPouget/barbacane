@@ -239,7 +239,7 @@ async def api_game_action(req: GameActionRequest):
         })
 
     # Timer: riavvia al cambio turno, cancella se la partita è finita
-    if req.action == "end_turn" or state.winner_id:
+    if req.action == "end_turn" or result.get("auto_end_turn") or state.winner_id:
         await _start_turn_timer(req.game_id, state)
 
     return {"result": result, "state": public_state(state, player_id)}
@@ -390,6 +390,14 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             fucina_res = check_fucina_after_action(state, player)
             if fucina_res:
                 result["fucina"] = fucina_res
+
+    # Dopo la battaglia (o eracle_destroy), fine turno automatica se non ci sono
+    # più battaglie disponibili e nessun eracle_destroy in attesa di scelta.
+    if action in ("battle", "eracle_destroy") and not state.winner_id:
+        eracle_pending = action == "battle" and result.get("eracle_destroy_triggered", False)
+        if state.battles_remaining <= 0 and not eracle_pending:
+            end_turn(state)
+            result["auto_end_turn"] = True
 
     return result
 
@@ -594,7 +602,7 @@ async def _handle_ws_message(game_id: str, player_id: str, data: dict) -> None:
                     "state": public_state(state, pid),
                 })
             # Timer: riavvia al cambio turno, cancella se la partita è finita
-            if action == "end_turn" or state.winner_id:
+            if action == "end_turn" or result.get("auto_end_turn") or state.winner_id:
                 await _start_turn_timer(game_id, state)
         except ActionError as e:
             await manager.send_to_player(game_id, player_id, {
