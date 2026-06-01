@@ -184,13 +184,13 @@ def _pick(font_dir: Path, *patterns: str) -> Path | None:
 
 
 def load_fonts(font_dir: Path) -> dict:
-    lb_regular = _pick(font_dir, "librebaskerville", "regular")
-    lb_italic  = _pick(font_dir, "librebaskerville", "italic")
-    lb_semi    = _pick(font_dir, "librebaskerville", "semibold")
+    st_regular = _pick(font_dir, "stixtwotext", "regular")
+    st_italic  = _pick(font_dir, "stixtwotext", "italic")
+    st_medium  = _pick(font_dir, "stixtwotext", "medium")
 
-    missing = [name for name, f in [("LibreBaskerville-Regular", lb_regular),
-                                     ("LibreBaskerville-Italic",  lb_italic),
-                                     ("LibreBaskerville-SemiBold", lb_semi)] if f is None]
+    missing = [name for name, f in [("STIXTwoText-Regular", st_regular),
+                                     ("STIXTwoText-Italic",  st_italic),
+                                     ("STIXTwoText-Medium",  st_medium)] if f is None]
     if missing:
         print(f"  ⚠  Font non trovati: {', '.join(missing)} — uso PIL default per quelli mancanti")
 
@@ -202,13 +202,13 @@ def load_fonts(font_dir: Path) -> dict:
         return ImageFont.truetype(str(path), pt(size_pt))
 
     return {
-        "type":       tf(lb_semi,    FSIZE_TYPE),     # Guerriero  — SemiBold
-        "subtype":    tf(lb_regular, FSIZE_SUBTYPE),  # Recluta    — Regular
-        "name":       tf(lb_semi,    FSIZE_NAME),     # PATRIZIO   — SemiBold
-        "cost":       tf(lb_semi,    FSIZE_COST),     # numero     — SemiBold
-        "stat_label": tf(lb_regular, FSIZE_STATS),    # ATT: GIT:  — Regular
-        "stat_val":   tf(lb_italic,  FSIZE_STATS),    # Elfo, …    — Italic
-        "effect":     tf(lb_italic,  FSIZE_EFFECT),   # effetto    — Italic
+        "type":       tf(st_medium,  FSIZE_TYPE),
+        "subtype":    tf(st_regular, FSIZE_SUBTYPE),
+        "name":       tf(st_medium,  FSIZE_NAME),
+        "cost":       tf(st_medium,  FSIZE_COST),
+        "stat_label": tf(st_regular, FSIZE_STATS),
+        "stat_val":   tf(st_italic,  FSIZE_STATS),
+        "effect":     tf(st_italic,  FSIZE_EFFECT),
     }
 
 
