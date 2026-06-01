@@ -109,7 +109,7 @@ FSIZE_EFFECT  =  8.0
 # ---------------------------------------------------------------------------
 # Colori
 # ---------------------------------------------------------------------------
-COLOR_BROWN = (123, 69,  13)
+COLOR_BROWN = (86,  48,   9)
 COLOR_GOLD  = (255, 189, 89)
 
 # ---------------------------------------------------------------------------
@@ -420,7 +420,7 @@ def generate_card(card: dict, tpl: Image.Image, images_dir: Path,
 # Main
 # ---------------------------------------------------------------------------
 
-CARDS_JSON    = Path("input/cards.json")
+CARDS_JSON    = Path(__file__).parent.parent / "data" / "cards.json"
 TEMPLATES_DIR = Path("input/templates")
 FONTS_DIR     = Path("input/fonts")
 IMAGES_DIR    = Path("images")
@@ -473,7 +473,7 @@ def main():
             continue
         generate_card(card, tpl, images_dir, fonts, id_to_name, out_dir)
 
-    print(f"\nFatto — output in '{args.out}'")
+    print(f"\nFatto — output in '{out_dir}'")
 
 
 if __name__ == "__main__":
