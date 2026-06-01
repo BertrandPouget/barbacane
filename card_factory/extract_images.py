@@ -36,15 +36,11 @@ STANDARD_BOX_PT = (20.0, 25.8, 159.0, 105.5)   # x0, y0, x1, y1
 # La differenza è solo nel y1 più basso: l'illustrazione eroe è più alta.
 HERO_BOX_PT    = (20.0, 25.8, 159.0, 158.5)
 
-# Zona di rilevamento eroe: area tra il bordo esterno e il frame interno
-# Se contiene pixel DAVVERO colorati (non grigi) → carta eroe
-HERO_DETECT_BOX_PT = (20.0, 10.8, 159.0, 24.8)
-
 # Soglia cromaticità: differenza massima tra canali R/G/B per considerare un pixel "colorato"
 COLOR_DIFF_THRESHOLD = 15
 
-# Soglia minima di pixel colorati per classificare come eroe
-HERO_COLOR_MIN_PX = 100
+# Margine sotto l'area basic: 5mm in pt. Se esiste un pixel colorato oltre questa soglia → eroe.
+HERO_MARGIN_PT = 5 * 72 / 25.4   # ≈ 14.2 pt
 
 # ---------------------------------------------------------------------------
 # Costanti per la rimozione dell'ottagono (badge costo) in alto a destra.
@@ -88,17 +84,16 @@ def render_page(page: fitz.Page, dpi: int) -> np.ndarray:
 
 
 def detect_hero(arr: np.ndarray, scale: float) -> bool:
-    """Ritorna True se la pagina è una carta eroe."""
-    x0 = pt_to_px(HERO_DETECT_BOX_PT[0], scale)
-    y0 = pt_to_px(HERO_DETECT_BOX_PT[1], scale)
-    x1 = pt_to_px(HERO_DETECT_BOX_PT[2], scale)
-    y1 = pt_to_px(HERO_DETECT_BOX_PT[3], scale)
+    """Ritorna True se esiste almeno un pixel colorato oltre 5mm sotto l'area basic."""
+    x0 = pt_to_px(STANDARD_BOX_PT[0], scale)
+    x1 = pt_to_px(STANDARD_BOX_PT[2], scale)
+    y0 = pt_to_px(STANDARD_BOX_PT[3] + HERO_MARGIN_PT, scale)
+    y1 = pt_to_px(HERO_BOX_PT[3], scale)
 
     zone = arr[y0:y1, x0:x1]
     if zone.size == 0:
         return False
-    colored_count = is_truly_colored(zone).sum()
-    return int(colored_count) >= HERO_COLOR_MIN_PX
+    return bool(is_truly_colored(zone).any())
 
 
 def crop_illustration(arr: np.ndarray, scale: float, hero: bool) -> np.ndarray:
@@ -192,8 +187,9 @@ def process_pdf(pdf_path: Path) -> None:
         img.save(out_path, format="PNG")
         print(f"  Pag. {page_num:02d} [{card_type:8s}]  →  {crop.shape[1]}×{crop.shape[0]}px  →  {out_path.name}")
 
+    n_pages = len(doc)
     doc.close()
-    print(f"\nDone. {len(doc)} immagini salvate in '{OUT_DIR}'")
+    print(f"\nDone. {n_pages} immagini salvate in '{OUT_DIR}'")
 
 
 def main():
