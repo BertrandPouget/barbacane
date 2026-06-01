@@ -427,12 +427,12 @@ def generate_card(card: dict, tpl: Image.Image, images_dir: Path,
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("cards_json")
-    ap.add_argument("--templates", default="./templates",
+    ap.add_argument("--templates", default="./input/templates",
                     help="Cartella template PNG. File usato per ogni carta: {key}.png "
                          "(recruit.png, hero.png, spell.png, building.png). "
                          "La scala viene rilevata automaticamente dalla larghezza del PNG.")
     ap.add_argument("--images",   default="./images")
-    ap.add_argument("--fonts",    default="./fonts")
+    ap.add_argument("--fonts",    default="./input/fonts")
     ap.add_argument("--out",      default="./output")
     ap.add_argument("--dpi",      type=int, default=300)
     args = ap.parse_args()
