@@ -345,7 +345,8 @@ def _draw_effect_block(draw, text: str, fonts: dict, y_start_pt: float) -> None:
 # ---------------------------------------------------------------------------
 
 def generate_card(card: dict, tpl: Image.Image, images_dir: Path,
-                  fonts: dict, id_to_name: dict, out_dir: Path) -> None:
+                  fonts: dict, id_to_name: dict, out_dir: Path,
+                  has_img: bool = True) -> None:
     t       = card.get("type", "")
     subtype = card.get("subtype", "")
     cid     = card["id"]
@@ -363,7 +364,8 @@ def generate_card(card: dict, tpl: Image.Image, images_dir: Path,
 
     if t == "spell":
         # Illustrazione (banner standard)
-        paste_illustration(bg, images_dir / f"{cid}.png")
+        if has_img:
+            paste_illustration(bg, images_dir / f"{cid}.png")
         # Nome
         draw_mm(draw, NAME_CX_PT, NAME_CY_PT, card.get("name","").upper(), fonts["name"], COLOR_GOLD)
         # Due blocchi effetto sotto le icone stella
@@ -372,7 +374,8 @@ def generate_card(card: dict, tpl: Image.Image, images_dir: Path,
 
     elif t == "building":
         # Illustrazione (banner standard)
-        paste_illustration(bg, images_dir / f"{cid}.png")
+        if has_img:
+            paste_illustration(bg, images_dir / f"{cid}.png")
         # Nome
         draw_mm(draw, NAME_CX_PT, NAME_CY_PT, card.get("name","").upper(), fonts["name"], COLOR_GOLD)
         # Due blocchi effetto sotto le icone torre
@@ -385,7 +388,8 @@ def generate_card(card: dict, tpl: Image.Image, images_dir: Path,
 
     elif subtype == "hero":
         # Illustrazione (banner più in basso)
-        paste_illustration(bg, images_dir / f"{cid}.png", banner_top_pt=H_BANNER_TOP)
+        if has_img:
+            paste_illustration(bg, images_dir / f"{cid}.png", banner_top_pt=H_BANNER_TOP)
         # Nome
         draw_mm(draw, NAME_CX_PT, H_NAME_CY, card.get("name","").upper(), fonts["name"], COLOR_GOLD)
         # Stats con y spostate
@@ -394,7 +398,8 @@ def generate_card(card: dict, tpl: Image.Image, images_dir: Path,
 
     else:  # recruit (default warrior)
         # Illustrazione (banner standard)
-        paste_illustration(bg, images_dir / f"{cid}.png")
+        if has_img:
+            paste_illustration(bg, images_dir / f"{cid}.png")
         # Nome
         draw_mm(draw, NAME_CX_PT, NAME_CY_PT, card.get("name","").upper(), fonts["name"], COLOR_GOLD)
         # Stats
@@ -464,14 +469,12 @@ def main():
         tpl_key = get_template_key(card)
         has_img = (images_dir / f"{cid}.png").exists()
 
-        print(f"→ {cid}  [{tpl_key}] [img: {'✓' if has_img else '✗ skip'}]")
-        if not has_img:
-            continue
+        print(f"→ {cid}  [{tpl_key}] [img: {'✓' if has_img else '✗ no img'}]")
 
         tpl = get_template(tpl_key)
         if tpl is None:
             continue
-        generate_card(card, tpl, images_dir, fonts, id_to_name, out_dir)
+        generate_card(card, tpl, images_dir, fonts, id_to_name, out_dir, has_img=has_img)
 
     print(f"\nFatto — output in '{out_dir}'")
 

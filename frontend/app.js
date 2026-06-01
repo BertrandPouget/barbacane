@@ -972,6 +972,7 @@ const App = (() => {
     }
 
     const title = def ? def.name : (fieldWarrior ? (fieldWarrior.name || instanceId) : instanceId);
+    const baseId = def ? def.id : null;
 
     // Frecce di navigazione per le carte in mano
     let navOptions = null;
@@ -987,7 +988,7 @@ const App = (() => {
       }
     }
 
-    Renderer.showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons, navOptions);
+    Renderer.showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons, navOptions, baseId);
   }
 
   function showPlayOptions(instanceId, def) {
@@ -1256,7 +1257,8 @@ const App = (() => {
       {
         onPrev: idx > 0 ? () => _showSpellWallPicker(walls, side, spellInstanceId, idx - 1) : null,
         onNext: idx < walls.length - 1 ? () => _showSpellWallPicker(walls, side, spellInstanceId, idx + 1) : null,
-      }
+      },
+      def ? def.id : null
     );
   }
 
@@ -1734,7 +1736,8 @@ const App = (() => {
       null,
       null,
       extraButtons,
-      navOptions
+      navOptions,
+      def ? def.id : null
     );
   }
 
@@ -1796,6 +1799,7 @@ const App = (() => {
       null,
       [],
       navOptions,
+      def ? def.id : null
     );
   }
 
