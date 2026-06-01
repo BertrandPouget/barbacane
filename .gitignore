@@ -2,4 +2,3 @@ __pycache__/
 *.db
 .claude/
 venv/
-card_factory/
