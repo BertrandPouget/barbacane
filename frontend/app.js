@@ -953,7 +953,7 @@ const App = (() => {
       if (fieldBuilding && !fieldBuilding.completed) {
         const player = currentState.players.find(p => p.id === myPlayerId);
         const isEtherealComplete = player && player.ethereal_complete === instanceId;
-        actionLabel = isEtherealComplete ? 'Completa gratis (Velocemento)' : 'Completa costruzione';
+        actionLabel = isEtherealComplete ? 'Completa gratis (Velocemento)' : 'Completa';
         onAction = () => {
           Renderer.closeCardDetail();
           sendAction('complete_building', { building_instance_id: instanceId });

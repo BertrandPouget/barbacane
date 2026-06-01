@@ -34,7 +34,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: var(--bg-dark) url('/assets/background.png') center center / cover fixed;
+  background: var(--bg-dark) url('/assets/cracked_background.png') center center / cover fixed;
   color: var(--text);
   font-family: 'Georgia', serif;
   min-height: 100vh;
@@ -54,31 +54,6 @@ body {
   overflow: hidden;
 }
 
-#screen-lobby::before,
-#screen-lobby::after,
-#screen-waiting::before,
-#screen-waiting::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background-repeat: no-repeat, no-repeat;
-}
-
-#screen-lobby::before,
-#screen-waiting::before {
-  background-image: url('/assets/crack_tl.png'), url('/assets/crack_tr.png');
-  background-position: top left, top right;
-  background-size: 880px 880px, 400px 400px;
-}
-
-#screen-lobby::after,
-#screen-waiting::after {
-  background-image: url('/assets/crack_br.png'), url('/assets/crack_bl.png');
-  background-position: bottom right, bottom left;
-  background-size: 880px 880px, 400px 400px;
-}
 
 .lobby-container {
   position: relative;
