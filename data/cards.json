@@ -87,12 +87,12 @@
       "horde_effect": "Gli Anatemi a costo 1 che giochi ti ritornano in mano.",
       "horde_effect_id": "araminta_horde",
       "evolves_from": null,
-      "evolves_into": "araminta_the_pyric",
+      "evolves_into": "the_pyric",
       "copies": 4
     },
     {
-      "id": "araminta_the_pyric",
-      "name": "Araminta, the Pyric",
+      "id": "the_pyric",
+      "name": "The Pyric",
       "type": "warrior",
       "subtype": "hero",
       "species": "maga",
@@ -231,12 +231,12 @@
       "horde_effect": "I Sortilegi a costo 1 che giochi vengono giocati una seconda volta.",
       "horde_effect_id": "evelyn_horde",
       "evolves_from": null,
-      "evolves_into": "evelyn_the_briny",
+      "evolves_into": "the_briny",
       "copies": 4
     },
     {
-      "id": "evelyn_the_briny",
-      "name": "Evelyn, the Briny",
+      "id": "the_briny",
+      "name": "The Briny",
       "type": "warrior",
       "subtype": "hero",
       "species": "maga",
@@ -375,12 +375,12 @@
       "horde_effect": "I Prodigi dei tuoi Incantesimi si attivano indipendentemente dalla Scuola delle tue Maghe.",
       "horde_effect_id": "madeleine_horde",
       "evolves_from": null,
-      "evolves_into": "madeleine_the_nemoral",
+      "evolves_into": "the_nemoral",
       "copies": 4
     },
     {
-      "id": "madeleine_the_nemoral",
-      "name": "Madeleine, the Nemoral",
+      "id": "the_nemoral",
+      "name": "The Nemoral",
       "type": "warrior",
       "subtype": "hero",
       "species": "maga",
