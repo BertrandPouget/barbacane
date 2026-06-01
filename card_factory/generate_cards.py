@@ -4,13 +4,9 @@ generate_cards.py
 Genera carte Barbacane dal template PDF + JSON dati + PNG illustrazioni.
 
 Utilizzo:
-    python generate_cards.py cards.json
-    python generate_cards.py cards.json --template Barbacane_-_Template_v2.pdf
-                                         --images ./images  --fonts ./fonts
-                                         --out ./output     --dpi 300
+    python generate_cards.py
 """
 
-import argparse
 import json
 import textwrap
 from pathlib import Path
@@ -424,28 +420,22 @@ def generate_card(card: dict, tpl: Image.Image, images_dir: Path,
 # Main
 # ---------------------------------------------------------------------------
 
+CARDS_JSON    = Path("input/cards.json")
+TEMPLATES_DIR = Path("input/templates")
+FONTS_DIR     = Path("input/fonts")
+IMAGES_DIR    = Path("images")
+OUT_DIR       = Path("output")
+
+
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("cards_json")
-    ap.add_argument("--templates", default="./input/templates",
-                    help="Cartella template PNG. File usato per ogni carta: {key}.png "
-                         "(recruit.png, hero.png, spell.png, building.png). "
-                         "La scala viene rilevata automaticamente dalla larghezza del PNG.")
-    ap.add_argument("--images",   default="./images")
-    ap.add_argument("--fonts",    default="./input/fonts")
-    ap.add_argument("--out",      default="./output")
-    ap.add_argument("--dpi",      type=int, default=300)
-    args = ap.parse_args()
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    global DPI, SCALE
-    DPI, SCALE = args.dpi, args.dpi / 72.0
+    fonts = load_fonts(FONTS_DIR)
+    all_cards, id_to_name = load_cards(CARDS_JSON)
 
-    out_dir       = Path(args.out);       out_dir.mkdir(parents=True, exist_ok=True)
-    templates_dir = Path(args.templates)
-    images_dir    = Path(args.images)
-
-    fonts = load_fonts(Path(args.fonts))
-    all_cards, id_to_name = load_cards(Path(args.cards_json))
+    out_dir       = OUT_DIR
+    templates_dir = TEMPLATES_DIR
+    images_dir    = IMAGES_DIR
 
     # Cache dei template renderizzati
     tpl_cache: dict[str, Image.Image] = {}

@@ -165,47 +165,48 @@ def make_white_transparent(arr: np.ndarray, scale: float,
     return Image.fromarray(rgba, mode="RGBA")
 
 
-def process_pdf(pdf_path: str, dpi: int = 300, out_dir: str = "./images") -> None:
-    out = Path(out_dir)
-    out.mkdir(parents=True, exist_ok=True)
+DPI     = 300
+OUT_DIR = Path("images")
 
-    doc = fitz.open(pdf_path)
-    scale = dpi / 72.0
-    stem = Path(pdf_path).stem
 
-    print(f"PDF: {pdf_path}  |  {len(doc)} pagine  |  DPI={dpi}  |  scala={scale:.2f}")
-    print()
+def process_pdf(pdf_path: Path) -> None:
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    doc   = fitz.open(str(pdf_path))
+    scale = DPI / 72.0
+    stem  = pdf_path.stem
+
+    print(f"PDF: {pdf_path}  |  {len(doc)} pagine  |  DPI={DPI}\n")
 
     for i, page in enumerate(doc):
-        page_num = i + 1
-        arr = render_page(page, dpi)
-
-        hero = detect_hero(arr, scale)
+        page_num  = i + 1
+        arr       = render_page(page, DPI)
+        hero      = detect_hero(arr, scale)
         card_type = "EROE" if hero else "STANDARD"
 
-        crop = crop_illustration(arr, scale, hero)
-        box = HERO_BOX_PT if hero else STANDARD_BOX_PT
-        crop_y0_pt = box[1]
-        img = make_white_transparent(crop, scale, crop_y0_pt)
+        crop       = crop_illustration(arr, scale, hero)
+        crop_y0_pt = (HERO_BOX_PT if hero else STANDARD_BOX_PT)[1]
+        img        = make_white_transparent(crop, scale, crop_y0_pt)
 
-        out_path = out / f"{stem}_page{page_num:02d}_{card_type.lower()}.png"
+        out_path = OUT_DIR / f"{stem}_page{page_num:02d}_{card_type.lower()}.png"
         img.save(out_path, format="PNG")
-
         print(f"  Pag. {page_num:02d} [{card_type:8s}]  →  {crop.shape[1]}×{crop.shape[0]}px  →  {out_path.name}")
 
-    n_pages = len(doc)
     doc.close()
-    print(f"\nDone. {n_pages} immagini salvate in '{out}'")
+    print(f"\nDone. {len(doc)} immagini salvate in '{OUT_DIR}'")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Estrae illustrazioni da PDF carte Barbacane.")
-    parser.add_argument("pdf", help="Percorso al file PDF di input")
-    parser.add_argument("--dpi", type=int, default=300, help="DPI di rendering (default: 300)")
-    parser.add_argument("--out", default="./images", help="Cartella di images (default: ./images)")
+    parser.add_argument("deck", help="Nome del deck (es. deck_color → input/deck_color.pdf)")
     args = parser.parse_args()
 
-    process_pdf(args.pdf, dpi=args.dpi, out_dir=args.out)
+    pdf_path = Path("input") / f"{args.deck}.pdf"
+    if not pdf_path.exists():
+        print(f"Errore: file non trovato: {pdf_path}", file=sys.stderr)
+        sys.exit(1)
+
+    process_pdf(pdf_path)
 
 
 if __name__ == "__main__":
