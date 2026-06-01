@@ -183,7 +183,7 @@ def process_pdf(pdf_path: Path) -> None:
         crop_y0_pt = (HERO_BOX_PT if hero else STANDARD_BOX_PT)[1]
         img        = make_white_transparent(crop, scale, crop_y0_pt)
 
-        out_path = OUT_DIR / f"{stem}_page{page_num:02d}_{card_type.lower()}.png"
+        out_path = OUT_DIR / f"{stem}_page{page_num:02d}.png"
         img.save(out_path, format="PNG")
         print(f"  Pag. {page_num:02d} [{card_type:8s}]  →  {crop.shape[1]}×{crop.shape[0]}px  →  {out_path.name}")
 
