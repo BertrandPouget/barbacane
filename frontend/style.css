@@ -1,25 +1,27 @@
 /* =========================================================
    Barbacane — Foglio di stile
-   Palette: pergamena scura, oro, rosso sangue, verde bosco
+   Palette: terracotta calda, oro vivace, rosso sangue, verde bosco
    ========================================================= */
 
 :root {
-  --bg-dark:      #1a1410;
-  --bg-medium:    #2a201a;
-  --bg-light:     #3a2e24;
-  --bg-card:      #2e2318;
-  --gold:         #c8a84b;
-  --gold-light:   #e8c86b;
+  --bg-dark:      #1a0c00;
+  --bg-medium:    #2c1800;
+  --bg-light:     #3e2408;
+  --bg-card:      #281200;
+  --gold:         #f0ce06;
+  --gold-light:   #ffe040;
   --red:          #b03030;
   --red-light:    #e04040;
   --green:        #2d6b3a;
   --green-light:  #4a9a58;
   --blue:         #2a4a8a;
   --blue-light:   #4a7aaa;
-  --text:         #e8d8b8;
-  --text-dim:     #a09070;
-  --border:       #5a4530;
-  --border-gold:  #8a6830;
+  --text:         #f0e0b8;
+  --text-dim:     #a88050;
+  --border:       #6a3010;
+  --border-gold:  #a06820;
+  --brown:        #4a2008;
+  --brown-light:  #7a4418;
 
   --card-w: 90px;
   --card-h: 130px;
@@ -32,7 +34,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: var(--bg-dark);
+  background: var(--bg-dark) url('/assets/background.png') center center / cover fixed;
   color: var(--text);
   font-family: 'Georgia', serif;
   min-height: 100vh;
@@ -46,18 +48,52 @@ body {
 
 /* ==================== LOBBY ==================== */
 
+#screen-lobby,
+#screen-waiting {
+  position: relative;
+  overflow: hidden;
+}
+
+#screen-lobby::before,
+#screen-lobby::after,
+#screen-waiting::before,
+#screen-waiting::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-repeat: no-repeat, no-repeat;
+}
+
+#screen-lobby::before,
+#screen-waiting::before {
+  background-image: url('/assets/crack_tl.png'), url('/assets/crack_tr.png');
+  background-position: top left, top right;
+  background-size: 880px 880px, 400px 400px;
+}
+
+#screen-lobby::after,
+#screen-waiting::after {
+  background-image: url('/assets/crack_br.png'), url('/assets/crack_bl.png');
+  background-position: bottom right, bottom left;
+  background-size: 880px 880px, 400px 400px;
+}
+
 .lobby-container {
+  position: relative;
+  z-index: 1;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
-  gap: 2rem;
+  padding: 2rem 2rem 6vh;
+  gap: 1.5rem;
 }
 
 .logo-area { text-align: center; }
-.logo { max-width: 510px; width: 120vw; margin-bottom: 0.5rem; display: block; margin-left: auto; margin-right: auto; }
+.logo { max-width: 440px; width: 80vw; display: block; margin: 0 auto; }
 
 .game-title {
   font-size: 3.5rem;
@@ -125,14 +161,28 @@ input:focus {
 
 /* ==================== SALA D'ATTESA ==================== */
 
-.waiting-container {
+#screen-waiting.active {
   min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.waiting-container {
+  position: relative;
+  z-index: 1;
+  background: var(--bg-medium);
+  border: 1px solid var(--border-gold);
+  border-radius: 12px;
+  padding: 2.5rem 3rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 1.5rem;
-  padding: 2rem;
+  min-width: 360px;
+  max-width: 500px;
+  width: 100%;
 }
 
 .waiting-container h2 { color: var(--gold); font-size: 1.8rem; }
@@ -172,8 +222,8 @@ input:focus {
   background: var(--green-light);
 }
 
-.waiting-hint { color: var(--text-dim); font-style: italic; font-size: 0.9rem; }
-.status-msg { color: var(--text-dim); font-size: 0.85rem; min-height: 1.2rem; }
+.waiting-hint { color: var(--text); font-style: italic; font-size: 0.9rem; text-align: center; }
+.status-msg { color: var(--text-dim); font-size: 0.85rem; min-height: 1.2rem; text-align: center; }
 
 /* ==================== PULSANTI ==================== */
 
@@ -200,8 +250,8 @@ input:focus {
 /* ==================== HEADER GIOCO ==================== */
 
 #game-header {
-  background: var(--bg-medium);
-  border-bottom: 2px solid var(--border-gold);
+  background: rgba(50, 22, 4, 0.88);
+  border-bottom: 1px solid rgba(160, 104, 32, 0.5);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -216,7 +266,7 @@ input:focus {
   gap: 1rem;
   align-items: center;
   font-size: 0.85rem;
-  color: var(--text-dim);
+  color: var(--text);
 }
 
 .header-center {
@@ -292,14 +342,14 @@ input:focus {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  background: var(--bg-medium);
+  background: rgba(50, 22, 4, 0.72);
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
 }
 
-#left-strip  { border-right: 2px solid var(--border-gold); }
-#right-strip { border-left:  2px solid var(--border-gold); }
+#left-strip  { border-right: 1px solid rgba(122, 68, 24, 0.4); }
+#right-strip { border-left:  1px solid rgba(122, 68, 24, 0.4); }
 #left-strip.hidden, #right-strip.hidden { display: none; }
 
 #left-strip.active-player-strip  { border-right-color: var(--gold); }
@@ -331,12 +381,12 @@ input:focus {
   gap: 3px;
   padding: 4px 5px;
   border-radius: 4px;
-  border: 1px dashed var(--border);
+  border: 1px dashed rgba(122, 68, 24, 0.35);
 }
 
 .strip-section-label {
   font-size: 0.67rem;
-  color: var(--text-dim);
+  color: var(--gold);
   font-style: italic;
 }
 
@@ -376,8 +426,8 @@ input:focus {
 }
 
 .opponent-field {
-  background: var(--bg-medium);
-  border: 1px solid var(--border);
+  background: rgba(50, 22, 4, 0.72);
+  border: 1px solid rgba(122, 68, 24, 0.35);
   border-radius: 6px;
   padding: 5px 8px;
   display: flex;
@@ -447,7 +497,7 @@ input:focus {
 /* Bastioni avversari: stessa proporzione dei miei (flex:1) */
 .opp-region.opp-bastion {
   flex: 1;
-  border: 1px dashed var(--border);
+  border: 1px dashed rgba(122, 68, 24, 0.35);
   border-radius: 4px;
   padding: 3px 4px;
   cursor: pointer;
@@ -471,7 +521,7 @@ input:focus {
 
 .opp-bastion-label {
   font-size: 0.62rem;
-  color: var(--text-dim);
+  color: var(--gold);
   font-style: italic;
 }
 
@@ -515,14 +565,13 @@ input:focus {
   display: flex;
   align-items: flex-end;
   padding: 4px 1rem;
-  background: var(--bg-dark);
-  border-bottom: 1px solid var(--border);
+  background: transparent;
   overflow: hidden;
 }
 
 #battle-log {
   font-size: 0.8rem;
-  color: var(--text-dim);
+  color: var(--brown-light);
   flex: 1;
   text-align: center;
   display: flex;
@@ -545,8 +594,8 @@ input:focus {
 
 /* Campo locale */
 #my-field {
-  background: var(--bg-medium);
-  border-top: 2px solid var(--border-gold);
+  background: transparent;
+  border-top: 1px dashed rgba(122, 68, 24, 0.5);
   padding: 6px 8px;
   display: flex;
   flex-direction: column;
@@ -576,7 +625,7 @@ input:focus {
   display: block;
   width: 100%;
   font-size: 0.65rem;
-  color: var(--text-dim);
+  color: var(--gold);
   text-align: center;
   padding-bottom: 2px;
   pointer-events: none;
@@ -588,10 +637,11 @@ input:focus {
   flex-wrap: wrap;
   gap: 4px;
   align-items: flex-start;
-  border: 1px dashed var(--border);
+  border: 1px solid rgba(160, 90, 30, 0.55);
   border-radius: 4px;
   padding: 4px;
   min-height: 70px;
+  background: rgba(50, 22, 4, 0.72);
   transition: border-color 0.2s, background 0.2s;
 }
 
@@ -609,7 +659,11 @@ input:focus {
   display: flex;
   gap: 1.5rem;
   font-size: 0.85rem;
-  padding: 2px 4px;
+  padding: 4px 14px;
+  background: rgba(50, 22, 4, 0.78);
+  border: 1px solid rgba(160, 90, 30, 0.5);
+  border-radius: 20px;
+  align-self: center;
 }
 
 #my-mana    { color: var(--blue-light); }
@@ -653,8 +707,8 @@ input:focus {
 
 /* Mano */
 #hand-area {
-  background: var(--bg-dark);
-  border-top: 2px solid var(--border);
+  background: transparent;
+  border-top: none;
   padding: 8px 8px 6px;
   display: flex;
   flex-direction: column;
@@ -663,11 +717,7 @@ input:focus {
   overflow: visible;
 }
 
-.hand-label {
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  text-align: center;
-}
+.hand-label { display: none; }
 
 #hand-cards {
   display: flex;
@@ -675,6 +725,7 @@ input:focus {
   flex-wrap: nowrap;
   overflow-x: auto;
   padding-bottom: 4px;
+  justify-content: center;
 }
 
 /* ==================== CARTA ==================== */
@@ -870,9 +921,9 @@ input:focus {
   flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0.4rem 0.8rem;
-  background: var(--bg-medium);
-  border-top: 1px solid var(--border-gold);
-  border-bottom: 1px solid var(--border-gold);
+  background: rgba(50, 22, 4, 0.82);
+  border-top: 1px solid rgba(122, 68, 24, 0.4);
+  border-bottom: 1px solid rgba(122, 68, 24, 0.4);
   flex-shrink: 0;
 }
 
