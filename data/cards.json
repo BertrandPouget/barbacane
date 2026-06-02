@@ -128,7 +128,7 @@
     },
     {
       "id": "orfeus",
-      "name": "Ὀρφεύς",
+      "name": "Ορφευς",
       "type": "warrior",
       "subtype": "hero",
       "species": "umano",
@@ -272,7 +272,7 @@
     },
     {
       "id": "polemarcos",
-      "name": "Πολέμαρχος",
+      "name": "Πολεμαρχος",
       "type": "warrior",
       "subtype": "hero",
       "species": "umano",
@@ -416,7 +416,7 @@
     },
     {
       "id": "eracles",
-      "name": "Ἡρακλῆς",
+      "name": "Ηρακλης",
       "type": "warrior",
       "subtype": "hero",
       "species": "umano",

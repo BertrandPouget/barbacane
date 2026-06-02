@@ -13,10 +13,9 @@
 <div id="screen-lobby" class="screen active">
   <div class="lobby-container">
     <div class="logo-area">
-      <img src="/assets/logo.png" alt="Barbacane" class="logo"
+      <img src="/assets/logo_color.png" alt="Barbacane" class="logo"
            onerror="this.style.display='none'; document.getElementById('lobby-title').classList.add('show')" />
       <h1 class="game-title" id="lobby-title">BARBACANE</h1>
-      <p class="game-subtitle">Il gioco di carte fantasy</p>
     </div>
 
     <div class="lobby-panels">
@@ -156,17 +155,21 @@
             <div id="my-bastion-right" class="region bastion" data-side="right" data-label="Bastione D."></div>
           </div>
           <div class="field-row" id="my-village-row">
-            <div id="my-life-deck" class="region life-deck" data-label="Vite"></div>
             <div id="my-village" class="region village" data-label="Villaggio"></div>
           </div>
-          <div id="my-stats" class="player-stats">
-            <span id="my-mana">Mana: 0</span>
-            <span id="my-actions">Azioni: 2</span>
-          </div>
         </div>
-        <div id="hand-area">
-          <div class="hand-label">Mano (<span id="hand-count">0</span>)</div>
-          <div id="hand-cards"></div>
+        <div id="my-bottom-area">
+          <div id="my-life-deck" class="region life-deck" data-label="Vite"></div>
+          <div id="my-right-panel">
+            <div id="my-stats" class="player-stats">
+              <span id="my-mana">Mana: 0</span>
+              <span id="my-actions">Azioni: 2</span>
+            </div>
+            <div id="hand-area">
+              <div id="hand-cards"></div>
+              <div class="hand-label">Mano (<span id="hand-count">0</span>)</div>
+            </div>
+          </div>
         </div>
       </div><!-- /center-column -->
 
@@ -191,20 +194,40 @@
 
   <!-- Card detail overlay (lettura carta) -->
   <div id="card-detail-overlay" class="hidden">
-    <div id="card-detail-box">
-      <div class="card-detail-header">
-        <button id="card-nav-prev" class="btn btn-secondary btn-small card-nav-btn hidden">◀</button>
-        <div id="card-detail-title" class="card-detail-title"></div>
-        <button id="card-nav-next" class="btn btn-secondary btn-small card-nav-btn hidden">▶</button>
-      </div>
-      <div id="card-detail-body"  class="card-detail-body"></div>
-      <div id="card-detail-footer">
-        <div id="card-detail-extra-btns"></div>
-        <button id="card-detail-action-btn"  class="btn btn-primary hidden"></button>
-        <button id="card-detail-discard-btn" class="btn btn-danger hidden">Scarta</button>
-        <button id="card-detail-close"       class="btn btn-secondary">Chiudi</button>
+
+    <!-- Modalità immagine carta -->
+    <div id="card-image-wrap" class="hidden">
+      <img id="card-detail-img" alt="" />
+      <div id="card-image-footer">
+        <button id="card-img-prev"    class="btn btn-secondary card-nav-btn" style="visibility:hidden">◀</button>
+        <div id="card-img-center">
+          <div id="card-img-extra-btns"></div>
+          <button id="card-img-action"  class="btn btn-primary hidden"></button>
+          <button id="card-img-discard" class="btn btn-danger  hidden">Scarta</button>
+          <button id="card-img-close"   class="btn btn-secondary">Chiudi</button>
+        </div>
+        <button id="card-img-next"    class="btn btn-secondary card-nav-btn" style="visibility:hidden">▶</button>
       </div>
     </div>
+
+    <!-- Modalità testo (flashcard) -->
+    <div id="card-detail-box" class="hidden">
+      <div class="card-detail-header">
+        <div id="card-detail-title" class="card-detail-title"></div>
+      </div>
+      <div id="card-detail-body" class="card-detail-body"></div>
+      <div id="card-detail-footer">
+        <button id="card-nav-prev"           class="btn btn-secondary btn-small card-nav-btn" style="visibility:hidden">◀</button>
+        <div class="card-footer-center">
+          <div id="card-detail-extra-btns"></div>
+          <button id="card-detail-action-btn"  class="btn btn-primary hidden"></button>
+          <button id="card-detail-discard-btn" class="btn btn-danger  hidden">Scarta</button>
+          <button id="card-detail-close"       class="btn btn-secondary">Chiudi</button>
+        </div>
+        <button id="card-nav-next"           class="btn btn-secondary btn-small card-nav-btn" style="visibility:hidden">▶</button>
+      </div>
+    </div>
+
   </div>
 
   <!-- Toast notifiche -->

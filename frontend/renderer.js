@@ -545,61 +545,119 @@ const Renderer = (() => {
   // Card detail overlay
   // ---------------------------------------------------------------------------
 
-  function showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons = [], navOptions = null) {
-    document.getElementById('card-detail-title').textContent = title;
-    document.getElementById('card-detail-body').innerHTML = bodyHTML;
+  function showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons = [], navOptions = null, baseCardId = null) {
+    const overlay = document.getElementById('card-detail-overlay');
 
-    const actionBtn = document.getElementById('card-detail-action-btn');
-    if (actionLabel && onAction) {
-      actionBtn.textContent = actionLabel;
-      actionBtn.onclick = onAction;
-      actionBtn.classList.remove('hidden');
-    } else {
-      actionBtn.classList.add('hidden');
-    }
-
-    const discardBtn = document.getElementById('card-detail-discard-btn');
-    if (onDiscard) {
-      discardBtn.onclick = onDiscard;
-      discardBtn.classList.remove('hidden');
-    } else {
-      discardBtn.classList.add('hidden');
-    }
-
-    const extraContainer = document.getElementById('card-detail-extra-btns');
-    if (extraContainer) {
-      extraContainer.innerHTML = '';
-      extraButtons.forEach(btn => {
-        const el = document.createElement('button');
-        el.textContent = btn.label;
-        el.className = `btn ${btn.className || 'btn-secondary'}`;
-        el.disabled = !!btn.disabled;
-        el.onclick = btn.onClick;
-        extraContainer.appendChild(el);
-      });
-    }
-
-    const prevBtn = document.getElementById('card-nav-prev');
-    const nextBtn = document.getElementById('card-nav-next');
-    if (prevBtn && nextBtn) {
+    function _setupNav(prevId, nextId) {
+      const prevBtn = document.getElementById(prevId);
+      const nextBtn = document.getElementById(nextId);
+      if (!prevBtn || !nextBtn) return;
       if (navOptions && navOptions.onPrev) {
         prevBtn.onclick = navOptions.onPrev;
-        prevBtn.classList.remove('hidden');
+        prevBtn.style.visibility = 'visible';
+        prevBtn.style.pointerEvents = 'auto';
       } else {
-        prevBtn.classList.add('hidden');
+        prevBtn.onclick = null;
+        prevBtn.style.visibility = 'hidden';
+        prevBtn.style.pointerEvents = 'none';
       }
       if (navOptions && navOptions.onNext) {
         nextBtn.onclick = navOptions.onNext;
-        nextBtn.classList.remove('hidden');
+        nextBtn.style.visibility = 'visible';
+        nextBtn.style.pointerEvents = 'auto';
       } else {
-        nextBtn.classList.add('hidden');
+        nextBtn.onclick = null;
+        nextBtn.style.visibility = 'hidden';
+        nextBtn.style.pointerEvents = 'none';
       }
     }
 
-    const overlay = document.getElementById('card-detail-overlay');
-    overlay.classList.remove('hidden');
-    document.getElementById('card-detail-close').onclick = () => overlay.classList.add('hidden');
-    overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.add('hidden'); };
+    function _fillExtraButtons(containerId) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      container.innerHTML = '';
+      extraButtons.forEach(btn => {
+        const b = document.createElement('button');
+        b.textContent = btn.label;
+        b.className = `btn ${btn.className || 'btn-secondary'}`;
+        b.disabled = !!btn.disabled;
+        b.onclick = btn.onClick;
+        container.appendChild(b);
+      });
+    }
+
+    function _showTextMode() {
+      document.getElementById('card-image-wrap').classList.add('hidden');
+      document.getElementById('card-detail-box').classList.remove('hidden');
+
+      document.getElementById('card-detail-title').textContent = title;
+      document.getElementById('card-detail-body').innerHTML = bodyHTML;
+
+      const actionBtn = document.getElementById('card-detail-action-btn');
+      if (actionLabel && onAction) {
+        actionBtn.textContent = actionLabel;
+        actionBtn.onclick = onAction;
+        actionBtn.classList.remove('hidden');
+      } else {
+        actionBtn.classList.add('hidden');
+      }
+
+      const discardBtn = document.getElementById('card-detail-discard-btn');
+      if (onDiscard) {
+        discardBtn.onclick = onDiscard;
+        discardBtn.classList.remove('hidden');
+      } else {
+        discardBtn.classList.add('hidden');
+      }
+
+      _fillExtraButtons('card-detail-extra-btns');
+      _setupNav('card-nav-prev', 'card-nav-next');
+
+      document.getElementById('card-detail-close').onclick = () => overlay.classList.add('hidden');
+      overlay.classList.remove('hidden');
+      overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.add('hidden'); };
+    }
+
+    function _showImageMode(imgSrc) {
+      document.getElementById('card-detail-box').classList.add('hidden');
+      document.getElementById('card-image-wrap').classList.remove('hidden');
+
+      document.getElementById('card-detail-img').src = imgSrc;
+
+      const actionBtn = document.getElementById('card-img-action');
+      if (actionLabel && onAction) {
+        actionBtn.textContent = actionLabel;
+        actionBtn.onclick = onAction;
+        actionBtn.classList.remove('hidden');
+      } else {
+        actionBtn.classList.add('hidden');
+      }
+
+      const discardBtn = document.getElementById('card-img-discard');
+      if (onDiscard) {
+        discardBtn.onclick = onDiscard;
+        discardBtn.classList.remove('hidden');
+      } else {
+        discardBtn.classList.add('hidden');
+      }
+
+      _fillExtraButtons('card-img-extra-btns');
+      _setupNav('card-img-prev', 'card-img-next');
+
+      document.getElementById('card-img-close').onclick = () => overlay.classList.add('hidden');
+      overlay.classList.remove('hidden');
+      overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.add('hidden'); };
+    }
+
+    if (baseCardId) {
+      const imgUrl = `/card_images/${baseCardId}.png`;
+      const probe = new window.Image();
+      probe.onload = () => _showImageMode(imgUrl);
+      probe.onerror = () => _showTextMode();
+      probe.src = imgUrl;
+    } else {
+      _showTextMode();
+    }
   }
 
   function closeCardDetail() {
@@ -731,8 +789,8 @@ const Renderer = (() => {
 
   function phaseLabel(phase) {
     const map = {
-      action: 'Azione', reposition: 'Riposizionamento',
-      horde: 'Orda', battle: 'Battaglia', draw: 'Pesca', end: 'Fine'
+      action: 'Azioni', reposition: 'Schieramento', schieramento: 'Schieramento',
+      horde: 'Orda', battle: 'Battaglia', battaglia: 'Battaglia', draw: 'Pesca', end: 'Fine'
     };
     return map[phase] || phase;
   }

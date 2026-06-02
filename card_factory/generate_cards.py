@@ -184,13 +184,13 @@ def _pick(font_dir: Path, *patterns: str) -> Path | None:
 
 
 def load_fonts(font_dir: Path) -> dict:
-    lb_regular = _pick(font_dir, "librebaskerville", "regular")
-    lb_italic  = _pick(font_dir, "librebaskerville", "italic")
-    lb_semi    = _pick(font_dir, "librebaskerville", "semibold")
+    st_regular = _pick(font_dir, "stixtwotext", "regular")
+    st_italic  = _pick(font_dir, "stixtwotext", "italic")
+    st_medium  = _pick(font_dir, "stixtwotext", "medium")
 
-    missing = [name for name, f in [("LibreBaskerville-Regular", lb_regular),
-                                     ("LibreBaskerville-Italic",  lb_italic),
-                                     ("LibreBaskerville-SemiBold", lb_semi)] if f is None]
+    missing = [name for name, f in [("STIXTwoText-Regular", st_regular),
+                                     ("STIXTwoText-Italic",  st_italic),
+                                     ("STIXTwoText-Medium",  st_medium)] if f is None]
     if missing:
         print(f"  ⚠  Font non trovati: {', '.join(missing)} — uso PIL default per quelli mancanti")
 
@@ -202,13 +202,13 @@ def load_fonts(font_dir: Path) -> dict:
         return ImageFont.truetype(str(path), pt(size_pt))
 
     return {
-        "type":       tf(lb_semi,    FSIZE_TYPE),     # Guerriero  — SemiBold
-        "subtype":    tf(lb_regular, FSIZE_SUBTYPE),  # Recluta    — Regular
-        "name":       tf(lb_semi,    FSIZE_NAME),     # PATRIZIO   — SemiBold
-        "cost":       tf(lb_semi,    FSIZE_COST),     # numero     — SemiBold
-        "stat_label": tf(lb_regular, FSIZE_STATS),    # ATT: GIT:  — Regular
-        "stat_val":   tf(lb_italic,  FSIZE_STATS),    # Elfo, …    — Italic
-        "effect":     tf(lb_italic,  FSIZE_EFFECT),   # effetto    — Italic
+        "type":       tf(st_medium,  FSIZE_TYPE),
+        "subtype":    tf(st_regular, FSIZE_SUBTYPE),
+        "name":       tf(st_medium,  FSIZE_NAME),
+        "cost":       tf(st_medium,  FSIZE_COST),
+        "stat_label": tf(st_regular, FSIZE_STATS),
+        "stat_val":   tf(st_italic,  FSIZE_STATS),
+        "effect":     tf(st_italic,  FSIZE_EFFECT),
     }
 
 
@@ -345,7 +345,8 @@ def _draw_effect_block(draw, text: str, fonts: dict, y_start_pt: float) -> None:
 # ---------------------------------------------------------------------------
 
 def generate_card(card: dict, tpl: Image.Image, images_dir: Path,
-                  fonts: dict, id_to_name: dict, out_dir: Path) -> None:
+                  fonts: dict, id_to_name: dict, out_dir: Path,
+                  has_img: bool = True) -> None:
     t       = card.get("type", "")
     subtype = card.get("subtype", "")
     cid     = card["id"]
@@ -363,7 +364,8 @@ def generate_card(card: dict, tpl: Image.Image, images_dir: Path,
 
     if t == "spell":
         # Illustrazione (banner standard)
-        paste_illustration(bg, images_dir / f"{cid}.png")
+        if has_img:
+            paste_illustration(bg, images_dir / f"{cid}.png")
         # Nome
         draw_mm(draw, NAME_CX_PT, NAME_CY_PT, card.get("name","").upper(), fonts["name"], COLOR_GOLD)
         # Due blocchi effetto sotto le icone stella
@@ -372,7 +374,8 @@ def generate_card(card: dict, tpl: Image.Image, images_dir: Path,
 
     elif t == "building":
         # Illustrazione (banner standard)
-        paste_illustration(bg, images_dir / f"{cid}.png")
+        if has_img:
+            paste_illustration(bg, images_dir / f"{cid}.png")
         # Nome
         draw_mm(draw, NAME_CX_PT, NAME_CY_PT, card.get("name","").upper(), fonts["name"], COLOR_GOLD)
         # Due blocchi effetto sotto le icone torre
@@ -385,7 +388,8 @@ def generate_card(card: dict, tpl: Image.Image, images_dir: Path,
 
     elif subtype == "hero":
         # Illustrazione (banner più in basso)
-        paste_illustration(bg, images_dir / f"{cid}.png", banner_top_pt=H_BANNER_TOP)
+        if has_img:
+            paste_illustration(bg, images_dir / f"{cid}.png", banner_top_pt=H_BANNER_TOP)
         # Nome
         draw_mm(draw, NAME_CX_PT, H_NAME_CY, card.get("name","").upper(), fonts["name"], COLOR_GOLD)
         # Stats con y spostate
@@ -394,7 +398,8 @@ def generate_card(card: dict, tpl: Image.Image, images_dir: Path,
 
     else:  # recruit (default warrior)
         # Illustrazione (banner standard)
-        paste_illustration(bg, images_dir / f"{cid}.png")
+        if has_img:
+            paste_illustration(bg, images_dir / f"{cid}.png")
         # Nome
         draw_mm(draw, NAME_CX_PT, NAME_CY_PT, card.get("name","").upper(), fonts["name"], COLOR_GOLD)
         # Stats
@@ -464,14 +469,12 @@ def main():
         tpl_key = get_template_key(card)
         has_img = (images_dir / f"{cid}.png").exists()
 
-        print(f"→ {cid}  [{tpl_key}] [img: {'✓' if has_img else '✗ skip'}]")
-        if not has_img:
-            continue
+        print(f"→ {cid}  [{tpl_key}] [img: {'✓' if has_img else '✗ no img'}]")
 
         tpl = get_template(tpl_key)
         if tpl is None:
             continue
-        generate_card(card, tpl, images_dir, fonts, id_to_name, out_dir)
+        generate_card(card, tpl, images_dir, fonts, id_to_name, out_dir, has_img=has_img)
 
     print(f"\nFatto — output in '{out_dir}'")
 
