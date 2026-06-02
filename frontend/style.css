@@ -720,7 +720,7 @@ input:focus {
 /* Mano */
 #hand-area {
   background: transparent;
-  padding: 4px 0 0 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -734,6 +734,7 @@ input:focus {
   gap: 6px;
   flex-wrap: nowrap;
   overflow-x: auto;
+  padding-top: 8px;
   padding-bottom: 4px;
   justify-content: center;
 }
