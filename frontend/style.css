@@ -163,7 +163,7 @@ input:focus {
 .waiting-container h2 { color: var(--gold); font-size: 1.8rem; }
 
 .lobby-code-display {
-  font-size: 2rem;
+  font-size: 1.4rem;
   color: var(--gold-light);
   background: var(--bg-medium);
   border: 2px solid var(--border-gold);
@@ -328,7 +328,11 @@ input:focus {
 #left-strip.active-player-strip  { border-right-color: rgba(240, 206, 6, 0.4); }
 #right-strip.active-player-strip { border-left-color:  rgba(240, 206, 6, 0.4); }
 
-.strip-player.active-player-content { border-color: var(--gold); }
+.strip-player.active-player-content {
+  border-color: var(--gold);
+  border-width: 2px;
+  box-shadow: 0 0 16px rgba(240, 206, 6, 0.45);
+}
 
 .strip-player {
   display: flex;
@@ -415,7 +419,11 @@ input:focus {
   transition: border-color 0.3s;
 }
 
-.opponent-field.active-player { border-color: var(--gold); }
+.opponent-field.active-player {
+  border-color: var(--gold);
+  border-width: 2px;
+  box-shadow: 0 0 16px rgba(240, 206, 6, 0.45);
+}
 .opponent-field.damaged { animation: flash-red 0.5s; }
 
 @keyframes flash-red {
@@ -574,11 +582,29 @@ input:focus {
 /* Campo locale */
 #my-field {
   background: transparent;
-  border-top: 1px dashed rgba(122, 68, 24, 0.5);
   padding: 6px 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+#my-bottom-area {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 6px;
+  padding: 0 8px 6px 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+#my-right-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
 }
 
 .field-row {
@@ -650,13 +676,20 @@ input:focus {
 
 /* Mazzo vite */
 .region.life-deck {
-  flex: 1;
-  min-width: 60px;
-  max-width: 90px;
-  justify-content: flex-start;
+  position: absolute;
+  left: 8px;
+  bottom: 6px;
+  height: calc(var(--card-h-hand) + 26px);
+  width: calc(var(--card-w-hand) + 10px);
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0 4px 4px 4px;
 }
 
 .card.life-stack {
+  width: var(--card-w-hand);
+  min-width: var(--card-w-hand);
+  height: var(--card-h-hand);
   background: #181818;
   border-color: var(--text-dim);
   border-left: 3px solid var(--text-dim);
@@ -673,13 +706,13 @@ input:focus {
 }
 
 .life-stack-icon {
-  font-size: 1.6rem;
+  font-size: 2.2rem;
   line-height: 1;
   color: var(--red-light);
 }
 
 .life-stack-count {
-  font-size: 1rem;
+  font-size: 1.3rem;
   font-weight: bold;
   color: var(--text);
 }
@@ -687,12 +720,10 @@ input:focus {
 /* Mano */
 #hand-area {
   background: transparent;
-  border-top: none;
-  padding: 8px 8px 6px;
+  padding: 4px 0 0 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 192px;
   overflow: visible;
 }
 
@@ -900,9 +931,10 @@ input:focus {
   flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0.4rem 0.8rem;
+  margin: 4px 8px;
   background: rgba(50, 22, 4, 0.82);
-  border-top: 1px solid rgba(122, 68, 24, 0.4);
-  border-bottom: 1px solid rgba(122, 68, 24, 0.4);
+  border: 1px solid rgba(122, 68, 24, 0.4);
+  border-radius: 8px;
   flex-shrink: 0;
 }
 
