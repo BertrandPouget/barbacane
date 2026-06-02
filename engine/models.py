@@ -301,6 +301,7 @@ class GameState(BaseModel):
     game_id: str
     turn: int = 1
     current_player_index: int = 0
+    first_player_index: int = 0
     phase: str = "action"  # action | reposition | horde | battle | draw | end
     players: List[Player]
     deck: List[str] = Field(default_factory=list)     # instance_ids nel mazzo

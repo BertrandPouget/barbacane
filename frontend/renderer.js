@@ -789,8 +789,8 @@ const Renderer = (() => {
 
   function phaseLabel(phase) {
     const map = {
-      action: 'Azione', reposition: 'Riposizionamento',
-      horde: 'Orda', battle: 'Battaglia', draw: 'Pesca', end: 'Fine'
+      action: 'Azioni', reposition: 'Schieramento', schieramento: 'Schieramento',
+      horde: 'Orda', battle: 'Battaglia', battaglia: 'Battaglia', draw: 'Pesca', end: 'Fine'
     };
     return map[phase] || phase;
   }

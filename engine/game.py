@@ -76,6 +76,7 @@ def create_game(player_names: List[str], game_id: Optional[str] = None) -> GameS
         game_id=game_id,
         turn=1,
         current_player_index=first_player,
+        first_player_index=first_player,
         phase="action",
         players=players,
         deck=deck,
@@ -374,8 +375,11 @@ def end_turn(state: GameState) -> GameState:
     while not state.players[next_idx].is_alive:
         next_idx = (next_idx + 1) % num
 
-    # Se abbiamo completato un giro, incrementa il turno
-    if next_idx <= state.current_player_index:
+    # Trova il primo giocatore vivo che apre ogni round (first_player_index potrebbe essere eliminato)
+    round_opener = state.first_player_index
+    while not state.players[round_opener].is_alive:
+        round_opener = (round_opener + 1) % num
+    if next_idx == round_opener:
         state.turn += 1
 
     state.current_player_index = next_idx
