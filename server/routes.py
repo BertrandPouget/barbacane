@@ -304,10 +304,13 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             "biblioteca_discard": "resolve_biblioteca",
             "biblioteca_wall": "resolve_biblioteca",
             "cardo_move": "resolve_cardo_move",
+            "agilpesca_discard": "resolve_agilpesca",
         }.get(_pending_type)
         if _allowed and action != _allowed:
             if _pending_type in ("biblioteca_discard", "biblioteca_wall"):
                 raise ActionError("C'è un'interazione Biblioteca in attesa di risoluzione.")
+            elif _pending_type == "agilpesca_discard":
+                raise ActionError("Devi scegliere una carta da scartare (Agilpesca).")
             else:
                 raise ActionError("C'è un'interazione Cardo in attesa di risoluzione.")
 
@@ -400,6 +403,9 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             state, player_id, params,
         ),
         "resolve_velocemento": lambda: _resolve_velocemento_action(
+            state, player_id, params,
+        ),
+        "resolve_agilpesca": lambda: _resolve_agilpesca_action(
             state, player_id, params,
         ),
         "arena_activate": lambda: arena_activate(
@@ -549,6 +555,29 @@ def _resolve_biblioteca_action(state, player_id: str, params: dict) -> dict:
 
     state.pending_interactions.pop(0)
     return result
+
+
+def _resolve_agilpesca_action(state, player_id: str, params: dict) -> dict:
+    if not state.pending_interactions:
+        raise ActionError("Nessuna interazione Agilpesca in corso.")
+    pending = state.pending_interactions[0]
+    if pending.get("type") != "agilpesca_discard":
+        raise ActionError("L'interazione in attesa non è Agilpesca.")
+    if pending["player_id"] != player_id:
+        raise ActionError("Non è la tua interazione.")
+
+    player = state.get_player(player_id)
+    discard_iid = params.get("discard_iid")
+    if not discard_iid:
+        raise ActionError("Devi scegliere una carta da scartare.")
+    if discard_iid not in player.hand:
+        raise ActionError("La carta scelta non è in mano.")
+
+    player.hand.remove(discard_iid)
+    state.discard_pile.append(discard_iid)
+    state.add_log(player_id, "agilpesca_discard", card=discard_iid)
+    state.pending_interactions.pop(0)
+    return {"discarded": discard_iid}
 
 
 def _resolve_velocemento_action(state, player_id: str, params: dict) -> dict:

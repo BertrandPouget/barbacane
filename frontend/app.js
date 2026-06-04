@@ -394,10 +394,12 @@ const App = (() => {
       _showSearchModal(state.search_deck, state.pending_search);
     }
 
-    // Mostra il modale di interazione in attesa (Biblioteca o Cardo)
+    // Mostra il modale di interazione in attesa (Biblioteca, Cardo, Agilpesca)
     if (myPendingInteraction) {
       if (myPendingInteraction.type === 'cardo_move') {
         _showCardoMoveModal(state);
+      } else if (myPendingInteraction.type === 'agilpesca_discard') {
+        _showAgilpescaDiscardModal(state);
       } else {
         _showBibliotecaModal(myPendingInteraction, state);
       }
@@ -425,6 +427,7 @@ const App = (() => {
     const myPending = state.pending_interactions && state.pending_interactions.find(i => i.player_id === myPlayerId);
     if (myPending) {
       if (myPending.type === 'cardo_move') _showCardoMoveModal(state);
+      else if (myPending.type === 'agilpesca_discard') _showAgilpescaDiscardModal(state);
       else _showBibliotecaModal(myPending, state);
     }
     const myP = state.players && state.players.find(p => p.id === myPlayerId);
@@ -492,6 +495,9 @@ const App = (() => {
       if (myPendingInteraction.type === 'cardo_move') {
         document.getElementById('action-hint').textContent = '🛞 Cardo: scegli un Guerriero da spostare prima di pescare.';
         _showCardoMoveModal(currentState);
+      } else if (myPendingInteraction.type === 'agilpesca_discard') {
+        document.getElementById('action-hint').textContent = '🎣 Agilpesca: scegli una carta da scartare.';
+        _showAgilpescaDiscardModal(currentState);
       } else {
         document.getElementById('action-hint').textContent = '📚 Biblioteca: scegli una carta prima di continuare.';
         _showBibliotecaModal(myPendingInteraction, currentState);
@@ -1139,9 +1145,15 @@ const App = (() => {
       return;
     }
 
+    // Bastioncontrario: UI dedicata (base = scegli giocatore; prodigio = 2 bastioni qualsiasi)
+    if (def.id === 'bastioncontrario') {
+      _showBastioncontrarioOptions(instanceId, def);
+      return;
+    }
+
     const spellsNeedingTarget = [
       'ardolancio', 'guerremoto', 'cuordipietra', 'incendifesa',
-      'regicidio', 'malcomune', 'bastioncontrario',
+      'regicidio', 'malcomune',
     ];
 
     if (!spellsNeedingTarget.includes(def.id) || opponents.length === 0) {
@@ -1169,37 +1181,141 @@ const App = (() => {
     });
   }
 
-  function _showTelecinesiOptions(instanceId) {
+  function _showBastioncontrarioOptions(instanceId, def) {
     if (!currentState) return;
+    const prodigy = _computeSpellProdigy(def);
     const allPlayers = currentState.players.filter(p => p.lives > 0);
 
-    // Construisce la lista di tutti i bastioni con i loro muri
-    const bastionOptions = [];
-    allPlayers.forEach(p => {
-      const isMe = p.id === myPlayerId;
-      const prefix = isMe ? 'Mio' : p.name;
-      ['left', 'right'].forEach(side => {
-        const bastionData = side === 'left' ? p.field.bastion_left : p.field.bastion_right;
-        const walls = bastionData.wall_count != null ? bastionData.wall_count : 0;
-        const label = `${prefix} — Bastione ${side === 'left' ? 'Sinistro' : 'Destro'} (${walls} muri)`;
-        bastionOptions.push({ label, value: `${p.id}:${side}` });
+    if (!prodigy) {
+      // Base: scegli un giocatore — i suoi due Bastioni vengono scambiati
+      const options = allPlayers.map(p => ({
+        label: p.id === myPlayerId ? 'I miei Muri' : `I Muri di ${p.name}`,
+        value: p.id,
+      }));
+      Renderer.showChoiceModal(`${def.name} — scegli un giocatore`, options, (playerId) => {
+        sendAction('play_spell', { instance_id: instanceId, player1_id: playerId });
       });
-    });
-
-    Renderer.showChoiceModal('Telecinesi — bastione di partenza', bastionOptions, (srcChoice) => {
-      const [srcPlayerId, srcSide] = srcChoice.split(':');
-      const destOptions = bastionOptions.filter(o => o.value !== srcChoice);
-      Renderer.showChoiceModal('Telecinesi — bastione di arrivo', destOptions, (dstChoice) => {
-        const [dstPlayerId, dstSide] = dstChoice.split(':');
-        sendAction('play_spell', {
-          instance_id: instanceId,
-          source_player_id: srcPlayerId,
-          source_side: srcSide,
-          dest_player_id: dstPlayerId,
-          dest_side: dstSide,
+    } else {
+      // Prodigio: scegli due Bastioni da qualsiasi giocatore
+      const bastionOptions = [];
+      allPlayers.forEach(p => {
+        const isMe = p.id === myPlayerId;
+        const prefix = isMe ? 'Mio' : p.name;
+        ['left', 'right'].forEach(side => {
+          bastionOptions.push({
+            label: `${prefix} — Bastione ${side === 'left' ? 'Sinistro' : 'Destro'}`,
+            value: `${p.id}:${side}`,
+          });
         });
       });
-    });
+      Renderer.showChoiceModal(`${def.name} — primo Bastione`, bastionOptions, (choice1) => {
+        const [p1Id, s1] = choice1.split(':');
+        const secondOptions = bastionOptions.filter(o => o.value !== choice1);
+        Renderer.showChoiceModal(`${def.name} — secondo Bastione`, secondOptions, (choice2) => {
+          const [p2Id, s2] = choice2.split(':');
+          sendAction('play_spell', {
+            instance_id: instanceId,
+            player1_id: p1Id,
+            side1: s1,
+            player2_id: p2Id,
+            side2: s2,
+          });
+        });
+      });
+    }
+  }
+
+  function _showTelecinesiOptions(instanceId) {
+    if (!currentState) return;
+    const def = getCardDef(instanceId);
+    const prodigy = _computeSpellProdigy(def);
+    const me = currentState.players.find(p => p.id === myPlayerId);
+    const alivePlayers = currentState.players.filter(p => p.lives > 0);
+
+    function wallCount(p, side) {
+      return (side === 'left' ? p.field.bastion_left : p.field.bastion_right).wall_count ?? 0;
+    }
+
+    function showCountPicker(maxWalls, onCount) {
+      const max = Math.min(3, maxWalls);
+      const options = [];
+      for (let i = 1; i <= max; i++) options.push({ label: `${i} ${i > 1 ? 'Muri' : 'Muro'}`, value: String(i) });
+      Renderer.showChoiceModal('Telecinesi — quanti Muri?', options, (v) => onCount(parseInt(v)));
+    }
+
+    if (!prodigy) {
+      // Base: tra i miei due bastioni
+      const srcOptions = ['left', 'right']
+        .filter(side => wallCount(me, side) > 0)
+        .map(side => ({
+          label: `Bastione ${side === 'left' ? 'Sinistro' : 'Destro'} (${wallCount(me, side)} muri)`,
+          value: side,
+        }));
+      if (srcOptions.length === 0) {
+        Renderer.toast('Nessun Muro nei tuoi Bastioni.', 'error');
+        return;
+      }
+      Renderer.showChoiceModal('Telecinesi — bastione di partenza', srcOptions, (srcSide) => {
+        const destSide = srcSide === 'left' ? 'right' : 'left';
+        showCountPicker(wallCount(me, srcSide), (count) => {
+          sendAction('play_spell', { instance_id: instanceId, source_side: srcSide, dest_side: destSide, count });
+        });
+      });
+    } else {
+      // Prodigio: qualsiasi bastione → solo adiacenti
+      function getAdjacentKeys(playerId, side) {
+        const n = alivePlayers.length;
+        const idx = alivePlayers.findIndex(p => p.id === playerId);
+        const adj = [`${playerId}:${side === 'left' ? 'right' : 'left'}`];
+        if (side === 'right') {
+          adj.push(`${alivePlayers[(idx + 1) % n].id}:left`);
+        } else {
+          adj.push(`${alivePlayers[(idx - 1 + n) % n].id}:right`);
+        }
+        return adj;
+      }
+
+      function bastionLabel(p, side) {
+        const prefix = p.id === myPlayerId ? 'Mio' : p.name;
+        return `${prefix} — Bastione ${side === 'left' ? 'Sinistro' : 'Destro'} (${wallCount(p, side)} muri)`;
+      }
+
+      const srcOptions = [];
+      alivePlayers.forEach(p => {
+        ['left', 'right'].forEach(side => {
+          if (wallCount(p, side) > 0)
+            srcOptions.push({ label: bastionLabel(p, side), value: `${p.id}:${side}` });
+        });
+      });
+      if (srcOptions.length === 0) {
+        Renderer.toast('Nessun Muro disponibile.', 'error');
+        return;
+      }
+
+      Renderer.showChoiceModal('Telecinesi — bastione di partenza', srcOptions, (srcChoice) => {
+        const [srcPlayerId, srcSide] = srcChoice.split(':');
+        const adjKeys = getAdjacentKeys(srcPlayerId, srcSide);
+        const dstOptions = adjKeys.map(key => {
+          const [pid, side] = key.split(':');
+          const p = alivePlayers.find(p => p.id === pid);
+          return { label: bastionLabel(p, side), value: key };
+        });
+        Renderer.showChoiceModal('Telecinesi — bastione di arrivo', dstOptions, (dstChoice) => {
+          const [dstPlayerId, dstSide] = dstChoice.split(':');
+          const src = alivePlayers.find(p => p.id === srcPlayerId);
+          showCountPicker(wallCount(src, srcSide), (count) => {
+            sendAction('play_spell', {
+              instance_id: instanceId,
+              source_player_id: srcPlayerId,
+              source_side: srcSide,
+              dest_player_id: dstPlayerId,
+              dest_side: dstSide,
+              count,
+            });
+          });
+        });
+      });
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1412,6 +1528,19 @@ const App = (() => {
           .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
       });
     }
+  }
+
+  function _showAgilpescaDiscardModal(state) {
+    const myPlayer = state.players && state.players.find(p => p.id === myPlayerId);
+    const hand = (myPlayer && myPlayer.hand) || [];
+    const options = hand.map(iid => {
+      const def = getCardDef(iid);
+      return { label: def ? def.name : iid, value: iid };
+    });
+    Renderer.showChoiceModal('Agilpesca — scegli una carta da scartare', options, (chosenIid) => {
+      sendAction('resolve_agilpesca', { discard_iid: chosenIid })
+        .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
+    });
   }
 
   function _showCardoMoveModal(state) {
