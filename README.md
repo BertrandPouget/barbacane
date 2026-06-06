@@ -19,7 +19,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Apri il browser su `http://localhost:8000`.
+Apri il browser su `http://localhost:8000` per accedere alla schermata di gioco. Accedi da più finestre per poter simulare una partita.
 
 ## Come si Gioca
 
@@ -35,7 +35,7 @@ Ogni giocatore ha un campo diviso in 4 Regioni:
 
 - **Avanscoperta** — i Guerrieri qui attaccano e determinano la potenza offensiva
 - **Bastioni** — i Guerrieri qui difendono; i Muri assorbono i danni in arrivo
-- **Villaggio** — contiene le Vite (carte a faccia in giù); perderle significa essere eliminati
+- **Villaggio** — contiene le Costruzioni, che potenziano il giocatore, e le Vite rimanenti
 
 I giocatori siedono in cerchio: il Bastione destro di un giocatore è adiacente al Bastione sinistro del successivo.
 
@@ -70,15 +70,6 @@ Il Bastione perde Muri pari al Danno. Se il Danno supera i Muri disponibili, il 
 ### Orde
 
 Schierare 3 Guerrieri della stessa Specie nella stessa Regione forma un'Orda e sblocca un effetto speciale attivabile una volta per turno.
-
-## Multiplayer
-
-1. Un giocatore crea una lobby e ottiene un codice (es. `BARB-7X3K`)
-2. Gli altri giocatori si uniscono con il codice
-3. Il creatore avvia la partita
-4. Ogni turno ha un timer di 120 secondi; allo scadere il turno viene passato automaticamente
-
-In caso di disconnessione il giocatore può tornare nella partita con il proprio session token. La partita viene conservata su SQLite finché non termina.
 
 ## Guida per Developer
 
