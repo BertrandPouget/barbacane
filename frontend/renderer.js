@@ -69,6 +69,8 @@ const Renderer = (() => {
       rightStrip.appendChild(renderSideStrip(rn, state, 'right'));
       leftStrip.classList.toggle('active-player-strip',  ln.id === state.current_player_id);
       rightStrip.classList.toggle('active-player-strip', rn.id === state.current_player_id);
+      leftStrip.classList.toggle('spell-immune-strip',  !!ln.spell_immune);
+      rightStrip.classList.toggle('spell-immune-strip', !!rn.spell_immune);
 
     } else if (n === 4) {
       const rn     = state.players[(myIndex + 1) % 4]; // vicino destro
@@ -81,6 +83,8 @@ const Renderer = (() => {
       rightStrip.appendChild(renderSideStrip(rn, state, 'right'));
       leftStrip.classList.toggle('active-player-strip',  ln.id === state.current_player_id);
       rightStrip.classList.toggle('active-player-strip', rn.id === state.current_player_id);
+      leftStrip.classList.toggle('spell-immune-strip',  !!ln.spell_immune);
+      rightStrip.classList.toggle('spell-immune-strip', !!rn.spell_immune);
     }
   }
 
@@ -96,7 +100,8 @@ const Renderer = (() => {
 
   function renderTopOpponent(player, state, role) {
     const isActive = player.id === state.current_player_id;
-    const div = el('div', { className: `opponent-field${isActive ? ' active-player' : ''}`,
+    const isImmune = !!player.spell_immune;
+    const div = el('div', { className: `opponent-field${isActive ? ' active-player' : ''}${isImmune ? ' spell-immune' : ''}`,
       dataset: { playerId: player.id } });
 
     const infoRow = el('div', { className: 'opp-info-row' }, [
@@ -166,7 +171,8 @@ const Renderer = (() => {
     const adjLabel    = mySide === 'left' ? 'Bastione D. (Possibile Bersaglio)' : 'Bastione S. (Possibile Bersaglio)';
     const nonAdjLabel = mySide === 'left' ? 'Bastione S.' : 'Bastione D.';
     const wrapper = el('div', { className: 'strip-player' +
-      (player.id === state.current_player_id ? ' active-player-content' : '') });
+      (player.id === state.current_player_id ? ' active-player-content' : '') +
+      (player.spell_immune ? ' spell-immune' : '') });
 
     // Header
     wrapper.appendChild(el('div', { className: 'strip-header' }, [
@@ -246,8 +252,9 @@ const Renderer = (() => {
   // ---------------------------------------------------------------------------
 
   function renderMyField(player, state, myPlayerId) {
-    // Carte-vita (solo per il proprietario)
+    // Carte-vita e carte con effetti attivi
     renderLifeCards(player);
+    renderActiveCards(player);
     document.getElementById('my-mana').textContent    = `Mana: ${player.mana_remaining ?? 0}`;
     document.getElementById('my-actions').textContent = `Azioni: ${player.actions_remaining ?? 0}`;
 
@@ -351,6 +358,26 @@ const Renderer = (() => {
     }
 
     container.appendChild(stack);
+  }
+
+  function renderActiveCards(player) {
+    const container = document.getElementById('my-active-cards');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const activeEffects = player.active_effects || [];
+    const isSpellImmune = activeEffects.some(e => e.type === 'spell_immune');
+
+    if (!isSpellImmune) {
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = '';
+    const card = el('div', { className: 'card card-sm in-field active-card-slot' });
+    card.appendChild(el('div', { className: 'active-card-name' }, ['Magiscudo']));
+    card.title = 'Le Magie non hanno effetto su di te fino al tuo prossimo turno.';
+    container.appendChild(card);
   }
 
   function renderHand(cards, etherealCard) {

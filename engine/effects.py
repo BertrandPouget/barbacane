@@ -687,24 +687,21 @@ def regicidio_effect(
 
 
 @register_effect("agilpesca_effect")
-def agilpesca_effect(state: GameState, player: Player, prodigy: bool = False, discard_iid: Optional[str] = None, **kwargs) -> dict:
+def agilpesca_effect(state: GameState, player: Player, prodigy: bool = False, **kwargs) -> dict:
     """
-    Base: pesca 1 carta. Ottieni 1 Azione aggiuntiva.
-    Prodigio (additivo &): pesca anche 1 carta e scarta 1 carta.
+    Base: pesca 2 carte, scarta 1 (risolto via pending_interaction), ottieni 1 Azione aggiuntiva.
+    Prodigio: pesca 2 carte, ottieni 1 Azione aggiuntiva (nessun scarto).
     """
-    drawn = _draw_cards(state, player, 1)
+    drawn = _draw_cards(state, player, 2)
     player.actions_remaining += 1
     result: dict = {"cards_drawn": drawn, "extra_action": 1}
 
-    if prodigy:
-        extra_drawn = _draw_cards(state, player, 1)
-        result["extra_drawn"] = extra_drawn
-        if discard_iid and discard_iid in player.hand:
-            player.hand.remove(discard_iid)
-            state.discard_pile.append(discard_iid)
-            result["discarded"] = discard_iid
-        else:
-            result["needs_discard"] = True
+    if not prodigy:
+        state.pending_interactions.append({
+            "type": "agilpesca_discard",
+            "player_id": player.id,
+        })
+        result["needs_discard"] = True
 
     state.recent_events.append({
         "type": "draw", "card": "agilpesca",
@@ -929,14 +926,17 @@ def bastioncontrario_effect(
     Base: scambia due Bastioni dello stesso giocatore.
     Prodigio (sostituisce): scambia due Bastioni (anche di giocatori diversi).
     """
+    def _get_bastion(p, side):
+        return p.field.bastion_left if side == "left" else p.field.bastion_right
+
     if not prodigy:
         target_player = state.get_player(player1_id) if player1_id else player
         if target_player is None:
             target_player = player
-        bl = target_player.field.bastion_left
-        br = target_player.field.bastion_right
-        target_player.field.bastion_left = br
-        target_player.field.bastion_right = bl
+        bl = target_player.field.bastion_left.walls
+        br = target_player.field.bastion_right.walls
+        target_player.field.bastion_left.walls = br
+        target_player.field.bastion_right.walls = bl
         state.recent_events.append({
             "type": "effect", "card": "bastioncontrario",
             "player_id": player.id, "prodigy": prodigy,
@@ -948,20 +948,9 @@ def bastioncontrario_effect(
         p2 = state.get_player(player2_id) if player2_id else player
         if p1 is None or p2 is None:
             return {"error": "Giocatori non validi"}
-
-        def get_bastion(p, side):
-            return p.field.bastion_left if side == "left" else p.field.bastion_right
-
-        def set_bastion(p, side, bastion):
-            if side == "left":
-                p.field.bastion_left = bastion
-            else:
-                p.field.bastion_right = bastion
-
-        b1 = get_bastion(p1, side1)
-        b2 = get_bastion(p2, side2)
-        set_bastion(p1, side1, b2)
-        set_bastion(p2, side2, b1)
+        b1 = _get_bastion(p1, side1)
+        b2 = _get_bastion(p2, side2)
+        b1.walls, b2.walls = b2.walls, b1.walls
         state.recent_events.append({
             "type": "effect", "card": "bastioncontrario",
             "player_id": player.id, "prodigy": prodigy,
