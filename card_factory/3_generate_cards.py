@@ -426,8 +426,8 @@ def generate_card(card: dict, tpl: Image.Image, images_dir: Path,
 # ---------------------------------------------------------------------------
 
 CARDS_JSON    = Path(__file__).parent.parent / "data" / "cards.json"
-TEMPLATES_DIR = Path("input/templates")
-FONTS_DIR     = Path("input/fonts")
+TEMPLATES_DIR = Path("assets/templates")
+FONTS_DIR     = Path("assets/fonts")
 IMAGES_DIR    = Path("images")
 OUT_DIR       = Path("output")
 
