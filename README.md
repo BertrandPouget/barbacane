@@ -10,7 +10,7 @@ Barbacane è un gioco di carte da tavolo fantasy in versione digitale multiplaye
 
 Il gioco è ambientato in un mondo popolato da Umani, Elfi, Nani e Maghe (tutti di sangue Goblin). Ogni giocatore costruisce e difende il proprio campo schierando Guerrieri, erigendo Costruzioni e lanciando Magie — finché non rimane uno solo con almeno una Vita in piedi.
 
-**Gioca ora su [barbacane.onrender.com](https://barbacane.onrender.com)**
+**Prova la beta su [barbacane.onrender.com](https://barbacane.onrender.com)**
 
 ## Avvio in Locale
 
