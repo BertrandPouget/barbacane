@@ -103,8 +103,8 @@ FSIZE_TYPE    = 11.0
 FSIZE_SUBTYPE =  8.0
 FSIZE_NAME    =  8.5
 FSIZE_COST    =  9.0
-FSIZE_STATS   =  7.5
-FSIZE_EFFECT  =  8.0
+FSIZE_STATS   =  8.5
+FSIZE_EFFECT  =  8.5
 
 # ---------------------------------------------------------------------------
 # Colori
