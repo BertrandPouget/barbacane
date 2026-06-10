@@ -360,24 +360,44 @@ const Renderer = (() => {
     container.appendChild(stack);
   }
 
+  const ACTIVE_EFFECT_CONFIG = {
+    'spell_immune':            { baseCardId: 'magiscudo',    label: 'Magiscudo',    desc: () => 'Le Magie non hanno effetto su di te fino al prossimo turno.' },
+    'guerremoto':              { baseCardId: 'guerremoto',   label: 'Guerremoto',   desc: ef => `Puoi attaccare qualsiasi Bastione${ef.damage_bonus ? ` (+${ef.damage_bonus} Danni)` : ''}.` },
+    'investimento_deferred':   { baseCardId: 'investimento', label: 'Investimento', desc: ef => `+${ef.mana || 2} Mana all'inizio del prossimo turno.` },
+    'divinazione_incantesimo': { baseCardId: 'divinazione',  label: 'Divinazione',  desc: () => 'Ricevi un Incantesimo gratuito a inizio prossimo turno.' },
+    'divinazione_all_mage':    { baseCardId: 'divinazione',  label: 'Divinazione',  desc: () => '+1 Maga a inizio prossimo turno.' },
+    'equipotenza_own':         { baseCardId: 'equipotenza',  label: 'Equipotenza',  desc: () => 'Un tuo Guerriero ha le statistiche livellate ai valori più alti in campo.' },
+  };
+
   function renderActiveCards(player) {
     const container = document.getElementById('my-active-cards');
     if (!container) return;
     container.innerHTML = '';
 
     const activeEffects = player.active_effects || [];
-    const isSpellImmune = activeEffects.some(e => e.type === 'spell_immune');
+    const seen = new Set();
+    const items = [];
+    for (const ef of activeEffects) {
+      const cfg = ACTIVE_EFFECT_CONFIG[ef.type];
+      if (!cfg || seen.has(cfg.baseCardId)) continue;
+      seen.add(cfg.baseCardId);
+      items.push({ baseCardId: cfg.baseCardId, label: cfg.label, desc: cfg.desc(ef) });
+    }
 
-    if (!isSpellImmune) {
+    if (items.length === 0) {
       container.style.display = 'none';
       return;
     }
 
     container.style.display = '';
-    const card = el('div', { className: 'card card-sm in-field active-card-slot' });
-    card.appendChild(el('div', { className: 'active-card-name' }, ['Magiscudo']));
-    card.title = 'Le Magie non hanno effetto su di te fino al tuo prossimo turno.';
-    container.appendChild(card);
+    const stack = el('div', { className: 'card card-sm in-field active-card-slot' });
+    stack.appendChild(el('div', { className: 'active-card-slot-icon' }, ['✨']));
+    stack.appendChild(el('div', { className: 'active-card-slot-count' }, [String(items.length)]));
+    stack.style.cursor = 'pointer';
+    stack.addEventListener('click', () => {
+      if (App.showActiveSlideshow) App.showActiveSlideshow(items, 0);
+    });
+    container.appendChild(stack);
   }
 
   function renderHand(cards, etherealCard) {

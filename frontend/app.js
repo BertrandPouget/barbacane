@@ -2022,6 +2022,59 @@ const App = (() => {
     document.getElementById('modal-overlay').classList.remove('hidden');
   }
 
+  function showActiveSlideshow(items, idx) {
+    const item = items[idx];
+    const def = getCardDef(item.baseCardId);
+    const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+    let bodyHTML = '';
+
+    if (def) {
+      if (def.type === 'warrior') {
+        bodyHTML += `<div class="detail-meta">
+          <span class="species-${def.species}">${cap(def.species)}</span>
+          ${def.school ? `· <span>${cap(def.school)}</span>` : ''}
+          · ${def.subtype === 'hero' ? 'Eroe' : 'Recluta'}
+          · 💎${def.cost} Mana
+        </div>
+        <div class="detail-stats">
+          <span class="stat-att">🗡️ ATT ${def.att}</span>
+          <span class="stat-git">🏹 GIT ${def.git}</span>
+          <span class="stat-dif">🛡️ DIF ${def.dif}</span>
+        </div>`;
+        if (def.horde_effect) bodyHTML += `<div class="detail-section"><strong>Effetto Orda:</strong><br>${def.horde_effect}</div>`;
+        if (def.evolves_from) bodyHTML += `<div class="detail-dim">Evolve da: ${cardDefs[def.evolves_from]?.name || def.evolves_from}</div>`;
+        if (def.evolves_into) bodyHTML += `<div class="detail-dim">Evolve in: ${cardDefs[def.evolves_into]?.name || def.evolves_into}</div>`;
+      } else if (def.type === 'spell') {
+        bodyHTML += `<div class="detail-meta">
+          <span class="school-${def.school}">${cap(def.school)}</span> · Magia · 🔮${def.cost} Maghe
+        </div>
+        <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
+        if (def.prodigy_effect) bodyHTML += `<div class="detail-section"><strong>Prodigio:</strong><br>${def.prodigy_effect}</div>`;
+      } else if (def.type === 'building') {
+        bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🏗️${def.completion_cost} Mana</div>
+        <div class="detail-section"><strong>Effetto Base:</strong><br>${def.base_effect || '—'}</div>`;
+        if (def.complete_effect) bodyHTML += `<div class="detail-section"><strong>Effetto Completo:</strong><br>${def.complete_effect}</div>`;
+      }
+    } else {
+      bodyHTML = `<div class="detail-dim">${item.baseCardId}</div>`;
+    }
+
+    bodyHTML += `<div class="detail-section" style="color:var(--green-light)"><strong>Effetto Attivo:</strong><br>${item.desc}</div>`;
+
+    const navOptions = {
+      onPrev: idx > 0 ? () => showActiveSlideshow(items, idx - 1) : null,
+      onNext: idx < items.length - 1 ? () => showActiveSlideshow(items, idx + 1) : null,
+    };
+
+    Renderer.showCardDetail(
+      `✨ Attivo ${idx + 1} / ${items.length}${def ? ' — ' + def.name : ''}`,
+      bodyHTML,
+      null, null, null, [],
+      navOptions,
+      def ? def.id : null
+    );
+  }
+
   return {
     init,
     getCardDef,
@@ -2029,6 +2082,7 @@ const App = (() => {
     sendAction,
     showWallSlideshow,
     showLifeSlideshow,
+    showActiveSlideshow,
   };
 })();
 

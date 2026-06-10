@@ -4,3 +4,10 @@ __pycache__/
 venv/
 card_factory/images/
 card_factory/input/
+
+# graphify - local paths (machine-specific)
+graphify-out/.graphify_python
+graphify-out/.graphify_root
+
+# graphify - cache (regenerabile, può contenere path assoluti)
+graphify-out/cache/
