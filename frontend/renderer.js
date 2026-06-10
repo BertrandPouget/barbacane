@@ -391,7 +391,7 @@ const Renderer = (() => {
 
     container.style.display = '';
     const stack = el('div', { className: 'card card-sm in-field active-card-slot' });
-    stack.appendChild(el('div', { className: 'active-card-slot-icon' }, ['✨']));
+    stack.appendChild(el('div', { className: 'active-card-slot-icon' }, ['🌟']));
     stack.appendChild(el('div', { className: 'active-card-slot-count' }, [String(items.length)]));
     stack.style.cursor = 'pointer';
     stack.addEventListener('click', () => {
