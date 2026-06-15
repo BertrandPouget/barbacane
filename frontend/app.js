@@ -398,12 +398,14 @@ const App = (() => {
       _showSearchModal(state.search_deck, state.pending_search);
     }
 
-    // Mostra il modale di interazione in attesa (Biblioteca, Cardo, Agilpesca)
+    // Mostra il modale di interazione in attesa (Biblioteca, Cardo, Agilpesca, Magiscudo)
     if (myPendingInteraction) {
       if (myPendingInteraction.type === 'cardo_move') {
         _showCardoMoveModal(state);
       } else if (myPendingInteraction.type === 'agilpesca_discard') {
         _showAgilpescaDiscardModal(state);
+      } else if (myPendingInteraction.type === 'magiscudo_counter') {
+        _showMagiscudoCounterModal(myPendingInteraction, state);
       } else {
         _showBibliotecaModal(myPendingInteraction, state);
       }
@@ -432,6 +434,7 @@ const App = (() => {
     if (myPending) {
       if (myPending.type === 'cardo_move') _showCardoMoveModal(state);
       else if (myPending.type === 'agilpesca_discard') _showAgilpescaDiscardModal(state);
+      else if (myPending.type === 'magiscudo_counter') _showMagiscudoCounterModal(myPending, state);
       else _showBibliotecaModal(myPending, state);
     }
     const myP = state.players && state.players.find(p => p.id === myPlayerId);
@@ -492,7 +495,7 @@ const App = (() => {
       return;
     }
 
-    // Interazioni in attesa (Biblioteca, Cardo): mostrano solo il modale, bloccano tutto
+    // Interazioni in attesa (Biblioteca, Cardo, Magiscudo): mostrano solo il modale, bloccano tutto
     const myPendingInteraction = currentState.pending_interactions &&
       currentState.pending_interactions.find(i => i.player_id === myPlayerId);
     if (myPendingInteraction) {
@@ -502,10 +505,20 @@ const App = (() => {
       } else if (myPendingInteraction.type === 'agilpesca_discard') {
         document.getElementById('action-hint').textContent = '🎣 Agilpesca: scegli una carta da scartare.';
         _showAgilpescaDiscardModal(currentState);
-      } else {
+      } else if (myPendingInteraction.type !== 'magiscudo_counter') {
         document.getElementById('action-hint').textContent = '📚 Biblioteca: scegli una carta prima di continuare.';
         _showBibliotecaModal(myPendingInteraction, currentState);
       }
+      return;
+    }
+
+    // Magiscudo counter in attesa da parte di un avversario (blocca il giocatore attivo)
+    const magiscudoPending = currentState.pending_interactions &&
+      currentState.pending_interactions.find(i => i.type === 'magiscudo_counter');
+    if (magiscudoPending) {
+      const defName = (currentState.players.find(p => p.id === magiscudoPending.player_id) || {}).name || '…';
+      document.getElementById('action-hint').textContent = `🛡 In attesa della risposta di ${defName} (Magiscudo)…`;
+      hide('action-banner');
       return;
     }
 
@@ -1545,6 +1558,34 @@ const App = (() => {
       sendAction('resolve_agilpesca', { discard_iid: chosenIid })
         .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
     });
+  }
+
+  function _showMagiscudoCounterModal(pending, state) {
+    const caster = state.players.find(p => p.id === pending.caster_id) || {};
+    const spellDef = getCardDef(pending.spell_iid) || {};
+    const spellName = spellDef.name || 'una Magia';
+
+    document.getElementById('modal-title').textContent = '🛡 Magiscudo — reagisci!';
+    const body = document.getElementById('modal-body');
+    body.innerHTML = '';
+    const msg = document.createElement('p');
+    msg.textContent = `${caster.name || 'Un avversario'} ha giocato ${spellName} contro di te. Vuoi usare Magiscudo per bloccarla?`;
+    body.appendChild(msg);
+
+    const confirmBtn = document.getElementById('modal-confirm');
+    const cancelBtn  = document.getElementById('modal-cancel');
+    confirmBtn.textContent = 'Usa Magiscudo';
+    confirmBtn.classList.remove('hidden');
+    confirmBtn.onclick = () => {
+      sendAction('resolve_magiscudo_counter', { accept: true })
+        .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
+    };
+    cancelBtn.textContent = 'Lascia passare';
+    cancelBtn.onclick = () => {
+      sendAction('resolve_magiscudo_counter', { accept: false })
+        .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
+    };
+    document.getElementById('modal-overlay').classList.remove('hidden');
   }
 
   function _showCardoMoveModal(state) {

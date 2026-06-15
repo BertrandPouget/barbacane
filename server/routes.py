@@ -36,6 +36,7 @@ from engine.actions import (
     eracle_destroy,
     discard_card,
     arena_activate,
+    _apply_spell_post_effects,
 )
 from server.lobby import (
     create_lobby,
@@ -305,12 +306,15 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             "biblioteca_wall": "resolve_biblioteca",
             "cardo_move": "resolve_cardo_move",
             "agilpesca_discard": "resolve_agilpesca",
+            "magiscudo_counter": "resolve_magiscudo_counter",
         }.get(_pending_type)
         if _allowed and action != _allowed:
             if _pending_type in ("biblioteca_discard", "biblioteca_wall"):
                 raise ActionError("C'è un'interazione Biblioteca in attesa di risoluzione.")
             elif _pending_type == "agilpesca_discard":
                 raise ActionError("Devi scegliere una carta da scartare (Agilpesca).")
+            elif _pending_type == "magiscudo_counter":
+                raise ActionError("In attesa della risposta di Magiscudo del bersaglio.")
             else:
                 raise ActionError("C'è un'interazione Cardo in attesa di risoluzione.")
 
@@ -416,6 +420,9 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             params["target_player_id"],
         ),
         "resolve_cardo_move": lambda: _resolve_cardo_move_action(
+            state, player_id, params,
+        ),
+        "resolve_magiscudo_counter": lambda: _resolve_magiscudo_counter_action(
             state, player_id, params,
         ),
         "next_phase": lambda: _next_phase_action(state, player_id),
@@ -653,6 +660,59 @@ def _resolve_cardo_move_action(state, player_id: str, params: dict) -> dict:
     end_turn(state)
     result["turn_ended"] = True
     return result
+
+
+def _resolve_magiscudo_counter_action(state, player_id: str, params: dict) -> dict:
+    if not state.pending_interactions:
+        raise ActionError("Nessuna interazione Magiscudo in corso.")
+    pending = state.pending_interactions[0]
+    if pending.get("type") != "magiscudo_counter":
+        raise ActionError("L'interazione in attesa non è Magiscudo.")
+    if pending["player_id"] != player_id:
+        raise ActionError("Non è la tua scelta.")
+
+    from engine.effects import apply_effect
+    from engine.deck import get_base_card_id
+
+    state.pending_interactions.pop(0)
+    accept = params.get("accept", False)
+    defender = state.get_player(player_id)
+
+    if accept:
+        magiscudo_iid = next(
+            (iid for iid in defender.hand if get_base_card_id(iid) == "magiscudo"),
+            None,
+        )
+        if not magiscudo_iid:
+            raise ActionError("Non hai Magiscudo in mano.")
+        defender.hand.remove(magiscudo_iid)
+        state.discard_pile.append(magiscudo_iid)
+        apply_effect("magiscudo_effect", state, defender, prodigy=True)
+        state.recent_events.append({
+            "type": "magiscudo_blocked",
+            "card": get_base_card_id(pending["spell_iid"]),
+            "player_id": pending["caster_id"],
+            "blocked_player": player_id,
+        })
+        state.add_log(player_id, "magiscudo_counter", spell=pending["spell_iid"])
+        return {"magiscudo_used": True, "spell_blocked": pending["spell_iid"]}
+
+    # Bersaglio declina: applica l'effetto originale della magia
+    caster = state.get_player(pending["caster_id"])
+    if not caster:
+        return {"declined": True}
+    result = apply_effect(
+        pending["effect_id"], state, caster,
+        prodigy=pending["prodigy"], **pending.get("kwargs", {}),
+    )
+    _apply_spell_post_effects(
+        state, caster,
+        pending["spell_cost"], pending["spell_school"],
+        pending["spell_base_id"], pending["spell_iid"],
+        result,
+    )
+    state.add_log(player_id, "magiscudo_counter_declined", spell=pending["spell_iid"])
+    return {"declined": True, "effect": result}
 
 
 # ---------------------------------------------------------------------------

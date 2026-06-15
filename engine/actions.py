@@ -215,6 +215,67 @@ def _warrior_regions(player: Player):
 # 3. Gioca Magia
 # ---------------------------------------------------------------------------
 
+def _can_counter_magiscudo(target: Player) -> bool:
+    """True se il target ha Magiscudo in mano e ≥1 maga incantesimo in campo."""
+    has_magiscudo = any(get_base_card_id(iid) == "magiscudo" for iid in target.hand)
+    if not has_magiscudo:
+        return False
+    return target.mages_by_school().get("incantesimo", 0) >= 1
+
+
+def _apply_spell_post_effects(
+    state: GameState,
+    player: Player,
+    card_cost: int,
+    card_school: str,
+    base_id: str,
+    instance_id: str,
+    result: dict,
+) -> None:
+    """Applica gli effetti post-Magia: Araminta (ritorno in mano), Obelisco (D10), Evelyn (recast)."""
+    araminta_eff = next(
+        (e for e in player.active_effects
+         if e.get("type") == "araminta_spell_return"
+         and e.get("school") == card_school
+         and card_cost <= e.get("cost", 1)),
+        None,
+    )
+    if araminta_eff:
+        if instance_id in state.discard_pile:
+            state.discard_pile.remove(instance_id)
+        player.hand.append(instance_id)
+        result["returned_to_hand"] = True
+
+    if not result.get("returned_to_hand"):
+        for b_inst in player.field.village.buildings:
+            if b_inst.base_card_id == "obelisco":
+                roll = _random.randint(1, 10)
+                threshold = 6 if b_inst.completed else 8
+                returned = roll >= threshold
+                if returned:
+                    if instance_id in state.discard_pile:
+                        state.discard_pile.remove(instance_id)
+                    player.hand.append(instance_id)
+                    result["returned_to_hand"] = True
+                state.recent_events.append({
+                    "type": "d10", "card": "obelisco",
+                    "player_id": player.id, "roll": roll,
+                    "threshold": threshold, "returned": returned,
+                })
+                break
+
+    evelyn_eff = next(
+        (e for e in player.active_effects
+         if e.get("type") == "evelyn_spell_double"
+         and e.get("school") == card_school
+         and card_cost <= e.get("cost", 1)),
+        None,
+    )
+    if evelyn_eff and not result.get("returned_to_hand"):
+        result["needs_recast"] = True
+        result["recast_base_id"] = base_id
+
+
 def play_spell(
     state: GameState,
     player_id: str,
@@ -315,56 +376,35 @@ def play_spell(
         player.actions_remaining -= 1
     player.ethereal_card = None
 
+    # Magiscudo Prodigio: offri al bersaglio la possibilità di reagire prima che l'effetto si applichi
+    _target_pid = kwargs.get("target_player_id")
+    if _target_pid and _target_pid != player_id:
+        _target_p = state.get_player(_target_pid)
+        _already_immune = _target_p and any(e.get("type") == "spell_immune" for e in _target_p.active_effects)
+        if _target_p and _target_p.is_alive and not _already_immune and _can_counter_magiscudo(_target_p):
+            state.discard_pile.append(instance_id)
+            state.pending_interactions.insert(0, {
+                "type": "magiscudo_counter",
+                "player_id": _target_p.id,
+                "caster_id": player_id,
+                "effect_id": card.effect_id,
+                "prodigy": prodigy,
+                "spell_iid": instance_id,
+                "spell_base_id": base_id,
+                "spell_cost": card.cost,
+                "spell_school": school,
+                "kwargs": dict(kwargs),
+            })
+            state.add_log(player_id, "play_spell", card=instance_id, prodigy=prodigy)
+            return {"card": instance_id, "prodigy": prodigy, "pending_magiscudo_counter": True, "awaiting_player_id": _target_p.id}
+
     # Applica effetto
     result = apply_effect(card.effect_id, state, player, prodigy=prodigy, **kwargs)
 
     # Scarta la Magia
     state.discard_pile.append(instance_id)
 
-    # Araminta horde: anatema cost-1 spells return to hand
-    araminta_eff = next(
-        (e for e in player.active_effects
-         if e.get("type") == "araminta_spell_return"
-         and e.get("school") == school
-         and card.cost <= e.get("cost", 1)),
-        None,
-    )
-    if araminta_eff:
-        if instance_id in state.discard_pile:
-            state.discard_pile.remove(instance_id)
-        player.hand.append(instance_id)
-        result["returned_to_hand"] = True
-
-    # Obelisco: after playing a spell, roll D10 and maybe return to hand
-    if not result.get("returned_to_hand"):
-        for b_inst in player.field.village.buildings:
-            if b_inst.base_card_id == "obelisco":
-                roll = _random.randint(1, 10)
-                threshold = 6 if b_inst.completed else 8
-                returned = roll >= threshold
-                if returned:
-                    if instance_id in state.discard_pile:
-                        state.discard_pile.remove(instance_id)
-                    player.hand.append(instance_id)
-                    result["returned_to_hand"] = True
-                state.recent_events.append({
-                    "type": "d10", "card": "obelisco",
-                    "player_id": player.id, "roll": roll,
-                    "threshold": threshold, "returned": returned,
-                })
-                break
-
-    # Evelyn horde: sortilegio cost-1 spells are cast a second time
-    evelyn_eff = next(
-        (e for e in player.active_effects
-         if e.get("type") == "evelyn_spell_double"
-         and e.get("school") == school
-         and card.cost <= e.get("cost", 1)),
-        None,
-    )
-    if evelyn_eff and not result.get("returned_to_hand"):
-        result["needs_recast"] = True
-        result["recast_base_id"] = base_id
+    _apply_spell_post_effects(state, player, card.cost, school, base_id, instance_id, result)
 
     state.add_log(player_id, "play_spell", card=instance_id, prodigy=prodigy)
     return {"card": instance_id, "prodigy": prodigy, "effect": result}
