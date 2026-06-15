@@ -350,6 +350,10 @@ const App = (() => {
           else if (ev.card === 'joseph') msg = `${pName} — Orda Joseph: ${ev.has_trono ? 'Troni avversari scartati' : 'nessun Trono assegnato'}`;
           else if (ev.card === 'eracle') msg = `${pName} — Orda Eracle: distruggi Costruzione se ≥3 Danni`;
           else msg = `${pName} — Orda ${cardName}`;
+        } else if (ev.type === 'magiscudo_blocked') {
+          const blockedName = (state.players.find(p => p.id === ev.blocked_player) || {}).name || ev.blocked_player;
+          const cardLabel = ev.card ? ev.card.charAt(0).toUpperCase() + ev.card.slice(1) : 'Magia';
+          msg = `${pName} — ${cardLabel} annullata: ${blockedName} è protetto da Magiscudo`;
         } else if (ev.type === 'effect') {
           if (ev.card === 'magiscudo') msg = `${pName} — Magiscudo: immune alle Magie`;
           else if (ev.card === 'guerremoto') msg = `${pName} — Guerremoto: attacco a qualsiasi Bastione${ev.damage_bonus ? ` +${ev.damage_bonus} Danni` : ''}`;

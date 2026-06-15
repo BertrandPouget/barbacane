@@ -309,13 +309,6 @@ def play_spell(
         if not has_building:
             raise ActionError("Non hai nessuna Costruzione in mano.")
 
-    # Check immunità alle Magie sul giocatore bersaglio
-    target_pid = kwargs.get("target_player_id")
-    if target_pid and target_pid != player.id:
-        target_player = state.get_player(target_pid)
-        if target_player and any(e.get("type") == "spell_immune" for e in target_player.active_effects):
-            raise ActionError(f"{target_player.name} è immune alle Magie in questo momento.")
-
     # Rimuovi dalla mano e consuma azione
     player.hand.remove(instance_id)
     if not is_ethereal:
