@@ -136,6 +136,11 @@ def _find_warrior_in_all(player: Player, warrior_iid: str) -> Optional[WarriorIn
     return None
 
 
+def _is_spell_immune(player: Player) -> bool:
+    """True se il giocatore ha Magiscudo attivo."""
+    return any(e.get("type") == "spell_immune" for e in player.active_effects)
+
+
 # ---------------------------------------------------------------------------
 # EFFETTI COSTRUZIONI
 # ---------------------------------------------------------------------------
@@ -467,6 +472,12 @@ def ardolancio_effect(
     target = state.get_player(target_player_id) if target_player_id else None
     if target is None or target.id == player.id:
         return {"error": "Devi scegliere un Bastione avversario"}
+    if _is_spell_immune(target):
+        state.recent_events.append({
+            "type": "magiscudo_blocked", "card": "ardolancio",
+            "player_id": player.id, "blocked_player": target.id,
+        })
+        return {"blocked_by": "magiscudo", "blocked_player": target.id}
     bastion = target.field.bastion_left if target_bastion_side == "left" else target.field.bastion_right
     max_walls = 4 if prodigy else 2
     walls_to_remove = random.sample(bastion.walls, min(max_walls, len(bastion.walls)))
@@ -507,6 +518,12 @@ def vitalflusso_effect(state: GameState, player: Player, prodigy: bool = False, 
         discarded = []
         for p in state.players:
             if p.id == player.id or not p.is_alive:
+                continue
+            if _is_spell_immune(p):
+                state.recent_events.append({
+                    "type": "magiscudo_blocked", "card": "vitalflusso",
+                    "player_id": player.id, "blocked_player": p.id,
+                })
                 continue
             enemy_sorgiva = next(
                 (b for b in p.field.village.buildings if b.base_card_id == "sorgiva" and b.completed),
@@ -594,6 +611,12 @@ def equipotenza_effect(
         for p in state.players:
             enemy_w = _find_warrior_in_all(p, enemy_warrior_iid)
             if enemy_w:
+                if p.id != player.id and _is_spell_immune(p):
+                    state.recent_events.append({
+                        "type": "magiscudo_blocked", "card": "equipotenza",
+                        "player_id": player.id, "blocked_player": p.id,
+                    })
+                    break
                 low = min(enemy_w.effective_att(), enemy_w.effective_dif())
                 from engine.cards import CARD_REGISTRY
                 base_card = CARD_REGISTRY.get(enemy_w.base_card_id)
@@ -638,6 +661,13 @@ def regicidio_effect(
 
     if target is None:
         return {"error": "Nessun Trono trovato"}
+
+    if target.id != player.id and _is_spell_immune(target):
+        state.recent_events.append({
+            "type": "magiscudo_blocked", "card": "regicidio",
+            "player_id": player.id, "blocked_player": target.id,
+        })
+        return {"blocked_by": "magiscudo", "blocked_player": target.id}
 
     trono = None
     if target_trono_iid:
@@ -796,6 +826,12 @@ def arrampicarta_effect(
         for p in state.players:
             if p.id == player.id or not p.is_alive:
                 continue
+            if _is_spell_immune(p):
+                state.recent_events.append({
+                    "type": "magiscudo_blocked", "card": "arrampicarta",
+                    "player_id": player.id, "blocked_player": p.id,
+                })
+                continue
             for w in p.all_warriors():
                 if w.assigned_cards:
                     removed_card = w.assigned_cards.pop(0)
@@ -861,6 +897,13 @@ def cuordipietra_effect(
     target = state.get_player(target_player_id) if target_player_id else None
     if target is None:
         return {"error": "Bersaglio non valido"}
+
+    if _is_spell_immune(target):
+        state.recent_events.append({
+            "type": "magiscudo_blocked", "card": "cuordipietra",
+            "player_id": player.id, "blocked_player": target.id,
+        })
+        return {"blocked_by": "magiscudo", "blocked_player": target.id}
 
     if not target_warrior_iid:
         return {"error": "Guerriero bersaglio non specificato"}
@@ -933,6 +976,12 @@ def bastioncontrario_effect(
         target_player = state.get_player(player1_id) if player1_id else player
         if target_player is None:
             target_player = player
+        if target_player.id != player.id and _is_spell_immune(target_player):
+            state.recent_events.append({
+                "type": "magiscudo_blocked", "card": "bastioncontrario",
+                "player_id": player.id, "blocked_player": target_player.id,
+            })
+            return {"blocked_by": "magiscudo", "blocked_player": target_player.id}
         bl = target_player.field.bastion_left.walls
         br = target_player.field.bastion_right.walls
         target_player.field.bastion_left.walls = br
@@ -948,6 +997,14 @@ def bastioncontrario_effect(
         p2 = state.get_player(player2_id) if player2_id else player
         if p1 is None or p2 is None:
             return {"error": "Giocatori non validi"}
+        # Prodigio: non puoi selezionare bastioni di giocatori con Magiscudo attivo
+        for px in (p1, p2):
+            if px.id != player.id and _is_spell_immune(px):
+                state.recent_events.append({
+                    "type": "magiscudo_blocked", "card": "bastioncontrario",
+                    "player_id": player.id, "blocked_player": px.id,
+                })
+                return {"blocked_by": "magiscudo", "blocked_player": px.id}
         b1 = _get_bastion(p1, side1)
         b2 = _get_bastion(p2, side2)
         b1.walls, b2.walls = b2.walls, b1.walls
@@ -1022,6 +1079,12 @@ def malcomune_effect(
     enemies_discarded = []
     for p in state.players:
         if p.id == player.id or not p.is_alive:
+            continue
+        if _is_spell_immune(p):
+            state.recent_events.append({
+                "type": "magiscudo_blocked", "card": "malcomune",
+                "player_id": player.id, "blocked_player": p.id,
+            })
             continue
         for w in p.all_warriors():
             card = get_card(w.base_card_id)
@@ -1147,6 +1210,13 @@ def incendifesa_effect(
     if target is None:
         return {"error": "Bersaglio non valido"}
 
+    if _is_spell_immune(target):
+        state.recent_events.append({
+            "type": "magiscudo_blocked", "card": "incendifesa",
+            "player_id": player.id, "blocked_player": target.id,
+        })
+        return {"blocked_by": "magiscudo", "blocked_player": target.id}
+
     if prodigy:
         damage = (
             len(target.field.bastion_left.warriors) +
@@ -1182,6 +1252,12 @@ def dazipazzi_effect(
     affected = []
     for p in state.players:
         if p.id == player.id or not p.is_alive:
+            continue
+        if _is_spell_immune(p):
+            state.recent_events.append({
+                "type": "magiscudo_blocked", "card": "dazipazzi",
+                "player_id": player.id, "blocked_player": p.id,
+            })
             continue
         for b in p.field.village.buildings:
             if b.base_card_id == "scrigno" and b.completed:
@@ -1254,6 +1330,13 @@ def cambiamente_effect(
     target = state.get_player(target_player_id) if target_player_id else None
     if target is None:
         return {"error": "Bersaglio non valido"}
+
+    if _is_spell_immune(target):
+        state.recent_events.append({
+            "type": "magiscudo_blocked", "card": "cambiamente",
+            "player_id": player.id, "blocked_player": target.id,
+        })
+        return {"blocked_by": "magiscudo", "blocked_player": target.id}
 
     if not target_warrior_iid:
         warriors = target.all_warriors()

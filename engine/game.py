@@ -497,7 +497,13 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
             "actions_remaining": p.actions_remaining if p.id == viewer_player_id else None,
             "hordes_activated_this_turn": p.hordes_activated_this_turn if p.id == viewer_player_id else None,
             "available_hordes": _available_hordes(p) if p.id == viewer_player_id else None,
-            "active_effects": p.active_effects if p.id == viewer_player_id else None,
+            "active_effects": p.active_effects if p.id == viewer_player_id else [
+                e for e in p.active_effects
+                if e.get("type") in {
+                    "spell_immune", "guerremoto", "investimento_deferred",
+                    "divinazione_incantesimo", "divinazione_all_mage", "equipotenza_own",
+                }
+            ],
             "spell_immune": any(e.get("type") == "spell_immune" for e in p.active_effects),
             "ethereal_card": p.ethereal_card if p.id == viewer_player_id else None,
             "ethereal_complete": p.ethereal_complete if p.id == viewer_player_id else None,

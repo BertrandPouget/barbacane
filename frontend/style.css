@@ -332,19 +332,10 @@ input:focus {
 #left-strip.active-player-strip  { border-right-color: rgba(240, 206, 6, 0.4); }
 #right-strip.active-player-strip { border-left-color:  rgba(240, 206, 6, 0.4); }
 
-#left-strip.spell-immune-strip  { border-right-color: rgba(74, 158, 255, 0.4); }
-#right-strip.spell-immune-strip { border-left-color:  rgba(74, 158, 255, 0.4); }
-
 .strip-player.active-player-content {
   border-color: var(--gold);
   border-width: 2px;
   box-shadow: 0 0 16px rgba(240, 206, 6, 0.45);
-}
-
-.strip-player.spell-immune {
-  border-color: #4a9eff;
-  border-width: 2px;
-  box-shadow: 0 0 16px rgba(74, 158, 255, 0.45);
 }
 
 .strip-player {
@@ -438,13 +429,30 @@ input:focus {
   box-shadow: 0 0 16px rgba(240, 206, 6, 0.45);
 }
 
-.opponent-field.spell-immune {
-  border-color: #4a9eff;
-  border-width: 2px;
-  box-shadow: 0 0 16px rgba(74, 158, 255, 0.45);
-}
-
 .opponent-field.damaged { animation: flash-red 0.5s; }
+
+.opp-active-effects {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.opp-active-badge {
+  font-size: 0.63rem;
+  padding: 1px 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(74, 158, 255, 0.45);
+  color: #7abfff;
+  background: rgba(74, 158, 255, 0.08);
+  cursor: default;
+  white-space: nowrap;
+}
+.strip-active-effects {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  padding: 2px 0;
+}
 
 @keyframes flash-red {
   0%, 100% { border-color: var(--border); }

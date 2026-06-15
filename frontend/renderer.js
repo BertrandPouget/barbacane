@@ -69,8 +69,6 @@ const Renderer = (() => {
       rightStrip.appendChild(renderSideStrip(rn, state, 'right'));
       leftStrip.classList.toggle('active-player-strip',  ln.id === state.current_player_id);
       rightStrip.classList.toggle('active-player-strip', rn.id === state.current_player_id);
-      leftStrip.classList.toggle('spell-immune-strip',  !!ln.spell_immune);
-      rightStrip.classList.toggle('spell-immune-strip', !!rn.spell_immune);
 
     } else if (n === 4) {
       const rn     = state.players[(myIndex + 1) % 4]; // vicino destro
@@ -83,8 +81,6 @@ const Renderer = (() => {
       rightStrip.appendChild(renderSideStrip(rn, state, 'right'));
       leftStrip.classList.toggle('active-player-strip',  ln.id === state.current_player_id);
       rightStrip.classList.toggle('active-player-strip', rn.id === state.current_player_id);
-      leftStrip.classList.toggle('spell-immune-strip',  !!ln.spell_immune);
-      rightStrip.classList.toggle('spell-immune-strip', !!rn.spell_immune);
     }
   }
 
@@ -100,8 +96,7 @@ const Renderer = (() => {
 
   function renderTopOpponent(player, state, role) {
     const isActive = player.id === state.current_player_id;
-    const isImmune = !!player.spell_immune;
-    const div = el('div', { className: `opponent-field${isActive ? ' active-player' : ''}${isImmune ? ' spell-immune' : ''}`,
+    const div = el('div', { className: `opponent-field${isActive ? ' active-player' : ''}`,
       dataset: { playerId: player.id } });
 
     const infoRow = el('div', { className: 'opp-info-row' }, [
@@ -112,6 +107,8 @@ const Renderer = (() => {
     ]);
     const villageEl = renderOppVillageInline(player.field.village);
     if (villageEl) infoRow.appendChild(villageEl);
+    const activeEl = renderOppActiveEffects(player);
+    if (activeEl) infoRow.appendChild(activeEl);
     div.appendChild(infoRow);
 
     // Bastioni SPECCHIATI: B.D. a sinistra, B.S. a destra
@@ -164,6 +161,24 @@ const Renderer = (() => {
   //   bastione ADIACENTE (margin-top:auto, spinto in fondo — vicino al mio campo)
   // ---------------------------------------------------------------------------
 
+  function renderOppActiveEffects(player, mode) {
+    const activeEffects = player.active_effects || [];
+    const seen = new Set();
+    const items = [];
+    for (const ef of activeEffects) {
+      const cfg = ACTIVE_EFFECT_CONFIG[ef.type];
+      if (!cfg || seen.has(cfg.baseCardId)) continue;
+      seen.add(cfg.baseCardId);
+      items.push({ label: cfg.label, desc: cfg.desc(ef) });
+    }
+    if (items.length === 0) return null;
+    const row = el('div', { className: mode === 'strip' ? 'strip-active-effects' : 'opp-active-effects' });
+    items.forEach(item => {
+      row.appendChild(el('span', { className: 'opp-active-badge', title: item.desc }, [item.label]));
+    });
+    return row;
+  }
+
   function renderSideStrip(player, state, mySide) {
     const isAdj_side = mySide === 'left' ? 'right' : 'left'; // lato del loro bastione adj
     const adjBastion    = mySide === 'left' ? player.field.bastion_right : player.field.bastion_left;
@@ -171,16 +186,18 @@ const Renderer = (() => {
     const adjLabel    = mySide === 'left' ? 'Bastione D. (Possibile Bersaglio)' : 'Bastione S. (Possibile Bersaglio)';
     const nonAdjLabel = mySide === 'left' ? 'Bastione S.' : 'Bastione D.';
     const wrapper = el('div', { className: 'strip-player' +
-      (player.id === state.current_player_id ? ' active-player-content' : '') +
-      (player.spell_immune ? ' spell-immune' : '') });
+      (player.id === state.current_player_id ? ' active-player-content' : '') });
 
     // Header
-    wrapper.appendChild(el('div', { className: 'strip-header' }, [
+    const headerEl = el('div', { className: 'strip-header' }, [
       el('div', { className: 'strip-name'  }, [player.name]),
       el('div', { className: 'strip-lives' },
         ['❤'.repeat(Math.max(0, player.lives)) + '✕'.repeat(Math.max(0, 3 - player.lives))]),
       el('div', { className: 'strip-hand'  }, [`🃏 ${player.hand_count}`]),
-    ]));
+    ]);
+    const stripActiveEl = renderOppActiveEffects(player, 'strip');
+    if (stripActiveEl) headerEl.appendChild(stripActiveEl);
+    wrapper.appendChild(headerEl);
 
     // Villaggio
     const buildings = (player.field.village && player.field.village.buildings) || [];
