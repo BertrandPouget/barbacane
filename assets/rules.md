@@ -30,7 +30,7 @@ Qualsiasi carta può essere inoltre utilizzata come Muro tramite un’Azione. In
 
 Infine, alcune carte possono conferire a un'altra carta in mano la proprietà Eterea. Una carta Eterea può essere giocata immediatamente senza pagarne il costo (in Mana o in Maghe) e senza consumare un'Azione. La proprietà decade non appena si utilizza un'Azione, si dichiara Battaglia o si termina il turno.
 
-## Campo da Gioco
+## Campo di Gioco
 Il campo da gioco di ogni giocatore è diviso in quattro Regioni: Avanscoperta, Bastione sinistro, Bastione destro e Villaggio.
 
 L’Avanscoperta è la Regione frontale. Qui vengono posizionati i Guerrieri che si vogliono utilizzare per attaccare durante una Battaglia. Solo i Guerrieri in Avanscoperta contribuiscono ai valori offensivi.
@@ -103,40 +103,40 @@ La partita termina quando solo uno dei giocatori ha ancora almeno una Vita. Tale
 ## Glossario
 
 ### Termini di Gioco
-Anatema: Magia appartenente all'omonima Scuola. Ha effetti offensivi: infligge Danni, colpisce i Guerrieri avversari o modifica le condizioni della Battaglia.  
-Attacco (ATT): Caratteristica di un Guerriero da considerare quando si è l’attaccante in una Battaglia.  
-Avanscoperta: La Regione davanti al campo di gioco. Ha scopo di attacco nelle Battaglie e il suo potere di attacco è dato dai Guerrieri che ne fanno parte.  
-Azione: Una qualsiasi delle attività che un giocatore può compiere in un turno. In particolare, le possibili azioni sono Giocare una carta, Completare una carta, Aggiungere fino a 3 Muri. La Battaglia di fine turno non viene considerata Azione.  
-(Effetto) Base: Effetto di una Costruzione non completa o di una Magia di cui non si hanno le Maghe della Scuola giusta. Essi vengono rispettivamente sostituiti dagli effetti Completi e dagli effetti Prodigio, quando le giuste condizioni vengono soddisfatte.  
-Bastione: Una delle due Regioni laterali. Ha scopo difensivo nelle Battaglie e il numero di Muri di cui è composto rappresenta il suo potere difensivo. Due Bastioni si dicono adiacenti solo se non esiste nessun Bastione tra di essi (es. il destro è adiacente al sinistro del giocatore alla propria destra).  
-Battaglia: L’ultima attività che il giocatore svolge prima della fine del suo turno. Il giocatore attacca con i Guerrieri posizionati in Avanscoperta uno dei Bastioni adiacenti ai propri.  
-Caratteristica: Uno degli attributi assegnati a qualsiasi Guerriero. Gli attributi sono Attacco (ATT), Gittata (GIT) e Difesa (DIF).  
-(Effetto) Completo: Effetto secondario di una Costruzione, che si attiva quando essa viene completata.  
-Costruzione: Tipologia di carta. Si usa per effetti vari che agevolano il giocatore durante la partita. Si posiziona in Villaggio a meno che non sia specificato altrimenti. Quando essa viene giocata, non è completa.  
-Danno: Unità del danno inflitto dall’attaccante al difensore dopo una Battaglia. Si parla di Danno da Attacco, Danno da Gittata e Danno Totale (o solo Danno) per la somma dei due. Alcune carte possono infliggere Danno direttamente a un Bastione: in tal caso i Guerrieri presenti presso di esso vengono ignorati ai fini del calcolo, e il Danno viene applicato ai Muri seguendo le stesse regole della Battaglia.  
-Difesa (DIF): Caratteristica di un Guerriero da considerare quando si è il difensore in una Battaglia.  
-Eroe: Guerriero che evolve da una Recluta. Ha Caratteristiche più potenti della sua Recluta, ne eredita l’effetto Orda e carte assegnate. Se viene scartato per effetto di una carta, la sua Recluta rimane in gioco con eventuali carte assegnate.  
-(Carta) Eterea: carta che, se giocata immediatamente, non richiede il pagamento del proprio costo (in Mana o in Maghe) né l'utilizzo di un'Azione. La proprietà decade non appena si utilizza un'Azione, si dichiara Battaglia o si termina il turno.  
-Gittata (GIT): Caratteristica di un Guerriero da considerare sia che si sia l’attaccante che il difensore in una Battaglia.  
-Guerriero: Tipologia di carta. Si usa per attaccare se posizionata in Avanscoperta o per difendere se posizionata presso un Bastione. Fanno parte dei Guerrieri, le Reclute e gli Eroi. Ogni Guerriero è dotato di Caratteristiche, Specie, linea evolutiva ed effetto Orda. Le carte di Specie Maga hanno inoltre una Scuola.  
-Incantesimo: Magia appartenente all'omonima Scuola. Ha effetti di supporto: potenzia il giocatore, genera risorse o modifica le proprie carte.  
-Magia: Tipologia di carta. Fanno parte delle Magie, gli Anatemi, i Sortilegi e gli Incantesimi. Per giocare una carta Magia, il giocatore deve avere in campo un numero di Maghe pari a quello richiesto dalla carta, indipendentemente dalla loro Scuola. Se tali Maghe sono inoltre della stessa Scuola della Magia giocata, si sblocca l’effetto Prodigio.  
-Mana: Costo per giocare o completare carte che non siano Magie. È indicato sulla carta stessa, in alto a destra.  
-Muro: Singola carta parte di un Bastione. Qualsiasi carta può essere resa Muro tramite un’Azione Aggiungere fino a 3 Muri. Tale Azione permette aggiungere le carte ai Bastioni in qualsiasi combinazione.  
-Orda: Insieme di tre Guerrieri della stessa Specie nella stessa regione. A fine turno, per ogni Orda che ha in campo, sia essa presso un Bastione o in Avanscoperta, il giocatore può attivare uno degli effetti Orda posseduti dai Guerrieri che ne fanno parte.  
-(Effetto) Prodigio: Effetto secondario di una Magia, che si attiva quando il giocatore ha in campo un numero sufficiente di Maghe della Scuola corretta. Se la descrizione inizia con una ‘&’ significa che esso va aggiunto all’effetto Base, altrimenti lo sostituisce. Il numero di Maghe necessario per attivare un Prodigio è indipendente da eventuali riduzioni di costo.  
-Recluta: Guerriero che evolve in Eroe. Ha delle Caratteristiche limitate rispetto al suo Eroe e un effetto Orda.  
-Regione: Una delle 4 aree che compongono il campo di gioco di un giocatore. Le Regioni sono Avanscoperta, Bastioni (destro e sinistro) e Villaggio.  
-Schieramento: Fase di gioco in cui il giocatore posiziona i propri Guerrieri tra le sue Regioni e seleziona gli eventuali effetti Orda.
-Scuola: Tipologia di Magia e di Maga. Le possibili Scuole sono Anatemi, Sortilegi ed Incantesimi.  
-Sortilegio: Magia appartenente all'omonima Scuola. Ha effetti manipolativi: agisce su Muri, Costruzioni, Bastioni o Vite.  
-Specie: Tipologia assegnata a ogni Guerriero. Le possibili Specie sono Elfi, Nani, Umani e Maghe. Sulla base della Specie, si può formare un’Orda.  
-Villaggio: La Regione dietro al campo di gioco. In questa Regione vengono giocate le Costruzioni.  
-Vita: Unità base dei punti vita del giocatore. Si rappresenta con una carta posizionata in Villaggio a faccia in giù. Il giocatore inizia la partita con 3 Vite e perde quando le perde tutte.  
+**Anatema**: Magia appartenente all'omonima Scuola. Ha effetti offensivi: infligge Danni, colpisce i Guerrieri avversari o modifica le condizioni della Battaglia.  
+**Attacco (ATT)**: Caratteristica di un Guerriero da considerare quando si è l’attaccante in una Battaglia.  
+**Avanscoperta**: La Regione davanti al campo di gioco, dove si posizionano i Guerrieri offensivi: i loro ATT e GIT determinano la potenza d'attacco in Battaglia.  
+**Azione**: Una qualsiasi delle attività che un giocatore può compiere in un turno. In particolare, le possibili azioni sono Giocare una carta, Completare una carta, Aggiungere fino a 3 Muri. La Battaglia di fine turno non viene considerata Azione.  
+**(Effetto) Base**: Effetto di una Costruzione non completa o di una Magia di cui non si hanno le Maghe della Scuola giusta. Essi vengono rispettivamente sostituiti dagli effetti Completi e dagli effetti Prodigio, quando le giuste condizioni vengono soddisfatte.  
+**Bastione**: Una delle due Regioni laterali, dove si posizionano i Muri e i Guerrieri difensivi: i Muri assorbono i Danni, mentre la DIF e la GIT dei Guerrieri determinano la potenza difensiva in Battaglia. Due Bastioni si dicono adiacenti solo se non esiste nessun Bastione tra di essi (es. il destro è adiacente al sinistro del giocatore alla propria destra).  
+**Battaglia**: L’ultima attività che il giocatore svolge prima della fine del suo turno. Il giocatore attacca con i Guerrieri posizionati in Avanscoperta uno dei Bastioni adiacenti ai propri.  
+**Caratteristica**: Uno degli attributi assegnati a qualsiasi Guerriero. Gli attributi sono Attacco (ATT), Gittata (GIT) e Difesa (DIF).  
+**(Effetto) Completo**: Effetto secondario di una Costruzione, che si attiva quando essa viene completata.  
+**Costruzione**: Tipologia di carta. Si usa per effetti vari che agevolano il giocatore durante la partita. Si posiziona in Villaggio a meno che non sia specificato altrimenti. Quando essa viene giocata, non è completa.  
+**Danno**: Unità del danno inflitto dall’attaccante al difensore dopo una Battaglia. Si parla di Danno da Attacco, Danno da Gittata e Danno Totale (o solo Danno) per la somma dei due. Alcune carte possono infliggere Danno direttamente a un Bastione: in tal caso i Guerrieri presenti presso di esso vengono ignorati ai fini del calcolo, e il Danno viene applicato ai Muri seguendo le stesse regole della Battaglia.  
+**Difesa (DIF)**: Caratteristica di un Guerriero da considerare quando si è il difensore in una Battaglia.  
+**Eroe**: Guerriero che evolve da una Recluta. Ha Caratteristiche più potenti della sua Recluta, ne eredita l’effetto Orda e carte assegnate. Se viene scartato per effetto di una carta, la sua Recluta rimane in gioco con eventuali carte assegnate.  
+**(Carta) Eterea**: carta che, se giocata immediatamente, non richiede il pagamento del proprio costo (in Mana o in Maghe) né l'utilizzo di un'Azione. La proprietà decade non appena si utilizza un'Azione, si dichiara Battaglia o si termina il turno.  
+**Gittata (GIT)**: Caratteristica di un Guerriero da considerare sia che si sia l’attaccante che il difensore in una Battaglia.  
+**Guerriero**: Tipologia di carta. Si usa per attaccare se posizionata in Avanscoperta o per difendere se posizionata presso un Bastione. Fanno parte dei Guerrieri, le Reclute e gli Eroi. Ogni Guerriero è dotato di Caratteristiche, Specie, linea evolutiva ed effetto Orda. Le carte di Specie Maga hanno inoltre una Scuola.  
+**Incantesimo**: Magia appartenente all'omonima Scuola. Ha effetti di supporto: potenzia il giocatore, genera risorse o modifica le proprie carte.  
+**Magia**: Tipologia di carta. Fanno parte delle Magie, gli Anatemi, i Sortilegi e gli Incantesimi. Per giocare una carta Magia, il giocatore deve avere in campo un numero di Maghe pari a quello richiesto dalla carta, indipendentemente dalla loro Scuola. Se tali Maghe sono inoltre della stessa Scuola della Magia giocata, si sblocca l’effetto Prodigio.  
+**Mana**: Costo per giocare o completare carte che non siano Magie. È indicato sulla carta stessa, in alto a destra.  
+**Muro**: Singola carta parte di un Bastione. Qualsiasi carta può essere resa Muro tramite un’Azione Aggiungere fino a 3 Muri. Tale Azione permette aggiungere le carte ai Bastioni in qualsiasi combinazione.  
+**Orda**: Insieme di tre Guerrieri della stessa Specie nella stessa regione. A fine turno, per ogni Orda che ha in campo, sia essa presso un Bastione o in Avanscoperta, il giocatore può attivare uno degli effetti Orda posseduti dai Guerrieri che ne fanno parte.  
+**(Effetto) Prodigio**: Effetto secondario di una Magia, che si attiva quando il giocatore ha in campo un numero sufficiente di Maghe della Scuola corretta. Se la descrizione inizia con una ‘&’ significa che esso va aggiunto all’effetto Base, altrimenti lo sostituisce. Il numero di Maghe necessario per attivare un Prodigio è indipendente da eventuali riduzioni di costo.  
+**Recluta**: Guerriero che evolve in Eroe. Ha delle Caratteristiche limitate rispetto al suo Eroe e un effetto Orda.  
+**Regione**: Una delle 4 aree che compongono il campo di gioco di un giocatore. Le Regioni sono Avanscoperta, Bastioni (destro e sinistro) e Villaggio.  
+**Schieramento**: Fase di gioco in cui il giocatore posiziona i propri Guerrieri tra le sue Regioni e seleziona gli eventuali effetti Orda.
+**Scuola**: Tipologia di Magia e di Maga. Le possibili Scuole sono Anatemi, Sortilegi ed Incantesimi.  
+**Sortilegio**: Magia appartenente all'omonima Scuola. Ha effetti manipolativi: agisce su Muri, Costruzioni, Bastioni o Vite.  
+**Specie**: Tipologia assegnata a ogni Guerriero. Le possibili Specie sono Elfi, Nani, Umani e Maghe. Sulla base della Specie, si può formare un’Orda.  
+**Villaggio**: La Regione dietro al campo di gioco, dove si posizionano le Costruzioni.  
+**Vita**: Unità base dei punti vita del giocatore. Si rappresenta con una carta posizionata in Villaggio a faccia in giù. Il giocatore inizia la partita con 3 Vite e perde quando le perde tutte.  
 
 ### Verbi Utili
-assegnare: Alcune carte sono pensate per essere posizionate sotto un Guerriero. Si dice che sono assegnate. Se una Recluta con delle carte assegnate viene scartata, anche tali carte vanno scartate. Se un Eroe con delle carte assegnate viene scartato, tali carte rimangono alla sua Recluta. Non puoi rimuovere una carta assegnata o spostarla sotto un altro Guerriero.  
-cercare: Quando una carta richiede di cercarne un’altra, si intende che il giocatore può guardare il mazzo di gioco e, se tale carta dovesse essere presente, aggiungerla alla propria mano. Se non specificato diversamente, non è possibile cercare da Bastioni o Vite. Dopo aver cercato, il giocatore è sempre tenuto a mischiare il mazzo.  
-completare: Quando una Costruzione viene giocata, essa viene posizionata in orizzontale e si dice che non è completa. Utilizzando un’Azione Completare una carta e pagando il Mana richiesto, la carta viene posizionata in verticale e si attiva il suo effetto Completo.  
-evolvere: Ogni Recluta può evolvere in uno specifico Eroe. Se il giocatore ha la Recluta in campo e l’Eroe in mano può giocare quest’ultimo e posizionarlo sopra la Recluta. L’Eroe ha sempre Caratteristiche potenziate rispetto alla Recluta e ne eredita l’effetto Orda.  
-scartare: Per vari motivi, può essere richiesto di scartare una carta. Essa va immediatamente aggiunta alla pila degli scarti. Se viene scartato un Eroe, la Recluta resta in campo con eventuali carte assegnate.
+**assegnare**: Alcune carte sono pensate per essere posizionate sotto un Guerriero. Si dice che sono assegnate. Se una Recluta con delle carte assegnate viene scartata, anche tali carte vanno scartate. Se un Eroe con delle carte assegnate viene scartato, tali carte rimangono alla sua Recluta. Non puoi rimuovere una carta assegnata o spostarla sotto un altro Guerriero.  
+**cercare**: Quando una carta richiede di cercarne un’altra, si intende che il giocatore può guardare il mazzo di gioco e, se tale carta dovesse essere presente, aggiungerla alla propria mano. Se non specificato diversamente, non è possibile cercare da Bastioni o Vite. Dopo aver cercato, il giocatore è sempre tenuto a mischiare il mazzo.  
+**completare**: Quando una Costruzione viene giocata, essa viene posizionata in orizzontale e si dice che non è completa. Utilizzando un’Azione Completare una carta e pagando il Mana richiesto, la carta viene posizionata in verticale e si attiva il suo effetto Completo.  
+**evolvere**: Ogni Recluta può evolvere in uno specifico Eroe. Se il giocatore ha la Recluta in campo e l’Eroe in mano può giocare quest’ultimo e posizionarlo sopra la Recluta. L’Eroe ha sempre Caratteristiche potenziate rispetto alla Recluta e ne eredita l’effetto Orda.  
+**scartare**: Per vari motivi, può essere richiesto di scartare una carta. Essa va immediatamente aggiunta alla pila degli scarti. Se viene scartato un Eroe, la Recluta resta in campo con eventuali carte assegnate.

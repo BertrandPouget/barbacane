@@ -6,11 +6,11 @@
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat&logo=sqlite&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat)
 
-Barbacane è un gioco di carte da tavolo fantasy in versione digitale multiplayer online, giocabile da browser senza installazione.
+Barbacane è un gioco di carte da tavolo fantasy, ora in versione digitale multiplayer.
 
-Il gioco è ambientato in un mondo popolato da Umani, Elfi, Nani e Maghe (tutti di sangue Goblin). Ogni giocatore costruisce e difende il proprio campo schierando Guerrieri, erigendo Costruzioni e lanciando Magie — finché non rimane uno solo con almeno una Vita in piedi.
+Il mondo di Barbacane è popolato da Umani, Elfi, Nani e Maghe — tutti, inspiegabilmente, di sangue Goblin. Turno dopo turno, ogni giocatore deve potenziare il proprio campo di gioco schierando Guerrieri, erigendo Costruzioni e scagliando Magie contro gli avversari. Niente alleanze, niente tregue: ne resterà soltanto uno.
 
-**Prova la beta su [barbacane.onrender.com](https://barbacane.onrender.com)**
+La beta è disponibile qui: [Play Barbacane](https://barbacane.onrender.com).
 
 ## Avvio in Locale
 
@@ -23,39 +23,31 @@ Apri il browser su `http://localhost:8000` per accedere alla schermata di gioco.
 
 ## Come si Gioca
 
-**Setup**: 2–4 giocatori. Mazzo comune da 200 carte. Ogni giocatore inizia con 3 Vite e pesca 6 carte.
+Ecco una breve introduzione al gioco e alle sue meccaniche principali. Per il regolamento completo, consigliamo comunque di vedere `assets/rules.md`.
 
-### Il Campo di Gioco
+### Campo di Gioco
+
+Si gioca in 2–4 giocatori. Mazzo comune da 200 carte. Ogni giocatore inizia con 3 Vite e pesca 6 carte.
 
 Ogni giocatore ha un campo diviso in 4 Regioni:
-
-```
-[ Avanscoperta ] [ Bastione Sinistro ] [ Bastione Destro ] [ Villaggio ]
-```
-
-- **Avanscoperta** — i Guerrieri qui attaccano e determinano la potenza offensiva
-- **Bastioni** — i Guerrieri qui difendono; i Muri assorbono i danni in arrivo
-- **Villaggio** — contiene le Costruzioni, che potenziano il giocatore, e le Vite rimanenti
-
-I giocatori siedono in cerchio: il Bastione destro di un giocatore è adiacente al Bastione sinistro del successivo.
+- **Avanscoperta** — dove si posizionano i Guerrieri offensivi: i loro ATT e GIT determinano la potenza d'attacco in Battaglia.
+- **Bastioni (Destro e Sinistro)** — dove si posizionano i Muri e i Guerrieri difensivi: i Muri assorbono i Danni, mentre la DIF e la GIT dei Guerrieri determinano la potenza difensiva in Battaglia.
+- **Villaggio** — dove si posizionano le Costruzioni, che potenziano il giocatore
 
 ### Turno
 
-1. Ricevi Mana (scalato al numero di turno: da 1 a 5)
-2. Fino a 2 Azioni: gioca carte, completa Costruzioni, aggiungi Muri
-3. Riposiziona Guerrieri tra Avanscoperta e Bastioni (gratuito)
-4. Attiva le Orde disponibili
-5. Battaglia (opzionale): attacca un Bastione avversario adiacente
-6. Pesca fino a 6 carte
+1. **Fase iniziale**: ricevi Mana (scalato al numero di turno: da 1 a 5)
+2. **Fase delle Azioni**: fino a 2 Azioni — gioca carte, completa Costruzioni, aggiungi Muri
+3. **Fase dello Schieramento**: riposiziona i Guerrieri tra Avanscoperta e Bastioni e attiva le Orde disponibili
+4. **Fase della Battaglia** (opzionale): attacca un Bastione avversario adiacente
+5. **Fase finale**: pesca fino a 6 carte
 
 ### Tipi di Carta
 
 - **Guerrieri** (Reclute ed Eroi): hanno ATT, GIT e DIF; le Reclute evolvono in Eroi
-- **Magie** (Anatemi, Sortilegi, Incantesimi): costo in Maghe anziché Mana; attivano il **Prodigio** se le Maghe della stessa Scuola in campo sono sufficienti
+- **Magie** (Anatemi, Sortilegi, Incantesimi): costo in Maghe anziché Mana; attivano il Prodigio se le Maghe della stessa Scuola in campo sono sufficienti
 - **Costruzioni**: piazzate incomplete con effetto Base, completabili con un'azione aggiuntiva per sbloccare l'effetto Completo
 - **Muri**: qualsiasi carta può essere convertita in Muro per assorbire danni in Battaglia
-
-Per il regolamento completo vedere `assets/rules.md`.
 
 ### Battaglia
 
@@ -109,31 +101,48 @@ barbacane/
 
 ### Flusso di un'Azione
 
-Quando un giocatore gioca una carta, l'intera pipeline è:
+Il client (frontend) non conosce le regole del gioco: si limita a tradurre i click del giocatore in un'**intenzione** (`{action, params}`) e a mostrare lo stato che riceve indietro. Tutta la logica vive nel server, organizzato in livelli che si passano lo stato in sequenza:
 
 ```
-app.js  →  WebSocket  →  routes.py (_dispatch_action)
-       →  actions.py (validazione + rimozione dalla mano)
-       →  effects.py (applica effetto sul GameState)
-       →  storage.py (salva su SQLite)
-       →  public_state() per ogni giocatore  →  broadcast WebSocket
+app.js          (intenzione)
+  → routes.py   (dispatcher)
+  → actions.py  (regole del turno)
+  → effects.py  (effetto carta)
+  → storage.py  (persistenza)
+  → ws.js       (broadcast a tutti i client)
+  → app.js      (applyState → aggiorna la UI)
 ```
 
-Il client invia solo intenzioni; il server valida tutto e non si fida mai dello stato client.
+- **`app.js`** (client) — costruisce l'intenzione (es. "gioca questa carta su questo bersaglio") e la invia via WebSocket. Non modifica mai lo stato in locale.
+- **`routes.py`** (dispatcher) — unico punto d'ingresso del server: riceve il messaggio e lo smista alla funzione giusta in base al tipo di azione.
+- **`actions.py`** (regole del turno) — verifica che l'azione sia legale in questo momento (turno del giocatore, mana/maghe sufficienti, azioni rimaste, carta effettivamente in mano), poi consuma la risorsa necessaria.
+- **`effects.py`** (effetto carta) — la funzione registrata per quella carta specifica, che modifica davvero il `GameState` (danni, pescate, mana guadagnato...).
+- **`storage.py`** (persistenza) — salva il nuovo `GameState` su SQLite; il server genera poi una vista filtrata dello stato per ciascun giocatore (`public_state`) e la rispedisce a tutti via WebSocket, dove `ws.js` la riceve e aggiorna la UI.
 
-### Registry degli Effetti
+Esempio concreto, un giocatore gioca la Magia Ardolancio:
 
-Ogni effetto carta è una funzione registrata in `engine/effects.py`:
+1. `app.js` costruisce `{action: "play_spell", params: {instance_id, bastion_side}}` e lo invia via WebSocket.
+2. `routes.py` → `_dispatch_action()` riceve il messaggio e chiama `play_spell(state, player_id, instance_id, **params)`.
+3. `actions.py` → `play_spell()` valida turno/mana/maghe, rimuove la carta dalla mano, poi chiama `apply_effect(card.effect_id, state, player, prodigy=..., **params)`.
+4. `effects.py` → la funzione registrata (`ardolancio_effect`) modifica il `GameState` e ritorna un dict con il risultato.
+5. `routes.py` salva il nuovo stato su SQLite, genera `public_state(state, player_id)` per ogni giocatore connesso e fa broadcast via WebSocket.
+6. `ws.js` riceve il nuovo stato e chiama `app.js` → `applyState()`, che aggiorna la UI.
 
-```python
-@register_effect("ardolancio_effect")
-def ardolancio_effect(state, player, prodigy=False, target_player_id=None, bastion_side=None, **kwargs):
-    damage = 4 if prodigy else 2
-    apply_damage_to_bastion(state, target_player_id, bastion_side, damage)
-    return {"damage": damage}
-```
+### Aggiungere una Nuova Carta
 
-Per aggiungere una carta: definire la carta in `data/cards.json` con un `effect_id`, poi registrare la funzione corrispondente in `effects.py`.
+1. Definire la carta in `data/cards.json` con un `effect_id` univoco.
+2. Implementare e registrare la funzione effetto in `engine/effects.py`:
+
+   ```python
+   @register_effect("ardolancio_effect")
+   def ardolancio_effect(state, player, prodigy=False, target_player_id=None, bastion_side=None, **kwargs):
+       damage = 4 if prodigy else 2
+       apply_damage_to_bastion(state, target_player_id, bastion_side, damage)
+       return {"damage": damage}
+   ```
+
+3. Se l'effetto richiede targeting o input dal giocatore (scegliere un bastione, un bersaglio, una carta da cercare...), aggiungere la UI ad hoc in `app.js` per costruire i `params` dell'azione, ed eventualmente il rendering specifico in `renderer.js`.
+4. Se l'effetto introduce un'interazione asincrona in due passi (es. cercare, biblioteca), usare `state.pending_search` / `state.pending_interactions` e gestire la risposta con un'azione `resolve_*` dedicata.
 
 ### Modalità Test
 
@@ -144,4 +153,4 @@ Entrare con nome `Test` o `Test2` per avere le carte da `data/test_cards.json` i
 - **Backend**: Python + FastAPI, WebSocket per aggiornamenti real-time
 - **Frontend**: SPA in vanilla JS, servita come file statico da FastAPI
 - **Persistenza**: SQLite
-- **Deploy**: Render (free tier)
+- **Deploy**: Render
