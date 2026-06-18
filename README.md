@@ -6,7 +6,7 @@
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat&logo=sqlite&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat)
 
-Barbacane è un gioco di carte da tavolo fantasy, ora in versione digitale multiplayer.
+Barbacane è un gioco di carte fantasy, ora in versione digitale multiplayer.
 
 Il mondo di Barbacane è popolato da Umani, Elfi, Nani e Maghe — tutti, inspiegabilmente, di sangue Goblin. Turno dopo turno, ogni giocatore deve potenziare il proprio campo di gioco schierando Guerrieri, erigendo Costruzioni e scagliando Magie contro gli avversari. Niente alleanze, niente tregue: ne resterà soltanto uno.
 
