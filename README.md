@@ -27,7 +27,7 @@ Ecco una breve introduzione al gioco e alle sue meccaniche principali. Per il re
 
 ### Campo di Gioco
 
-Si gioca in 2–4 giocatori. Mazzo comune da 200 carte. Ogni giocatore inizia con 3 Vite e pesca 6 carte.
+Si gioca da 2 a 4 giocatori, con un mazzo comune di 200 carte. Ogni giocatore inizia con 3 Vite e pesca 6 carte.
 
 Ogni giocatore ha un campo diviso in 4 Regioni:
 - **Avanscoperta** — dove si posizionano i Guerrieri offensivi: i loro ATT e GIT determinano la potenza d'attacco in Battaglia.
