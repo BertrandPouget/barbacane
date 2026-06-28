@@ -71,6 +71,16 @@ Le carte senza illustrazione corrispondente in `images/` vengono comunque genera
 
 ---
 
+### Step 4 — Genera il PDF di stampa
+
+```bash
+python 4_make_print_pdf.py
+```
+
+Nessun argomento: legge tutti i PNG in `output/`, e per ognuno crea una coppia di pagine — back, carta — con un bordo monocromo di 3mm su tutti i lati (estratto dal pixel più a sinistra in centro verticale, per simulare il bordo di taglio). Salva il risultato in `output/cards_to_print.pdf`.
+
+---
+
 ## Output
 
 I PNG in `output/` sono già referenziati dal frontend di Barbacane. Una volta rigenerati basta sostituire i file nella stessa cartella; non serve toccare altro.
