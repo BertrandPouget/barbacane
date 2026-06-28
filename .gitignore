@@ -4,6 +4,7 @@ __pycache__/
 venv/
 card_factory/images/
 card_factory/input/
+card_factory/output/cards_to_print.pdf
 
 # graphify - local paths (machine-specific)
 graphify-out/.graphify_python
