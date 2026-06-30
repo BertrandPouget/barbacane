@@ -30,11 +30,13 @@ from PIL import Image
 
 # Finestra illustrazione standard (Recluta ecc.)
 # x leggermente stretto per escludere il bordo del frame; y1 appena sopra il banner nome
-STANDARD_BOX_PT = (20.0, 25.8, 159.0, 105.5)   # x0, y0, x1, y1
+# y0 spostato 1mm più in basso (25.8+2.83pt) per non includere il filo d'illustrazione
+# che a volte sfora sopra l'etichetta Recluta/Eroe del frame.
+STANDARD_BOX_PT = (20.0, 28.6, 159.0, 105.5)   # x0, y0, x1, y1
 
 # Finestra illustrazione eroe (stessa y0 dello standard — "subito sotto il rettangolo")
 # La differenza è solo nel y1 più basso: l'illustrazione eroe è più alta.
-HERO_BOX_PT    = (20.0, 25.8, 159.0, 158.5)
+HERO_BOX_PT    = (20.0, 28.6, 159.0, 158.5)
 
 # Soglia cromaticità: differenza massima tra canali R/G/B per considerare un pixel "colorato"
 COLOR_DIFF_THRESHOLD = 15

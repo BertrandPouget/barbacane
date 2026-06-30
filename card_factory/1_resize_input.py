@@ -3,7 +3,8 @@
 resize_input.py
 Ritaglia le aree bianche esterne alla carta e ridimensiona ogni pagina a 63×88 mm.
 
-Il bounding box viene rilevato solo dalla prima pagina (tutte le altre hanno lo stesso layout).
+Il bounding box viene rilevato singolarmente per ogni pagina (alcuni PDF hanno
+pagine con margini o dimensioni diverse tra loro, es. carte Eroe più alte).
 Il file viene risalvato in-place nella cartella input/.
 
 Utilizzo:
@@ -57,16 +58,15 @@ def process_pdf(pdf_path: Path) -> None:
 
     print(f"PDF: {pdf_path}  |  {n} pagine")
 
-    crop = find_content_rect(src[0])
-    print(
-        f"Crop rilevato: ({crop.x0:.1f}, {crop.y0:.1f}, {crop.x1:.1f}, {crop.y1:.1f}) pt"
-        f"  [{crop.width * 25.4 / 72:.1f}×{crop.height * 25.4 / 72:.1f} mm]"
-    )
-
     target = fitz.Rect(0, 0, CARD_W_PT, CARD_H_PT)
     dst = fitz.open()
 
     for i in range(n):
+        crop = find_content_rect(src[i])
+        print(
+            f"  Pag. {i + 1}: crop ({crop.x0:.1f}, {crop.y0:.1f}, {crop.x1:.1f}, {crop.y1:.1f}) pt"
+            f"  [{crop.width * 25.4 / 72:.1f}×{crop.height * 25.4 / 72:.1f} mm]"
+        )
         page = dst.new_page(width=CARD_W_PT, height=CARD_H_PT)
         page.show_pdf_page(target, src, i, clip=crop)
 
