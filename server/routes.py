@@ -307,6 +307,7 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             "cardo_move": "resolve_cardo_move",
             "agilpesca_discard": "resolve_agilpesca",
             "magiscudo_counter": "resolve_magiscudo_counter",
+            "malcomune_discard": "resolve_malcomune",
         }.get(_pending_type)
         if _allowed and action != _allowed:
             if _pending_type in ("biblioteca_discard", "biblioteca_wall"):
@@ -315,6 +316,8 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
                 raise ActionError("Devi scegliere una carta da scartare (Agilpesca).")
             elif _pending_type == "magiscudo_counter":
                 raise ActionError("In attesa della risposta di Magiscudo del bersaglio.")
+            elif _pending_type == "malcomune_discard":
+                raise ActionError("In attesa della scelta del Guerriero da scartare (Malcomune).")
             else:
                 raise ActionError("C'è un'interazione Cardo in attesa di risoluzione.")
 
@@ -423,6 +426,9 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             state, player_id, params,
         ),
         "resolve_magiscudo_counter": lambda: _resolve_magiscudo_counter_action(
+            state, player_id, params,
+        ),
+        "resolve_malcomune": lambda: _resolve_malcomune_action(
             state, player_id, params,
         ),
         "next_phase": lambda: _next_phase_action(state, player_id),
@@ -713,6 +719,38 @@ def _resolve_magiscudo_counter_action(state, player_id: str, params: dict) -> di
     )
     state.add_log(player_id, "magiscudo_counter_declined", spell=pending["spell_iid"])
     return {"declined": True, "effect": result}
+
+
+def _resolve_malcomune_action(state, player_id: str, params: dict) -> dict:
+    if not state.pending_interactions:
+        raise ActionError("Nessuna interazione Malcomune in corso.")
+    pending = state.pending_interactions[0]
+    if pending.get("type") != "malcomune_discard":
+        raise ActionError("L'interazione in attesa non è Malcomune.")
+    if pending["player_id"] != player_id:
+        raise ActionError("Non è la tua scelta.")
+
+    from engine.effects import _discard_warrior_from_player, _find_warrior_in_all
+    from engine.cards import get_card, WarriorCard
+
+    player = state.get_player(player_id)
+    warrior_iid = params.get("warrior_iid")
+    species = pending["species"]
+    w = _find_warrior_in_all(player, warrior_iid) if warrior_iid else None
+    card = get_card(w.base_card_id) if w else None
+    if not w or not isinstance(card, WarriorCard) or card.species != species:
+        raise ActionError("Devi scegliere un tuo Guerriero della Specie richiesta.")
+
+    state.pending_interactions.pop(0)
+    _discard_warrior_from_player(state, player, warrior_iid)
+    state.recent_events.append({
+        "type": "warrior_discarded", "card": "malcomune",
+        "player_id": pending["caster_id"],
+        "species": species,
+        "enemies_discarded": [{"player": player_id, "warrior": warrior_iid}],
+    })
+    state.add_log(player_id, "malcomune_discard", warrior=warrior_iid)
+    return {"discarded": warrior_iid}
 
 
 # ---------------------------------------------------------------------------

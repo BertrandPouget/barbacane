@@ -398,7 +398,7 @@ const App = (() => {
       _showSearchModal(state.search_deck, state.pending_search);
     }
 
-    // Mostra il modale di interazione in attesa (Biblioteca, Cardo, Agilpesca, Magiscudo)
+    // Mostra il modale di interazione in attesa (Biblioteca, Cardo, Agilpesca, Magiscudo, Malcomune)
     if (myPendingInteraction) {
       if (myPendingInteraction.type === 'cardo_move') {
         _showCardoMoveModal(state);
@@ -406,6 +406,8 @@ const App = (() => {
         _showAgilpescaDiscardModal(state);
       } else if (myPendingInteraction.type === 'magiscudo_counter') {
         _showMagiscudoCounterModal(myPendingInteraction, state);
+      } else if (myPendingInteraction.type === 'malcomune_discard') {
+        _showMalcomuneDiscardModal(myPendingInteraction, state);
       } else {
         _showBibliotecaModal(myPendingInteraction, state);
       }
@@ -435,6 +437,7 @@ const App = (() => {
       if (myPending.type === 'cardo_move') _showCardoMoveModal(state);
       else if (myPending.type === 'agilpesca_discard') _showAgilpescaDiscardModal(state);
       else if (myPending.type === 'magiscudo_counter') _showMagiscudoCounterModal(myPending, state);
+      else if (myPending.type === 'malcomune_discard') _showMalcomuneDiscardModal(myPending, state);
       else _showBibliotecaModal(myPending, state);
     }
     const myP = state.players && state.players.find(p => p.id === myPlayerId);
@@ -518,6 +521,15 @@ const App = (() => {
     if (magiscudoPending) {
       const defName = (currentState.players.find(p => p.id === magiscudoPending.player_id) || {}).name || '…';
       document.getElementById('action-hint').textContent = `🛡 In attesa della risposta di ${defName} (Magiscudo)…`;
+      hide('action-banner');
+      return;
+    }
+
+    const malcomunePending = currentState.pending_interactions &&
+      currentState.pending_interactions.find(i => i.type === 'malcomune_discard');
+    if (malcomunePending) {
+      const defName = (currentState.players.find(p => p.id === malcomunePending.player_id) || {}).name || '…';
+      document.getElementById('action-hint').textContent = `☠ In attesa della scelta di ${defName} (Malcomune)…`;
       hide('action-banner');
       return;
     }
@@ -1168,9 +1180,39 @@ const App = (() => {
       return;
     }
 
+    // Malcomune: scegli un tuo Guerriero (scartato se Base, mantenuto se Prodigio);
+    // ogni avversario con un Guerriero della stessa Specie lo scarterà (o sceglierà quale, se ne ha più di uno)
+    if (def.id === 'malcomune') {
+      const me = currentState.players.find(p => p.id === myPlayerId);
+      const zones = [
+        { warriors: me.field.vanguard, label: 'Avanscoperta' },
+        { warriors: me.field.bastion_left.warriors, label: 'Bastione Sinistro' },
+        { warriors: me.field.bastion_right.warriors, label: 'Bastione Destro' },
+      ];
+      const options = [];
+      zones.forEach(({ warriors, label }) => {
+        (warriors || []).forEach(w => {
+          const wDef = getCardDef(w.instance_id);
+          options.push({ label: `${label} — ${wDef ? wDef.name : w.instance_id}`, value: w.instance_id });
+        });
+      });
+      if (options.length === 0) {
+        Renderer.toast('Non hai nessun Guerriero in campo.', 'error');
+        return;
+      }
+      const prodigy = _computeSpellProdigy(def);
+      const title = prodigy
+        ? `${def.name} — scegli un tuo Guerriero (lo mantieni)`
+        : `${def.name} — scegli un tuo Guerriero da scartare`;
+      Renderer.showChoiceModal(title, options, (chosenIid) => {
+        sendAction('play_spell', { instance_id: instanceId, own_warrior_iid: chosenIid });
+      });
+      return;
+    }
+
     const spellsNeedingTarget = [
       'ardolancio', 'guerremoto', 'cuordipietra', 'incendifesa',
-      'regicidio', 'malcomune',
+      'regicidio',
     ];
 
     if (!spellsNeedingTarget.includes(def.id) || opponents.length === 0) {
@@ -1586,6 +1628,38 @@ const App = (() => {
         .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
     };
     document.getElementById('modal-overlay').classList.remove('hidden');
+  }
+
+  function _showMalcomuneDiscardModal(pending, state) {
+    const myPlayer = state.players.find(p => p.id === myPlayerId);
+    const caster = state.players.find(p => p.id === pending.caster_id) || {};
+    const zones = [
+      { warriors: myPlayer.field.vanguard, label: 'Avanscoperta' },
+      { warriors: myPlayer.field.bastion_left.warriors, label: 'Bastione Sinistro' },
+      { warriors: myPlayer.field.bastion_right.warriors, label: 'Bastione Destro' },
+    ];
+    const options = [];
+    zones.forEach(({ warriors, label }) => {
+      (warriors || []).forEach(w => {
+        const wDef = getCardDef(w.instance_id);
+        if (wDef && wDef.species === pending.species) {
+          options.push({ label: `${label} — ${wDef.name}`, value: w.instance_id });
+        }
+      });
+    });
+    if (options.length === 0) {
+      // Non dovrebbe accadere: il server accoda questa interazione solo se c'è una scelta reale.
+      sendAction('resolve_malcomune', {}).catch(() => {});
+      return;
+    }
+    Renderer.showChoiceModal(
+      `☠ Malcomune — ${caster.name || 'Un avversario'} ti costringe a scartare un Guerriero`,
+      options,
+      (chosenIid) => {
+        sendAction('resolve_malcomune', { warrior_iid: chosenIid })
+          .catch(e => Renderer.toast(e.message || 'Errore', 'error'));
+      }
+    );
   }
 
   function _showCardoMoveModal(state) {

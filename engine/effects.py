@@ -1050,18 +1050,15 @@ def malcomune_effect(
     **kwargs,
 ) -> dict:
     """
-    Base: scarta un tuo Guerriero. Ogni avversario scarta un Guerriero della stessa Specie.
-    Prodigio (sostituisce): scegli un tuo Guerriero; ogni avversario scarta un Guerriero della stessa Specie (tu tieni il tuo).
+    Base: scarta un tuo Guerriero. Ogni avversario con un Guerriero della stessa Specie lo sceglie e lo scarta.
+    Prodigio (sostituisce): scegli un tuo Guerriero (lo mantieni); ogni avversario sceglie comunque e scarta.
+    Se un avversario ha più di un Guerriero della Specie scelta, la scelta di quale scartare spetta a lui
+    (accodata in state.pending_interactions come "malcomune_discard"); se ne ha uno solo viene scartato
+    automaticamente (nessuna vera scelta possibile).
     """
     from engine.cards import get_card, WarriorCard
 
-    if not own_warrior_iid:
-        warriors = player.all_warriors()
-        if not warriors:
-            return {"error": "Nessun Guerriero in campo"}
-        own_warrior_iid = warriors[0].instance_id
-
-    own_w = _find_warrior_in_all(player, own_warrior_iid)
+    own_w = _find_warrior_in_all(player, own_warrior_iid) if own_warrior_iid else None
     if not own_w:
         return {"error": "Guerriero non trovato"}
 
@@ -1077,6 +1074,7 @@ def malcomune_effect(
         result["own_discarded"] = own_warrior_iid
 
     enemies_discarded = []
+    enemies_pending = []
     for p in state.players:
         if p.id == player.id or not p.is_alive:
             continue
@@ -1086,13 +1084,26 @@ def malcomune_effect(
                 "player_id": player.id, "blocked_player": p.id,
             })
             continue
-        for w in p.all_warriors():
-            card = get_card(w.base_card_id)
-            if isinstance(card, WarriorCard) and card.species == species:
-                _discard_warrior_from_player(state, p, w.instance_id)
-                enemies_discarded.append({"player": p.id, "warrior": w.instance_id})
-                break
+        matches = [
+            w for w in p.all_warriors()
+            if isinstance(get_card(w.base_card_id), WarriorCard)
+            and get_card(w.base_card_id).species == species
+        ]
+        if not matches:
+            continue
+        if len(matches) == 1:
+            _discard_warrior_from_player(state, p, matches[0].instance_id)
+            enemies_discarded.append({"player": p.id, "warrior": matches[0].instance_id})
+        else:
+            state.pending_interactions.append({
+                "type": "malcomune_discard",
+                "player_id": p.id,
+                "caster_id": player.id,
+                "species": species,
+            })
+            enemies_pending.append(p.id)
     result["enemies_discarded"] = enemies_discarded
+    result["enemies_pending"] = enemies_pending
 
     state.recent_events.append({
         "type": "warrior_discarded", "card": "malcomune",
@@ -1100,6 +1111,7 @@ def malcomune_effect(
         "species": species,
         "own_discarded": result.get("own_discarded"),
         "enemies_discarded": enemies_discarded,
+        "enemies_pending": enemies_pending,
     })
     return result
 

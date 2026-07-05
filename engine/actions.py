@@ -361,6 +361,14 @@ def play_spell(
             if not has_enemy_sorgiva:
                 raise ActionError("Non hai nessuna Sorgiva completa in campo e nessun avversario ha Sorgive.")
 
+    # Pre-validazione: malcomune richiede la scelta esplicita di un proprio Guerriero
+    if base_id == "malcomune":
+        own_warrior_iid = kwargs.get("own_warrior_iid")
+        if not own_warrior_iid or not any(
+            w.instance_id == own_warrior_iid for w in player.all_warriors()
+        ):
+            raise ActionError("Devi scegliere un tuo Guerriero in campo.")
+
     # Pre-validazione: velocemento richiede almeno una Costruzione in mano
     if base_id == "velocemento":
         has_building = any(
