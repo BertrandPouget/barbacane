@@ -48,6 +48,9 @@ if os.path.isdir(_CARD_IMAGES_DIR):
 @app.get("/")
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str = ""):
+    # Frontend mobile: /m (o /mobile) → frontend/mobile/index.html
+    if full_path in ("m", "m/", "mobile", "mobile/"):
+        return FileResponse(os.path.join(_FRONTEND_DIR, "mobile", "index.html"))
     # Se è un file che esiste nel frontend dir, servilo direttamente
     candidate = os.path.join(_FRONTEND_DIR, full_path)
     if full_path and os.path.isfile(candidate):
