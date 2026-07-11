@@ -1,6 +1,8 @@
 /**
  * render.js — Rendering dello stato di gioco per il client mobile.
- * Costruisce topbar, avversari, campo, statusbar e mano.
+ * Costruisce topbar, avversari, campo (4 tasselli), statusbar e mano.
+ * Nei tasselli le carte sono riassunte in chip a una riga (dettaglio nello
+ * sheet della Regione); negli sheet e in mano usano il markup del desktop.
  * I gesti/flussi sono delegati a Mob (app.js).
  */
 
@@ -8,8 +10,7 @@
 
 const Render = (() => {
 
-  const SPECIES_ICON = { elfo: '🌿', nano: '⛏', maga: '🔮', umano: '🛡' };
-  const KIND_ICON = { warrior: '🗡', spell: '✨', building: '🏛' };
+  const SPECIES_ICON = { elfo: '🌿', nano: '⛏️', maga: '🔮', umano: '🛡️' };
 
   // ---------------------------------------------------------------------------
   // Render principale
@@ -23,8 +24,7 @@ const Render = (() => {
     const me = state.players.find(p => p.id === myId);
     if (!me) return;
 
-    vanguard(me, state, myId);
-    towers(me, state, myId);
+    field(me, state, myId);
     statusbar(me);
     hand(me);
   }
@@ -35,7 +35,7 @@ const Render = (() => {
 
   function topbar(state) {
     $('tb-turn').textContent = `T${state.turn}`;
-    $('tb-deck').textContent = `🂠 ${state.deck_count}`;
+    $('tb-deck').textContent = `🃏 ${state.deck_count}`;
 
     const phases = ['action', 'schieramento', 'battaglia'];
     const idx = phases.indexOf(state.phase);
@@ -75,36 +75,149 @@ const Render = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Avversari
+  // Carte — stesso markup del desktop (renderer.js), usate negli sheet
+  // ---------------------------------------------------------------------------
+
+  // Usata dagli sheet di app.js (avversari, ecc.)
+  function warriorMini(w) {
+    const div = el('div', {
+      className: 'card card-sm in-field',
+      dataset: { type: 'warrior', instanceId: w.instance_id, baseId: w.base_card_id },
+    });
+    if (w.horde_active) div.classList.add('horde-active');
+
+    div.appendChild(el('div', { className: 'card-name' }, [w.name || w.base_card_id]));
+    div.appendChild(el('div', {
+      className: `card-species species-${w.species}`
+    }, [capitalize(w.species || '')]));
+
+    const stats = el('div', { className: 'card-stats' });
+    stats.appendChild(el('span', { className: 'stat stat-att' }, [`🗡️${w.att}`]));
+    stats.appendChild(el('span', { className: 'stat stat-git' }, [`🏹${w.git}`]));
+    stats.appendChild(el('span', { className: 'stat stat-dif' }, [`🛡️${w.dif}`]));
+    div.appendChild(stats);
+    return div;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Riassunto di una Regione dentro i suoi tasselli — solo numeri, come per
+  // gli avversari ma con più respiro. Il dettaglio carta per carta si apre
+  // toccando il tassello (vedi openVanguardSheet/openBastionSheet/openVillageSheet).
+  // ---------------------------------------------------------------------------
+
+  function _speciesDots(warriors, max = 8) {
+    const wrap = el('span', { className: 'rg-dots' });
+    (warriors || []).slice(0, max).forEach(w => {
+      wrap.appendChild(el('i', { className: `rg-dot sp-${w.species || 'umano'}` }));
+    });
+    if ((warriors || []).length > max) {
+      wrap.appendChild(el('span', { className: 'rg-dots-more' }, [`+${warriors.length - max}`]));
+    }
+    return wrap;
+  }
+
+  function _maxStat(warriors, key) {
+    if (!warriors || warriors.length === 0) return 0;
+    return Math.max(...warriors.map(w => w[key] || 0));
+  }
+
+  function _statBlock(num, label) {
+    return el('div', { className: `rg-stat${num === 0 ? ' zero' : ''}` }, [
+      el('span', { className: 'rg-stat-num' }, [String(num)]),
+      el('span', { className: 'rg-stat-label' }, [label]),
+    ]);
+  }
+
+  function _statRow(...blocks) {
+    return el('div', { className: 'rg-stat-row' }, blocks);
+  }
+
+  function vanguardSummary(vg) {
+    const wrap = el('div', { className: 'rg-summary' }, [
+      _statRow(_statBlock(vg.length, vg.length === 1 ? 'Guerriero' : 'Guerrieri')),
+      _speciesDots(vg),
+      el('div', { className: 'rg-summary-sub' },
+        [`ATT max ${_maxStat(vg, 'att')} · GIT max ${_maxStat(vg, 'git')}`]),
+    ]);
+    return wrap;
+  }
+
+  function bastionSummary(bastion) {
+    const wallCount = bastion.wall_count ?? (bastion.walls || []).length;
+    const warriors = bastion.warriors || [];
+    const wrap = el('div', { className: 'rg-summary' }, [
+      _statRow(
+        _statBlock(wallCount, wallCount === 1 ? 'Muro' : 'Muri'),
+        _statBlock(warriors.length, warriors.length === 1 ? 'Difensore' : 'Difensori'),
+      ),
+    ]);
+    if (warriors.length > 0) {
+      wrap.appendChild(_speciesDots(warriors));
+      wrap.appendChild(el('div', { className: 'rg-summary-sub' },
+        [`DIF max ${_maxStat(warriors, 'dif')} · GIT max ${_maxStat(warriors, 'git')}`]));
+    }
+    return wrap;
+  }
+
+  function villageSummary(buildings) {
+    const completed = buildings.filter(b => b.completed).length;
+    return el('div', { className: 'rg-summary' }, [
+      _statRow(
+        _statBlock(buildings.length, buildings.length === 1 ? 'Costruzione' : 'Costruzioni'),
+        _statBlock(completed, completed === 1 ? 'Completa' : 'Complete'),
+      ),
+    ]);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Avversari — mini versione delle 4 Regioni
   // ---------------------------------------------------------------------------
 
   function _livesStr(lives) {
     const n = Math.max(0, lives);
-    return '❤'.repeat(n) + '✕'.repeat(Math.max(0, 3 - n));
+    return '❤︎'.repeat(n) + '✕'.repeat(Math.max(0, 3 - n));
   }
 
-  function _speciesDots(warriors, max = 5) {
-    const wrap = el('span', { className: 'opp-vg-dots' });
-    (warriors || []).slice(0, max).forEach(w => {
-      wrap.appendChild(el('i', {
-        className: 'tower-dot',
-        style: `width:6px;height:6px;border-radius:50%;display:inline-block;` +
-               `background:var(--${w.species || 'umano'});`,
-      }));
-    });
-    return wrap;
+  function _oppGrid(p, canHitLeft, canHitRight) {
+    const cell = (label, value, attackable) => el('span', {
+      className: `og-cell${attackable ? ' atk-target' : ''}`
+    }, [
+      el('i', {}, [label]),
+      el('b', {}, [value]),
+    ]);
+    const vg = (p.field.vanguard || []).length;
+    const vil = ((p.field.village && p.field.village.buildings) || []).length;
+    const wallsL = p.field.bastion_left.wall_count ?? 0;
+    const wallsR = p.field.bastion_right.wall_count ?? 0;
+    const defL = (p.field.bastion_left.warriors || []).length;
+    const defR = (p.field.bastion_right.warriors || []).length;
+
+    return el('span', { className: 'opp-grid' }, [
+      cell('Avanscoperta', `🗡️${vg}`),
+      cell('Villaggio', `🏗️${vil}`),
+      cell('Bastione S.', `🧱${wallsL}${defL ? ` 🗡️${defL}` : ''}`, canHitLeft),
+      cell('Bastione D.', `🧱${wallsR}${defR ? ` 🗡️${defR}` : ''}`, canHitRight),
+    ]);
   }
 
   function opponents(state, myId) {
     const rail = $('opp-rail');
     rail.innerHTML = '';
+    const n = state.players.length;
+    const myIndex = state.players.findIndex(pp => pp.id === myId);
+    const leftNb = state.players[(myIndex - 1 + n) % n];
+    const rightNb = state.players[(myIndex + 1) % n];
+
     state.players.forEach(p => {
       if (p.id === myId) return;
       const isTurn = p.id === state.current_player_id;
       const dead = (p.lives ?? 0) <= 0;
       const fxCount = (p.active_effects || []).length;
-      const wallsL = p.field.bastion_left.wall_count ?? 0;
-      const wallsR = p.field.bastion_right.wall_count ?? 0;
+      // Bastione destro di X è adiacente al Bastione sinistro di X+1:
+      // se p è il mio vicino di destra posso colpire il suo Bastione S.,
+      // se p è il mio vicino di sinistra posso colpire il suo Bastione D.
+      const canHitLeft = p.id === rightNb.id;
+      const canHitRight = p.id === leftNb.id;
 
       const chip = el('button', {
         className: `opp-chip${isTurn ? ' turn' : ''}${dead ? ' dead' : ''}`,
@@ -116,10 +229,9 @@ const Render = (() => {
         ]),
         el('span', { className: 'opp-sub' }, [
           el('span', {}, ['🃏 ', el('b', {}, [String(p.hand_count ?? 0)])]),
-          el('span', {}, ['🧱 ', el('b', {}, [`${wallsL}·${wallsR}`])]),
-          (p.field.vanguard || []).length > 0 ? _speciesDots(p.field.vanguard) : null,
           fxCount > 0 ? el('span', { className: 'opp-fx-badge' }, [`✨${fxCount}`]) : null,
         ]),
+        _oppGrid(p, canHitLeft, canHitRight),
       ]);
       chip.addEventListener('click', () => { haptic(); Mob.openOpponentSheet(p.id); });
       rail.appendChild(chip);
@@ -135,94 +247,76 @@ const Render = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Campo: avanscoperta
+  // Campo — 4 tasselli uguali (Avanscoperta, Villaggio, Bastione S., Bastione D.)
   // ---------------------------------------------------------------------------
 
-  function warriorMini(w, { showMove = false } = {}) {
-    const card = el('button', {
-      className: `wmini sp-${w.species || 'umano'}${w.horde_active ? ' horde' : ''}`,
-      dataset: { instanceId: w.instance_id },
-    }, [
-      showMove ? el('span', { className: 'wm-move' }, ['⇄']) : null,
-      el('span', { className: 'wm-name', style: 'display:block' }, [w.name || w.base_card_id]),
-      el('span', { className: 'wm-species', style: 'display:block' },
-        [`${SPECIES_ICON[w.species] || ''} ${capitalize(w.species || '')}`]),
-      el('span', { className: 'wm-stats' }, [
-        el('span', { className: 'c-att' }, [`🗡${w.att}`]),
-        el('span', { className: 'c-git' }, [`🏹${w.git}`]),
-        el('span', { className: 'c-dif' }, [`🛡${w.dif}`]),
-      ]),
-    ]);
-    return card;
-  }
-
-  function vanguard(me, state, myId) {
-    const wrap = $('vg-cards');
-    wrap.innerHTML = '';
-    const ws = me.field.vanguard || [];
+  function field(me, state, myId) {
     const canMove = state.current_player_id === myId && state.phase === 'schieramento';
-    $('fld-vanguard').classList.toggle('hot', canMove && ws.length > 0);
 
-    if (ws.length === 0) {
-      wrap.appendChild(el('div', { className: 'vg-empty' }, ['Nessun guerriero in avanscoperta']));
-      return;
-    }
-    ws.forEach(w => {
-      const card = warriorMini(w, { showMove: canMove });
-      card.addEventListener('click', () => { haptic(); Mob.openFieldWarriorSheet(w.instance_id); });
-      wrap.appendChild(card);
-    });
-  }
+    // Avanscoperta
+    const vgWrap = $('vg-cards');
+    vgWrap.innerHTML = '';
+    const vg = me.field.vanguard || [];
+    $('fld-vanguard').classList.toggle('hot', canMove && vg.length > 0);
+    vgWrap.appendChild(vg.length === 0
+      ? el('div', { className: 'rg-empty' }, ['Vuota'])
+      : vanguardSummary(vg));
 
-  // ---------------------------------------------------------------------------
-  // Campo: torri
-  // ---------------------------------------------------------------------------
+    // Villaggio
+    const vWrap = $('village-cards');
+    vWrap.innerHTML = '';
+    const buildings = (me.field.village.buildings || []);
+    vWrap.appendChild(buildings.length === 0
+      ? el('div', { className: 'rg-empty' }, ['Nessuna Costruzione'])
+      : villageSummary(buildings));
 
-  function _towerDots(container, warriors) {
-    container.innerHTML = '';
-    (warriors || []).slice(0, 5).forEach(w => {
-      container.appendChild(el('i', { style: `--sp: var(--${w.species || 'umano'})` }));
-    });
-  }
-
-  function towers(me, state, myId) {
+    // Bastioni + nome del vicino che li minaccia
     const n = state.players.length;
     const myIndex = state.players.findIndex(p => p.id === myId);
     const leftNb = state.players[(myIndex - 1 + n) % n];
     const rightNb = state.players[(myIndex + 1) % n];
+    $('tw-left-threat').textContent = leftNb && leftNb.id !== myId ? `Esposto a ${leftNb.name}` : '';
+    $('tw-right-threat').textContent = rightNb && rightNb.id !== myId ? `Esposto a ${rightNb.name}` : '';
 
-    $('tw-left-walls').textContent = me.field.bastion_left.wall_count ?? 0;
-    $('tw-right-walls').textContent = me.field.bastion_right.wall_count ?? 0;
-    _towerDots($('tw-left-dots'), me.field.bastion_left.warriors);
-    _towerDots($('tw-right-dots'), me.field.bastion_right.warriors);
-    $('tw-left-threat').textContent = leftNb && leftNb.id !== myId ? `⚔ ${leftNb.name}` : '';
-    $('tw-right-threat').textContent = rightNb && rightNb.id !== myId ? `⚔ ${rightNb.name}` : '';
-
-    const buildings = (me.field.village.buildings || []);
-    $('tw-village-count').textContent = buildings.length;
-    const incomplete = buildings.some(b => !b.completed);
-    $('tw-village-badge').hidden = !incomplete;
+    [['left', 'bl-cards', 'tw-left'], ['right', 'br-cards', 'tw-right']].forEach(([side, wrapId, tileId]) => {
+      const bastion = side === 'left' ? me.field.bastion_left : me.field.bastion_right;
+      const wrap = $(wrapId);
+      wrap.innerHTML = '';
+      const wallCount = bastion.wall_count ?? (bastion.walls || []).length;
+      const warriors = bastion.warriors || [];
+      $(tileId).classList.toggle('hot', canMove && warriors.length > 0);
+      wrap.appendChild(wallCount === 0 && warriors.length === 0
+        ? el('div', { className: 'rg-empty' }, ['Vuoto'])
+        : bastionSummary(bastion));
+    });
   }
 
   // ---------------------------------------------------------------------------
   // Statusbar
   // ---------------------------------------------------------------------------
 
+  let _prevMana = null;
+  let _prevActs = null;
+
+  function _bump(id) {
+    const chip = $(id);
+    chip.classList.remove('bump');
+    void chip.offsetWidth;
+    chip.classList.add('bump');
+  }
+
   function statusbar(me) {
     $('st-lives').textContent = _livesStr(me.lives ?? 0);
 
     const mana = me.mana_remaining ?? 0;
-    $('st-mana').textContent = `💎 ${mana}`;
+    $('st-mana').textContent = `Mana: ${mana}`;
+    if (_prevMana !== null && mana !== _prevMana) _bump('st-mana');
+    _prevMana = mana;
 
     const acts = me.actions_remaining ?? 0;
-    const actEl = $('st-actions');
-    actEl.innerHTML = '';
-    actEl.appendChild(document.createTextNode('⚡'));
-    const total = Math.max(acts, 2);
-    for (let i = 0; i < Math.min(total, 5); i++) {
-      actEl.appendChild(document.createTextNode(' '));
-      actEl.appendChild(el('span', { className: i < acts ? '' : 'dimmed' }, ['●']));
-    }
+    $('st-actions').textContent = `Azioni: ${acts}`;
+    if (_prevActs !== null && acts !== _prevActs) _bump('st-actions');
+    _prevActs = acts;
 
     const fxItems = activeEffectItems(me);
     const fxBtn = $('st-fx');
@@ -252,7 +346,7 @@ const Render = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Mano
+  // Mano — riga orizzontale scorrevole, carte identiche al desktop
   // ---------------------------------------------------------------------------
 
   function hand(me) {
@@ -263,56 +357,57 @@ const Render = (() => {
       wrap.appendChild(el('div', { className: 'hand-empty' }, ['Mano vuota']));
       return;
     }
+    cards.forEach(iid => wrap.appendChild(handCard(iid, me.ethereal_card || null)));
+  }
 
-    const n = cards.length;
-    cards.forEach((iid, i) => {
-      const def = Mob.getCardDef(iid);
-      const isEthereal = me.ethereal_card === iid;
-      const center = (n - 1) / 2;
-      const rot = n > 1 ? ((i - center) * Math.min(4.5, 26 / n)).toFixed(2) : 0;
-      const lift = n > 1 ? (Math.abs(i - center) * 3.4).toFixed(1) : 0;
+  function handCard(iid, etherealCard) {
+    const isEthereal = etherealCard === iid;
+    const div = el('div', { className: isEthereal ? 'card ethereal' : 'card', dataset: { instanceId: iid } });
 
-      const card = el('button', {
-        className: `hcard${isEthereal ? ' ethereal' : ''}`,
-        dataset: { instanceId: iid },
-        style: `--rot:${rot}deg; --lift:${lift}px; animation-delay:${i * 0.045}s`,
-      });
+    const def = Mob.getCardDef(iid);
+    if (def) {
+      div.dataset.type = def.type;
+      div.dataset.baseId = def.id;
 
-      if (def) {
-        const isSpell = def.type === 'spell';
-        const costCls = isEthereal ? 'hc-cost zero' : (isSpell ? 'hc-cost maghe' : 'hc-cost');
-        card.appendChild(el('span', { className: costCls }, [String(isEthereal ? 0 : def.cost)]));
-        card.appendChild(el('span', { className: 'hc-name', style: 'display:block' }, [def.name]));
+      // Badge costo: notifica in alto a destra, oro = Mana, azzurro = Maghe
+      const badgeCls = isEthereal ? 'ethereal' : (def.cost_type === 'maga' ? 'maga' : 'mana');
+      div.appendChild(el('div', { className: `card-cost-badge ${badgeCls}` }, [String(isEthereal ? 0 : def.cost)]));
 
-        const spCls = def.type === 'warrior' ? `sp-${def.species}` : (isSpell ? `sc-${def.school}` : '');
-        const typeLabel = def.type === 'warrior'
-          ? `${capitalize(def.species)}${def.subtype === 'hero' ? ' · Eroe' : ''}`
-          : isSpell ? capitalize(def.school)
-          : `Costruzione · 🏗${def.completion_cost}`;
-        card.appendChild(el('span', { className: `hc-type ${spCls}`, style: 'display:block' }, [typeLabel]));
-        if (spCls) card.classList.add(spCls);
+      div.appendChild(el('div', { className: 'card-name' }, [def.name]));
 
-        if (def.type === 'warrior') {
-          card.appendChild(el('span', { className: 'hc-stats' }, [
-            el('span', { className: 'c-att' }, [`🗡${def.att}`]),
-            el('span', { className: 'c-git' }, [`🏹${def.git}`]),
-            el('span', { className: 'c-dif' }, [`🛡${def.dif}`]),
-          ]));
-        } else {
-          card.appendChild(el('span', { className: 'hc-kind' }, [KIND_ICON[def.type] || '❔']));
-        }
-      } else {
-        card.appendChild(el('span', { className: 'hc-name', style: 'display:block' }, [iid]));
+      if (def.type === 'warrior') {
+        div.appendChild(el('div', {
+          className: `card-species species-${def.species}`
+        }, [`${capitalize(def.species)}${def.school ? ` · ${capitalize(def.school)}` : ''}`]));
+
+        // Caratteristiche in colonna, una sotto l'altra
+        const attrsDiv = el('div', { className: 'card-warrior-attrs' });
+        attrsDiv.appendChild(el('span', { className: 'stat stat-att' }, [`🗡️ ${def.att}`]));
+        attrsDiv.appendChild(el('span', { className: 'stat stat-git' }, [`🏹 ${def.git}`]));
+        attrsDiv.appendChild(el('span', { className: 'stat stat-dif' }, [`🛡️ ${def.dif}`]));
+        div.appendChild(attrsDiv);
+
+      } else if (def.type === 'spell') {
+        div.appendChild(el('div', {
+          className: `card-species school-${def.school}`
+        }, [capitalize(def.school)]));
+
+      } else if (def.type === 'building') {
+        div.appendChild(el('div', { className: 'card-stats hand-cost-row' }, [
+          el('span', { className: 'stat stat-mana' }, [`🏗️${def.completion_cost}`]),
+        ]));
       }
+    } else {
+      div.appendChild(el('div', { className: 'card-name' }, [iid]));
+    }
 
-      card.addEventListener('click', () => { haptic(); Mob.onHandTap(iid); });
-      wrap.appendChild(card);
-    });
+    div.addEventListener('click', () => { haptic(); Mob.onHandTap(iid); });
+    return div;
   }
 
   function markWallPicks(selectedIds) {
-    document.querySelectorAll('#hand .hcard').forEach(c => {
-      c.classList.toggle('wall-pick', selectedIds.has(c.dataset.instanceId));
+    document.querySelectorAll('#hand .card').forEach(c => {
+      c.classList.toggle('wall-marked', selectedIds.has(c.dataset.instanceId));
     });
   }
 
@@ -332,7 +427,7 @@ const Render = (() => {
         · ${def.subtype === 'hero' ? 'Eroe' : 'Recluta'} · 💎${def.cost} Mana
       </div>
       <div class="ct-stats">
-        <span class="c-att">🗡 ${att}</span><span class="c-git">🏹 ${git}</span><span class="c-dif">🛡 ${dif}</span>
+        <span class="c-att">🗡️ ${att}</span><span class="c-git">🏹 ${git}</span><span class="c-dif">🛡️ ${dif}</span>
       </div>`;
       if (def.horde_effect) html += `<div class="ct-section"><strong>Effetto Orda</strong><br>${def.horde_effect}</div>`;
       if (def.evolves_from) html += `<div class="ct-dim">Evolve da: ${Mob.cardName(def.evolves_from)}</div>`;
@@ -351,7 +446,7 @@ const Render = (() => {
         : ' · <span style="color:var(--text-faint)">Incompleta</span>';
       const baseCls = ctx.completed === false ? ' ct-active' : '';
       const complCls = ctx.completed === true ? ' ct-active' : '';
-      html += `<div class="ct-meta">Costruzione · 💎${def.cost} Mana · 🏗${ctx.completionCostLabel || def.completion_cost} Mana${statusStr}</div>
+      html += `<div class="ct-meta">Costruzione · 💎${def.cost} Mana · 🏗️${ctx.completionCostLabel || def.completion_cost} Mana${statusStr}</div>
       <div class="ct-section${baseCls}"><strong>Effetto Base</strong><br>${def.base_effect || '—'}</div>`;
       if (def.complete_effect) {
         html += `<div class="ct-section${complCls}"><strong>Effetto Completo</strong><br>${def.complete_effect}</div>`;
@@ -423,8 +518,7 @@ const Render = (() => {
     phaseDimmed,
     opponents,
     flashOpponent,
-    vanguard,
-    towers,
+    field,
     statusbar,
     hand,
     markWallPicks,

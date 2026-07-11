@@ -268,7 +268,7 @@ const Sheet = (() => {
 function spawnConfetti() {
   const box = $('confetti');
   if (!box || box.childElementCount > 0) return;
-  const colors = ['#f2c14e', '#ff9a3d', '#7fd8a4', '#62a9e8', '#b07fe0', '#f47069'];
+  const colors = ['#f0ce06', '#ff9a3d', '#4a9a58', '#4a7aaa', '#9966cc', '#e04040'];
   for (let i = 0; i < 34; i++) {
     const c = el('i', {
       style: `left:${Math.random() * 100}vw;` +

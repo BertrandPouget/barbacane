@@ -2,7 +2,7 @@
  * app.js — Logica del client mobile di Barbacane (modulo Mob).
  * Parla lo stesso protocollo del client desktop (server/routes.py),
  * ma con interazioni ripensate per il touch: bottom sheet, dock contestuale,
- * mano a ventaglio, bastioni "chiusi" da toccare per rivelare.
+ * campo a 4 tasselli (le mie Regioni) da toccare per rivelare.
  */
 
 'use strict';
@@ -343,7 +343,7 @@ const Mob = (() => {
         const attName = playerName(result.attacker_id);
         const defName = playerName(result.defender_id);
         const side = result.defender_bastion === 'left' ? 'Sinistro' : 'Destro';
-        Render.logPush(`⚔ ${attName} → ${defName} [Bastione ${side}]: ` +
+        Render.logPush(`⚔️ ${attName} → ${defName} [Bastione ${side}]: ` +
           `${result.total_damage} Danni, ${result.walls_destroyed} Muri, ${result.life_lost} Vita`);
       }
 
@@ -354,7 +354,7 @@ const Mob = (() => {
         Sheet.choice(
           '⚡ Eracle',
           result.eracle_targets.map(b => ({
-            icon: '🏛',
+            icon: '🏗️',
             label: cardName(b.base_card_id || (getCardDef(b.instance_id) || {}).id) || b.instance_id,
             value: b.instance_id,
           })),
@@ -507,7 +507,7 @@ const Mob = (() => {
       } else {
         Render.timer(timerSecondsLeft);
         if (timerSecondsLeft === 15 && currentState && currentState.current_player_id === myPlayerId) {
-          Toast.show('⏱ 15 secondi!', 'error');
+          Toast.show('⏱️ 15 secondi!', 'error');
           haptic(60);
         }
       }
@@ -521,6 +521,7 @@ const Mob = (() => {
   // ---------------------------------------------------------------------------
 
   function bindGameChrome() {
+    $('fld-vanguard').addEventListener('click', () => { haptic(); openVanguardSheet(); });
     $('tw-left').addEventListener('click', () => { haptic(); openBastionSheet('left'); });
     $('tw-right').addEventListener('click', () => { haptic(); openBastionSheet('right'); });
     $('tw-village').addEventListener('click', () => { haptic(); openVillageSheet(); });
@@ -603,7 +604,7 @@ const Mob = (() => {
       if (acts > 0) {
         dock.appendChild(hint(hasCards ? 'Tocca una carta per giocarla' : 'Nessuna carta in mano'));
         dock.appendChild(mkBtn('🧱 Muri', '', enterWallMode, !hasCards));
-        dock.appendChild(mkBtn('🏗', '', openCompleteSheet, !hasIncomplete));
+        dock.appendChild(mkBtn('🏗️', '', openCompleteSheet, !hasIncomplete));
         dock.appendChild(mkBtn('Avanti ›', '', () => sendAction('next_phase', {})));
       } else {
         dock.appendChild(hint(hasEthereal ? 'Gioca la carta eterea o avanza' : 'Azioni esaurite'));
@@ -613,9 +614,9 @@ const Mob = (() => {
     } else if (phase === 'schieramento') {
       const hordes = my && my.available_hordes
         ? my.available_hordes.filter(h => !h.already_activated) : [];
-      dock.appendChild(hint('Tocca un guerriero per spostarlo.'));
+      dock.appendChild(hint('Tocca una Regione per riposizionare i Guerrieri.'));
       if (hordes.length > 0) {
-        dock.appendChild(mkBtn(`🔥 Orda (${hordes.length})`, 'mbtn-warn mbtn-pulse', openHordeSheet));
+        dock.appendChild(mkBtn(`⚡ Orda (${hordes.length})`, 'mbtn-warn mbtn-pulse', openHordeSheet));
       }
       dock.appendChild(mkBtn('Battaglia ›', '', () => sendAction('next_phase', {})));
 
@@ -623,7 +624,7 @@ const Mob = (() => {
       const canAttack = currentState.battles_remaining > 0 &&
         my && my.field.vanguard && my.field.vanguard.length > 0;
       dock.appendChild(hint(canAttack ? 'Attacca o termina il turno.' : 'Nessun attacco possibile.'));
-      dock.appendChild(mkBtn('⚔ Attacca', canAttack ? 'mbtn-gold' : '', openBattleSheet, !canAttack));
+      dock.appendChild(mkBtn('⚔️ Attacca', canAttack ? 'mbtn-gold' : '', openBattleSheet, !canAttack));
       dock.appendChild(mkBtn('Fine turno', 'mbtn-danger', confirmEndTurn));
     }
   }
@@ -631,7 +632,7 @@ const Mob = (() => {
   function confirmEndTurn() {
     Sheet.confirm('Terminare il turno?', 'Pescherai fino a riempire la mano e il turno passerà al prossimo giocatore.', () => {
       sendAction('end_turn', {});
-    }, { yesLabel: '🏁 Fine turno', danger: true });
+    }, { yesLabel: 'Fine turno', danger: true });
   }
 
   // ---------------------------------------------------------------------------
@@ -693,7 +694,7 @@ const Mob = (() => {
       if (def.subtype === 'hero') showHeroPlayOptions(iid, def);
       else {
         Sheet.choice(`Gioca ${def.name}`, [
-          { icon: '⚔', label: 'Avanscoperta', sub: 'Prima linea: attacca e difende in battaglia', value: 'vanguard' },
+          { icon: '⚔️', label: 'Avanscoperta', sub: 'Prima linea: attacca e difende in battaglia', value: 'vanguard' },
           { icon: '🏰', label: 'Bastione Sinistro', value: 'bastion_left' },
           { icon: '🏰', label: 'Bastione Destro', value: 'bastion_right' },
         ], (region) => sendAction('play_warrior', { instance_id: iid, region }),
@@ -706,7 +707,7 @@ const Mob = (() => {
         `Costruisci ${def.name}`,
         `Costo: <b>${def.cost} Mana</b><br>${def.base_effect || ''}`,
         () => sendAction('play_building', { instance_id: iid }),
-        { yesLabel: '🏗 Costruisci' },
+        { yesLabel: '🏗️ Costruisci' },
       );
     }
   }
@@ -723,7 +724,7 @@ const Mob = (() => {
         const wDef = getCardDef(w.instance_id);
         if (wDef && wDef.evolves_into === def.id) {
           compat.push({
-            icon: '⬆',
+            icon: '⬆️',
             label: `Evolvi ${wDef.name}`,
             sub: regionLabels[reg],
             value: w.instance_id,
@@ -800,9 +801,9 @@ const Mob = (() => {
         zones.forEach(({ warriors, label }) => {
           (warriors || []).forEach(w => {
             options.push({
-              icon: '🗡',
+              icon: '🗡️',
               label: w.name || w.base_card_id,
-              sub: `${p.name} — ${label} · 🗡${w.att} 🏹${w.git} 🛡${w.dif}`,
+              sub: `${p.name} — ${label} · 🗡️${w.att} 🏹${w.git} 🛡️${w.dif}`,
               value: `${p.id}:${w.instance_id}`,
             });
           });
@@ -828,7 +829,7 @@ const Mob = (() => {
       const options = [];
       zones.forEach(({ warriors, label }) => {
         (warriors || []).forEach(w => {
-          options.push({ icon: '🗡', label: w.name || w.base_card_id, sub: label, value: w.instance_id });
+          options.push({ icon: '🗡️', label: w.name || w.base_card_id, sub: label, value: w.instance_id });
         });
       });
       if (options.length === 0) { Toast.show('Non hai nessun Guerriero in campo.', 'error'); return; }
@@ -1104,7 +1105,7 @@ const Mob = (() => {
       const eff = baseCost !== null ? Math.max(0, baseCost - discount) : '?';
       const isEth = my.ethereal_complete === b.instance_id;
       return {
-        icon: '🏗',
+        icon: '🏗️',
         label: def ? def.name : b.base_card_id,
         sub: isEth ? 'Gratis (Velocemento)' : `${discount > 0 ? `${baseCost}→` : ''}${eff} Mana`,
         value: b.instance_id,
@@ -1149,14 +1150,14 @@ const Mob = (() => {
     }
 
     if (warriors.length > 0) {
-      body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' }, [`🗡 Guerrieri (${warriors.length})`]));
+      body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' }, [`🗡️ Guerrieri (${warriors.length})`]));
       warriors.forEach(w => {
         const row = el('button', { className: `opt-row sp-${w.species || 'umano'}` }, [
-          el('span', { className: 'opt-icon' }, ['🗡']),
+          el('span', { className: 'opt-icon' }, ['🗡️']),
           el('span', { className: 'opt-main' }, [
             el('span', { className: 'opt-label' }, [w.name || w.base_card_id]),
             el('span', { className: 'opt-sub', style: 'display:block' },
-              [`${capitalize(w.species || '')} · 🗡${w.att} 🏹${w.git} 🛡${w.dif}${w.horde_active ? ' · 🔥 Orda' : ''}`]),
+              [`${capitalize(w.species || '')} · 🗡️${w.att} 🏹${w.git} 🛡️${w.dif}${w.horde_active ? ' · ⚡ Orda' : ''}`]),
           ]),
           el('span', { className: 'opt-chevron' }, ['›']),
         ]);
@@ -1228,7 +1229,7 @@ const Mob = (() => {
 
     Sheet.open({
       title: w.name || iid,
-      subtitle: `${zoneLabel}${w.horde_active ? ' · 🔥 Orda attiva' : ''}` +
+      subtitle: `${zoneLabel}${w.horde_active ? ' · ⚡ Orda attiva' : ''}` +
         (canMove ? '' : ' — spostabile nella fase Schieramento'),
       body: Render.cardViewNode(def, { att: w.att, git: w.git, dif: w.dif, instanceId: iid }),
       footer: [
@@ -1240,13 +1241,52 @@ const Mob = (() => {
           onClick: () => {
             Sheet.close(true);
             Sheet.choice(`Sposta ${w.name || ''}`, [
-              { icon: '⚔', label: 'Avanscoperta', value: 'vanguard', disabled: zone === 'vanguard' },
+              { icon: '⚔️', label: 'Avanscoperta', value: 'vanguard', disabled: zone === 'vanguard' },
               { icon: '🏰', label: 'Bastione Sinistro', value: 'bastion_left', disabled: zone === 'bastion_left' },
               { icon: '🏰', label: 'Bastione Destro', value: 'bastion_right', disabled: zone === 'bastion_right' },
             ], (dest) => sendAction('reposition', { warrior_instance_id: iid, destination: dest }));
           },
         },
       ],
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sheet: avanscoperta (mia)
+  // ---------------------------------------------------------------------------
+
+  function openVanguardSheet() {
+    const my = me();
+    if (!my) return;
+    const warriors = my.field.vanguard || [];
+    const canMove = isMyTurn() && currentState.phase === 'schieramento';
+
+    const body = [];
+    if (warriors.length === 0) {
+      body.push(el('div', { className: 'sheet-note' },
+        ['Nessun Guerriero in Avanscoperta. Senza di loro non puoi attaccare in Battaglia.']));
+    }
+
+    warriors.forEach(w => {
+      const row = el('button', { className: `opt-row sp-${w.species || 'umano'}` }, [
+        el('span', { className: 'opt-icon' }, ['🗡️']),
+        el('span', { className: 'opt-main' }, [
+          el('span', { className: 'opt-label' }, [w.name || w.base_card_id]),
+          el('span', { className: 'opt-sub', style: 'display:block' },
+            [`${capitalize(w.species || '')} · 🗡️${w.att} 🏹${w.git} 🛡️${w.dif}${w.horde_active ? ' · ⚡ Orda' : ''}`]),
+        ]),
+        el('span', { className: 'opt-chevron' }, ['›']),
+      ]);
+      row.addEventListener('click', () => { haptic(); openFieldWarriorSheet(w.instance_id); });
+      body.push(row);
+    });
+
+    Sheet.open({
+      title: '⚔️ Avanscoperta',
+      subtitle: `${warriors.length} Guerrieri` +
+        (canMove && warriors.length > 0 ? ' · tocca un Guerriero per riposizionarlo' : ''),
+      body,
+      footer: [{ label: 'Chiudi', onClick: () => Sheet.close() }],
     });
   }
 
@@ -1268,7 +1308,7 @@ const Mob = (() => {
       const def = getCardDef(b.instance_id);
       const isEth = my.ethereal_complete === b.instance_id;
       const row = el('button', { className: `opt-row${b.completed ? ' gold' : ''}` }, [
-        el('span', { className: 'opt-icon' }, [b.completed ? '🏛' : '🏗']),
+        el('span', { className: 'opt-icon' }, [b.completed ? '🏰' : '🏗️']),
         el('span', { className: 'opt-main' }, [
           el('span', { className: 'opt-label' }, [(def ? def.name : b.base_card_id) + (b.completed ? ' ✓' : '')]),
           el('span', { className: 'opt-sub', style: 'display:block' },
@@ -1307,7 +1347,7 @@ const Mob = (() => {
 
     if (def && def.id === 'arena') {
       footer.push({
-        label: '⚔ Attiva Arena',
+        label: '⚔️ Attiva Arena',
         className: 'mbtn-warn',
         disabled: !canActivateArena(iid),
         onClick: () => { Sheet.close(true); showArenaFlow(iid); },
@@ -1351,9 +1391,9 @@ const Mob = (() => {
     const enemies = currentState.players.filter(p => p.id !== myPlayerId && p.lives > 0);
 
     Sheet.choice('Arena — il tuo campione', mine.map(w => ({
-      icon: '🗡',
+      icon: '🗡️',
       label: w.name || w.base_card_id,
-      sub: `🗡${w.att} 🏹${w.git} 🛡${w.dif} — verrà scartato`,
+      sub: `🗡️${w.att} 🏹${w.git} 🛡️${w.dif} — verrà scartato`,
       value: w.instance_id,
     })), (ownIid) => {
       const ownW = mine.find(w => w.instance_id === ownIid);
@@ -1365,7 +1405,7 @@ const Mob = (() => {
             targets.push({
               icon: '💀',
               label: ew.name || ew.base_card_id,
-              sub: `${p.name} · 🗡${ew.att} 🏹${ew.git} 🛡${ew.dif}`,
+              sub: `${p.name} · 🗡️${ew.att} 🏹${ew.git} 🛡️${ew.dif}`,
               value: `${p.id}:${ew.instance_id}`,
             });
           }
@@ -1439,7 +1479,7 @@ const Mob = (() => {
 
     // Avanscoperta
     body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' },
-      [`⚔ Avanscoperta (${(p.field.vanguard || []).length})`]));
+      [`⚔️ Avanscoperta (${(p.field.vanguard || []).length})`]));
     if ((p.field.vanguard || []).length === 0) {
       body.push(el('div', { className: 'sheet-note' }, ['Vuota — non può attaccare.']));
     } else {
@@ -1455,7 +1495,7 @@ const Mob = (() => {
     // Bastioni
     [['left', 'Sinistro'], ['right', 'Destro']].forEach(([side, name]) => {
       const bastion = side === 'left' ? p.field.bastion_left : p.field.bastion_right;
-      const tag = attackable.has(side) ? ' · 🎯 attaccabile da te' : '';
+      const tag = attackable.has(side) ? ' (Possibile Bersaglio)' : '';
       body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' },
         [`🏰 Bastione ${name} — 🧱 ${bastion.wall_count ?? 0}${tag}`]));
       if ((bastion.warriors || []).length > 0) {
@@ -1477,7 +1517,7 @@ const Mob = (() => {
     buildings.forEach(b => {
       const def = getCardDef(b.instance_id);
       const row = el('button', { className: `opt-row${b.completed ? ' gold' : ''}` }, [
-        el('span', { className: 'opt-icon' }, [b.completed ? '🏛' : '🏗']),
+        el('span', { className: 'opt-icon' }, [b.completed ? '🏰' : '🏗️']),
         el('span', { className: 'opt-main' }, [
           el('span', { className: 'opt-label' }, [(def ? def.name : b.base_card_id) + (b.completed ? ' ✓' : '')]),
           el('span', { className: 'opt-sub', style: 'display:block' }, [b.effect || '']),
@@ -1499,7 +1539,7 @@ const Mob = (() => {
 
     Sheet.open({
       title: p.name,
-      subtitle: `❤ ${p.lives} Vite · 🃏 ${p.hand_count} carte in mano` +
+      subtitle: `❤︎ ${p.lives} Vite · 🃏 ${p.hand_count} carte in mano` +
         (p.id === currentState.current_player_id ? ' · sta giocando' : ''),
       body,
       footer: [{ label: 'Chiudi', onClick: () => Sheet.close() }],
@@ -1530,7 +1570,7 @@ const Mob = (() => {
     const iid = cards[idx];
     const def = getCardDef(iid);
     showCardNavSheet({
-      title: `❤ Vita ${idx + 1} di ${cards.length}`,
+      title: `❤︎ Vita ${idx + 1} di ${cards.length}`,
       subtitle: 'Solo tu puoi vedere le tue carte-Vita.',
       def,
       ctx: { instanceId: iid },
@@ -1586,7 +1626,7 @@ const Mob = (() => {
     hordes.forEach(h => {
       h.warriors.forEach(w => {
         options.push({
-          icon: '🔥',
+          icon: '⚡',
           label: w.name,
           sub: `${capitalize(h.species)} · ${zoneNames[h.zone] || h.zone} — ${w.horde_effect}`,
           value: `${w.base_card_id}|${w.instance_id}|${h.zone}`,
@@ -1594,7 +1634,7 @@ const Mob = (() => {
       });
     });
 
-    Sheet.choice('🔥 Attiva un effetto Orda', options, (choice) => {
+    Sheet.choice('⚡ Attiva un effetto Orda', options, (choice) => {
       const [hordeCardId, warriorIid, zone] = choice.split('|');
       sendAction('horde', { horde_card_id: hordeCardId, warrior_instance_id: warriorIid, zone });
     }, { subtitle: 'Ogni Orda può essere attivata una sola volta per turno' });
@@ -1633,11 +1673,11 @@ const Mob = (() => {
       };
     });
 
-    Sheet.choice('⚔ Scegli il bersaglio', options, (choice) => {
+    Sheet.choice('⚔️ Scegli il bersaglio', options, (choice) => {
       const [idx, side] = choice.split(':');
       haptic(30);
       sendAction('battle', { defender_player_index: parseInt(idx), defender_bastion_side: side });
-    }, { subtitle: `I tuoi attaccanti: 🗡 ${attAtt} · 🏹 ${attGit}` });
+    }, { subtitle: `I tuoi attaccanti: 🗡️ ${attAtt} · 🏹 ${attGit}` });
   }
 
   // ---------------------------------------------------------------------------
@@ -1735,9 +1775,9 @@ const Mob = (() => {
   }
 
   function showVelocementoSheet(buildingIids) {
-    Sheet.choice('⚡ Velocemento', buildingIids.map(iid => {
+    Sheet.choice('✨ Velocemento', buildingIids.map(iid => {
       const def = getCardDef(iid);
-      return { icon: '🏗', label: def ? def.name : iid, sub: def ? `${def.base_effect || ''}` : '', value: iid };
+      return { icon: '🏗️', label: def ? def.name : iid, sub: def ? `${def.base_effect || ''}` : '', value: iid };
     }), (iid) => sendAction('resolve_velocemento', { building_instance_id: iid }),
     { subtitle: 'Scegli la Costruzione da rendere Eterea', locked: true, cancelLabel: null });
   }
@@ -1757,7 +1797,7 @@ const Mob = (() => {
     const spellDef = getCardDef(pending.spell_iid);
     const spellName = spellDef ? spellDef.name : 'una Magia';
     Sheet.open({
-      title: '🛡 Magiscudo — reagisci!',
+      title: '🛡️ Magiscudo — reagisci!',
       subtitle: `${caster} ha lanciato ${spellName} contro di te.`,
       body: spellDef ? Render.cardViewNode(spellDef, {}) : [],
       footer: [
@@ -1766,7 +1806,7 @@ const Mob = (() => {
           onClick: () => { Sheet.close(true); sendAction('resolve_magiscudo_counter', { accept: false }); },
         },
         {
-          label: '🛡 Usa Magiscudo',
+          label: '🛡️ Usa Magiscudo',
           className: 'mbtn-gold',
           onClick: () => { Sheet.close(true); sendAction('resolve_magiscudo_counter', { accept: true }); },
         },
@@ -1793,14 +1833,14 @@ const Mob = (() => {
       });
     });
     if (options.length === 0) { sendAction('resolve_malcomune', {}); return; }
-    Sheet.choice('☠ Malcomune', options,
+    Sheet.choice('☠️ Malcomune', options,
       (iid) => sendAction('resolve_malcomune', { warrior_iid: iid }),
       { subtitle: `${caster} ti costringe a scartare un Guerriero ${capitalize(pending.species)}`, locked: true, cancelLabel: null });
   }
 
   function showCardoSheet() {
     const my = me();
-    const zoneLabels = { vanguard: '⚔ Avanscoperta', bastion_left: '🏰 Bastione Sin.', bastion_right: '🏰 Bastione Des.' };
+    const zoneLabels = { vanguard: '⚔️ Avanscoperta', bastion_left: '🏰 Bastione Sin.', bastion_right: '🏰 Bastione Des.' };
     const options = [];
     Object.entries(zoneLabels).forEach(([zoneKey, zoneLabel]) => {
       const zone = my.field[zoneKey];
@@ -1812,7 +1852,7 @@ const Mob = (() => {
 
     Sheet.choice('🛞 Cardo — sposta un Guerriero', options, (warriorIid) => {
       Sheet.choice('🛞 Cardo — destinazione', [
-        { icon: '⚔', label: 'Avanscoperta', value: 'vanguard' },
+        { icon: '⚔️', label: 'Avanscoperta', value: 'vanguard' },
         { icon: '🏰', label: 'Bastione Sinistro', value: 'bastion_left' },
         { icon: '🏰', label: 'Bastione Destro', value: 'bastion_right' },
       ], (dest) => sendAction('resolve_cardo_move', { warrior_iid: warriorIid, destination: dest }),
@@ -1838,11 +1878,54 @@ const Mob = (() => {
     const winner = state.players.find(p => p.id === state.winner_id);
     const iWon = state.winner_id === myPlayerId;
     $('over-title').textContent = iWon ? 'Vittoria!' : 'Fine partita';
-    $('over-winner').textContent = winner ? `${winner.name} conquista il Barbacane 🏆` : 'Nessun vincitore';
+    $('over-winner').textContent = winner ? `${winner.name} conquista il Barbacane` : 'Nessun vincitore';
     $('over-scores').innerHTML = state.players
-      .map(p => `${p.name}: ${'❤'.repeat(Math.max(0, p.lives))}${'✕'.repeat(Math.max(0, 3 - p.lives))}`)
+      .map(p => `${p.name}: ${'❤︎'.repeat(Math.max(0, p.lives))}${'✕'.repeat(Math.max(0, 3 - p.lives))}`)
       .join('<br>');
     haptic(iWon ? 120 : 40);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Animazione: la carta giocata vola dalla mano al bersaglio
+  // ---------------------------------------------------------------------------
+
+  const PLAY_TARGETS = {
+    vanguard: 'fld-vanguard',
+    bastion_left: 'tw-left',
+    bastion_right: 'tw-right',
+  };
+
+  function flyFromHand(iid, targetElId) {
+    const src = document.querySelector(`#hand .card[data-instance-id="${iid}"]`);
+    if (!src) return;
+    const r = src.getBoundingClientRect();
+    const ghost = src.cloneNode(true);
+    ghost.classList.add('hcard-ghost');
+    ghost.style.left = `${r.left}px`;
+    ghost.style.top = `${r.top}px`;
+    ghost.style.bottom = 'auto';
+    ghost.style.width = `${r.width}px`;
+    ghost.style.height = `${r.height}px`;
+    document.body.appendChild(ghost);
+
+    const target = targetElId ? document.getElementById(targetElId) : null;
+    const tr = target ? target.getBoundingClientRect()
+      : { left: window.innerWidth / 2 - r.width / 2, top: window.innerHeight * 0.3, width: r.width, height: 0 };
+    const dx = (tr.left + tr.width / 2) - (r.left + r.width / 2);
+    const dy = (tr.top + tr.height / 2) - (r.top + r.height / 2);
+
+    requestAnimationFrame(() => {
+      ghost.style.transform = `translate(${dx.toFixed(0)}px, ${dy.toFixed(0)}px) scale(0.3) rotate(8deg)`;
+      ghost.style.opacity = '0';
+    });
+    setTimeout(() => ghost.remove(), 600);
+  }
+
+  function _animateAction(action, params) {
+    if (action === 'play_warrior') flyFromHand(params.instance_id, PLAY_TARGETS[params.region]);
+    else if (action === 'play_building') flyFromHand(params.instance_id, 'tw-village');
+    else if (action === 'play_spell') flyFromHand(params.instance_id, null);
+    else if (action === 'evolve') flyFromHand(params.hero_instance_id, null);
   }
 
   // ---------------------------------------------------------------------------
@@ -1850,6 +1933,7 @@ const Mob = (() => {
   // ---------------------------------------------------------------------------
 
   async function sendAction(action, params = {}) {
+    _animateAction(action, params);
     if (WS && gameId) {
       WS.sendAction(action, params);
       return;
@@ -1892,6 +1976,7 @@ const Mob = (() => {
     cardName,
     onHandTap,
     openFieldWarriorSheet,
+    openBuildingSheet,
     openOpponentSheet,
     sendAction,
   };

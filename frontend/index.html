@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#140d08" />
   <title>Barbacane</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧱</text></svg>" />
   <script>
@@ -26,12 +25,6 @@
 </head>
 <body>
 
-<!-- Sfondo dinamico: braci fluttuanti -->
-<div id="bg-embers" aria-hidden="true">
-  <span></span><span></span><span></span><span></span><span></span>
-  <span></span><span></span><span></span><span></span><span></span>
-</div>
-
 <!-- ===== SCHERMATA: LOBBY ===== -->
 <div id="screen-lobby" class="screen active">
   <div class="lobby-container">
@@ -39,7 +32,6 @@
       <img src="/assets/logo_color.png" alt="Barbacane" class="logo"
            onerror="this.style.display='none'; document.getElementById('lobby-title').classList.add('show')" />
       <h1 class="game-title" id="lobby-title">BARBACANE</h1>
-      <p class="game-subtitle">Evoca · Costruisci · Assedia</p>
     </div>
 
     <div class="lobby-panels">
@@ -68,7 +60,7 @@
       </div>
     </div>
     <a href="/m" style="display:block;text-align:center;margin-top:14px;font-size:0.8rem;color:var(--text-dim);text-decoration:none"
-       onclick="try{localStorage.removeItem('barbacane-desktop')}catch(e){}">📱 Versione mobile</a>
+       onclick="try{localStorage.removeItem('barbacane-desktop')}catch(e){}">Passa alla versione mobile</a>
   </div>
 </div>
 

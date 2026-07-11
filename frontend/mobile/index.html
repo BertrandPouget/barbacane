@@ -12,19 +12,14 @@
 </head>
 <body>
 
-<!-- Sfondo dinamico: braci fluttuanti -->
-<div id="bg-embers" aria-hidden="true">
-  <span></span><span></span><span></span><span></span><span></span><span></span>
-</div>
-
 <!-- ═══════════ SCHERMATA: LOBBY ═══════════ -->
 <section id="scr-lobby" class="scr active">
   <div class="lobby-scroll">
     <div class="lobby-hero">
       <img src="/assets/logo_color.png" alt="" class="lobby-logo"
+           onload="document.querySelector('.lobby-title').style.display='none'"
            onerror="this.style.display='none'" />
       <h1 class="lobby-title">BARBACANE</h1>
-      <p class="lobby-tagline">Evoca · Costruisci · Assedia</p>
     </div>
 
     <div class="seg-tabs glass" role="tablist">
@@ -42,7 +37,7 @@
         <span>Timer turno — secondi, 0 = nessuno</span>
         <input type="number" id="in-create-timer" value="120" min="0" max="600" inputmode="numeric" />
       </label>
-      <button id="btn-create" class="cta cta-gold">⚑ Crea lobby</button>
+      <button id="btn-create" class="cta cta-gold">Crea lobby</button>
     </div>
 
     <div id="pane-join" class="lobby-pane glass" hidden>
@@ -54,25 +49,27 @@
         <span>Codice lobby</span>
         <input type="text" id="in-join-code" placeholder="BARB-XXXX" maxlength="9" autocapitalize="characters" autocomplete="off" />
       </label>
-      <button id="btn-join" class="cta">➤ Entra nella lobby</button>
+      <button id="btn-join" class="cta">Entra nella lobby</button>
     </div>
 
-    <a class="desktop-link" href="/?desktop=1">🖥 Passa alla versione desktop</a>
+    <a class="desktop-link" href="/?desktop=1">Passa alla versione desktop</a>
   </div>
 </section>
 
 <!-- ═══════════ SCHERMATA: SALA D'ATTESA ═══════════ -->
 <section id="scr-wait" class="scr">
   <div class="wait-wrap">
-    <h2 class="wait-title">Sala d'attesa</h2>
-    <button id="wait-code" class="code-chip glass" title="Tocca per copiare">
-      <span id="wait-code-text">—</span>
-      <span class="code-copy">copia</span>
-    </button>
-    <div id="wait-players" class="wait-players"></div>
-    <p class="wait-hint">Condividi il codice con i tuoi amici.<br>Servono almeno 2 giocatori.</p>
-    <button id="btn-start" class="cta cta-gold" hidden>⚔ Avvia partita</button>
-    <div id="wait-status" class="wait-status"></div>
+    <div class="wait-card">
+      <h2 class="wait-title">Sala d'attesa</h2>
+      <button id="wait-code" class="code-chip" title="Tocca per copiare">
+        <span id="wait-code-text">—</span>
+        <span class="code-copy">copia</span>
+      </button>
+      <div id="wait-players" class="wait-players"></div>
+      <p class="wait-hint">Condividi il codice con i tuoi amici.<br>Servono almeno 2 giocatori.</p>
+      <button id="btn-start" class="cta cta-gold" hidden>Avvia partita</button>
+      <div id="wait-status" class="wait-status"></div>
+    </div>
   </div>
 </section>
 
@@ -83,7 +80,7 @@
   <header id="topbar" class="glass">
     <div class="tb-left">
       <span id="tb-turn" class="tb-pill">T1</span>
-      <span id="tb-deck" class="tb-pill">🂠 —</span>
+      <span id="tb-deck" class="tb-pill">🃏 —</span>
     </div>
     <div id="tb-phase" class="tb-phase" aria-label="Fase del turno">
       <span class="ph-dot" data-ph="action"><i></i><em>Azioni</em></span>
@@ -105,39 +102,39 @@
   <!-- Ticker eventi -->
   <button id="ticker" class="ticker" hidden></button>
 
-  <!-- Campo -->
+  <!-- Campo: le mie 4 Regioni, 4 tasselli uguali ancorati al mio lato.
+       Davanti (verso gli avversari) Avanscoperta e Villaggio,
+       dietro (vicino a me) i due Bastioni. Tocca un tassello per aprirlo. -->
   <main id="field">
-    <div id="fld-vanguard" class="zone-vanguard">
-      <div class="zone-label"><span>⚔ Avanscoperta</span></div>
-      <div id="vg-cards" class="vg-cards"></div>
-    </div>
-
-    <div id="towers">
-      <button id="tw-left" class="tower" data-side="left">
-        <span class="tower-name">Bastione S.</span>
-        <span class="tower-walls"><b id="tw-left-walls">0</b>🧱</span>
-        <span id="tw-left-dots" class="tower-dots"></span>
-        <span id="tw-left-threat" class="tower-threat"></span>
-      </button>
-      <button id="tw-village" class="tower tower-village">
-        <span class="tower-name">Villaggio</span>
-        <span class="tower-walls"><b id="tw-village-count">0</b>🏛</span>
-        <span id="tw-village-badge" class="tower-badge" hidden>da completare</span>
-      </button>
-      <button id="tw-right" class="tower" data-side="right">
-        <span class="tower-name">Bastione D.</span>
-        <span class="tower-walls"><b id="tw-right-walls">0</b>🧱</span>
-        <span id="tw-right-dots" class="tower-dots"></span>
-        <span id="tw-right-threat" class="tower-threat"></span>
-      </button>
+    <div id="field-grid">
+      <div id="fld-vanguard" class="rg-tile" data-label="Avanscoperta">
+        <div id="vg-cards" class="rg-cards"></div>
+      </div>
+      <div id="tw-village" class="rg-tile" data-label="Villaggio">
+        <div id="village-cards" class="rg-cards"></div>
+      </div>
+      <div id="tw-left" class="rg-tile rg-tile-bastion" data-side="left">
+        <div class="rg-title">
+          <span class="rg-title-main">Bastione Sinistro</span>
+          <span id="tw-left-threat" class="rg-title-sub"></span>
+        </div>
+        <div id="bl-cards" class="rg-cards"></div>
+      </div>
+      <div id="tw-right" class="rg-tile rg-tile-bastion" data-side="right">
+        <div class="rg-title">
+          <span class="rg-title-main">Bastione Destro</span>
+          <span id="tw-right-threat" class="rg-title-sub"></span>
+        </div>
+        <div id="br-cards" class="rg-cards"></div>
+      </div>
     </div>
   </main>
 
   <!-- Stato personale -->
   <div id="statusbar">
-    <button id="st-lives" class="st-chip" aria-label="Le tue vite">❤ —</button>
-    <div id="st-mana" class="st-chip" aria-label="Mana">💎 —</div>
-    <div id="st-actions" class="st-chip" aria-label="Azioni">● ●</div>
+    <button id="st-lives" class="st-chip" aria-label="Le tue vite">❤︎ —</button>
+    <div id="st-mana" class="st-chip" aria-label="Mana">Mana: —</div>
+    <div id="st-actions" class="st-chip" aria-label="Azioni">Azioni: —</div>
     <button id="st-fx" class="st-chip st-fx" hidden aria-label="Effetti attivi">✨ 0</button>
   </div>
 
@@ -165,7 +162,6 @@
 <section id="scr-over" class="scr">
   <div id="confetti" aria-hidden="true"></div>
   <div class="over-wrap">
-    <div class="over-trophy">🏆</div>
     <h1 id="over-title">Fine partita</h1>
     <p id="over-winner"></p>
     <div id="over-scores" class="glass"></div>
