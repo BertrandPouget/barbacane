@@ -3,13 +3,17 @@ Entry point FastAPI di Barbacane.
 Serve sia il backend (API/WebSocket) che i file statici del frontend.
 """
 
+import asyncio
+import logging
 import os
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from db.storage import init_db
+from db.storage import init_db, cleanup_games
 from server.routes import router
+
+logger = logging.getLogger("barbacane")
 
 app = FastAPI(
     title="Barbacane",
@@ -17,10 +21,33 @@ app = FastAPI(
     version="0.1.0",
 )
 
+_CLEANUP_INTERVAL_SECONDS = 15 * 60
+
+
+async def _cleanup_loop():
+    """Elimina periodicamente le partite finite/abbandonate dal database."""
+    while True:
+        try:
+            deleted = await asyncio.to_thread(cleanup_games)
+            if deleted:
+                logger.info("[cleanup] Eliminate %d partite finite/abbandonate", deleted)
+        except Exception as e:
+            logger.error("[cleanup] Errore: %s", e)
+        await asyncio.sleep(_CLEANUP_INTERVAL_SECONDS)
+
+
 # Inizializza il database al primo avvio
 @app.on_event("startup")
 async def startup():
     init_db()
+    asyncio.create_task(_cleanup_loop())
+
+
+# Keep-alive: il client lo chiama periodicamente via HTTP per evitare che
+# Render consideri inattivo il servizio (il traffico WebSocket non conta).
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 
 # Endpoint API e WebSocket

@@ -13,6 +13,10 @@ const WS = (() => {
   const MAX_RECONNECT_DELAY = 30000;
   let keepaliveTimer = null;
   const KEEPALIVE_INTERVAL = 30000;
+  let httpKeepaliveTimer = null;
+  // Ping HTTP: il traffico WebSocket non azzera il timer di inattività di
+  // Render (free tier), quindi serve una richiesta HTTP periodica.
+  const HTTP_KEEPALIVE_INTERVAL = 4 * 60 * 1000;
 
   const handlers = {};
 
@@ -65,11 +69,16 @@ const WS = (() => {
         socket.send(JSON.stringify({ type: 'ping' }));
       }
     }, KEEPALIVE_INTERVAL);
+    httpKeepaliveTimer = setInterval(() => {
+      fetch('/health').catch(() => {});
+    }, HTTP_KEEPALIVE_INTERVAL);
   }
 
   function _stopKeepalive() {
     clearInterval(keepaliveTimer);
     keepaliveTimer = null;
+    clearInterval(httpKeepaliveTimer);
+    httpKeepaliveTimer = null;
   }
 
   function _scheduleReconnect() {
