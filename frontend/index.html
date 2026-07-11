@@ -5,6 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Barbacane</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧱</text></svg>" />
+  <script>
+    // Da telefono si viene reindirizzati al frontend mobile (/m).
+    // ?desktop=1 forza (e memorizza) la versione desktop.
+    (function () {
+      var qs = new URLSearchParams(location.search);
+      if (qs.has('desktop')) {
+        try { localStorage.setItem('barbacane-desktop', '1'); } catch (e) {}
+        return;
+      }
+      var forced = false;
+      try { forced = localStorage.getItem('barbacane-desktop') === '1'; } catch (e) {}
+      var coarse = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+      var small = Math.min(screen.width, screen.height) < 820;
+      if (coarse && small && !forced) location.replace('/m');
+    })();
+  </script>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -43,6 +59,8 @@
         <button id="btn-join" class="btn btn-secondary">Entra</button>
       </div>
     </div>
+    <a href="/m" style="display:block;text-align:center;margin-top:14px;font-size:0.8rem;color:var(--text-dim);text-decoration:none"
+       onclick="try{localStorage.removeItem('barbacane-desktop')}catch(e){}">Passa alla versione mobile</a>
   </div>
 </div>
 
