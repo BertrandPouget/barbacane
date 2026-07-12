@@ -461,6 +461,17 @@ const Render = (() => {
    * Vista carta per lo sheet: immagine con flip verso il testo, o solo flashcard.
    * Ritorna un Node. Prova a caricare /card_images/{baseId}.png.
    */
+  // Immagini carta caricate almeno una volta: per queste la vista carta viene
+  // costruita subito, senza il flash della flashcard testuale in attesa della rete.
+  const _imgLoaded = new Set();
+
+  function preloadCardImage(baseId) {
+    if (!baseId || _imgLoaded.has(baseId)) return;
+    const i = new Image();
+    i.onload = () => _imgLoaded.add(baseId);
+    i.src = `/card_images/${baseId}.png`;
+  }
+
   function cardViewNode(def, ctx = {}) {
     const textHTML = cardTextHTML(def, ctx);
     const wrap = el('div', { className: 'cardview' });
@@ -480,16 +491,24 @@ const Render = (() => {
     inner.appendChild(back);
     flip.appendChild(inner);
 
-    img.onload = () => {
+    const showFlip = () => {
+      _imgLoaded.add(def.id);
       wrap.innerHTML = '';
       wrap.appendChild(flip);
       wrap.appendChild(el('div', { className: 'flip-hint' }, ['tocca la carta per girarla']));
       flip.addEventListener('click', () => { haptic(8); flip.classList.toggle('flipped'); });
     };
-    img.onerror = () => { /* resta la flashcard testuale */ };
-    img.src = `/card_images/${def.id}.png`;
 
-    wrap.appendChild(textOnly);
+    if (_imgLoaded.has(def.id)) {
+      img.onerror = () => { wrap.innerHTML = ''; wrap.appendChild(textOnly); };
+      img.src = `/card_images/${def.id}.png`;
+      showFlip();
+    } else {
+      img.onload = showFlip;
+      img.onerror = () => { /* resta la flashcard testuale */ };
+      img.src = `/card_images/${def.id}.png`;
+      wrap.appendChild(textOnly);
+    }
     return wrap;
   }
 
@@ -526,6 +545,7 @@ const Render = (() => {
     activeEffectItems,
     cardTextHTML,
     cardViewNode,
+    preloadCardImage,
     timerStart,
     timer,
     timerHide,

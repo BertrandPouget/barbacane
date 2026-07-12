@@ -699,6 +699,7 @@ const Mob = (() => {
     else if (!canAct) subtitle = 'Azioni esaurite per questo turno.';
     else if (isEthereal) subtitle = 'Carta eterea: gratis e senza consumare Azioni.';
 
+    preloadCardImages([hand[idx - 1], hand[idx + 1]]);
     showCardNavSheet({
       title: def ? def.name : iid,
       subtitle,
@@ -1012,6 +1013,7 @@ const Mob = (() => {
     if (!walls.length) return;
     const iid = walls[idx];
     const def = getCardDef(iid);
+    preloadCardImages([walls[idx - 1], walls[idx + 1]]);
     showCardNavSheet({
       title: def ? def.name : iid,
       subtitle: `Muro ${idx + 1} di ${walls.length}`,
@@ -1030,16 +1032,27 @@ const Mob = (() => {
     });
   }
 
+  // Precarica le immagini delle carte indicate (usato per le carte adiacenti
+  // nella navigazione, così lo scorrimento non aspetta la rete)
+  function preloadCardImages(iids) {
+    (iids || []).forEach(iid => {
+      if (!iid) return;
+      const def = getCardDef(iid);
+      if (def) Render.preloadCardImage(def.id);
+    });
+  }
+
   // Sheet carta con navigazione precedente/successiva
   function showCardNavSheet({ title, subtitle, def, ctx = {}, pos, onPrev, onNext, footer = [] }) {
     const body = [Render.cardViewNode(def, ctx)];
     if (onPrev || onNext) {
       const nav = el('div', { className: 'card-nav', style: 'justify-content:center' });
-      const prevBtn = el('button', { className: 'nav-btn' }, ['⮜']);
+      // ︎ forza la resa testuale 2D (come ❤︎): i glifi ⮜⮞ non esistono nei font iOS
+      const prevBtn = el('button', { className: 'nav-btn' }, ['◀︎']);
       prevBtn.disabled = !onPrev;
       prevBtn.addEventListener('click', () => { haptic(); onPrev && onPrev(); });
       const posEl = el('span', { className: 'nav-pos' }, [pos ? `${pos.idx + 1} / ${pos.total}` : '']);
-      const nextBtn = el('button', { className: 'nav-btn' }, ['⮞']);
+      const nextBtn = el('button', { className: 'nav-btn' }, ['▶︎']);
       nextBtn.disabled = !onNext;
       nextBtn.addEventListener('click', () => { haptic(); onNext && onNext(); });
       nav.append(prevBtn, posEl, nextBtn);
@@ -1211,6 +1224,7 @@ const Mob = (() => {
     const iid = walls[idx];
     const def = getCardDef(iid);
     const turnOk = isMyTurn();
+    preloadCardImages([walls[idx - 1], walls[idx + 1]]);
     showCardNavSheet({
       title: `🧱 ${def ? def.name : iid}`,
       subtitle: 'Questa carta è un Muro: assorbe 1 Danno in Battaglia.',
@@ -1605,6 +1619,7 @@ const Mob = (() => {
     const cards = my.life_cards;
     const iid = cards[idx];
     const def = getCardDef(iid);
+    preloadCardImages([cards[idx - 1], cards[idx + 1]]);
     showCardNavSheet({
       title: `❤︎ Vita ${idx + 1} di ${cards.length}`,
       subtitle: 'Solo tu puoi vedere le tue carte-Vita.',
