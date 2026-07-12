@@ -71,10 +71,18 @@ html, body {
   overscroll-behavior: none;
 }
 
+/* Colore canvas nelle zone che nessun layer raggiunge (rubber-band, safe area
+   in modalità webapp): un tono caldo coerente con la pergamena, non nero. */
+html { background: #a8611f; }
+
+/* Il body NON deve avere uno sfondo opaco: coprirebbe il layer body::before
+   (z-index negativo, che nell'ordine di pittura sta sotto il background del
+   body quando html ha un background proprio). Il colore di base scuro è già
+   dentro body::before, sotto l'immagine. */
 body {
   font-family: 'Georgia', serif;
   color: var(--text);
-  background: var(--bg-dark);
+  background: transparent;
   min-height: 100dvh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
@@ -85,13 +93,16 @@ body {
 
 /* Sfondo su layer fisso: background-attachment:fixed non funziona su iOS Safari
    e in modalità app (home screen) lascerebbe una banda troncata in basso.
-   Un layer position:fixed copre sempre l'intero schermo, safe area inclusa. */
+   Il bordo inferiore sborda oltre il viewport (safe area + margine): in modalità
+   webapp iOS il viewport di layout può fermarsi sopra l'indicatore home, e senza
+   overscan lì resterebbe una banda scoperta. */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
+  bottom: calc(-1 * var(--sab) - 80px);
   z-index: -1;
-  background: var(--bg-dark) url('/assets/background.png') center center / cover no-repeat;
+  background: var(--bg-dark) url('/assets/background.jpg') center center / cover no-repeat;
 }
 
 button {
@@ -231,7 +242,7 @@ input {
 
 .desktop-link {
   text-align: center;
-  color: var(--text-dim);
+  color: var(--border-gold);
   font-size: 0.82rem;
   font-style: italic;
   text-decoration: none;
