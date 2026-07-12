@@ -154,5 +154,5 @@ Entrare con nome `Test` o `Test2` per avere le carte da `data/test_cards.json` i
 
 - **Backend**: Python + FastAPI, WebSocket per aggiornamenti real-time
 - **Frontend**: SPA in vanilla JS, servita come file statico da FastAPI
-- **Persistenza**: PostgreSQL su [Neon](https://neon.tech) (free tier) in produzione, tramite variabile d'ambiente `DATABASE_URL`; fallback automatico su SQLite locale in sviluppo. Le partite finite o abbandonate vengono eliminate automaticamente.
+- **Persistenza**: PostgreSQL su Neon (free tier) in produzione, tramite variabile d'ambiente `DATABASE_URL`; fallback automatico su SQLite locale in sviluppo. Le partite finite o abbandonate vengono eliminate automaticamente.
 - **Deploy**: Render (free tier); il client invia un ping HTTP periodico per evitare lo spindown durante le partite
