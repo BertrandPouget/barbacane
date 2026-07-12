@@ -332,7 +332,7 @@ const App = (() => {
           msg = `${pName} — ${cardName}: guerriero spostato`;
         } else if (ev.type === 'wall_moved') {
           const n = ev.moved_walls ? ev.moved_walls.length : 0;
-          msg = `${pName} — ${cardName}: ${n} Muro${n !== 1 ? 'i' : ''} spostato${n !== 1 ? 'i' : ''}`;
+          msg = `${pName} — ${cardName}: ${n} ${n !== 1 ? 'Muri spostati' : 'Muro spostato'}`;
         } else if (ev.type === 'wall_taken') {
           msg = `${pName} — ${cardName}: Muro in mano`;
         } else if (ev.type === 'search') {
@@ -2115,7 +2115,7 @@ const App = (() => {
       if (walls.length > 0) {
         const wallHeader = document.createElement('p');
         wallHeader.className = 'search-summary';
-        wallHeader.textContent = `${walls.length} Muro${walls.length !== 1 ? 'i' : ''}`;
+        wallHeader.textContent = `${walls.length} ${walls.length === 1 ? 'Muro' : 'Muri'}`;
         body.appendChild(wallHeader);
 
         const wallList = document.createElement('div');
@@ -2142,7 +2142,7 @@ const App = (() => {
         const warriorHeader = document.createElement('p');
         warriorHeader.className = 'search-summary';
         if (walls.length > 0) warriorHeader.style.marginTop = '0.7rem';
-        warriorHeader.textContent = `${warriors.length} Guerriero${warriors.length !== 1 ? 'i' : ''}`;
+        warriorHeader.textContent = `${warriors.length} ${warriors.length === 1 ? 'Guerriero' : 'Guerrieri'}`;
         body.appendChild(warriorHeader);
 
         const warriorList = document.createElement('div');

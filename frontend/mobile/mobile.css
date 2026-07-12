@@ -898,6 +898,25 @@ input {
 .card[data-type="building"] { border-left: 3px solid var(--green); }
 .card[data-type="wall"]     { border-left: 3px solid var(--text-dim); background: #1a1a1a; }
 
+/* Pila di Muri: finta carta con emoji grande e conteggio sotto (come desktop) */
+.card.wall-stack {
+  background: #181818;
+  border-color: var(--text-dim);
+  align-items: center;
+  justify-content: center;
+}
+
+.wall-stack-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.wall-stack-count {
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--text);
+}
+
 /* Costruzione completata */
 .card[data-type="building"].completed {
   border-left-color: var(--gold);

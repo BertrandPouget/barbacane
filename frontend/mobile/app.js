@@ -470,7 +470,7 @@ const Mob = (() => {
     if (ev.type === 'warrior_moved') return `${pName} — ${cardLabel}: guerriero spostato`;
     if (ev.type === 'wall_moved') {
       const n = ev.moved_walls ? ev.moved_walls.length : 0;
-      return `${pName} — ${cardLabel}: ${n} Muro${n !== 1 ? 'i' : ''} spostato${n !== 1 ? 'i' : ''}`;
+      return `${pName} — ${cardLabel}: ${n} ${n !== 1 ? 'Muri spostati' : 'Muro spostato'}`;
     }
     if (ev.type === 'wall_taken') return `${pName} — ${cardLabel}: Muro in mano`;
     if (ev.type === 'search') return `${pName} — ${cardLabel}: ricerca nel mazzo`;
@@ -1213,7 +1213,7 @@ const Mob = (() => {
     }
 
     Sheet.open({
-      title: `Bastione ${sideName}`,
+      title: `🧱 Bastione ${sideName}`,
       subtitle: `${walls.length} Muri · ${warriors.length} Guerrieri`,
       body,
       footer: [{ label: 'Chiudi', onClick: () => Sheet.close() }],
@@ -1528,8 +1528,7 @@ const Mob = (() => {
     }
 
     // Avanscoperta
-    body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' },
-      [`⚔️ Avanscoperta (${(p.field.vanguard || []).length})`]));
+    body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' }, ['⚔️ Avanscoperta']));
     if ((p.field.vanguard || []).length === 0) {
       body.push(el('div', { className: 'sheet-note' }, ['Vuota — non può attaccare.']));
     } else {
@@ -1547,23 +1546,26 @@ const Mob = (() => {
       const bastion = side === 'left' ? p.field.bastion_left : p.field.bastion_right;
       const tag = attackable.has(side) ? ' (Possibile Bersaglio)' : '';
       body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' },
-        [`🏰 Bastione ${name} — 🧱 ${bastion.wall_count ?? 0}${tag}`]));
-      if ((bastion.warriors || []).length > 0) {
-        const row = el('div', { style: 'display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px' });
-        bastion.warriors.forEach(w => {
-          const mini = Render.warriorMini(w);
-          mini.addEventListener('click', () => { haptic(); openEnemyCardSheet(w, p); });
-          row.appendChild(mini);
-        });
-        body.push(row);
-      } else {
-        body.push(el('div', { className: 'sheet-note' }, ['Nessun difensore.']));
-      }
+        [`🧱 Bastione ${name}${tag}`]));
+      const row = el('div', { style: 'display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px' });
+      row.appendChild(el('div', {
+        className: 'card card-sm in-field wall-stack',
+        dataset: { type: 'wall' },
+      }, [
+        el('div', { className: 'wall-stack-icon' }, ['🧱']),
+        el('div', { className: 'wall-stack-count' }, [String(bastion.wall_count ?? 0)]),
+      ]));
+      (bastion.warriors || []).forEach(w => {
+        const mini = Render.warriorMini(w);
+        mini.addEventListener('click', () => { haptic(); openEnemyCardSheet(w, p); });
+        row.appendChild(mini);
+      });
+      body.push(row);
     });
 
     // Villaggio
     const buildings = (p.field.village && p.field.village.buildings) || [];
-    body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' }, [`🏰 Villaggio (${buildings.length})`]));
+    body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' }, ['🏰 Villaggio']));
     buildings.forEach(b => {
       const def = getCardDef(b.instance_id);
       const row = el('button', { className: `opt-row${b.completed ? ' gold' : ''}` }, [
