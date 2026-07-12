@@ -21,7 +21,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
-_CLEANUP_INTERVAL_SECONDS = 15 * 60
+_CLEANUP_INTERVAL_SECONDS = 5 * 60
 
 
 async def _cleanup_loop():

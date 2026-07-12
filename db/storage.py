@@ -154,7 +154,7 @@ def delete_game(game_id: str) -> None:
         conn.execute(_q("DELETE FROM games WHERE game_id = ?"), (game_id,))
 
 
-def cleanup_games(finished_grace_minutes: int = 30, stale_hours: int = 24) -> int:
+def cleanup_games(finished_grace_minutes: int = 5, stale_hours: float = 1) -> int:
     """
     Elimina le partite concluse da più di `finished_grace_minutes` e quelle
     abbandonate (nessun aggiornamento da `stale_hours` ore).

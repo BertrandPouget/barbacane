@@ -177,7 +177,7 @@ CREATE TABLE players (
 );
 ```
 
-**Cleanup automatico**: un task in background (`main.py` → `_cleanup_loop`, ogni 15 min + subito all'avvio) chiama `cleanup_games()`, che elimina le partite `finished` da più di 30 minuti e quelle ferme da più di 24 ore, insieme ai rispettivi `players`. Il DB contiene quindi solo le partite attive o appena concluse.
+**Cleanup automatico**: un task in background (`main.py` → `_cleanup_loop`, ogni 5 min + subito all'avvio) chiama `cleanup_games()`, che elimina le partite `finished` da più di 5 minuti e quelle ferme da più di 1 ora, insieme ai rispettivi `players`. Il DB contiene quindi solo le partite attive o appena concluse.
 
 ---
 
