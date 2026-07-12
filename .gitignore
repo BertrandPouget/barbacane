@@ -1,6 +1,7 @@
 __pycache__/
 *.db
 .claude/
+.vscode/
 venv/
 card_factory/images/
 card_factory/input/
