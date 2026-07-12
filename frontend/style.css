@@ -222,6 +222,13 @@ input:focus {
 .btn-warning   { background: #8a5a20;              color: #fff; }
 .btn-small     { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
 
+.btn-abandon {
+  background: transparent;
+  border: 1px solid rgba(176, 48, 48, 0.6);
+  color: #e05050;
+}
+.btn-abandon:hover { background: rgba(176, 48, 48, 0.2); filter: none; }
+
 /* ==================== HEADER GIOCO ==================== */
 
 #game-header {

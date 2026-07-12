@@ -391,6 +391,90 @@ def end_turn(state: GameState) -> GameState:
     return state
 
 
+def abandon_game(state: GameState, player_id: str) -> dict:
+    """
+    Il giocatore abbandona la partita: tutte le sue carte (mano, vite, campo)
+    vanno negli scarti e viene eliminato. Se resta un solo giocatore vivo,
+    questi vince a tavolino. Se era il turno di chi abbandona, il turno passa
+    al prossimo giocatore vivo.
+    """
+    player = state.get_player(player_id)
+    if player is None:
+        raise ActionError("Giocatore non trovato.")
+    if state.winner_id or state.phase == "end":
+        raise ActionError("La partita è già finita.")
+    if not player.is_alive:
+        raise ActionError("Sei già stato eliminato.")
+
+    was_current = state.current_player.id == player_id
+
+    # Tutte le carte del giocatore tornano nella pila degli scarti,
+    # così il mazzo comune non si impoverisce quando gli scarti vengono rimescolati.
+    discarded: List[str] = []
+    discarded += player.hand
+    player.hand = []
+    discarded += player.life_cards
+    player.life_cards = []
+    for w in player.all_warriors():
+        discarded.append(w.instance_id)
+        if w.evolved_from:
+            discarded.append(w.evolved_from)
+        discarded += w.assigned_cards
+    player.field.vanguard = []
+    for bastion in (player.field.bastion_left, player.field.bastion_right):
+        discarded += [wall.instance_id for wall in bastion.walls]
+        bastion.walls = []
+        bastion.warriors = []
+    discarded += [b.instance_id for b in player.field.village.buildings]
+    player.field.village.buildings = []
+    state.discard_pile.extend(discarded)
+
+    player.active_effects = []
+    player.ethereal_card = None
+    player.ethereal_complete = None
+    player.pending_velocemento_buildings = []
+    player.pending_velocemento_prodigy = False
+
+    # Interazioni in sospeso di chi abbandona non hanno più senso
+    if state.pending_search and state.pending_search.get("player_id") == player_id:
+        random.shuffle(state.deck)
+        state.pending_search = None
+    state.pending_interactions = [
+        i for i in state.pending_interactions if i.get("player_id") != player_id
+    ]
+
+    state.recent_events.append({"type": "abandon", "player_id": player_id})
+    state.add_log(player_id, "abandon")
+
+    result: dict = {"abandoned": player_id}
+
+    winner = _check_winner(state)
+    if winner:
+        state.phase = "end"
+        state.winner_id = winner.id
+        state.add_log(winner.id, "game_over", winner=winner.name)
+        result["winner_id"] = winner.id
+        return result
+
+    # Se era il suo turno, passa al prossimo giocatore vivo (stessa logica di end_turn)
+    if was_current:
+        num = len(state.players)
+        next_idx = (state.current_player_index + 1) % num
+        while not state.players[next_idx].is_alive:
+            next_idx = (next_idx + 1) % num
+        round_opener = state.first_player_index
+        while not state.players[round_opener].is_alive:
+            round_opener = (round_opener + 1) % num
+        if next_idx == round_opener:
+            state.turn += 1
+        state.current_player_index = next_idx
+        state.add_log(state.players[next_idx].id, "start_turn", turn=state.turn)
+        _begin_turn(state)
+        result["turn_ended"] = True
+
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Condizione di vittoria
 # ---------------------------------------------------------------------------

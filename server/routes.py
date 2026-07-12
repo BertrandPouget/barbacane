@@ -19,6 +19,7 @@ from engine.game import (
     do_battle,
     end_turn,
     check_fucina_after_action,
+    abandon_game,
 )
 from engine.actions import (
     ActionError,
@@ -265,6 +266,11 @@ _PHASE_REQUIRED = {
 def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
     """Smista l'azione al handler appropriato."""
     state.recent_events = []
+
+    # Abbandono: consentito in qualsiasi momento (anche fuori dal proprio turno
+    # o con interazioni pendenti), quindi va gestito prima di ogni altro controllo.
+    if action == "leave_game":
+        return abandon_game(state, player_id)
 
     # Azzera carta eterea se il giocatore consuma un'azione senza giocarla
     _ETHEREAL_BREAKING = {

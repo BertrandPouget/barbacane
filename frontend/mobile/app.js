@@ -34,6 +34,9 @@ const Mob = (() => {
   let lobbyPollTimer = null;
   let _lastTurnPlayer = null;
 
+  // True mentre stiamo abbandonando la partita: ignora gli update in arrivo
+  let leavingGame = false;
+
   const SESSION_KEY = 'barb_m_session';
 
   // ---------------------------------------------------------------------------
@@ -311,7 +314,29 @@ const Mob = (() => {
     if (state.winner_id) showGameOver(state);
   }
 
+  function confirmLeaveGame() {
+    Sheet.confirm(
+      'Abbandonare la partita?',
+      'Verrai eliminato dalla partita e non potrai rientrare.',
+      async () => {
+        leavingGame = true;
+        try {
+          await api('/game/action', {
+            game_id: gameId, session_token: sessionToken,
+            action: 'leave_game', params: {},
+          });
+        } catch (_) {
+          // partita già finita o non più raggiungibile: esci comunque
+        }
+        clearSession();
+        location.href = '/m';
+      },
+      { yesLabel: 'Abbandona', danger: true },
+    );
+  }
+
   function onStateUpdate(state, action, result) {
+    if (leavingGame) return;
     const prevTurnPlayer = _lastTurnPlayer;
     currentState = state;
     _lastTurnPlayer = state.current_player_id;
@@ -468,6 +493,7 @@ const Mob = (() => {
       };
       return `${pName} — ${H[ev.card] || `Orda ${cardLabel}`}`;
     }
+    if (ev.type === 'abandon') return `${pName} ha abbandonato la partita`;
     if (ev.type === 'magiscudo_blocked') {
       const blockedName = playerName(ev.blocked_player);
       return `${pName} — ${cardLabel || 'Magia'} annullata: ${blockedName} è protetto da Magiscudo`;
@@ -528,6 +554,7 @@ const Mob = (() => {
     $('st-lives').addEventListener('click', () => { haptic(); openLivesSheet(); });
     $('st-fx').addEventListener('click', () => { haptic(); openActiveFxSheet(); });
     $('tb-log').addEventListener('click', () => { haptic(); openLogSheet(); });
+    $('tb-leave').addEventListener('click', () => { haptic(); confirmLeaveGame(); });
     $('ticker').addEventListener('click', () => { haptic(); openLogSheet(); });
 
     $('tray-cancel').addEventListener('click', () => exitWallMode());

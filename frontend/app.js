@@ -30,6 +30,9 @@ const App = (() => {
   let timerInterval = null;
   let timerSecondsLeft = 0;
 
+  // True mentre stiamo abbandonando la partita: ignora gli update in arrivo
+  let leavingGame = false;
+
   // ---------------------------------------------------------------------------
   // Init
   // ---------------------------------------------------------------------------
@@ -74,6 +77,7 @@ const App = (() => {
     document.getElementById('btn-battle').addEventListener('click', onBattleClick);
     document.getElementById('btn-horde').addEventListener('click', onHordeClick);
     document.getElementById('btn-next-phase').addEventListener('click', onNextPhase);
+    document.getElementById('btn-abandon').addEventListener('click', onAbandonClick);
     bindBastionClickHandlers();
 
     // Banner azione
@@ -247,6 +251,7 @@ const App = (() => {
   }
 
   function onStateUpdate(state, action, result) {
+    if (leavingGame) return;
     currentState = state;
     if (battleMode) exitBattleMode();
     Renderer.render(state, myPlayerId);
@@ -350,6 +355,9 @@ const App = (() => {
           else if (ev.card === 'joseph') msg = `${pName} — Orda Joseph: ${ev.has_trono ? 'Troni avversari scartati' : 'nessun Trono assegnato'}`;
           else if (ev.card === 'eracle') msg = `${pName} — Orda Eracle: distruggi Costruzione se ≥3 Danni`;
           else msg = `${pName} — Orda ${cardName}`;
+        } else if (ev.type === 'abandon') {
+          msg = `${pName} ha abbandonato la partita`;
+          Renderer.toast(msg, 'error');
         } else if (ev.type === 'magiscudo_blocked') {
           const blockedName = (state.players.find(p => p.id === ev.blocked_player) || {}).name || ev.blocked_player;
           const cardLabel = ev.card ? ev.card.charAt(0).toUpperCase() + ev.card.slice(1) : 'Magia';
@@ -1882,10 +1890,32 @@ const App = (() => {
   // Utility
   // ---------------------------------------------------------------------------
 
+  function onAbandonClick() {
+    Renderer.showModal(
+      'Abbandona la partita',
+      'Sei sicuro? Verrai eliminato dalla partita e non potrai rientrare.',
+      async () => {
+        leavingGame = true;
+        try {
+          await api('/game/action', {
+            game_id: gameId,
+            session_token: sessionToken,
+            action: 'leave_game',
+            params: {},
+          });
+        } catch (e) {
+          // partita già finita o non più raggiungibile: torna comunque alla lobby
+        }
+        returnToLobby();
+      }
+    );
+  }
+
   function returnToLobby() {
     WS.disconnect();
     stopLobbyPolling();
     stopLocalTimer();
+    leavingGame = false;
     selectedCard = null;
     actionMode = null;
     wallsSelected = [];

@@ -368,6 +368,14 @@ input {
   border: 1px solid transparent;
 }
 .tb-btn:active { border-color: var(--border); }
+.tb-leave {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 4px 6px;
+  color: var(--danger);
+  border-color: rgba(176, 48, 48, 0.55);
+  white-space: nowrap;
+}
 
 .tb-timer { position: relative; width: 34px; height: 34px; }
 .tb-timer svg { width: 34px; height: 34px; transform: rotate(-90deg); }
