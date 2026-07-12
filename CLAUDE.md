@@ -24,8 +24,8 @@ Il gioco è a turni: ogni giocatore posiziona carte (Guerrieri, Magie, Costruzio
 
 - **Backend**: Python + FastAPI, WebSocket per aggiornamenti real-time
 - **Frontend**: SPA in vanilla JS, servita come file statico da FastAPI
-- **Persistenza**: SQLite (file `.db` locale)
-- **Deploy**: Render (free tier, supporta WebSocket, deploy da GitHub; cold start ~30s accettabile)
+- **Persistenza**: PostgreSQL su Neon (free tier) in produzione, selezionato dalla env var `DATABASE_URL` (impostata nella dashboard Render, non nel repo); fallback automatico su SQLite (file `.db` locale) in sviluppo
+- **Deploy**: Render (free tier, supporta WebSocket, deploy da GitHub; cold start ~30s accettabile). Il free tier spegne il servizio dopo ~15 min senza traffico HTTP in ingresso e il traffico WebSocket non conta: per questo il client invia un ping HTTP a `/health` ogni 4 minuti durante le partite
 
 ---
 
@@ -54,7 +54,7 @@ barbacane/
 │   ├── ws_manager.py            # WebSocket manager: broadcast, send_to_player, timer
 │   └── routes.py                # Endpoint REST + WebSocket; _dispatch_action
 ├── db/
-│   └── storage.py               # save_game, load_game (SQLite)
+│   └── storage.py               # save_game, load_game, cleanup_games (Postgres/Neon o SQLite)
 └── frontend/
     ├── index.html
     ├── style.css
@@ -73,7 +73,7 @@ barbacane/
 2. `routes.py` → `_dispatch_action()` riceve il messaggio, identifica l'azione, chiama `play_spell(state, player_id, instance_id, **params)`.
 3. `actions.py` → `play_spell()` valida (turno, mana, maghe), rimuove la carta dalla mano, chiama `apply_effect(card.effect_id, state, player, prodigy=..., **params)`.
 4. `effects.py` → la funzione registrata (es. `plasmattone_effect`) modifica lo stato e ritorna un dict risultato.
-5. `routes.py` salva il nuovo stato su SQLite, chiama `public_state(state, player_id)` per ogni giocatore connesso e fa broadcast via WebSocket.
+5. `routes.py` salva il nuovo stato sul database, chiama `public_state(state, player_id)` per ogni giocatore connesso e fa broadcast via WebSocket.
 6. `ws.js` riceve il messaggio e chiama `app.js` → `applyState()`, che aggiorna la UI.
 
 **Effetti a inizio/fine turno**: `game.py` → `_begin_turn()` chiama `_trigger_building_start()` (estrattore, biblioteca, fucina), `_process_deferred_effects()` (investimento, divinazione). `end_turn()` chiama `_trigger_building_end()` (granaio) e `draw_cards()`.
@@ -159,7 +159,9 @@ turn_timer: int              # secondi; 0 = disattivato
 
 Ogni copia di carta ha un `instance_id` univoco (es. `"patrizio_3"`) composto da `{base_card_id}_{numero}`. `get_base_card_id(instance_id)` estrae il `base_card_id`; `CARD_REGISTRY[base_card_id]` ritorna la definizione statica della carta.
 
-### Schema SQLite
+### Schema Database
+
+`db/storage.py` supporta due backend con la stessa API: **Postgres** (Neon, in produzione) se la variabile d'ambiente `DATABASE_URL` è impostata, altrimenti **SQLite** locale (sviluppo). Le query usano il placeholder `?` convertito a `%s` per Postgres (`_q()`); i timestamp sono stringhe ISO 8601 UTC generate lato Python, così il SQL è identico sui due backend.
 
 ```sql
 CREATE TABLE games (
@@ -167,13 +169,15 @@ CREATE TABLE games (
     lobby_code TEXT UNIQUE,
     state TEXT NOT NULL,           -- GameState serializzato come JSON
     status TEXT DEFAULT 'lobby',   -- lobby | playing | finished
-    created_at TIMESTAMP, updated_at TIMESTAMP
+    created_at TEXT, updated_at TEXT   -- ISO 8601 UTC, scritti da Python
 );
 CREATE TABLE players (
-    player_id TEXT PRIMARY KEY, game_id TEXT, name TEXT,
-    session_token TEXT UNIQUE, connected BOOLEAN DEFAULT TRUE
+    player_id TEXT PRIMARY KEY, game_id TEXT REFERENCES games(game_id),
+    name TEXT NOT NULL, session_token TEXT UNIQUE, connected INTEGER DEFAULT 1
 );
 ```
+
+**Cleanup automatico**: un task in background (`main.py` → `_cleanup_loop`, ogni 15 min + subito all'avvio) chiama `cleanup_games()`, che elimina le partite `finished` da più di 30 minuti e quelle ferme da più di 24 ore, insieme ai rispettivi `players`. Il DB contiene quindi solo le partite attive o appena concluse.
 
 ---
 
@@ -334,7 +338,7 @@ Questo garantisce che la carta resti in mano e l'azione non venga consumata se l
 - Solo proprietario: contenuto mano, identità dei propri Muri/Vite, `ethereal_card`
 - Nessuno: ordine del mazzo
 
-**Disconnessione**: turno saltato dopo 120s. Riconnessione con session token. Partita resta in SQLite.
+**Disconnessione**: turno saltato dopo 120s. Riconnessione con session token. Partita resta nel database (sopravvive anche a riavvii/spindown del server).
 
 ---
 

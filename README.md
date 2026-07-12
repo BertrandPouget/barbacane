@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-003B57?style=flat&logo=sqlite&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat)
 
 Barbacane è un gioco di carte fantasy, ora in versione digitale multiplayer.
@@ -20,6 +20,8 @@ python main.py
 ```
 
 Apri il browser su `http://localhost:8000` per accedere alla schermata di gioco. Accedi da più finestre per poter simulare una partita.
+
+In locale la persistenza usa un file SQLite (`barbacane.db`) creato automaticamente. Per usare Postgres anche in locale, imposta la variabile d'ambiente `DATABASE_URL` con una connection string Postgres prima di avviare il server.
 
 ## Come si Gioca
 
@@ -90,7 +92,7 @@ barbacane/
 │   ├── ws_manager.py            # WebSocket manager
 │   └── routes.py                # Endpoint REST + WebSocket
 ├── db/
-│   └── storage.py               # Persistenza SQLite
+│   └── storage.py               # Persistenza: Postgres (Neon) o SQLite in locale
 └── frontend/
     ├── index.html
     ├── style.css
@@ -117,7 +119,7 @@ app.js          (intenzione)
 - **`routes.py`** (dispatcher) — unico punto d'ingresso del server: riceve il messaggio e lo smista alla funzione giusta in base al tipo di azione.
 - **`actions.py`** (regole del turno) — verifica che l'azione sia legale in questo momento (turno del giocatore, mana/maghe sufficienti, azioni rimaste, carta effettivamente in mano), poi consuma la risorsa necessaria.
 - **`effects.py`** (effetto carta) — la funzione registrata per quella carta specifica, che modifica davvero il `GameState` (danni, pescate, mana guadagnato...).
-- **`storage.py`** (persistenza) — salva il nuovo `GameState` su SQLite; il server genera poi una vista filtrata dello stato per ciascun giocatore (`public_state`) e la rispedisce a tutti via WebSocket, dove `ws.js` la riceve e aggiorna la UI.
+- **`storage.py`** (persistenza) — salva il nuovo `GameState` sul database (Postgres su Neon in produzione, SQLite in locale); il server genera poi una vista filtrata dello stato per ciascun giocatore (`public_state`) e la rispedisce a tutti via WebSocket, dove `ws.js` la riceve e aggiorna la UI.
 
 Esempio concreto, un giocatore gioca la Magia Ardolancio:
 
@@ -125,7 +127,7 @@ Esempio concreto, un giocatore gioca la Magia Ardolancio:
 2. `routes.py` → `_dispatch_action()` riceve il messaggio e chiama `play_spell(state, player_id, instance_id, **params)`.
 3. `actions.py` → `play_spell()` valida turno/mana/maghe, rimuove la carta dalla mano, poi chiama `apply_effect(card.effect_id, state, player, prodigy=..., **params)`.
 4. `effects.py` → la funzione registrata (`ardolancio_effect`) modifica il `GameState` e ritorna un dict con il risultato.
-5. `routes.py` salva il nuovo stato su SQLite, genera `public_state(state, player_id)` per ogni giocatore connesso e fa broadcast via WebSocket.
+5. `routes.py` salva il nuovo stato sul database, genera `public_state(state, player_id)` per ogni giocatore connesso e fa broadcast via WebSocket.
 6. `ws.js` riceve il nuovo stato e chiama `app.js` → `applyState()`, che aggiorna la UI.
 
 ### Aggiungere una Nuova Carta
@@ -152,5 +154,5 @@ Entrare con nome `Test` o `Test2` per avere le carte da `data/test_cards.json` i
 
 - **Backend**: Python + FastAPI, WebSocket per aggiornamenti real-time
 - **Frontend**: SPA in vanilla JS, servita come file statico da FastAPI
-- **Persistenza**: SQLite
-- **Deploy**: Render
+- **Persistenza**: PostgreSQL su [Neon](https://neon.tech) (free tier) in produzione, tramite variabile d'ambiente `DATABASE_URL`; fallback automatico su SQLite locale in sviluppo. Le partite finite o abbandonate vengono eliminate automaticamente.
+- **Deploy**: Render (free tier); il client invia un ping HTTP periodico per evitare lo spindown durante le partite
