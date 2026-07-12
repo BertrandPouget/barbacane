@@ -630,9 +630,9 @@ const Mob = (() => {
 
       if (acts > 0) {
         dock.appendChild(hint(hasCards ? 'Tocca una carta per giocarla' : 'Nessuna carta in mano'));
-        dock.appendChild(mkBtn('🧱 Muri', '', enterWallMode, !hasCards));
         dock.appendChild(mkBtn('🏗️', '', openCompleteSheet, !hasIncomplete));
-        dock.appendChild(mkBtn('Avanti ›', '', () => sendAction('next_phase', {})));
+        dock.appendChild(mkBtn('🧱', '', enterWallMode, !hasCards));
+        dock.appendChild(mkBtn('›', '', () => sendAction('next_phase', {})));
       } else {
         dock.appendChild(hint(hasEthereal ? 'Gioca la carta eterea o avanza' : 'Azioni esaurite'));
         dock.appendChild(mkBtn('Schieramento ›', 'mbtn-gold mbtn-pulse', () => sendAction('next_phase', {})));
