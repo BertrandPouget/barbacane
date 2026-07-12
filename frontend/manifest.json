@@ -1,0 +1,24 @@
+{
+  "name": "Barbacane",
+  "short_name": "Barbacane",
+  "description": "Gioco di carte fantasy multiplayer online",
+  "start_url": "/m",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#140d08",
+  "theme_color": "#140d08",
+  "icons": [
+    {
+      "src": "/assets/logo_app.png",
+      "sizes": "1045x1045",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/logo_app.png",
+      "sizes": "1045x1045",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
