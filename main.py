@@ -39,6 +39,9 @@ async def _cleanup_loop():
 # Inizializza il database al primo avvio
 @app.on_event("startup")
 async def startup():
+    from db.storage import IS_POSTGRES
+    logging.basicConfig(level=logging.INFO)
+    logger.info("[storage] Backend attivo: %s", "POSTGRES (Neon)" if IS_POSTGRES else "SQLITE (locale/effimero)")
     init_db()
     asyncio.create_task(_cleanup_loop())
 
