@@ -74,7 +74,7 @@ html, body {
 body {
   font-family: 'Georgia', serif;
   color: var(--text);
-  background: var(--bg-dark) url('/assets/cracked_background.png') center center / cover fixed;
+  background: var(--bg-dark) url('/assets/background.png') center center / cover fixed;
   min-height: 100dvh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;

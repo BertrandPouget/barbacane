@@ -674,6 +674,8 @@ const Mob = (() => {
   function openHandCardSheet(iid) {
     const def = getCardDef(iid);
     const my = me();
+    const hand = (my && my.hand) || [];
+    const idx = hand.indexOf(iid);
     const isEthereal = my && my.ethereal_card === iid;
     const canAct = isMyTurn() && currentState.phase === 'action' &&
       my && (my.actions_remaining > 0 || isEthereal);
@@ -697,10 +699,14 @@ const Mob = (() => {
     else if (!canAct) subtitle = 'Azioni esaurite per questo turno.';
     else if (isEthereal) subtitle = 'Carta eterea: gratis e senza consumare Azioni.';
 
-    Sheet.open({
+    showCardNavSheet({
       title: def ? def.name : iid,
       subtitle,
-      body: Render.cardViewNode(def, { instanceId: iid }),
+      def,
+      ctx: { instanceId: iid },
+      pos: idx >= 0 ? { idx, total: hand.length } : null,
+      onPrev: idx > 0 ? () => openHandCardSheet(hand[idx - 1]) : null,
+      onNext: idx >= 0 && idx < hand.length - 1 ? () => openHandCardSheet(hand[idx + 1]) : null,
       footer,
     });
   }
@@ -1029,11 +1035,11 @@ const Mob = (() => {
     const body = [Render.cardViewNode(def, ctx)];
     if (onPrev || onNext) {
       const nav = el('div', { className: 'card-nav', style: 'justify-content:center' });
-      const prevBtn = el('button', { className: 'nav-btn' }, ['◀']);
+      const prevBtn = el('button', { className: 'nav-btn' }, ['⮜']);
       prevBtn.disabled = !onPrev;
       prevBtn.addEventListener('click', () => { haptic(); onPrev && onPrev(); });
       const posEl = el('span', { className: 'nav-pos' }, [pos ? `${pos.idx + 1} / ${pos.total}` : '']);
-      const nextBtn = el('button', { className: 'nav-btn' }, ['▶']);
+      const nextBtn = el('button', { className: 'nav-btn' }, ['⮞']);
       nextBtn.disabled = !onNext;
       nextBtn.addEventListener('click', () => { haptic(); onNext && onNext(); });
       nav.append(prevBtn, posEl, nextBtn);
@@ -1274,6 +1280,7 @@ const Mob = (() => {
             ], (dest) => sendAction('reposition', { warrior_instance_id: iid, destination: dest }));
           },
         },
+        { label: 'Chiudi', onClick: () => Sheet.close() },
       ],
     });
   }
@@ -1389,6 +1396,8 @@ const Mob = (() => {
         onClick: () => { Sheet.close(true); sendAction('complete_building', { building_instance_id: iid }); },
       });
     }
+
+    footer.push({ label: 'Chiudi', onClick: () => Sheet.close() });
 
     Sheet.open({
       title: def ? def.name : iid,

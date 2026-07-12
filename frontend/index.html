@@ -29,7 +29,7 @@
 <div id="screen-lobby" class="screen active">
   <div class="lobby-container">
     <div class="logo-area">
-      <img src="/assets/logo_color.png" alt="Barbacane" class="logo"
+      <img src="/assets/logo.png" alt="Barbacane" class="logo"
            onerror="this.style.display='none'; document.getElementById('lobby-title').classList.add('show')" />
       <h1 class="game-title" id="lobby-title">BARBACANE</h1>
     </div>
@@ -59,7 +59,7 @@
         <button id="btn-join" class="btn btn-secondary">Entra</button>
       </div>
     </div>
-    <a href="/m" style="display:block;text-align:center;margin-top:14px;font-size:0.8rem;color:var(--text-dim);text-decoration:none"
+    <a href="/m" style="display:block;text-align:center;margin-top:14px;font-size:0.8rem;font-style:italic;color:var(--text-dim);text-decoration:none"
        onclick="try{localStorage.removeItem('barbacane-desktop')}catch(e){}">Passa alla versione mobile</a>
   </div>
 </div>
@@ -94,7 +94,7 @@
     <div class="header-right">
       <span id="hdr-deck">Mazzo: —</span>
       <div id="turn-timer-display" class="timer hidden"></div>
-      <button id="btn-abandon" class="btn btn-small btn-abandon">Abbandona</button>
+      <button id="btn-abandon" class="btn btn-small btn-abandon">Esci</button>
     </div>
   </div>
 
