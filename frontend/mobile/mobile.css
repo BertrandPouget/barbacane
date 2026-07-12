@@ -74,13 +74,24 @@ html, body {
 body {
   font-family: 'Georgia', serif;
   color: var(--text);
-  background: var(--bg-dark) url('/assets/background.png') center center / cover fixed;
+  background: var(--bg-dark);
   min-height: 100dvh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation;
+}
+
+/* Sfondo su layer fisso: background-attachment:fixed non funziona su iOS Safari
+   e in modalità app (home screen) lascerebbe una banda troncata in basso.
+   Un layer position:fixed copre sempre l'intero schermo, safe area inclusa. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--bg-dark) url('/assets/background.png') center center / cover no-repeat;
 }
 
 button {

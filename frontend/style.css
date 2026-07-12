@@ -34,11 +34,21 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: var(--bg-dark) url('/assets/background.png') center center / cover fixed;
+  background: var(--bg-dark);
   color: var(--text);
   font-family: 'Georgia', serif;
   min-height: 100vh;
   overflow-x: hidden;
+}
+
+/* Sfondo su layer fisso: background-attachment:fixed non funziona su iOS Safari
+   e lascerebbe lo sfondo troncato in basso su schermi touch. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--bg-dark) url('/assets/background.png') center center / cover no-repeat;
 }
 
 /* ==================== SCHERMATE ==================== */
