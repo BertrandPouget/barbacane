@@ -44,6 +44,8 @@ python 1_resize_input.py <nome_deck>
 
 Rileva automaticamente il bounding box del contenuto sulla prima pagina, ritaglia i margini bianchi e ridimensiona ogni pagina a **63 × 88 mm**. Salva in-place su `input/`.
 
+**Variante senza PDF:** se `images/<id_carta>.png` esiste già (illustrazione ritagliata a mano), `python 1_resize_input.py <id_carta>` la ridimensiona in-place alle dimensioni standard. A questo punto si può passare direttamente allo Step 3.
+
 ---
 
 ### Step 2 — Estrai le illustrazioni
