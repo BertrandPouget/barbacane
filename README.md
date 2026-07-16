@@ -10,8 +10,6 @@ Barbacane è un gioco di carte fantasy, ora in versione digitale multiplayer.
 
 Il mondo di Barbacane è popolato da Umani, Elfi, Nani e Maghe — tutti, inspiegabilmente, di sangue Goblin. Turno dopo turno, ogni giocatore deve potenziare il proprio campo di gioco schierando Guerrieri, erigendo Costruzioni e scagliando Magie contro gli avversari. Niente alleanze, niente tregue: ne resterà soltanto uno.
 
-La beta è disponibile qui: [Play Barbacane](https://barbacane.onrender.com).
-
 ## Avvio in Locale
 
 ```bash
