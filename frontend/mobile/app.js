@@ -146,6 +146,91 @@ const Mob = (() => {
     $('btn-start').addEventListener('click', onStartGame);
     $('in-join-code').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
     $('wait-code').addEventListener('click', copyLobbyCode);
+
+    // Catalogo carte
+    $('btn-catalog').addEventListener('click', openCatalog);
+    $('cat-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Catalogo carte (consultabile dalla lobby, prima della partita)
+  // ---------------------------------------------------------------------------
+
+  let catalogList = [];      // definizioni in ordine di visualizzazione
+  let catalogBuilt = false;
+
+  const CATALOG_SECTIONS = [
+    { type: 'warrior',  label: 'Guerrieri' },
+    { type: 'spell',    label: 'Magie' },
+    { type: 'building', label: 'Costruzioni' },
+  ];
+
+  function openCatalog() {
+    haptic();
+    if (!catalogBuilt) buildCatalogGrid();
+    Screens.show('catalog');
+  }
+
+  function buildCatalogGrid() {
+    const grid = $('cat-grid');
+    grid.innerHTML = '';
+    catalogList = [];
+
+    CATALOG_SECTIONS.forEach(section => {
+      const defs = Object.values(cardDefs).filter(c => c.type === section.type);
+      if (!defs.length) return;
+
+      grid.appendChild(el('div', { className: 'cat-section-title' }, [`${section.label} (${defs.length})`]));
+
+      const row = el('div', { className: 'cat-cards' });
+      defs.forEach(def => {
+        const idx = catalogList.length;
+        catalogList.push(def);
+
+        const cell = el('div', { className: 'cat-card' });
+        const img = el('img', { alt: def.name, draggable: 'false' });
+        img.loading = 'lazy';
+        img.src = `/card_images/${def.id}.png`;
+        // Senza immagine: tessera testuale col nome
+        img.onerror = () => {
+          cell.innerHTML = '';
+          cell.appendChild(el('div', { className: 'cat-card-fallback' }, [def.name]));
+        };
+        cell.appendChild(img);
+        cell.addEventListener('click', () => { haptic(); showCatalogCard(idx); });
+        row.appendChild(cell);
+      });
+      grid.appendChild(row);
+    });
+
+    $('cat-count').textContent = `${catalogList.length} carte`;
+    catalogBuilt = true;
+  }
+
+  function catalogSubtitle(def) {
+    if (def.type === 'warrior') {
+      return `${capitalize(def.species)} · ${def.subtype === 'hero' ? 'Eroe' : 'Recluta'}`;
+    }
+    if (def.type === 'spell') return `Magia · ${capitalize(def.school)}`;
+    return 'Costruzione';
+  }
+
+  function showCatalogCard(idx) {
+    const def = catalogList[idx];
+    if (!def) return;
+
+    // Precarica le vicine per una navigazione fluida
+    if (catalogList[idx - 1]) Render.preloadCardImage(catalogList[idx - 1].id);
+    if (catalogList[idx + 1]) Render.preloadCardImage(catalogList[idx + 1].id);
+
+    showCardNavSheet({
+      title: def.name,
+      subtitle: catalogSubtitle(def),
+      def,
+      pos: { idx, total: catalogList.length },
+      onPrev: idx > 0 ? () => showCatalogCard(idx - 1) : null,
+      onNext: idx < catalogList.length - 1 ? () => showCatalogCard(idx + 1) : null,
+    });
   }
 
   async function onCreateLobby() {

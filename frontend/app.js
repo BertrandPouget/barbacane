@@ -103,6 +103,86 @@ const App = (() => {
     document.getElementById('join-code').addEventListener('input', e => {
       e.target.value = e.target.value.toUpperCase();
     });
+
+    // Catalogo carte
+    document.getElementById('btn-catalog').addEventListener('click', openCatalog);
+    document.getElementById('btn-catalog-back').addEventListener('click', () => Renderer.showScreen('lobby'));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Catalogo carte (consultabile dalla lobby, prima della partita)
+  // ---------------------------------------------------------------------------
+
+  let catalogList = [];      // definizioni in ordine di visualizzazione
+  let catalogBuilt = false;
+
+  const CATALOG_SECTIONS = [
+    { type: 'warrior',  label: 'Guerrieri' },
+    { type: 'spell',    label: 'Magie' },
+    { type: 'building', label: 'Costruzioni' },
+  ];
+
+  function openCatalog() {
+    if (!catalogBuilt) buildCatalogGrid();
+    Renderer.showScreen('catalog');
+  }
+
+  function buildCatalogGrid() {
+    const grid = document.getElementById('catalog-grid');
+    grid.innerHTML = '';
+    catalogList = [];
+
+    CATALOG_SECTIONS.forEach(section => {
+      const defs = Object.values(cardDefs).filter(c => c.type === section.type);
+      if (!defs.length) return;
+
+      const header = document.createElement('div');
+      header.className = 'catalog-section-title';
+      header.textContent = `${section.label} (${defs.length})`;
+      grid.appendChild(header);
+
+      const row = document.createElement('div');
+      row.className = 'catalog-cards';
+      defs.forEach(def => {
+        const idx = catalogList.length;
+        catalogList.push(def);
+
+        const cell = document.createElement('div');
+        cell.className = 'catalog-card';
+        const img = document.createElement('img');
+        img.src = `/card_images/${def.id}.png`;
+        img.alt = def.name;
+        img.loading = 'lazy';
+        img.draggable = false;
+        // Senza immagine: mostra una tessera testuale col nome
+        img.onerror = () => {
+          cell.innerHTML = `<div class="catalog-card-fallback">${def.name}</div>`;
+        };
+        cell.appendChild(img);
+        cell.addEventListener('click', () => showCatalogCard(idx));
+        row.appendChild(cell);
+      });
+      grid.appendChild(row);
+    });
+
+    document.getElementById('catalog-count').textContent = `${catalogList.length} carte`;
+    catalogBuilt = true;
+  }
+
+  function showCatalogCard(idx) {
+    const def = catalogList[idx];
+    if (!def) return;
+    const navOptions = {
+      onPrev: idx > 0 ? () => showCatalogCard(idx - 1) : null,
+      onNext: idx < catalogList.length - 1 ? () => showCatalogCard(idx + 1) : null,
+    };
+    Renderer.showCardDetail(
+      def.name,
+      cardDetailBodyHTML(def, def.id),
+      null, null, null, [],
+      navOptions,
+      def.id,
+    );
   }
 
   async function onCreateLobby() {
@@ -871,29 +951,10 @@ const App = (() => {
     });
   }
 
-  // Costruisce e mostra il pannello di dettaglio per qualsiasi carta
-  function showCardDetail(instanceId, source) {
-    const def = getCardDef(instanceId);
+  // Costruisce il corpo HTML del dettaglio di una carta.
+  // fieldWarrior/fieldBuilding sono opzionali (contesto di gioco); senza, mostra i valori base.
+  function cardDetailBodyHTML(def, instanceId, fieldWarrior = null, fieldBuilding = null) {
     const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
-
-    // Recupera dati contestuali dallo stato
-    let fieldWarrior = null;
-    let fieldBuilding = null;
-    if (currentState) {
-      for (const player of currentState.players) {
-        const w = [
-          ...(player.field.vanguard || []),
-          ...(player.field.bastion_left.warriors || []),
-          ...(player.field.bastion_right.warriors || []),
-        ].find(w => w.instance_id === instanceId);
-        if (w) { fieldWarrior = w; break; }
-
-        const b = (player.field.village.buildings || []).find(b => b.instance_id === instanceId);
-        if (b) { fieldBuilding = b; break; }
-      }
-    }
-
-    // Costruisce il corpo HTML del dettaglio
     let bodyHTML = '';
 
     if (def && def.type === 'warrior') {
@@ -951,6 +1012,32 @@ const App = (() => {
     } else {
       bodyHTML = `<div class="detail-dim">${instanceId}</div>`;
     }
+
+    return bodyHTML;
+  }
+
+  // Costruisce e mostra il pannello di dettaglio per qualsiasi carta
+  function showCardDetail(instanceId, source) {
+    const def = getCardDef(instanceId);
+
+    // Recupera dati contestuali dallo stato
+    let fieldWarrior = null;
+    let fieldBuilding = null;
+    if (currentState) {
+      for (const player of currentState.players) {
+        const w = [
+          ...(player.field.vanguard || []),
+          ...(player.field.bastion_left.warriors || []),
+          ...(player.field.bastion_right.warriors || []),
+        ].find(w => w.instance_id === instanceId);
+        if (w) { fieldWarrior = w; break; }
+
+        const b = (player.field.village.buildings || []).find(b => b.instance_id === instanceId);
+        if (b) { fieldBuilding = b; break; }
+      }
+    }
+
+    const bodyHTML = cardDetailBodyHTML(def, instanceId, fieldWarrior, fieldBuilding);
 
     // Bottone contestuale
     const isMyTurn = currentState && currentState.current_player_id === myPlayerId;

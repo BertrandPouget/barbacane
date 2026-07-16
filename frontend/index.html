@@ -61,8 +61,21 @@
         <button id="btn-join" class="btn btn-secondary">Entra</button>
       </div>
     </div>
+    <button id="btn-catalog" class="btn btn-secondary btn-catalog">Catalogo Carte</button>
     <a href="/m" style="display:block;text-align:center;margin-top:14px;font-size:0.8rem;font-style:italic;color:var(--bg-medium);text-decoration:none"
        onclick="try{localStorage.removeItem('barbacane-desktop')}catch(e){}">Passa alla versione mobile</a>
+  </div>
+</div>
+
+<!-- ===== SCHERMATA: CATALOGO CARTE ===== -->
+<div id="screen-catalog" class="screen">
+  <div id="catalog-header">
+    <button id="btn-catalog-back" class="btn btn-secondary btn-small">← Indietro</button>
+    <h2>Catalogo Carte</h2>
+    <span id="catalog-count" class="catalog-count"></span>
+  </div>
+  <div id="catalog-scroll">
+    <div id="catalog-grid"></div>
   </div>
 </div>
 
@@ -214,46 +227,46 @@
     </div>
   </div>
 
-  <!-- Card detail overlay (lettura carta) -->
-  <div id="card-detail-overlay" class="hidden">
-
-    <!-- Modalità immagine carta -->
-    <div id="card-image-wrap" class="hidden">
-      <img id="card-detail-img" alt="" />
-      <div id="card-image-footer">
-        <button id="card-img-prev"    class="btn btn-secondary card-nav-btn" style="visibility:hidden">◀</button>
-        <div id="card-img-center">
-          <div id="card-img-extra-btns"></div>
-          <button id="card-img-action"  class="btn btn-primary hidden"></button>
-          <button id="card-img-discard" class="btn btn-danger  hidden">Scarta</button>
-          <button id="card-img-close"   class="btn btn-secondary">Chiudi</button>
-        </div>
-        <button id="card-img-next"    class="btn btn-secondary card-nav-btn" style="visibility:hidden">▶</button>
-      </div>
-    </div>
-
-    <!-- Modalità testo (flashcard) -->
-    <div id="card-detail-box" class="hidden">
-      <div class="card-detail-header">
-        <div id="card-detail-title" class="card-detail-title"></div>
-      </div>
-      <div id="card-detail-body" class="card-detail-body"></div>
-      <div id="card-detail-footer">
-        <button id="card-nav-prev"           class="btn btn-secondary btn-small card-nav-btn" style="visibility:hidden">◀</button>
-        <div class="card-footer-center">
-          <div id="card-detail-extra-btns"></div>
-          <button id="card-detail-action-btn"  class="btn btn-primary hidden"></button>
-          <button id="card-detail-discard-btn" class="btn btn-danger  hidden">Scarta</button>
-          <button id="card-detail-close"       class="btn btn-secondary">Chiudi</button>
-        </div>
-        <button id="card-nav-next"           class="btn btn-secondary btn-small card-nav-btn" style="visibility:hidden">▶</button>
-      </div>
-    </div>
-
-  </div>
-
   <!-- Toast notifiche -->
   <div id="toast-container"></div>
+
+</div>
+
+<!-- Card detail overlay (lettura carta) — a livello body: usato in partita e nel catalogo -->
+<div id="card-detail-overlay" class="hidden">
+
+  <!-- Modalità immagine carta -->
+  <div id="card-image-wrap" class="hidden">
+    <img id="card-detail-img" alt="" />
+    <div id="card-image-footer">
+      <button id="card-img-prev"    class="btn btn-secondary card-nav-btn" style="visibility:hidden">◀</button>
+      <div id="card-img-center">
+        <div id="card-img-extra-btns"></div>
+        <button id="card-img-action"  class="btn btn-primary hidden"></button>
+        <button id="card-img-discard" class="btn btn-danger  hidden">Scarta</button>
+        <button id="card-img-close"   class="btn btn-secondary">Chiudi</button>
+      </div>
+      <button id="card-img-next"    class="btn btn-secondary card-nav-btn" style="visibility:hidden">▶</button>
+    </div>
+  </div>
+
+  <!-- Modalità testo (flashcard) -->
+  <div id="card-detail-box" class="hidden">
+    <div class="card-detail-header">
+      <div id="card-detail-title" class="card-detail-title"></div>
+    </div>
+    <div id="card-detail-body" class="card-detail-body"></div>
+    <div id="card-detail-footer">
+      <button id="card-nav-prev"           class="btn btn-secondary btn-small card-nav-btn" style="visibility:hidden">◀</button>
+      <div class="card-footer-center">
+        <div id="card-detail-extra-btns"></div>
+        <button id="card-detail-action-btn"  class="btn btn-primary hidden"></button>
+        <button id="card-detail-discard-btn" class="btn btn-danger  hidden">Scarta</button>
+        <button id="card-detail-close"       class="btn btn-secondary">Chiudi</button>
+      </div>
+      <button id="card-nav-next"           class="btn btn-secondary btn-small card-nav-btn" style="visibility:hidden">▶</button>
+    </div>
+  </div>
 
 </div>
 

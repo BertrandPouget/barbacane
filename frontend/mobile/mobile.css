@@ -1461,3 +1461,88 @@ input {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ═══════════════════════ CATALOGO CARTE ═══════════════════════ */
+
+.cta-catalog { margin-top: 2px; }
+
+#scr-catalog.active {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+#cat-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: calc(var(--sat) + 8px) 10px 0;
+  padding: 7px 9px;
+  border-radius: var(--r-md);
+  flex: 0 0 auto;
+}
+
+.cat-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--gold);
+}
+
+.cat-count {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+
+#cat-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 12px calc(var(--sab) + 20px);
+}
+
+.cat-section-title {
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 0.92rem;
+  margin: 16px 2px 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cat-section-title:first-child { margin-top: 2px; }
+
+.cat-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cat-card {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-gold);
+  background: var(--bg-dark);
+  transition: filter 0.15s;
+}
+
+.cat-card:active { filter: brightness(1.2); }
+
+.cat-card img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.cat-card-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4px;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.62rem;
+  line-height: 1.2;
+}
