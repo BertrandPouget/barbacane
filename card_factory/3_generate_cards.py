@@ -4,10 +4,13 @@ generate_cards.py
 Genera carte Barbacane dal template PDF + JSON dati + PNG illustrazioni.
 
 Utilizzo:
-    python generate_cards.py
+    python generate_cards.py               # tutte le carte
+    python generate_cards.py faust joseph   # solo le carte indicate
 """
 
+import argparse
 import json
+import sys
 import textwrap
 from pathlib import Path
 
@@ -433,10 +436,28 @@ OUT_DIR       = Path("output")
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Genera carte Barbacane dal template PDF + JSON dati + PNG illustrazioni."
+    )
+    parser.add_argument(
+        "ids",
+        nargs="*",
+        help="Id delle carte da generare (es. faust joseph reinhold). "
+             "Se omesso, genera tutte le carte del JSON.",
+    )
+    args = parser.parse_args()
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     fonts = load_fonts(FONTS_DIR)
     all_cards, id_to_name = load_cards(CARDS_JSON)
+
+    if args.ids:
+        wanted = set(args.ids)
+        all_cards = [c for c in all_cards if c.get("id") in wanted]
+        missing = wanted - {c.get("id") for c in all_cards}
+        if missing:
+            print(f"Attenzione: id non trovati nel JSON: {', '.join(sorted(missing))}", file=sys.stderr)
 
     out_dir       = OUT_DIR
     templates_dir = TEMPLATES_DIR

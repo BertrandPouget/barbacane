@@ -81,30 +81,54 @@ def is_hero_card(card_id: str) -> bool:
 
 
 def process_image(png_path: Path) -> None:
-    """Adatta l'illustrazione alla larghezza target e porta l'altezza al canvas
-    standard aggiungendo trasparenza sopra (o ritagliando l'eccesso dall'alto)."""
+    """Adatta l'illustrazione al canvas standard mantenendo le proporzioni
+    (nessuna distorsione): sceglie se adattare alla larghezza o all'altezza
+    del canvas confrontando l'aspect ratio dell'immagine con quello del
+    canvas target, in modo che un'illustrazione più "quadrata"/verticale di
+    una carta Recluta (canvas largo) venga adattata all'altezza e centrata
+    orizzontalmente con bande trasparenti a destra e sinistra (come
+    patrizio.png), invece di essere stirata a piena larghezza e poi
+    tagliata pesantemente in verticale. Ancoraggio verticale in basso."""
     target_h = IMG_HERO_HEIGHT if is_hero_card(png_path.stem) else IMG_STANDARD_HEIGHT
+    canvas_aspect = IMG_TARGET_WIDTH / target_h
 
     img = Image.open(png_path).convert("RGBA")
-    scale = IMG_TARGET_WIDTH / img.width
-    fitted_h = int(round(img.height * scale))
-    fitted = img.resize((IMG_TARGET_WIDTH, fitted_h), Image.LANCZOS)
+    img_aspect = img.width / img.height
 
     canvas = Image.new("RGBA", (IMG_TARGET_WIDTH, target_h), (0, 0, 0, 0))
-    if fitted_h <= target_h:
-        canvas.paste(fitted, (0, target_h - fitted_h), fitted)
-        note = f"+{target_h - fitted_h}px trasparenti sopra"
+
+    if img_aspect >= canvas_aspect:
+        # Immagine relativamente più larga del canvas -> adatta alla larghezza.
+        scale = IMG_TARGET_WIDTH / img.width
+        fitted_h = int(round(img.height * scale))
+        fitted = img.resize((IMG_TARGET_WIDTH, fitted_h), Image.LANCZOS)
+
+        if fitted_h <= target_h:
+            canvas.paste(fitted, (0, target_h - fitted_h), fitted)
+            note = f"+{target_h - fitted_h}px trasparenti sopra"
+        else:
+            crop_top = fitted_h - target_h
+            fitted = fitted.crop((0, crop_top, IMG_TARGET_WIDTH, fitted_h))
+            canvas.paste(fitted, (0, 0), fitted)
+            note = f"ritagliati {crop_top}px in alto"
+        fit_kind = "larghezza"
     else:
-        crop_top = fitted_h - target_h
-        fitted = fitted.crop((0, crop_top, IMG_TARGET_WIDTH, fitted_h))
-        canvas.paste(fitted, (0, 0), fitted)
-        note = f"ritagliati {crop_top}px in alto"
+        # Immagine relativamente più stretta/verticale del canvas -> adatta
+        # all'altezza e centra orizzontalmente (bande trasparenti sui lati).
+        scale = target_h / img.height
+        fitted_w = int(round(img.width * scale))
+        fitted = img.resize((fitted_w, target_h), Image.LANCZOS)
+
+        x_off = (IMG_TARGET_WIDTH - fitted_w) // 2
+        canvas.paste(fitted, (x_off, 0), fitted)
+        note = f"bande trasparenti laterali {x_off}px/{IMG_TARGET_WIDTH - fitted_w - x_off}px"
+        fit_kind = "altezza"
 
     canvas.save(png_path, format="PNG")
     kind = "eroe" if target_h == IMG_HERO_HEIGHT else "standard"
     print(
-        f"{png_path.name}: {img.size} -> larghezza {IMG_TARGET_WIDTH} "
-        f"({fitted_h}px risultanti, {note}) -> canvas {kind} {IMG_TARGET_WIDTH}x{target_h}"
+        f"{png_path.name}: {img.size} -> adattata per {fit_kind} "
+        f"-> canvas {kind} {IMG_TARGET_WIDTH}x{target_h} ({note})"
     )
 
 
