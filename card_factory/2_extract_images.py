@@ -21,6 +21,7 @@ from pathlib import Path
 import fitz  # PyMuPDF
 import numpy as np
 from PIL import Image
+from scipy import ndimage
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +130,12 @@ def make_white_transparent(arr: np.ndarray, scale: float,
     rgba = np.zeros((h, w, 4), dtype=np.uint8)
     rgba[:, :, :3] = arr
 
-    # 1. Bianco puro → trasparente
+    # 1. Bianco puro → trasparente, ovunque (anche sacche di sfondo racchiuse dentro il
+    #    disegno, es. tra le dita o tra braccio/volto/fiamma: sono sfondo vero, non
+    #    dettagli). Un dettaglio interno bianco puro isolato (es. l'highlight di un
+    #    occhio) verrebbe reso trasparente per errore qui, ma è piccolo — viene
+    #    richiuso subito dopo da fill_interior_holes in base alla dimensione, non
+    #    alla connettività col bordo (che non distingue le due situazioni).
     r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
     is_white = (r >= white_threshold) & (g >= white_threshold) & (b >= white_threshold)
 
@@ -159,21 +165,171 @@ def make_white_transparent(arr: np.ndarray, scale: float,
 
     rgba[:, :, 3] = np.where(is_white | in_octagon | in_left_strip, 0, 255)
 
+    # Ordine importante: prima si richiudono i piccoli fori interni (falsi
+    # positivi come un highlight puro bianco negli occhi), così quello che
+    # resta trasparente a quel punto è SOLO vero sfondo — esterno o una sacca
+    # interna abbastanza grande (es. tra le dita, sotto un'ascella). Solo
+    # allora si fa crescere la frangia da ogni pixel trasparente rimasto: se
+    # lo si facesse prima, o solo dal bordo esterno, le sacche interne
+    # resterebbero con l'alone bianco mai pulito (bug osservato sulla fodera
+    # sotto le braccia di Giulio).
+    fill_interior_holes(rgba)
+    remove_edge_halo(rgba)
+    remove_isolated_specks(rgba)
+
     return Image.fromarray(rgba, mode="RGBA")
+
+
+# ---------------------------------------------------------------------------
+# Rimozione della frangia bianco-grigiastra residua sul contorno
+#
+# La sogliatura "bianco puro" lascia intatta la sfumatura di anti-aliasing tra
+# lo sfondo e il tratto nero del disegno (es. il contorno del personaggio),
+# perché quei pixel non sono abbastanza bianchi da superare white_threshold.
+# Non basta abbassare la soglia globale: dettagli chiari INTERNI al disegno
+# (es. il bianco degli occhi) hanno valori di luminosità che si sovrappongono
+# a quelli della frangia, quindi verrebbero cancellati per errore.
+#
+# La distinzione giusta non è il colore ma la connettività: la frangia tocca
+# sempre una zona di vero sfondo (esterna alla sagoma, o una sacca interna
+# abbastanza grande), i dettagli interni piccoli no (sono chiusi dentro un
+# contorno scuro e già richiusi da fill_interior_holes PRIMA di questa
+# funzione — vedi l'ordine in make_white_transparent). Si fa quindi
+# "crescere" ogni pixel trasparente rimasto, consumando i vicini grigiastri
+# e abbastanza chiari; la crescita si ferma da sola contro il tratto nero
+# vero o un colore reale.
+#
+# HALO_BRIGHTNESS_FLOOR basso (non 150): il gradiente di anti-aliasing tra
+# nero del contorno e bianco passa per grigi medi (misurato: 100-150 di
+# luminosità) che con una soglia troppo alta restano opachi a chiazze,
+# lasciando una fila di puntini invece di un bordo pulito. Un floor più
+# basso rischia di erodere qualche pixel in più su un eventuale riempimento
+# grigio scuro che tocca lo sfondo direttamente, ma è un rischio limitato
+# da HALO_MAX_ITERATIONS (la profondità massima di erosione dal bordo).
+# ---------------------------------------------------------------------------
+HALO_BRIGHTNESS_FLOOR = 60    # luminosità minima perché un pixel di bordo sia "frangia"
+HALO_MAX_ITERATIONS   = 5     # profondità massima di erosione dal vero sfondo, in px
+
+
+def _border_connected(mask: np.ndarray) -> np.ndarray:
+    """Sottoinsieme di mask connesso (8-adiacenza) al bordo dell'immagine."""
+    labeled, n = ndimage.label(mask, structure=np.ones((3, 3)))
+    if n == 0:
+        return mask
+    border_labels = np.union1d(
+        np.union1d(labeled[0, :], labeled[-1, :]),
+        np.union1d(labeled[:, 0], labeled[:, -1]),
+    )
+    border_labels = border_labels[border_labels != 0]
+    return np.isin(labeled, border_labels)
+
+
+def remove_edge_halo(rgba: np.ndarray,
+                      brightness_floor: int = HALO_BRIGHTNESS_FLOOR,
+                      max_iterations: int = HALO_MAX_ITERATIONS) -> None:
+    """Estende in-place la trasparenza di rgba mangiando la frangia grigiastra intorno a ogni
+    zona di vero sfondo rimasta (esterna alla sagoma o sacca interna). Va chiamata DOPO
+    fill_interior_holes, altrimenti userebbe anche i piccoli fori-errore come seed."""
+    alpha = rgba[:, :, 3]
+    seed = alpha == 0
+    if not seed.any() or seed.all():
+        return
+
+    grayish = ~is_truly_colored(rgba[:, :, :3])
+    brightness = rgba[:, :, :3].astype(np.int32).mean(axis=2)
+    candidate = grayish & (brightness >= brightness_floor)
+
+    grown = seed.copy()
+    for _ in range(max_iterations):
+        border = ndimage.binary_dilation(grown, structure=np.ones((3, 3))) & ~grown
+        newly_transparent = border & candidate
+        if not newly_transparent.any():
+            break
+        grown |= newly_transparent
+
+    final_transparent = (alpha == 0) | grown
+    rgba[:, :, 3] = np.where(final_transparent, 0, alpha)
+
+
+# ---------------------------------------------------------------------------
+# Rimozione dei "pallini" residui: piccoli frammenti opachi isolati lasciati
+# dalla sogliatura del bianco (rumore di anti-aliasing sparso nello sfondo).
+#
+# Anche qui la distinzione è per dimensione, non per colore/posizione: molte
+# illustrazioni hanno elementi disegnati intenzionalmente separati dal corpo
+# principale (fiori, rami, oggetti fluttuanti) grandi centinaia/migliaia di
+# pixel, e vanno preservati. I pallini di rumore misurati sono sempre <=15px,
+# con un salto netto rispetto al primo elemento di disegno legittimo (>=17px).
+# ---------------------------------------------------------------------------
+SPECK_MAX_SIZE = 15   # px; componenti connesse fino a questa dimensione sono rumore
+
+
+def remove_isolated_specks(rgba: np.ndarray, max_size: int = SPECK_MAX_SIZE) -> None:
+    """Rende trasparenti in-place le componenti opache isolate sotto max_size px."""
+    alpha = rgba[:, :, 3]
+    opaque = alpha > 0
+
+    labeled, n = ndimage.label(opaque, structure=np.ones((3, 3)))
+    if n <= 1:
+        return
+
+    sizes = ndimage.sum(opaque, labeled, range(1, n + 1))
+    small_labels = np.flatnonzero(sizes <= max_size) + 1
+    if small_labels.size == 0:
+        return
+
+    rgba[:, :, 3] = np.where(np.isin(labeled, small_labels), 0, alpha)
+
+
+# ---------------------------------------------------------------------------
+# Chiusura dei piccoli fori interni: l'esatto speculare di remove_isolated_specks.
+#
+# is_white (anche dopo il fix border-connected) può ancora produrre un piccolo
+# foro se un dettaglio interno era già puro bianco al momento della PRIMA
+# estrazione da PDF, o se un'immagine è stata processata prima di questo fix
+# (es. i buchi nelle pupille di Evelyn e The Briny). remove_edge_halo e
+# remove_isolated_specks aggiungono solo trasparenza: non possono richiudere
+# un foro già esistente. Qui si richiudono i fori trasparenti che NON toccano
+# il bordo (quindi non sono vero sfondo) sotto una soglia di dimensione,
+# riempendoli con il colore del pixel opaco più vicino.
+# ---------------------------------------------------------------------------
+def fill_interior_holes(rgba: np.ndarray, max_size: int = SPECK_MAX_SIZE) -> int:
+    """Richiude in-place i piccoli fori trasparenti interni. Ritorna i pixel richiusi."""
+    alpha = rgba[:, :, 3]
+    transparent = alpha == 0
+    interior_holes = transparent & ~_border_connected(transparent)
+    if not interior_holes.any():
+        return 0
+
+    labeled, n = ndimage.label(interior_holes, structure=np.ones((3, 3)))
+    sizes = ndimage.sum(interior_holes, labeled, range(1, n + 1))
+    small_labels = np.flatnonzero(sizes <= max_size) + 1
+    fill_mask = np.isin(labeled, small_labels)
+    filled = int(fill_mask.sum())
+    if filled == 0:
+        return 0
+
+    _, nearest_idx = ndimage.distance_transform_edt(transparent, return_distances=True, return_indices=True)
+    nearest_rgb = rgba[:, :, :3][tuple(nearest_idx)]
+    for c in range(3):
+        rgba[:, :, c] = np.where(fill_mask, nearest_rgb[:, :, c], rgba[:, :, c])
+    rgba[:, :, 3] = np.where(fill_mask, 255, alpha)
+    return filled
 
 
 DPI     = 300
 OUT_DIR = Path("images")
 
 
-def process_pdf(pdf_path: Path) -> None:
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+def process_pdf(pdf_path: Path, out_dir: Path = None) -> None:
+    out_dir = out_dir or OUT_DIR
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     doc   = fitz.open(str(pdf_path))
     scale = DPI / 72.0
     stem  = pdf_path.stem
 
-    print(f"PDF: {pdf_path}  |  {len(doc)} pagine  |  DPI={DPI}\n")
+    print(f"PDF: {pdf_path}  |  {len(doc)} pagine  |  DPI={DPI}  |  out={out_dir}\n")
 
     for i, page in enumerate(doc):
         page_num  = i + 1
@@ -185,26 +341,64 @@ def process_pdf(pdf_path: Path) -> None:
         crop_y0_pt = (HERO_BOX_PT if hero else STANDARD_BOX_PT)[1]
         img        = make_white_transparent(crop, scale, crop_y0_pt)
 
-        out_path = OUT_DIR / f"{stem}_page{page_num:02d}.png"
+        out_path = out_dir / f"{stem}_page{page_num:02d}.png"
         img.save(out_path, format="PNG")
         print(f"  Pag. {page_num:02d} [{card_type:8s}]  →  {crop.shape[1]}×{crop.shape[0]}px  →  {out_path.name}")
 
     n_pages = len(doc)
     doc.close()
-    print(f"\nDone. {n_pages} immagini salvate in '{OUT_DIR}'")
+    print(f"\nDone. {n_pages} immagini salvate in '{out_dir}'")
+
+
+def clean_existing(names: list[str], out_dir: Path = None) -> None:
+    """Riapplica halo/specks/fori a PNG già estratti in images/. Scrive in out_dir (default: in-place)."""
+    paths = [OUT_DIR / f"{n}.png" for n in names] if names else sorted(OUT_DIR.glob("*.png"))
+    if out_dir:
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+    for path in paths:
+        if not path.exists():
+            print(f"Errore: file non trovato: {path}", file=sys.stderr)
+            continue
+        img = Image.open(path).convert("RGBA")
+        arr = np.array(img)
+        opaque_before = int((arr[:, :, 3] > 0).sum())
+
+        filled = fill_interior_holes(arr)
+        remove_edge_halo(arr)
+        remove_isolated_specks(arr)
+
+        removed = opaque_before - int((arr[:, :, 3] > 0).sum())
+        dest = (out_dir / path.name) if out_dir else path
+        Image.fromarray(arr, mode="RGBA").save(dest)
+        print(f"{path.name}: {removed}px rimossi, {filled}px fori richiusi  -> {dest}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Estrae illustrazioni da PDF carte Barbacane.")
-    parser.add_argument("deck", help="Nome del deck (es. deck_color → input/deck_color.pdf)")
+    parser.add_argument("deck", nargs="?", help="Nome del deck (es. deck_color → input/deck_color.pdf)")
+    parser.add_argument("--clean", action="store_true",
+                         help="Ripulisce i PNG già estratti in images/ invece di estrarre da un PDF")
+    parser.add_argument("--out-dir", type=Path, default=None,
+                         help="Scrive qui invece di sovrascrivere images/ (per anteprima)")
+    parser.add_argument("names", nargs="*", help="Con --clean: nomi carta da ripulire (default: tutte)")
     args = parser.parse_args()
+
+    if args.clean:
+        names = [n for n in [args.deck, *args.names] if n]
+        clean_existing(names, out_dir=args.out_dir)
+        return
+
+    if not args.deck:
+        print("Errore: specifica il nome del deck (o usa --clean).", file=sys.stderr)
+        sys.exit(1)
 
     pdf_path = Path("input") / f"{args.deck}.pdf"
     if not pdf_path.exists():
         print(f"Errore: file non trovato: {pdf_path}", file=sys.stderr)
         sys.exit(1)
 
-    process_pdf(pdf_path)
+    process_pdf(pdf_path, out_dir=args.out_dir)
 
 
 if __name__ == "__main__":
