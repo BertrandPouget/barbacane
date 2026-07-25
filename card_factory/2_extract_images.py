@@ -8,8 +8,10 @@ Tipi di carta:
   - Eroe:                     illustrazione che "sfora" sopra il frame interno
 
 Utilizzo:
-    python extract_cards.py input.pdf [--dpi 300] [--out ./images]
-    python extract_cards.py input.pdf --dpi 300 --out ./images
+    python extract_cards.py                  # estrae tutti i PDF in input/
+    python extract_cards.py deck_color        # solo input/deck_color.pdf
+    python extract_cards.py --clean           # ripulisce tutti i PNG in images/
+    python extract_cards.py --clean eracle    # ripulisce solo images/eracle.png
 
 Output: un PNG per pagina, sfondo bianco puro reso trasparente.
 """
@@ -376,29 +378,32 @@ def clean_existing(names: list[str], out_dir: Path = None) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="Estrae illustrazioni da PDF carte Barbacane.")
-    parser.add_argument("deck", nargs="?", help="Nome del deck (es. deck_color → input/deck_color.pdf)")
     parser.add_argument("--clean", action="store_true",
                          help="Ripulisce i PNG già estratti in images/ invece di estrarre da un PDF")
     parser.add_argument("--out-dir", type=Path, default=None,
                          help="Scrive qui invece di sovrascrivere images/ (per anteprima)")
-    parser.add_argument("names", nargs="*", help="Con --clean: nomi carta da ripulire (default: tutte)")
+    parser.add_argument("names", nargs="*",
+                         help="Senza --clean: nomi deck (input/<nome>.pdf). Con --clean: nomi carta. "
+                              "Omesso: tutti i deck in input/ (o tutte le carte in images/ con --clean).")
     args = parser.parse_args()
 
     if args.clean:
-        names = [n for n in [args.deck, *args.names] if n]
-        clean_existing(names, out_dir=args.out_dir)
+        clean_existing(args.names, out_dir=args.out_dir)
         return
 
-    if not args.deck:
-        print("Errore: specifica il nome del deck (o usa --clean).", file=sys.stderr)
-        sys.exit(1)
+    if args.names:
+        pdf_paths = [Path("input") / f"{n}.pdf" for n in args.names]
+    else:
+        pdf_paths = sorted(Path("input").glob("*.pdf"))
+        if not pdf_paths:
+            print("Errore: nessun PDF trovato in input/.", file=sys.stderr)
+            sys.exit(1)
 
-    pdf_path = Path("input") / f"{args.deck}.pdf"
-    if not pdf_path.exists():
-        print(f"Errore: file non trovato: {pdf_path}", file=sys.stderr)
-        sys.exit(1)
-
-    process_pdf(pdf_path, out_dir=args.out_dir)
+    for pdf_path in pdf_paths:
+        if not pdf_path.exists():
+            print(f"Errore: file non trovato: {pdf_path}", file=sys.stderr)
+            continue
+        process_pdf(pdf_path, out_dir=args.out_dir)
 
 
 if __name__ == "__main__":
