@@ -43,7 +43,7 @@
   .body{position:absolute;top:148px;left:40px;right:40px;bottom:28px;
         display:flex;flex-direction:column;align-items:center;gap:8px;}
 
-  .illus{position:relative;width:517px;flex:0 0 auto;border:5px solid var(--brown);border-radius:4px;
+  .illus{position:relative;width:579px;flex:0 0 auto;border:5px solid var(--brown);border-radius:4px;
          overflow:hidden;background:linear-gradient(rgba(52,30,13,.22),rgba(52,30,13,.34)),url(sfondo.png) center/cover;font-size:0;line-height:0;margin:0 auto;}
   .illus img{display:block;width:100%;height:auto;}
   .illus.empty{height:372px;background:transparent;}
@@ -55,17 +55,25 @@
   .dia b{transform:rotate(-45deg);font-weight:800;font-size:42px;color:var(--cream);}
   .stat .lb{font-family:'Caudex',serif;font-variant:small-caps;font-weight:700;font-size:23px;letter-spacing:2px;color:var(--brown);}
 
+  /* Zona occupabile dalle sottoaree (verde specie/scuola/evo, blu+azzurro effetto):
+     parte da sotto le statistiche (guerrieri) o da sotto l'illustrazione (magie/costruzioni)
+     e riempie il resto del corpo carta. Le sue sottoaree (figli diretti) si toccano (gap:0)
+     e si dividono lo spazio in proporzione al minimo richiesto da ciascuna — vedi distributeZone(). */
+  .zone{width:100%;flex:1 1 auto;min-height:0;display:flex;flex-direction:column;align-items:center;gap:0;}
+  .stats + .zone{margin-top:-8px;}
+  .illus + .zone{margin-top:6px;}  /* magie/costruzioni: un po' di respiro tra illustrazione e prima sottoarea */
+
   .panel{width:598px;}
-  .info{padding:0 24px;flex:0 0 auto;margin-top:-8px;}
+  .info{width:579px;padding:0 24px;flex:0 0 auto;
+        display:flex;flex-direction:column;justify-content:center;}
   .info .row{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:11px 2px;
-             border-bottom:1px solid rgba(74,44,21,.28);}
+             border-bottom:1px solid rgba(74,44,21,.28);flex:0 0 auto;}
   .info .row:last-child{border-bottom:none;}
   .info .k{font-family:'Caudex',serif;font-variant:small-caps;font-weight:800;font-size:34px;letter-spacing:1px;color:var(--brown2);}
   .info .v{font-style:italic;font-weight:700;font-size:33px;color:var(--ink);}
 
-  .effect{width:100%;flex:1 1 auto;min-height:0;margin-top:-8px;
+  .effect{width:100%;flex:1 1 auto;min-height:0;
           display:flex;flex-direction:column;text-align:center;}
-  .illus + .effect{margin-top:6px;}  /* magie/costruzioni: un po' di respiro tra illustrazione e primo blocco */
   .effect .bt{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;}
   .divider{display:flex;align-items:center;justify-content:center;gap:14px;width:100%;flex:0 0 auto;}
   .divider .ln{height:2px;flex:1;max-width:150px;}
@@ -74,34 +82,21 @@
   .divider img{height:58px;display:block;}
   .etext{margin:0;font-style:italic;font-weight:600;line-height:1.3;color:var(--ink);}
 
-  /* magia / costruzione — due blocchi effetto */
-  .block{width:558px;flex:1 1 0;min-height:0;background:linear-gradient(rgba(74,44,21,.09),rgba(74,44,21,.16));
-         border:2px solid rgba(74,44,21,.5);border-radius:4px;padding:12px 24px 14px;
-         display:flex;flex-direction:column;}
-  .block .hd{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:6px;flex:0 0 auto;}
-  .block .hd .t{font-family:'Caudex',serif;font-variant:small-caps;font-weight:800;font-size:21px;letter-spacing:3px;
-                color:var(--brown2);white-space:nowrap;}
-  .block .hd .ln{height:2px;flex:1;max-width:80px;}
-  .block .bt{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;text-align:center;}
-  .block .bt span{font-style:italic;font-weight:600;line-height:1.3;color:var(--ink);}
-
   .cgem{position:relative;width:58px;height:58px;flex:0 0 auto;}
   .cgem img{position:absolute;top:0;left:0;width:100%;height:100%;display:block;}
   .cgem .brd{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:66px;height:66px;display:block;}
   .cgem span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
              font-weight:900;font-size:32px;color:#5a2d06;}
 
-  /* Debug: bordi dei contenitori flex, attivabili con --debug-borders (2_generate_cards.py) */
+  /* Debug: bordi dei contenitori, attivabili con --debug-borders (2_generate_cards.py).
+     Arancione = zona occupabile dalle sottoaree; rosa = ogni singola sottoarea
+     (blocco verde specie/scuola/evo, oppure coppia blu+azzurro di un effetto). */
   html.debug-borders .body{outline:2px solid red; outline-offset:-1px;}
   html.debug-borders .stats{outline:2px solid orangered; outline-offset:-1px;}
   html.debug-borders .stat{outline:2px solid orange; outline-offset:-1px;}
   html.debug-borders .dia{outline:2px solid gold; outline-offset:-1px;}
-  html.debug-borders .info .row{outline:2px solid lime; outline-offset:-1px;}
-  html.debug-borders .effect .bt{outline:2px solid cyan; outline-offset:-1px;}
-  html.debug-borders .divider{outline:2px solid blue; outline-offset:-1px;}
-  html.debug-borders .block{outline:2px solid indigo; outline-offset:-1px;}
-  html.debug-borders .block .hd{outline:2px solid magenta; outline-offset:-1px;}
-  html.debug-borders .block .bt{outline:2px solid deeppink; outline-offset:-1px;}
+  html.debug-borders .zone{outline:2px solid orange; outline-offset:-1px;}
+  html.debug-borders .zone > *{outline:2px solid deeppink; outline-offset:-3px;}
   html.debug-borders .cost span{outline:2px solid yellow; outline-offset:-1px;}
   html.debug-borders .cgem span{outline:2px solid yellow; outline-offset:-1px;}
   /* === FINE DEBUG TEMPORANEO === */
@@ -144,9 +139,15 @@ function head(card){
     <div class="type">${dtype}</div>
     ${card.cost!=null?costGem(card):''}`;
 }
+const ILLUS_FALLBACK='../images/patrizio.png';
+function onIllusError(img){
+  if(img.dataset.fallbackTried){ img.style.display='none'; img.parentElement.classList.add('empty'); return; }
+  img.dataset.fallbackTried='1';
+  img.src=ILLUS_FALLBACK;
+}
 function illus(card){
   const src=card.image||('../images/'+card.id+'.png');
-  return `<div class="illus"><img src="${esc(src)}" alt="" onerror="this.style.display='none';this.parentElement.classList.add('empty')"></div>`;
+  return `<div class="illus"><img src="${esc(src)}" alt="" onerror="onIllusError(this)"></div>`;
 }
 function diamonds(card){
   const s=[['ATT',card.att],['GIT',card.git],['DIF',card.dif]];
@@ -183,31 +184,24 @@ function towerBlock(text,filled,gemCost){
       <div class="bt"><span class="etext fit" data-max="33" data-min="20">${esc(text||'')}</span></div>
     </div>`;
 }
-function effectBlock(label,text,gemCost){
-  const gem=gemCost!=null
-    ? `<div class="cgem"><img src="esagono.png" alt=""><span>${esc(gemCost)}</span></div>` : '';
-  return `<div class="block">
-      <div class="hd"><span class="ln lnL"></span><span class="t">${label}</span>${gem}<span class="ln lnR"></span></div>
-      <div class="bt"><span class="fit" data-max="33" data-min="20">${esc(text||'')}</span></div>
-    </div>`;
-}
+function zone(...parts){ return `<div class="zone">${parts.join('')}</div>`; }
 
 function bodyFor(card){
   const isHero  = card.subtype==='hero';
   const isSpell = card.type==='spell';
   const isBld   = card.type==='building';
   if(isSpell){
-    return illus(card)+spellBlock(card.base_effect,false)+spellBlock(card.prodigy_effect,true);
+    return illus(card)+zone(spellBlock(card.base_effect,false), spellBlock(card.prodigy_effect,true));
   }
   if(isBld){
-    return illus(card)+towerBlock(card.base_effect,false)
-         +towerBlock(card.complete_effect,true,card.completion_cost);
+    return illus(card)+zone(towerBlock(card.base_effect,false),
+         towerBlock(card.complete_effect,true,card.completion_cost));
   }
   if(isHero){
-    return illus(card)+diamonds(card)+infoRows(card);
+    return illus(card)+diamonds(card)+zone(infoRows(card));
   }
   // recluta (default)
-  return illus(card)+diamonds(card)+infoRows(card)+hordeBlock(card);
+  return illus(card)+diamonds(card)+zone(infoRows(card), hordeBlock(card));
 }
 
 // Riduce la dimensione del font finché il testo entra nel suo contenitore
@@ -219,21 +213,28 @@ function fit(el){
   while(s>min && !fits()){ s-=1; el.style.fontSize=s+'px'; }
 }
 
-function fitIllus(){
-  const box=document.querySelector('.illus'); if(!box) return;
-  const img=box.querySelector('img'); if(!img || !img.naturalWidth) return;
-  const body=box.parentElement; if(!body) return;
-  box.style.width='517px';
-  const bodyH=body.clientHeight;
-  const cs=getComputedStyle(body); const gap=parseFloat(cs.rowGap)||0;
-  let used=gap*(body.children.length-1)-18;
-  for(const ch of body.children) used+=ch.getBoundingClientRect().height;
-  const overflow=used-bodyH;
-  if(overflow>1){
-    const ratio=img.naturalWidth/img.naturalHeight;
-    const outerH=box.getBoundingClientRect().height-overflow;
-    box.style.width=(((outerH-10)*ratio)+10)+'px';
-  }
+// Divide una .zone tra le sue sottoaree (figli diretti: .info oppure .effect) in proporzione
+// alla taglia "naturale" che ciascuna vorrebbe (testo al font massimo, data-max): così due
+// sottoaree con testo di lunghezza simile restano simili, e una con testo molto più lungo
+// (es. i due blocchi di Cardo) guadagna lo spazio che l'altra non usa. Il font minimo
+// (data-min) serve solo da rete di sicurezza (min-height) contro gli schiacciamenti, non
+// da base del peso: il blocco verde ha un solo font fisso, quindi pesarlo contro il font
+// minimo altrui lo avrebbe reso sproporzionatamente più grande.
+function distributeZone(zoneEl){
+  const subs=[...zoneEl.children];
+  if(subs.length<2){ subs.forEach(s=>{ s.style.flex='1 1 auto'; }); return; }
+  const measure=(attr, fallback)=>subs.map(sub=>{
+    sub.style.flex='0 0 auto';
+    sub.style.minHeight='0';
+    sub.querySelectorAll('.fit').forEach(el=>{ el.style.fontSize=(+el.dataset[attr]||fallback)+'px'; });
+    return sub.getBoundingClientRect().height;
+  });
+  const floors=measure('min',20);
+  const ideals=measure('max',33);
+  subs.forEach((sub,i)=>{
+    sub.style.flex=`${ideals[i]} 0 0`;
+    sub.style.minHeight=floors[i]+'px';
+  });
 }
 
 function renderCard(card, names){
@@ -245,7 +246,7 @@ function renderCard(card, names){
   }
   const frame = card.type==='spell' ? '#123a52' : (card.type==='building' ? '#245e33' : '#7a0000');
   stage.innerHTML=`<div class="card" id="card" style="background:${frame}"><div class="inner">${head(card)}<div class="body">${bodyFor(card)}</div></div></div>`;
-  const run=()=>{ fitIllus(); stage.querySelectorAll('.fit').forEach(fit); };
+  const run=()=>{ stage.querySelectorAll('.zone').forEach(distributeZone); stage.querySelectorAll('.fit').forEach(fit); };
   const img=stage.querySelector('.illus img');
   if(img) img.addEventListener('load', run);
   if(document.fonts&&document.fonts.ready){ document.fonts.ready.then(run); } else { run(); }
