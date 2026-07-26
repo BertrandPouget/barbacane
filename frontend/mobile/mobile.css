@@ -1229,6 +1229,7 @@ input {
   overflow-y: auto;
   font-size: 0.72rem;
 }
+.flip-back-img { padding: 0; overflow: hidden; }
 .flip-hint { font-size: 0.7rem; color: var(--text-faint); font-style: italic; }
 
 /* Flashcard testuale (senza immagine) */

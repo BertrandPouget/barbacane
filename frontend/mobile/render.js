@@ -486,7 +486,12 @@ const Render = (() => {
     const img = el('img', { alt: def.name, draggable: 'false' });
     front.appendChild(img);
     const back = el('div', { className: 'flip-face flip-back' });
-    back.innerHTML = textHTML;
+    if (ctx.realBack) {
+      back.classList.add('flip-back-img');
+      back.appendChild(el('img', { alt: 'Retro carta', draggable: 'false', src: '/card_images/retro.png' }));
+    } else {
+      back.innerHTML = textHTML;
+    }
     inner.appendChild(front);
     inner.appendChild(back);
     flip.appendChild(inner);

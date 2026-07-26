@@ -227,6 +227,7 @@ const Mob = (() => {
       title: def.name,
       subtitle: catalogSubtitle(def),
       def,
+      ctx: { realBack: true },
       pos: { idx, total: catalogList.length },
       onPrev: idx > 0 ? () => showCatalogCard(idx - 1) : null,
       onNext: idx < catalogList.length - 1 ? () => showCatalogCard(idx + 1) : null,
