@@ -1,443 +1,90 @@
 #!/usr/bin/env python3
 """
-generate_cards.py
-Genera carte Barbacane dal template PDF + JSON dati + PNG illustrazioni.
+3_generate_cards.py
+Genera le carte Barbacane finali dal renderer HTML unico (card.html).
+
+A differenza della vecchia pipeline PIL (template PNG + testo sovrapposto a coordinate
+fisse), qui la carta *disegna se stessa*: card.html impagina tutto — nome, tipo, costo,
+statistiche, pannelli, effetto orda, auto-adattamento del testo lungo. Questo script si
+limita a passargli i dati di ogni carta (da ../data/cards.json) e a fotografarne il
+risultato con un browser headless.
+
+Vantaggio: un'unica fonte di verità per la grafica (card.html). Cambi lo stile lì e
+tutte le carte si aggiornano — nessuna coordinata da ritarare.
+
+`render_cards()` è riutilizzato anche da 4_make_print_pdf.py, che rigenera le carte a
+risoluzione più alta apposta per la stampa senza toccare i PNG in output/.
 
 Utilizzo:
-    python generate_cards.py               # tutte le carte
-    python generate_cards.py faust joseph   # solo le carte indicate
+    python 3_generate_cards.py                  # tutte le carte
+    python 3_generate_cards.py faust joseph      # solo le carte indicate
+    python 3_generate_cards.py --scale 2         # 2x risoluzione (default 1 = 300 DPI)
 """
 
 import argparse
 import json
 import sys
-import textwrap
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from playwright.sync_api import sync_playwright
 
-# ---------------------------------------------------------------------------
-# DPI e scala (sovrascrivibili via --dpi)
-# ---------------------------------------------------------------------------
-DPI   = 300
-SCALE = DPI / 72.0
+ROOT       = Path(__file__).parent
+CARD_HTML  = ROOT / "assets" / "card.html"
+CARDS_JSON = ROOT.parent / "data" / "cards.json"
+IMAGES_DIR = ROOT / "images"
+OUT_DIR    = ROOT / "output"
 
-def pt(v: float) -> int:
-    return int(round(v * SCALE))
-
-
-# ---------------------------------------------------------------------------
-# Coordinate layout in PUNTI PDF — invarianti per ogni carta con il template v2
-# Derivate dall'analisi vettoriale del PDF e misurate sull'output reale.
-# ---------------------------------------------------------------------------
-
-CARD_W_PT = 178.50
-CARD_H_PT = 249.75
-CX_PT     = CARD_W_PT / 2          # 89.25
-
-# Intestazione tipo / sottotipo
-TYPE_CX_PT     = CX_PT
-TYPE_Y_PT      = 10.7
-SUBTYPE_CX_PT  = CX_PT
-SUBTYPE_Y_PT   = 21.0
-
-# Ottagono costo — centro dell'immagine embedded rect=[148.1, 8.0, 167.6, 27.5]
-COST_CX_PT     = 157.85
-COST_CY_PT     =  17.75
-
-# Illustrazione: larghezza = estremo sx linea deco sx → estremo dx linea deco dx
-ILLUS_X_LEFT_PT  = 17.9
-ILLUS_X_RIGHT_PT = 160.7
-ILLUS_WIDTH_PT   = ILLUS_X_RIGHT_PT - ILLUS_X_LEFT_PT   # 142.8 pt
-ILLUS_Y_TOP_PT   = 30.0
-ILLUS_Y_BOT_PT   = 107.9
-
-# Banner nome — RECRUIT / SPELL / BUILDING
-BANNER_Y_TOP_PT = 107.9
-BANNER_Y_BOT_PT = 121.2
-NAME_CX_PT      = CX_PT
-NAME_CY_PT      = 114.7   # centro testo = centro delle lineette decorative dello stendardo
-
-# Statistiche (Y modificate con +7.5 per compensare l'anchor "ls" alla baseline)
-STATS_Y1_PT       = 129.8 + 7.5    # ATT  / Specie
-STATS_Y2_PT       = 145.9 + 7.5    # GIT  / Evolve
-STATS_Y3_PT       = 161.75 + 7.5   # DIF  / Scuola
-
-STATS_LABEL_L_X_PT    = 25.2
-STATS_VAL_L_X_PT      = 52.0
-STATS_LABEL_R_EDGE_PT = 108.0
-STATS_VAL_R_X_PT      = 112.0
-
-# Effetto orda — RECRUIT
-HORDE_CX_PT    = CX_PT
-HORDE_Y_PT     = 201.8
-HORDE_MAX_W_PT = ILLUS_WIDTH_PT   # = 142.8pt — stessi estremi delle lineette decorative
-
-# ---------------------------------------------------------------------------
-# Coordinate HERO — banner più in basso, stessi offset dal banner top
-# Banner: [39.6, 168.3, 139.0, 181.5]
-# ---------------------------------------------------------------------------
-H_BANNER_TOP = 168.3
-H_BANNER_BOT = 181.5
-H_NAME_CY    = (H_BANNER_TOP + H_BANNER_BOT) / 2 + 0.15   # ~175.05
-H_STATS_Y1   = H_BANNER_TOP + (STATS_Y1_PT - 7.5 - BANNER_Y_TOP_PT) + 7.5
-H_STATS_Y2   = H_BANNER_TOP + (STATS_Y2_PT - 7.5 - BANNER_Y_TOP_PT) + 7.5
-H_STATS_Y3   = H_BANNER_TOP + (STATS_Y3_PT - 7.5 - BANNER_Y_TOP_PT) + 7.5
-# Nessun horde per hero (non c'è spazio né icona nel template)
-
-# ---------------------------------------------------------------------------
-# Coordinate SPELL / BUILDING
-# Banner identico al recruit. Due icone sotto il banner:
-#   Icona 1 (vuota, effetto base)    center y = 135.0pt → testo da 146pt
-#   Icona 2 (piena, prodigio/compl.) center y = 186.7pt → testo da 196pt
-# ---------------------------------------------------------------------------
-SB_TEXT1_Y      = 146.0
-SB_TEXT2_Y      = 196.0
-SB_EFFECT_MAX_W = ILLUS_WIDTH_PT
-
-# Building: costo completamento centrato nell'icona piena (color gold, size = costo)
-BLDG_COMPL_CX = CX_PT
-BLDG_COMPL_CY = 186.7
-
-# ---------------------------------------------------------------------------
-# Dimensioni font (pt)
-# ---------------------------------------------------------------------------
-FSIZE_TYPE    = 11.0
-FSIZE_SUBTYPE =  8.0
-FSIZE_NAME    =  8.5
-FSIZE_COST    =  9.0
-FSIZE_STATS   =  8.5
-FSIZE_EFFECT  =  8.5
-
-# ---------------------------------------------------------------------------
-# Colori
-# ---------------------------------------------------------------------------
-COLOR_BROWN = (86,  48,   9)
-COLOR_GOLD  = (255, 189, 89)
-
-# ---------------------------------------------------------------------------
-# Mappings
-# ---------------------------------------------------------------------------
-TYPE_MAP = {
-    "warrior":  "Guerriero",
-    "mage":     "Mago",
-    "rogue":    "Ladro",
-    "cleric":   "Chierico",
-    "beast":    "Bestia",
-    "spell":    "Magia",
-    "building": "Costruzione",
-}
-SUBTYPE_MAP = {
-    "recruit":     "Recluta",
-    "hero":        "Eroe",
-    "elite":       "Elite",
-    "anatema":     "Anatema",
-    "sortilegio":  "Sortilegio",
-    "incantesimo": "Incantesimo",
-}
+# Il retro non è una carta da gioco: non vive in cards.json, si genera comunque con
+# card.html (case "back" in renderCard) per restare l'unica fonte di verità grafica.
+BACK_CARD = {"id": "retro", "name": "Retro", "type": "back"}
 
 
-def snake_to_title(s: str) -> str:
-    return " ".join(w.capitalize() for w in s.split("_")) if s else "—"
-
-
-# ---------------------------------------------------------------------------
-# Caricamento JSON (piatto o annidato per categoria)
-# ---------------------------------------------------------------------------
-
-def load_cards(json_path: Path) -> tuple[list[dict], dict[str, str]]:
-    with open(json_path, encoding="utf-8") as f:
-        data = json.load(f)
+def load_cards(json_path: Path):
+    """Accetta sia una lista piatta sia un dict {categoria: [carte...]}."""
+    data = json.loads(json_path.read_text(encoding="utf-8"))
     if isinstance(data, list):
-        all_cards = data
+        cards = data
     else:
-        all_cards = []
+        cards = []
         for v in data.values():
             if isinstance(v, list):
-                all_cards.extend(v)
-    id_to_name = {c["id"]: c["name"] for c in all_cards}
-    return all_cards, id_to_name
+                cards.extend(v)
+    cards.append(BACK_CARD)
+    id_to_name = {c["id"]: c["name"] for c in cards if "id" in c and "name" in c}
+    return cards, id_to_name
 
 
-# ---------------------------------------------------------------------------
-# Template key — determina quale PDF usare in templates/
-# ---------------------------------------------------------------------------
+def render_cards(cards, id_to_name, out_dir: Path, scale: float = 1.0, quiet: bool = False):
+    """Renderizza ogni carta con card.html in un browser headless e salva out_dir/<id>.png."""
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-def get_template_key(card: dict) -> str:
-    t = card.get("type", "")
-    if t == "spell":    return "spell"
-    if t == "building": return "building"
-    return card.get("subtype", "recruit")   # "recruit" o "hero"
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(device_scale_factor=scale,
+                                viewport={"width": 900, "height": 1200})
+        page.goto(CARD_HTML.resolve().as_uri())
+        page.wait_for_function("() => typeof renderCard === 'function'")
 
+        for card in cards:
+            cid = card.get("id", "?")
+            has_img = (IMAGES_DIR / f"{cid}.png").exists()
+            page.evaluate("([c, n]) => renderCard(c, n)", [card, id_to_name])
+            page.wait_for_function("() => !!document.getElementById('card')")
+            page.evaluate("() => document.fonts.ready")
+            page.wait_for_timeout(120)  # lascia assestare il fit del testo
+            el = page.query_selector("#card")
+            out = out_dir / f"{cid}.png"
+            el.screenshot(path=str(out))
+            if not quiet:
+                print(f"  OK {out.name}  [{card.get('type', '?')}/{card.get('subtype') or '-'}]"
+                      f"{'' if has_img or card.get('type') == 'back' else '  (nessuna illustrazione)'}")
 
-# ---------------------------------------------------------------------------
-# Font
-# ---------------------------------------------------------------------------
-
-def _pick(font_dir: Path, *patterns: str) -> Path | None:
-    """Ritorna il primo file in font_dir il cui nome (lower) contiene tutti i pattern."""
-    exts = {".ttf", ".otf", ".TTF", ".OTF"}
-    for f in sorted(font_dir.iterdir()):
-        if f.suffix not in exts:
-            continue
-        nl = f.name.lower()
-        if all(p.lower() in nl for p in patterns):
-            return f
-    return None
-
-
-def load_fonts(font_dir: Path) -> dict:
-    st_regular = _pick(font_dir, "stixtwotext", "regular")
-    st_italic  = _pick(font_dir, "stixtwotext", "italic")
-    st_medium  = _pick(font_dir, "stixtwotext", "medium")
-
-    missing = [name for name, f in [("STIXTwoText-Regular", st_regular),
-                                     ("STIXTwoText-Italic",  st_italic),
-                                     ("STIXTwoText-Medium",  st_medium)] if f is None]
-    if missing:
-        print(f"  ⚠  Font non trovati: {', '.join(missing)} — uso PIL default per quelli mancanti")
-
-    fallback = ImageFont.load_default()
-
-    def tf(path: Path | None, size_pt: float) -> ImageFont.FreeTypeFont:
-        if path is None:
-            return fallback
-        return ImageFont.truetype(str(path), pt(size_pt))
-
-    return {
-        "type":       tf(st_medium,  FSIZE_TYPE),
-        "subtype":    tf(st_regular, FSIZE_SUBTYPE),
-        "name":       tf(st_medium,  FSIZE_NAME),
-        "cost":       tf(st_medium,  FSIZE_COST),
-        "stat_label": tf(st_regular, FSIZE_STATS),
-        "stat_val":   tf(st_italic,  FSIZE_STATS),
-        "effect":     tf(st_italic,  FSIZE_EFFECT),
-    }
-
-
-# ---------------------------------------------------------------------------
-# Helpers di disegno
-# ---------------------------------------------------------------------------
-
-def draw_mm(draw, cx_pt, cy_pt, text, font, color):
-    """Centro-centro."""
-    draw.text((pt(cx_pt), pt(cy_pt)), text, font=font, fill=color, anchor="mm")
-
-def draw_mt(draw, cx_pt, y_pt, text, font, color):
-    """Centro-top."""
-    draw.text((pt(cx_pt), pt(y_pt)), text, font=font, fill=color, anchor="mt")
-
-def draw_lt(draw, x_pt, y_pt, text, font, color):
-    """Left-top."""
-    draw.text((pt(x_pt), pt(y_pt)), text, font=font, fill=color, anchor="lt")
-
-def draw_rt(draw, x_pt, y_pt, text, font, color):
-    """Right-align: calcola la x manualmente e usa lt per garantire stessa y di draw_lt."""
-    try:
-        text_w = font.getlength(text)
-    except AttributeError:
-        text_w = len(text) * pt(FSIZE_STATS) * 0.6
-    x_start = pt(x_pt) - int(round(text_w))
-    draw.text((x_start, pt(y_pt)), text, font=font, fill=color, anchor="lt")
-
-
-# ---------------------------------------------------------------------------
-# Illustrazione
-# ---------------------------------------------------------------------------
-
-def wrap_pixels(text: str, font, max_px: int) -> list[str]:
-    """Word-wrap basato sulla larghezza reale in pixel, non sul conteggio caratteri."""
-    words = text.split()
-    lines, current = [], []
-    for word in words:
-        test = " ".join(current + [word])
-        try:
-            w = font.getlength(test)
-        except AttributeError:
-            w = len(test) * max_px / 20   # fallback grezzo
-        if w <= max_px or not current:
-            current.append(word)
-        else:
-            lines.append(" ".join(current))
-            current = [word]
-    if current:
-        lines.append(" ".join(current))
-    return lines
-
-
-def paste_illustration(bg: Image.Image, illus_path: Path,
-                        banner_top_pt: float = BANNER_Y_TOP_PT) -> None:
-    """Incolla l'illustrazione con il fondo allineato alla cima del banner."""
-    illus = Image.open(illus_path).convert("RGBA")
-
-    target_w = pt(ILLUS_WIDTH_PT)
-    ratio     = target_w / illus.width
-    target_h  = int(round(illus.height * ratio))
-    illus     = illus.resize((target_w, target_h), Image.LANCZOS)
-
-    paste_x = pt(ILLUS_X_LEFT_PT)
-    paste_y = pt(banner_top_pt) - target_h   # fondo = cima banner
-
-    bg.paste(illus, (paste_x, paste_y), illus)
-
-
-# ---------------------------------------------------------------------------
-# Sezione stats condivisa (recruit + hero, con y parametrizzate)
-# ---------------------------------------------------------------------------
-
-def _draw_stats(draw, card: dict, fonts: dict, id_to_name: dict,
-                sy1: float, sy2: float, sy3: float) -> None:
-    sy = [pt(sy1), pt(sy2), pt(sy3)]
-
-    left_labels = ["ATT:", "GIT:", "DIF:"]
-    left_vals   = [str(card.get("att","")), str(card.get("git","")), str(card.get("dif",""))]
-
-    for i, (lbl, val) in enumerate(zip(left_labels, left_vals)):
-        draw.text((pt(STATS_LABEL_L_X_PT), sy[i]), lbl, font=fonts["stat_label"],
-                  fill=COLOR_BROWN, anchor="ls")
-        draw.text((pt(STATS_VAL_L_X_PT),   sy[i]), val, font=fonts["stat_label"],
-                  fill=COLOR_BROWN, anchor="ls")
-
-    evo_into = card.get("evolves_into")
-    evo_from = card.get("evolves_from")
-    if evo_into:
-        evo_label = "Evolve in:"
-        evo_val   = id_to_name.get(evo_into, snake_to_title(evo_into))
-    elif evo_from:
-        evo_label = "Evolve da:"
-        evo_val   = id_to_name.get(evo_from, snake_to_title(evo_from))
-    else:
-        evo_label, evo_val = "Evolve in:", "—"
-
-    school     = card.get("school")
-    school_str = "Nessuna" if not school else school.capitalize()
-    species_str = snake_to_title(card.get("species",""))
-
-    right_labels = ["Specie:", "Scuola:", evo_label]
-    right_vals   = [species_str, school_str, evo_val]
-
-    for i, (lbl, val) in enumerate(zip(right_labels, right_vals)):
-        try:
-            lbl_w = int(round(fonts["stat_label"].getlength(lbl)))
-        except AttributeError:
-            lbl_w = len(lbl) * pt(FSIZE_STATS) // 2
-        lbl_x = pt(STATS_LABEL_R_EDGE_PT) - lbl_w
-
-        draw.text((lbl_x,               sy[i]), lbl, font=fonts["stat_label"],
-                  fill=COLOR_BROWN, anchor="ls")
-        draw.text((pt(STATS_VAL_R_X_PT), sy[i]), val, font=fonts["stat_val"],
-                  fill=COLOR_BROWN, anchor="ls")
-
-
-# ---------------------------------------------------------------------------
-# Blocco testo effetto (spell / building)
-# ---------------------------------------------------------------------------
-
-def _draw_effect_block(draw, text: str, fonts: dict, y_start_pt: float) -> None:
-    if not text:
-        return
-    max_px = pt(SB_EFFECT_MAX_W)
-    lines  = wrap_pixels(text, fonts["effect"], max_px)
-    lh_px  = int(FSIZE_EFFECT * SCALE * 1.35)
-    for i, line in enumerate(lines):
-        draw_mt(draw, CX_PT, y_start_pt + i * lh_px / SCALE, line, fonts["effect"], COLOR_BROWN)
-
-
-# ---------------------------------------------------------------------------
-# Generazione singola carta — dispatch per tipo
-# ---------------------------------------------------------------------------
-
-def generate_card(card: dict, tpl: Image.Image, images_dir: Path,
-                  fonts: dict, id_to_name: dict, out_dir: Path,
-                  has_img: bool = True) -> None:
-    t       = card.get("type", "")
-    subtype = card.get("subtype", "")
-    cid     = card["id"]
-
-    bg   = tpl.copy().convert("RGBA")
-    draw = ImageDraw.Draw(bg)
-
-    # -- Intestazione comune a tutti i tipi --
-    tipo      = TYPE_MAP.get(t,       snake_to_title(t))
-    sottotipo = SUBTYPE_MAP.get(subtype, snake_to_title(subtype) if subtype else "")
-    draw_mt(draw, TYPE_CX_PT, TYPE_Y_PT, tipo, fonts["type"], COLOR_BROWN)
-    if sottotipo:
-        draw_mt(draw, SUBTYPE_CX_PT, SUBTYPE_Y_PT, sottotipo, fonts["subtype"], COLOR_BROWN)
-    draw_mm(draw, COST_CX_PT,    COST_CY_PT,   str(card.get("cost","")), fonts["cost"], COLOR_BROWN)
-
-    if t == "spell":
-        # Illustrazione (banner standard)
-        if has_img:
-            paste_illustration(bg, images_dir / f"{cid}.png")
-        # Nome
-        draw_mm(draw, NAME_CX_PT, NAME_CY_PT, card.get("name","").upper(), fonts["name"], COLOR_GOLD)
-        # Due blocchi effetto sotto le icone stella
-        _draw_effect_block(draw, card.get("base_effect",""),    fonts, SB_TEXT1_Y)
-        _draw_effect_block(draw, card.get("prodigy_effect",""), fonts, SB_TEXT2_Y)
-
-    elif t == "building":
-        # Illustrazione (banner standard)
-        if has_img:
-            paste_illustration(bg, images_dir / f"{cid}.png")
-        # Nome
-        draw_mm(draw, NAME_CX_PT, NAME_CY_PT, card.get("name","").upper(), fonts["name"], COLOR_GOLD)
-        # Due blocchi effetto sotto le icone torre
-        _draw_effect_block(draw, card.get("base_effect",""),     fonts, SB_TEXT1_Y)
-        _draw_effect_block(draw, card.get("complete_effect",""), fonts, SB_TEXT2_Y)
-        # Costo completamento centrato nell'icona torre piena (gold, stesso size del costo)
-        compl = card.get("completion_cost")
-        if compl is not None:
-            draw_mm(draw, BLDG_COMPL_CX, BLDG_COMPL_CY, str(compl), fonts["cost"], COLOR_GOLD)
-
-    elif subtype == "hero":
-        # Illustrazione (banner più in basso)
-        if has_img:
-            paste_illustration(bg, images_dir / f"{cid}.png", banner_top_pt=H_BANNER_TOP)
-        # Nome
-        draw_mm(draw, NAME_CX_PT, H_NAME_CY, card.get("name","").upper(), fonts["name"], COLOR_GOLD)
-        # Stats con y spostate
-        _draw_stats(draw, card, fonts, id_to_name, H_STATS_Y1, H_STATS_Y2, H_STATS_Y3)
-        # No horde per l'eroe
-
-    else:  # recruit (default warrior)
-        # Illustrazione (banner standard)
-        if has_img:
-            paste_illustration(bg, images_dir / f"{cid}.png")
-        # Nome
-        draw_mm(draw, NAME_CX_PT, NAME_CY_PT, card.get("name","").upper(), fonts["name"], COLOR_GOLD)
-        # Stats
-        _draw_stats(draw, card, fonts, id_to_name, STATS_Y1_PT, STATS_Y2_PT, STATS_Y3_PT)
-        # Effetto orda
-        effect = card.get("horde_effect","")
-        if effect:
-            max_px = pt(HORDE_MAX_W_PT)
-            lines  = wrap_pixels(effect, fonts["effect"], max_px)
-            lh_px  = int(FSIZE_EFFECT * SCALE * 1.35)
-            for i, line in enumerate(lines):
-                draw_mt(draw, HORDE_CX_PT, HORDE_Y_PT + i * lh_px / SCALE, line, fonts["effect"], COLOR_BROWN)
-
-    # cx_px = pt(CX_PT)
-    # draw.line([(cx_px, 0), (cx_px, pt(CARD_H_PT))], fill=(255, 0, 0), width=1)
-
-    out = out_dir / f"{cid}.png"
-    bg.convert("RGB").save(out, format="PNG", dpi=(DPI, DPI))
-    print(f"  ✓ {out.name}")
-
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-
-CARDS_JSON    = Path(__file__).parent.parent / "data" / "cards.json"
-TEMPLATES_DIR = Path("assets/templates")
-FONTS_DIR     = Path("assets/fonts")
-IMAGES_DIR    = Path("images")
-OUT_DIR       = Path("output")
+        browser.close()
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Genera carte Barbacane dal template PDF + JSON dati + PNG illustrazioni."
+        description="Genera le carte Barbacane dal renderer HTML (card.html)."
     )
     parser.add_argument(
         "ids",
@@ -445,59 +92,24 @@ def main():
         help="Id delle carte da generare (es. faust joseph reinhold). "
              "Se omesso, genera tutte le carte del JSON.",
     )
+    parser.add_argument(
+        "--scale", type=float, default=1.0,
+        help="Moltiplicatore di risoluzione (1 = 744x1039px, ~300 DPI). Default 1.",
+    )
     args = parser.parse_args()
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    fonts = load_fonts(FONTS_DIR)
-    all_cards, id_to_name = load_cards(CARDS_JSON)
+    cards, id_to_name = load_cards(CARDS_JSON)
 
     if args.ids:
         wanted = set(args.ids)
-        all_cards = [c for c in all_cards if c.get("id") in wanted]
-        missing = wanted - {c.get("id") for c in all_cards}
+        missing = wanted - {c.get("id") for c in cards}
         if missing:
             print(f"Attenzione: id non trovati nel JSON: {', '.join(sorted(missing))}", file=sys.stderr)
+        cards = [c for c in cards if c.get("id") in wanted]
 
-    out_dir       = OUT_DIR
-    templates_dir = TEMPLATES_DIR
-    images_dir    = IMAGES_DIR
-
-    # Cache dei template renderizzati
-    tpl_cache: dict[str, Image.Image] = {}
-
-    def get_template(key: str) -> Image.Image | None:
-        global SCALE, DPI
-        if key in tpl_cache:
-            return tpl_cache[key]
-        png_path = templates_dir / f"{key}.png"
-        if not png_path.exists():
-            print(f"  ✗  Template non trovato: {png_path}")
-            return None
-        img = Image.open(str(png_path)).convert("RGBA")
-        # Rileva la scala dalla larghezza reale del PNG (al primo template)
-        if not tpl_cache:
-            SCALE = img.width / CARD_W_PT
-            DPI   = round(SCALE * 72.0)
-            print(f"  Scala rilevata: {SCALE:.4f}  (DPI equivalente: {DPI})")
-        tpl_cache[key] = img
-        print(f"  Template caricato: {png_path.name}  ({img.width}×{img.height}px)")
-        return img
-
-    print(f"Carte nel JSON: {len(all_cards)}\n")
-    for card in all_cards:
-        cid     = card.get("id", "?")
-        tpl_key = get_template_key(card)
-        has_img = (images_dir / f"{cid}.png").exists()
-
-        print(f"→ {cid}  [{tpl_key}] [img: {'✓' if has_img else '✗ no img'}]")
-
-        tpl = get_template(tpl_key)
-        if tpl is None:
-            continue
-        generate_card(card, tpl, images_dir, fonts, id_to_name, out_dir, has_img=has_img)
-
-    print(f"\nFatto — output in '{out_dir}'")
+    print(f"Carte da generare: {len(cards)}  (scala {args.scale}x)\n")
+    render_cards(cards, id_to_name, OUT_DIR, scale=args.scale)
+    print(f"\nFatto — output in '{OUT_DIR}'")
 
 
 if __name__ == "__main__":

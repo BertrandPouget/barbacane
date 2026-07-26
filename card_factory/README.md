@@ -7,8 +7,9 @@ input/          ← PDF delle illustrazioni (da creare / aggiungere tu)
 images/         ← PNG estratti dallo step 2
 output/         ← PNG carte finali → usati dal frontend di Barbacane
 assets/
-  templates/    ← template PNG per ogni tipo di carta (recruit, hero, spell, building)
-  fonts/        ← STIXTwoText (Regular, Italic, Medium)
+  card.html     ← il renderer: unica fonte di verità per la grafica delle carte
+  sfondo.png, esagono*.png, stella*.png, spade.png, back.png  ← texture/icone usate da card.html
+  fonts/        ← font offline opzionali (vedi assets/fonts/README.md)
 ```
 
 ---
@@ -29,7 +30,11 @@ card_factory/
 pip install -r requirements.txt
 ```
 
-Dipendenze: `PyMuPDF`, `numpy`, `Pillow`.
+Dipendenze: `PyMuPDF`, `numpy`, `Pillow`, `playwright`. Lo Step 3 usa un browser headless, va installato una volta sola:
+
+```bash
+playwright install chromium
+```
 
 ---
 
@@ -64,22 +69,41 @@ Rinomina poi i PNG con l'`id` della carta (es. `images/patrizio.png`) prima di p
 ### Step 3 — Genera le carte finali
 
 ```bash
-python 3_generate_cards.py
+python 3_generate_cards.py                    # tutte le carte di ../data/cards.json
+python 3_generate_cards.py faust joseph        # solo gli id indicati
+python 3_generate_cards.py --scale 2           # 2x risoluzione (default 1 → 744×1039px, ~300 DPI)
 ```
 
-Nessun argomento: legge `../data/cards.json`, abbina ogni carta al suo template in `assets/templates/`, incolla l'illustrazione da `images/`, scrive testi (nome, statistiche, effetti, costo) con i font STIX e salva il PNG finale in `output/<card_id>.png`.
+Apre `assets/card.html` in un browser headless (Playwright), gli passa i dati di ogni
+carta da `../data/cards.json`, incolla l'illustrazione da `images/<id>.png` (se presente)
+e ne fotografa il risultato in `output/<card_id>.png`. `card.html` impagina tutto da solo —
+nome, tipo, costo, statistiche, pannelli effetto, effetto orda — con auto-adattamento
+del testo lungo. Per cambiare lo stile grafico si tocca solo `assets/card.html`: tutte le
+carte si aggiornano insieme, senza coordinate da ritarare.
 
-Le carte senza illustrazione corrispondente in `images/` vengono comunque generate (solo il template con testi, senza immagine).
+Le carte senza illustrazione corrispondente in `images/` vengono comunque generate (solo
+la cornice con i testi, senza immagine). Il retro delle carte (`retro.png`) non è una
+carta da gioco quindi non vive in `cards.json`: viene aggiunto in coda da `load_cards()`
+(costante `BACK_CARD` in questo script) e generato allo stesso modo dalle altre.
+
+La risoluzione di default (300 DPI) è la stessa della vecchia pipeline: i PNG in `output/`
+sono tracciati in git, quindi non conviene alzarla qui — per la stampa ad alta qualità
+c'è lo Step 4, che rigenera le carte a parte senza appesantire il repo.
 
 ---
 
 ### Step 4 — Genera il PDF di stampa
 
 ```bash
-python 4_make_print_pdf.py
+python 4_make_print_pdf.py             # qualità massima (scala 4 → ~1200 DPI)
+python 4_make_print_pdf.py --scale 6   # ancora più definito
 ```
 
-Nessun argomento: legge tutti i PNG in `output/`, e per ognuno crea una coppia di pagine — back, carta — con un bordo monocromo di 3mm su tutti i lati (estratto dal pixel più a sinistra in centro verticale, per simulare il bordo di taglio). Salva il risultato in `output/cards_to_print.pdf`.
+Richiama lo Step 3 come libreria e rigenera *tutte* le carte a risoluzione di stampa in
+una cartella temporanea (senza toccare i PNG in `output/`), poi compone una coppia di
+pagine per carta — back, carta — con un bordo monocromo di 3mm su tutti i lati (estratto
+dal pixel più a sinistra in centro verticale, per simulare il bordo di taglio). Salva il
+risultato in `output/cards_to_print.pdf`.
 
 ---
 

@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Carta</title>
+<!-- FONT — online (funziona subito). Per l'uso OFFLINE nella repo: vedi fonts/README.md
+     e sostituisci questo <link> con il blocco @font-face indicato lì. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caudex:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --brown:#4a2c15; --brown2:#3a2110; --ink:#2e1a0c;
+    --gold:#b98a3e; --cream:#f4dea0; --border:#560D0D; --sub:#5c3a1e;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#171009;}
+  #stage{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;}
+
+  .card{position:relative;width:744px;height:1039px;border-radius:8px;padding:20px;
+        background:var(--border);font-family:'Caudex',Georgia,serif;flex:0 0 auto;}
+  .inner{position:relative;width:100%;height:100%;border-radius:5px;overflow:hidden;
+          background:linear-gradient(rgba(60,35,15,.06),rgba(60,35,15,.14)),url(sfondo.png) center/cover;}
+
+  .banner{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:466px;}
+  .rib{background:var(--brown);border:3px solid var(--gold);
+       clip-path:polygon(0 0,100% 0,93% 50%,100% 100%,0 100%,7% 50%);padding:8px 44px;text-align:center;}
+  .name{text-align:center;font-family:'Caudex',serif;font-weight:700;text-transform:uppercase;font-size:40px;
+        line-height:1.18;letter-spacing:2px;color:var(--cream);white-space:nowrap;}
+  .name .ini{font-size:54px;}
+  .type{position:absolute;top:106px;left:50%;transform:translateX(-50%);font-family:'Caudex',serif;font-variant:small-caps;
+        font-weight:600;font-size:34px;letter-spacing:2px;color:var(--sub);white-space:nowrap;}
+
+  .cost{position:absolute;top:20px;right:24px;width:74px;height:74px;}
+  .cost .brd{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:82px;height:82px;display:block;}
+  .cost img{position:absolute;top:0;left:0;width:100%;height:100%;display:block;}
+  .cost span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+             font-weight:900;font-size:44px;color:#5a2d06;}
+  .cost.star{width:82px;height:82px;top:16px;right:20px;}
+  .cost.star .brd{width:90px;height:90px;}
+  .cost.star span{inset:0 0 6% 0;}
+
+  .body{position:absolute;top:168px;left:40px;right:40px;bottom:28px;
+        display:flex;flex-direction:column;align-items:center;gap:15px;}
+
+  .illus{position:relative;width:517px;flex:0 0 auto;border:5px solid var(--brown);border-radius:4px;
+         overflow:hidden;background:linear-gradient(rgba(52,30,13,.22),rgba(52,30,13,.34)),url(sfondo.png) center/cover;font-size:0;line-height:0;margin:0 auto;}
+  .illus img{display:block;width:100%;height:auto;}
+  .illus.empty{height:372px;background:transparent;}
+
+  .stats{display:flex;justify-content:center;gap:44px;position:relative;z-index:3;margin-top:-18px;}
+  .stat{display:flex;flex-direction:column;align-items:center;gap:12px;}
+  .dia{width:60px;height:60px;transform:rotate(45deg);background:var(--brown);border:3px solid var(--gold);
+       border-radius:3px;display:flex;align-items:center;justify-content:center;}
+  .dia b{transform:rotate(-45deg);font-weight:800;font-size:42px;color:var(--cream);}
+  .stat .lb{font-family:'Caudex',serif;font-variant:small-caps;font-weight:700;font-size:23px;letter-spacing:2px;color:var(--brown);}
+
+  .panel{width:558px;}
+  .info{padding:8px 24px;flex:0 0 auto;margin-top:-8px;}
+  .info .row{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:11px 2px;
+             border-bottom:1px solid rgba(74,44,21,.28);}
+  .info .row:last-child{border-bottom:none;}
+  .info .k{font-family:'Caudex',serif;font-variant:small-caps;font-weight:800;font-size:34px;letter-spacing:1px;color:var(--brown2);}
+  .info .v{font-style:italic;font-weight:700;font-size:33px;color:var(--ink);}
+
+  .effect{flex:1 1 auto;min-height:0;padding:14px 26px 16px;
+          display:flex;flex-direction:column;text-align:center;}
+  .effect .bt{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;}
+  .divider{display:flex;align-items:center;justify-content:center;gap:14px;width:100%;margin-bottom:6px;flex:0 0 auto;}
+  .divider .ln{height:2px;flex:1;max-width:150px;}
+  .divider .lnL{background:linear-gradient(90deg,transparent,var(--brown));}
+  .divider .lnR{background:linear-gradient(270deg,transparent,var(--brown));}
+  .divider img{height:58px;display:block;}
+  .etext{margin:0;font-style:italic;font-weight:600;line-height:1.3;color:var(--ink);}
+
+  /* magia / costruzione — due blocchi effetto */
+  .block{width:558px;flex:1 1 0;min-height:0;background:linear-gradient(rgba(74,44,21,.09),rgba(74,44,21,.16));
+         border:2px solid rgba(74,44,21,.5);border-radius:4px;padding:12px 24px 14px;
+         display:flex;flex-direction:column;}
+  .block .hd{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:6px;flex:0 0 auto;}
+  .block .hd .t{font-family:'Caudex',serif;font-variant:small-caps;font-weight:800;font-size:21px;letter-spacing:3px;
+                color:var(--brown2);white-space:nowrap;}
+  .block .hd .ln{height:2px;flex:1;max-width:80px;}
+  .block .bt{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;text-align:center;}
+  .block .bt span{font-style:italic;font-weight:600;line-height:1.3;color:var(--ink);}
+
+  .cgem{position:relative;width:50px;height:50px;flex:0 0 auto;}
+  .cgem img{width:100%;height:100%;display:block;}
+  .cgem span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+             font-weight:900;font-size:25px;color:#5a2d06;}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+const TYPE_MAP={warrior:'Guerriero',mage:'Mago',rogue:'Ladro',cleric:'Chierico',hunter:'Cacciatore',
+                guardian:'Guardiano',beast:'Bestia',spell:'Magia',building:'Costruzione'};
+const SUB_MAP={recruit:'Recluta',hero:'Eroe',veteran:'Veterano',elite:'Elite',champion:'Campione',
+               master:'Maestro',anatema:'Anatema',sortilegio:'Sortilegio',incantesimo:'Incantesimo'};
+
+const cap=s=>s?s[0].toUpperCase()+s.slice(1):'';
+const titleize=s=>s?String(s).split(/[_\s-]+/).map(cap).join(' '):'';
+const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const isUpper=ch=>ch.toUpperCase()===ch && ch.toLowerCase()!==ch;
+const nameHTML=c=>[...String(c.name)].map(ch=>isUpper(ch)?'<span class="ini">'+esc(ch)+'</span>':esc(ch)).join('');
+
+let NAMES={};                                   // id -> nome (per evoluzioni), iniettato dal generatore
+const nameOf=id=>id?(NAMES[id]||titleize(id)):'';
+
+const STAR_EMPTY='<svg width="58" height="58" viewBox="0 0 24 24" style="display:block;flex:0 0 auto"><path d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.7 7L12 17.8 5.7 21.2l1.7-7L2 9.5l7.1-.6z" fill="none" stroke="#4a2c15" stroke-width="1.5" stroke-linejoin="round"></path></svg>';
+const STAR_FILLED='<svg width="58" height="58" viewBox="0 0 24 24" style="display:block;flex:0 0 auto"><path d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.7 7L12 17.8 5.7 21.2l1.7-7L2 9.5l7.1-.6z" fill="#4a2c15"></path></svg>';
+const TOWER_PATH='M5 7 L5 4 L7 4 L7 6 L9 6 L9 4 L11 4 L11 6 L13 6 L13 4 L15 4 L15 6 L17 6 L17 4 L19 4 L19 7 L16.8 9 L16.3 14.5 L18.5 16.5 L19.5 20.5 L4.5 20.5 L5.5 16.5 L7.7 14.5 L7.2 9 Z';
+const TOWER_EMPTY='<svg width="58" height="58" viewBox="0 0 24 24" style="display:block;flex:0 0 auto"><path d="'+TOWER_PATH+'" fill="none" stroke="#4a2c15" stroke-width="1.6" stroke-linejoin="round"></path></svg>';
+const TOWER_FILLED='<svg width="58" height="58" viewBox="0 0 24 24" style="display:block;flex:0 0 auto"><path d="'+TOWER_PATH+'" fill="#4a2c15"></path></svg>';
+
+function costGem(card){
+  if(card.type==='spell'){
+    return `<div class="cost star"><img class="brd" src="stella_border.png" alt=""><img src="stella.png" alt=""><span>${esc(card.cost)}</span></div>`;
+  }
+  return `<div class="cost"><img class="brd" src="esagono_border.png" alt=""><img src="esagono.png" alt=""><span>${esc(card.cost)}</span></div>`;
+}
+function head(card){
+  const tipo=TYPE_MAP[card.type]||titleize(card.type);
+  const sub=card.subtype?(SUB_MAP[card.subtype]||titleize(card.subtype)):'';
+  const dtype=sub?`${tipo}&nbsp;&nbsp;·&nbsp;&nbsp;${sub}`:tipo;
+  return `
+    <div class="banner"><div class="rib"><div class="name">${nameHTML(card)}</div></div></div>
+    <div class="type">${dtype}</div>
+    ${card.cost!=null?costGem(card):''}`;
+}
+function illus(card){
+  const src=card.image||('../images/'+card.id+'.png');
+  return `<div class="illus"><img src="${esc(src)}" alt="" onerror="this.style.display='none';this.parentElement.classList.add('empty')"></div>`;
+}
+function diamonds(card){
+  const s=[['ATT',card.att],['GIT',card.git],['DIF',card.dif]];
+  return `<div class="stats">${s.map(([l,v])=>
+    `<div class="stat"><div class="dia"><b>${esc(v)}</b></div><div class="lb">${l}</div></div>`).join('')}</div>`;
+}
+function infoRows(card){
+  const rows=[];
+  if(card.species) rows.push(['Specie',titleize(card.species)]);
+  if(card.school)  rows.push(['Scuola',cap(card.school)]);
+  if(card.evolves_into)      rows.push(['Evolve in',nameOf(card.evolves_into)]);
+  else if(card.evolves_from) rows.push(['Evolve da',nameOf(card.evolves_from)]);
+  return `<div class="panel info">${rows.map(([k,v])=>
+    `<div class="row"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join('')}</div>`;
+}
+function hordeBlock(card){
+  return `<div class="panel effect">
+      <div class="divider"><span class="ln lnL"></span><img src="spade.png" alt=""><span class="ln lnR"></span></div>
+      <div class="bt"><span class="etext fit" data-max="33" data-min="20">${esc(card.horde_effect||'')}</span></div>
+    </div>`;
+}
+function spellBlock(text,filled){
+  return `<div class="panel effect">
+      <div class="divider"><span class="ln lnL"></span>${filled?STAR_FILLED:STAR_EMPTY}<span class="ln lnR"></span></div>
+      <div class="bt"><span class="etext fit" data-max="33" data-min="20">${esc(text||'')}</span></div>
+    </div>`;
+}
+function towerBlock(text,filled,gemCost){
+  const gem=(filled&&gemCost!=null)
+    ? `<div class="cgem"><img src="esagono.png" alt=""><span>${esc(gemCost)}</span></div>` : '';
+  return `<div class="panel effect">
+      <div class="divider"><span class="ln lnL"></span>${filled?TOWER_FILLED:TOWER_EMPTY}${gem}<span class="ln lnR"></span></div>
+      <div class="bt"><span class="etext fit" data-max="33" data-min="20">${esc(text||'')}</span></div>
+    </div>`;
+}
+function effectBlock(label,text,gemCost){
+  const gem=gemCost!=null
+    ? `<div class="cgem"><img src="esagono.png" alt=""><span>${esc(gemCost)}</span></div>` : '';
+  return `<div class="block">
+      <div class="hd"><span class="ln lnL"></span><span class="t">${label}</span>${gem}<span class="ln lnR"></span></div>
+      <div class="bt"><span class="fit" data-max="33" data-min="20">${esc(text||'')}</span></div>
+    </div>`;
+}
+
+function bodyFor(card){
+  const isHero  = card.subtype==='hero';
+  const isSpell = card.type==='spell';
+  const isBld   = card.type==='building';
+  if(isSpell){
+    return illus(card)+spellBlock(card.base_effect,false)+spellBlock(card.prodigy_effect,true);
+  }
+  if(isBld){
+    return illus(card)+towerBlock(card.base_effect,false)
+         +towerBlock(card.complete_effect,true,card.completion_cost);
+  }
+  if(isHero){
+    return illus(card)+diamonds(card)+infoRows(card);
+  }
+  // recluta (default)
+  return illus(card)+diamonds(card)+infoRows(card)+hordeBlock(card);
+}
+
+// Riduce la dimensione del font finché il testo entra nel suo contenitore
+function fit(el){
+  const max=+el.dataset.max||28, min=+el.dataset.min||14;
+  const box=el.closest('.bt')||el.parentElement;
+  let s=max; el.style.fontSize=s+'px';
+  const fits=()=>el.scrollHeight<=box.clientHeight+1 && el.scrollWidth<=box.clientWidth+1;
+  while(s>min && !fits()){ s-=1; el.style.fontSize=s+'px'; }
+}
+
+function fitIllus(){
+  const box=document.querySelector('.illus'); if(!box) return;
+  const img=box.querySelector('img'); if(!img || !img.naturalWidth) return;
+  const body=box.parentElement; if(!body) return;
+  box.style.width='517px';
+  const bodyH=body.clientHeight;
+  const cs=getComputedStyle(body); const gap=parseFloat(cs.rowGap)||0;
+  let used=gap*(body.children.length-1)-18;
+  for(const ch of body.children) used+=ch.getBoundingClientRect().height;
+  const overflow=used-bodyH;
+  if(overflow>1){
+    const ratio=img.naturalWidth/img.naturalHeight;
+    const outerH=box.getBoundingClientRect().height-overflow;
+    box.style.width=(((outerH-10)*ratio)+10)+'px';
+  }
+}
+
+function renderCard(card, names){
+  if(names) NAMES=names;
+  const stage=document.getElementById('stage');
+  if(card.type==='back'){
+    stage.innerHTML=`<div class="card" id="card" style="background:#62370a"><div class="inner" style="background:url(back.png) center/cover"></div></div>`;
+    return stage.querySelector('#card');
+  }
+  const frame = card.type==='spell' ? '#123a52' : (card.type==='building' ? '#245e33' : '#7a0000');
+  stage.innerHTML=`<div class="card" id="card" style="background:${frame}"><div class="inner">${head(card)}<div class="body">${bodyFor(card)}</div></div></div>`;
+  const run=()=>{ stage.querySelectorAll('.fit').forEach(fit); fitIllus(); };
+  const img=stage.querySelector('.illus img');
+  if(img) img.addEventListener('load', run);
+  if(document.fonts&&document.fonts.ready){ document.fonts.ready.then(run); } else { run(); }
+  requestAnimationFrame(run);
+  return stage.querySelector('#card');
+}
+window.renderCard=renderCard;
+
+// Anteprima locale: se nessuno chiama renderCard, mostra una carta d'esempio.
+const DEFAULT={id:'araminta',name:'Araminta',type:'warrior',subtype:'recruit',species:'maga',
+  school:'anatema',cost:2,att:2,git:0,dif:2,evolves_into:'the_pyric',
+  horde_effect:'Gli Anatemi a costo 1 che giochi ti ritornano in mano.'};
+window.addEventListener('DOMContentLoaded',()=>{
+  if(!document.getElementById('card')) renderCard(window.__CARD__||DEFAULT, window.__NAMES__||{the_pyric:'The Pyric'});
+});
+</script>
+</body>
+</html>
