@@ -17,18 +17,18 @@
   html,body{margin:0;padding:0;background:#171009;}
   #stage{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;}
 
-  .card{position:relative;width:744px;height:1039px;border-radius:8px;padding:20px;
+  .card{position:relative;width:744px;height:1039px;border-radius:18px;padding:20px;
         background:var(--border);font-family:'Caudex',Georgia,serif;flex:0 0 auto;}
-  .inner{position:relative;width:100%;height:100%;border-radius:5px;overflow:hidden;
+  .inner{position:relative;width:100%;height:100%;border-radius:12px;overflow:hidden;
           background:linear-gradient(rgba(60,35,15,.06),rgba(60,35,15,.14)),url(sfondo.png) center/cover;}
 
-  .banner{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:466px;}
+  .banner{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:490px;}
   .rib{background:var(--brown);border:3px solid var(--gold);
-       clip-path:polygon(0 0,100% 0,93% 50%,100% 100%,0 100%,7% 50%);padding:8px 44px;text-align:center;}
-  .name{text-align:center;font-family:'Caudex',serif;font-weight:700;text-transform:uppercase;font-size:40px;
-        line-height:1.18;letter-spacing:2px;color:var(--cream);white-space:nowrap;}
-  .name .ini{font-size:54px;}
-  .type{position:absolute;top:106px;left:50%;transform:translateX(-50%);font-family:'Caudex',serif;font-variant:small-caps;
+       clip-path:polygon(0 0,100% 0,93% 50%,100% 100%,0 100%,7% 50%);padding:8px 34px;text-align:center;}
+  .name{text-align:center;font-family:'Caudex',serif;font-weight:700;text-transform:uppercase;font-size:33px;
+        line-height:1.18;letter-spacing:1.5px;color:var(--cream);white-space:nowrap;}
+  .name .ini{font-size:1.36em;}
+  .type{position:absolute;top:97px;left:50%;transform:translateX(-50%);font-family:'Caudex',serif;font-variant:small-caps;
         font-weight:600;font-size:34px;letter-spacing:2px;color:var(--sub);white-space:nowrap;}
 
   .cost{position:absolute;top:20px;right:24px;width:74px;height:74px;}
@@ -40,8 +40,8 @@
   .cost.star .brd{width:90px;height:90px;}
   .cost.star span{inset:0 0 6% 0;}
 
-  .body{position:absolute;top:168px;left:40px;right:40px;bottom:28px;
-        display:flex;flex-direction:column;align-items:center;gap:15px;}
+  .body{position:absolute;top:148px;left:40px;right:40px;bottom:28px;
+        display:flex;flex-direction:column;align-items:center;gap:8px;}
 
   .illus{position:relative;width:517px;flex:0 0 auto;border:5px solid var(--brown);border-radius:4px;
          overflow:hidden;background:linear-gradient(rgba(52,30,13,.22),rgba(52,30,13,.34)),url(sfondo.png) center/cover;font-size:0;line-height:0;margin:0 auto;}
@@ -55,18 +55,19 @@
   .dia b{transform:rotate(-45deg);font-weight:800;font-size:42px;color:var(--cream);}
   .stat .lb{font-family:'Caudex',serif;font-variant:small-caps;font-weight:700;font-size:23px;letter-spacing:2px;color:var(--brown);}
 
-  .panel{width:558px;}
-  .info{padding:8px 24px;flex:0 0 auto;margin-top:-8px;}
+  .panel{width:598px;}
+  .info{padding:0 24px;flex:0 0 auto;margin-top:-8px;}
   .info .row{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:11px 2px;
              border-bottom:1px solid rgba(74,44,21,.28);}
   .info .row:last-child{border-bottom:none;}
   .info .k{font-family:'Caudex',serif;font-variant:small-caps;font-weight:800;font-size:34px;letter-spacing:1px;color:var(--brown2);}
   .info .v{font-style:italic;font-weight:700;font-size:33px;color:var(--ink);}
 
-  .effect{flex:1 1 auto;min-height:0;padding:14px 26px 16px;
+  .effect{width:100%;flex:1 1 auto;min-height:0;margin-top:-8px;
           display:flex;flex-direction:column;text-align:center;}
+  .illus + .effect{margin-top:6px;}  /* magie/costruzioni: un po' di respiro tra illustrazione e primo blocco */
   .effect .bt{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;}
-  .divider{display:flex;align-items:center;justify-content:center;gap:14px;width:100%;margin-bottom:6px;flex:0 0 auto;}
+  .divider{display:flex;align-items:center;justify-content:center;gap:14px;width:100%;flex:0 0 auto;}
   .divider .ln{height:2px;flex:1;max-width:150px;}
   .divider .lnL{background:linear-gradient(90deg,transparent,var(--brown));}
   .divider .lnR{background:linear-gradient(270deg,transparent,var(--brown));}
@@ -84,10 +85,26 @@
   .block .bt{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;text-align:center;}
   .block .bt span{font-style:italic;font-weight:600;line-height:1.3;color:var(--ink);}
 
-  .cgem{position:relative;width:50px;height:50px;flex:0 0 auto;}
-  .cgem img{width:100%;height:100%;display:block;}
+  .cgem{position:relative;width:58px;height:58px;flex:0 0 auto;}
+  .cgem img{position:absolute;top:0;left:0;width:100%;height:100%;display:block;}
+  .cgem .brd{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:66px;height:66px;display:block;}
   .cgem span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-             font-weight:900;font-size:25px;color:#5a2d06;}
+             font-weight:900;font-size:32px;color:#5a2d06;}
+
+  /* Debug: bordi dei contenitori flex, attivabili con --debug-borders (2_generate_cards.py) */
+  html.debug-borders .body{outline:2px solid red; outline-offset:-1px;}
+  html.debug-borders .stats{outline:2px solid orangered; outline-offset:-1px;}
+  html.debug-borders .stat{outline:2px solid orange; outline-offset:-1px;}
+  html.debug-borders .dia{outline:2px solid gold; outline-offset:-1px;}
+  html.debug-borders .info .row{outline:2px solid lime; outline-offset:-1px;}
+  html.debug-borders .effect .bt{outline:2px solid cyan; outline-offset:-1px;}
+  html.debug-borders .divider{outline:2px solid blue; outline-offset:-1px;}
+  html.debug-borders .block{outline:2px solid indigo; outline-offset:-1px;}
+  html.debug-borders .block .hd{outline:2px solid magenta; outline-offset:-1px;}
+  html.debug-borders .block .bt{outline:2px solid deeppink; outline-offset:-1px;}
+  html.debug-borders .cost span{outline:2px solid yellow; outline-offset:-1px;}
+  html.debug-borders .cgem span{outline:2px solid yellow; outline-offset:-1px;}
+  /* === FINE DEBUG TEMPORANEO === */
 </style>
 </head>
 <body>
@@ -111,7 +128,6 @@ const STAR_EMPTY='<svg width="58" height="58" viewBox="0 0 24 24" style="display
 const STAR_FILLED='<svg width="58" height="58" viewBox="0 0 24 24" style="display:block;flex:0 0 auto"><path d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.7 7L12 17.8 5.7 21.2l1.7-7L2 9.5l7.1-.6z" fill="#4a2c15"></path></svg>';
 const TOWER_PATH='M5 7 L5 4 L7 4 L7 6 L9 6 L9 4 L11 4 L11 6 L13 6 L13 4 L15 4 L15 6 L17 6 L17 4 L19 4 L19 7 L16.8 9 L16.3 14.5 L18.5 16.5 L19.5 20.5 L4.5 20.5 L5.5 16.5 L7.7 14.5 L7.2 9 Z';
 const TOWER_EMPTY='<svg width="58" height="58" viewBox="0 0 24 24" style="display:block;flex:0 0 auto"><path d="'+TOWER_PATH+'" fill="none" stroke="#4a2c15" stroke-width="1.6" stroke-linejoin="round"></path></svg>';
-const TOWER_FILLED='<svg width="58" height="58" viewBox="0 0 24 24" style="display:block;flex:0 0 auto"><path d="'+TOWER_PATH+'" fill="#4a2c15"></path></svg>';
 
 function costGem(card){
   if(card.type==='spell'){
@@ -160,9 +176,10 @@ function spellBlock(text,filled){
 }
 function towerBlock(text,filled,gemCost){
   const gem=(filled&&gemCost!=null)
-    ? `<div class="cgem"><img src="esagono.png" alt=""><span>${esc(gemCost)}</span></div>` : '';
+    ? `<div class="cgem"><img class="brd" src="esagono_border.png" alt=""><img src="esagono.png" alt=""><span>${esc(gemCost)}</span></div>` : '';
+  const icon=filled?'':TOWER_EMPTY;
   return `<div class="panel effect">
-      <div class="divider"><span class="ln lnL"></span>${filled?TOWER_FILLED:TOWER_EMPTY}${gem}<span class="ln lnR"></span></div>
+      <div class="divider"><span class="ln lnL"></span>${icon}${gem}<span class="ln lnR"></span></div>
       <div class="bt"><span class="etext fit" data-max="33" data-min="20">${esc(text||'')}</span></div>
     </div>`;
 }
@@ -228,7 +245,7 @@ function renderCard(card, names){
   }
   const frame = card.type==='spell' ? '#123a52' : (card.type==='building' ? '#245e33' : '#7a0000');
   stage.innerHTML=`<div class="card" id="card" style="background:${frame}"><div class="inner">${head(card)}<div class="body">${bodyFor(card)}</div></div></div>`;
-  const run=()=>{ stage.querySelectorAll('.fit').forEach(fit); fitIllus(); };
+  const run=()=>{ fitIllus(); stage.querySelectorAll('.fit').forEach(fit); };
   const img=stage.querySelector('.illus img');
   if(img) img.addEventListener('load', run);
   if(document.fonts&&document.fonts.ready){ document.fonts.ready.then(run); } else { run(); }

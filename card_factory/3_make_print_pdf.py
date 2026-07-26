@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
 """
-4_make_print_pdf.py
+3_make_print_pdf.py
 
-Rigenera tutte le carte (Step 3, richiamato come libreria) a risoluzione di stampa
-in una cartella temporanea — senza toccare i PNG in output/, usati dal frontend — e
-per ognuna crea una coppia di pagine (back, carta) con un bordo monocromo di 3mm su
-tutti i lati (dello stesso colore del bordo della carta, estratto dal pixel più a
+Rigenera tutte le carte (lib/render.py) a risoluzione di stampa in una cartella
+temporanea — senza toccare i PNG in output/, usati dal frontend — e per ognuna
+crea una coppia di pagine (back, carta) con un bordo monocromo di 3mm su tutti
+i lati (dello stesso colore del bordo della carta, estratto dal pixel più a
 sinistra in centro verticale). Salva il PDF risultante in output/cards_to_print.pdf.
 
 Utilizzo:
-    python 4_make_print_pdf.py             # qualità massima di stampa (scala 4 = ~1200 DPI)
-    python 4_make_print_pdf.py --scale 6   # ancora più definito
+    python 3_make_print_pdf.py             # qualità massima di stampa (scala 4 = ~1200 DPI)
+    python 3_make_print_pdf.py --scale 6   # ancora più definito
 """
 
 import argparse
-import importlib.util
 import io
 import tempfile
 from pathlib import Path
@@ -22,18 +21,16 @@ from pathlib import Path
 import fitz  # PyMuPDF
 from PIL import Image, ImageOps
 
-ROOT = Path(__file__).parent
-BASE_DPI = 300  # DPI a scala 1 (744x1039px, carta 63x88mm) — vedi 3_generate_cards.py
+from lib.cards_data import CARDS_JSON, load_cards
+from lib.render import render_cards
+
+ROOT = Path(__file__).resolve().parent
+BASE_DPI = 300  # DPI a scala 1 (744x1039px, carta 63x88mm) — vedi lib/render.py
 BORDER_MM = 3
 
 OUTPUT_DIR = ROOT / "output"
 OUTPUT_PDF = OUTPUT_DIR / "cards_to_print.pdf"
 BACK_ID = "retro"
-
-# 3_generate_cards.py inizia con una cifra: non importabile con `import`, si carica dal path.
-_spec = importlib.util.spec_from_file_location("generate_cards", ROOT / "3_generate_cards.py")
-_gen = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_gen)
 
 
 def add_border(im: Image.Image, border_px: int) -> Image.Image:
@@ -74,12 +71,12 @@ def main():
     dpi = BASE_DPI * args.scale
     border_px = round(BORDER_MM / 25.4 * dpi)
 
-    cards, id_to_name = _gen.load_cards(_gen.CARDS_JSON)
+    cards, id_to_name = load_cards(CARDS_JSON)
 
     with tempfile.TemporaryDirectory(prefix="barbacane_print_") as tmp:
         tmp_dir = Path(tmp)
         print(f"Rendering {len(cards)} carte a qualità di stampa (scala {args.scale}x, ~{dpi:.0f} DPI)...\n")
-        _gen.render_cards(cards, id_to_name, tmp_dir, scale=args.scale)
+        render_cards(cards, id_to_name, tmp_dir, scale=args.scale)
 
         back_path = tmp_dir / f"{BACK_ID}.png"
         card_paths = sorted(p for p in tmp_dir.glob("*.png") if p.stem != BACK_ID)
