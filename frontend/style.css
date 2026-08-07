@@ -1801,11 +1801,14 @@ input:focus {
 .lobby-solo-row {
   display: flex;
   justify-content: center;
+  gap: 0.8rem;
   margin-top: 0.4rem;
+  flex-wrap: wrap;
 }
 
-.btn-tutorial {
-  padding: 0.7rem 2rem;
+.btn-tutorial,
+.btn-practice {
+  padding: 0.7rem 1.6rem;
   font-size: 1.05rem;
 }
 
@@ -1864,46 +1867,59 @@ input:focus {
 .tutorial-card-desc  { color: var(--text); font-size: 0.9rem; margin-top: 0.3rem; }
 .tutorial-card-steps { color: var(--text-dim); font-size: 0.78rem; margin-top: 0.5rem; font-style: italic; }
 
-.tutorial-list-divider {
-  max-width: 760px;
-  margin: 0.4rem auto 1rem;
-  padding: 0 1.2rem;
+/* ==================== SFIDA UN BOT ==================== */
+
+#screen-bot-difficulty.active {
   display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  color: var(--text-dim);
-  font-size: 0.8rem;
-  font-style: italic;
-  width: 100%;
-}
-.tutorial-list-divider::before,
-.tutorial-list-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
+  flex-direction: column;
+  min-height: 100vh;
 }
 
-.tutorial-practice-card {
-  display: block;
+#bot-difficulty-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.7rem 1.2rem;
+  background: var(--bg-medium);
+  border-bottom: 2px solid var(--border-gold);
+  flex-shrink: 0;
+}
+#bot-difficulty-header h2 { color: var(--gold); font-size: 1.2rem; margin: 0; }
+
+#bot-difficulty-grid {
   max-width: 760px;
-  margin: 0 auto 1.6rem;
-  width: calc(100% - 2.4rem);
+  margin: 1.2rem auto;
+  padding: 0 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+
+.difficulty-card {
+  display: block;
   text-align: left;
-  background: linear-gradient(135deg, var(--bg-medium), var(--bg-light));
-  border: 1px solid var(--gold);
+  background: var(--bg-medium);
+  border: 1px solid var(--border-gold);
   border-radius: 8px;
   padding: 1.1rem 1.4rem;
   cursor: pointer;
   font-family: inherit;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
-.tutorial-practice-card:hover {
+.difficulty-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(240, 206, 6, 0.25);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
 }
-.tutorial-practice-title { color: var(--gold); font-size: 1.15rem; font-weight: bold; }
-.tutorial-practice-desc  { color: var(--text); font-size: 0.88rem; margin-top: 0.4rem; }
+.difficulty-card-title { font-size: 1.1rem; font-weight: bold; }
+.difficulty-card-desc  { color: var(--text); font-size: 0.9rem; margin-top: 0.3rem; }
+
+.difficulty-easy:hover  { border-color: var(--green-light); }
+.difficulty-normal:hover { border-color: var(--gold); }
+.difficulty-hard:hover  { border-color: var(--red-light); }
+.difficulty-easy   .difficulty-card-title { color: var(--green-light); }
+.difficulty-normal .difficulty-card-title { color: var(--gold-light); }
+.difficulty-hard   .difficulty-card-title { color: var(--red-light); }
 
 /* Barra istruzioni tutorial, in partita */
 

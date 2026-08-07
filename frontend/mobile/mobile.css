@@ -1550,7 +1550,14 @@ input {
 
 /* ═══════════════════════ TUTORIAL ═══════════════════════ */
 
+.lobby-solo-row {
+  display: flex;
+  gap: 10px;
+}
+.lobby-solo-row .cta { flex: 1 1 0; margin-top: 4px; padding-left: 8px; padding-right: 8px; }
+
 .cta-tutorial { margin-top: 4px; }
+.cta-practice { margin-top: 4px; }
 
 #scr-tutorial-list.active {
   height: 100dvh;
@@ -1596,36 +1603,50 @@ input {
 .tut-item-desc  { color: var(--text); font-size: 0.85rem; margin-top: 4px; }
 .tut-item-steps { color: var(--text-faint); font-size: 0.72rem; margin-top: 6px; font-style: italic; }
 
-.tut-divider {
+/* ═══════════════════════ SFIDA UN BOT ═══════════════════════ */
+
+#scr-bot-difficulty.active {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+#bot-diff-head {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--text-dim);
-  font-size: 0.76rem;
-  font-style: italic;
-  margin: 6px 2px 14px;
-}
-.tut-divider::before,
-.tut-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
+  margin: calc(var(--sat) + 8px) 10px 0;
+  padding: 7px 9px;
+  border-radius: var(--r-md);
+  flex: 0 0 auto;
 }
 
-.tut-practice-card {
+#bot-diff-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 12px calc(var(--sab) + 20px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.difficulty-card {
   display: block;
   width: 100%;
   text-align: left;
-  background: linear-gradient(135deg, var(--bg-medium), var(--bg-light));
-  border: 1px solid var(--gold);
+  background: var(--bg-medium);
+  border: 1px solid var(--border-gold);
   border-radius: var(--r-lg);
   padding: 14px 16px;
   transition: filter 0.15s;
 }
-.tut-practice-card:active { filter: brightness(1.2); }
-.tut-practice-title { color: var(--gold); font-size: 1.05rem; font-weight: 700; }
-.tut-practice-desc  { color: var(--text); font-size: 0.82rem; margin-top: 6px; line-height: 1.35; }
+.difficulty-card:active { filter: brightness(1.2); }
+.difficulty-card-title { font-size: 1.05rem; font-weight: 700; }
+.difficulty-card-desc  { color: var(--text); font-size: 0.82rem; margin-top: 6px; line-height: 1.35; }
+
+.difficulty-easy   .difficulty-card-title { color: var(--green-light); }
+.difficulty-normal .difficulty-card-title { color: var(--gold-light); }
+.difficulty-hard   .difficulty-card-title { color: var(--red-light); }
 
 /* Barra istruzioni tutorial, in partita */
 

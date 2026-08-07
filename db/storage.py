@@ -182,13 +182,23 @@ def cleanup_games(finished_grace_minutes: int = 5, stale_hours: float = 1) -> in
 
 
 def save_player(game_id: str, player_id: str, name: str, session_token: str) -> None:
+    """
+    Salva/aggiorna la riga del giocatore. `player_id` (es. "player_1") NON è
+    un identificatore stabile tra partite diverse: ogni nuova lobby/tutorial/
+    partita di pratica riassegna gli stessi id in base all'ordine di ingresso,
+    quindi una riga esistente va sempre risincronizzata con la partita e il
+    token correnti, non solo marcata "connected" (altrimenti l'autenticazione
+    via DB — usata quando la lobby non è più in memoria, come per tutorial e
+    partite contro il Bot — punterebbe ancora alla partita precedente).
+    """
     with get_conn() as conn:
         existing = conn.execute(
             _q("SELECT player_id FROM players WHERE player_id = ?"), (player_id,)
         ).fetchone()
         if existing:
             conn.execute(
-                _q("UPDATE players SET connected = 1 WHERE player_id = ?"), (player_id,)
+                _q("UPDATE players SET game_id = ?, name = ?, session_token = ?, connected = 1 WHERE player_id = ?"),
+                (game_id, name, session_token, player_id),
             )
         else:
             conn.execute(

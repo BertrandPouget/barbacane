@@ -56,7 +56,10 @@
       <button id="btn-join" class="cta">Entra nella lobby</button>
     </div>
 
-    <button id="btn-tutorial" class="cta cta-gold cta-tutorial">🎓 Tutorial</button>
+    <div class="lobby-solo-row">
+      <button id="btn-tutorial" class="cta cta-gold cta-tutorial">🎓 Tutorial</button>
+      <button id="btn-practice" class="cta cta-gold cta-practice">⚔️ Sfida un Bot</button>
+    </div>
     <button id="btn-catalog" class="cta cta-catalog">Catalogo carte</button>
 
     <a class="desktop-link" href="/?desktop=1">Passa alla versione desktop</a>
@@ -72,11 +75,28 @@
   <div id="tut-scroll">
     <p class="tut-hint">Ogni tutorial è una breve partita guidata, con carte fisse pensate solo per insegnare una meccanica.</p>
     <div id="tut-list"></div>
+  </div>
+</section>
 
-    <div class="tut-divider"><span>oppure</span></div>
-    <button id="btn-practice" class="tut-practice-card">
-      <div class="tut-practice-title">⚔️ Sfida un Bot</div>
-      <div class="tut-practice-desc">Una partita vera, con mazzo e regole complete, contro un avversario controllato dal computer. Mettiti alla prova con tutto quello che hai imparato.</div>
+<!-- ═══════════ SCHERMATA: SFIDA UN BOT (scelta difficoltà) ═══════════ -->
+<section id="scr-bot-difficulty" class="scr">
+  <header id="bot-diff-head" class="glass">
+    <button id="bot-diff-back" class="tb-btn" aria-label="Torna alla lobby">←</button>
+    <span class="cat-title">Sfida un Bot</span>
+  </header>
+  <div id="bot-diff-scroll">
+    <p class="tut-hint">Una partita vera, con mazzo e regole complete, contro un avversario controllato dal computer. Scegli la difficoltà.</p>
+    <button class="difficulty-card difficulty-easy" data-difficulty="easy">
+      <div class="difficulty-card-title">🟢 Facile</div>
+      <div class="difficulty-card-desc">Mosse per lo più casuali. Ottimo per i primi passi dopo i tutorial.</div>
+    </button>
+    <button class="difficulty-card difficulty-normal" data-difficulty="normal">
+      <div class="difficulty-card-title">🟡 Normale</div>
+      <div class="difficulty-card-desc">Gioca con criterio: valuta le carte, cerca le Orde, attacca il punto più debole.</div>
+    </button>
+    <button class="difficulty-card difficulty-hard" data-difficulty="hard">
+      <div class="difficulty-card-title">🔴 Difficile</div>
+      <div class="difficulty-card-desc">Come Normale, ma sceglie quasi sempre la mossa migliore possibile.</div>
     </button>
   </div>
 </section>

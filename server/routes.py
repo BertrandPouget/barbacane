@@ -21,8 +21,8 @@ from engine.game import (
     check_fucina_after_action,
     abandon_game,
     create_practice_game,
-    random_bot_turn,
 )
+from engine.bot import run_bot_turn
 from engine.actions import (
     ActionError,
     play_warrior,
@@ -245,11 +245,12 @@ async def api_start_tutorial(req: TutorialStartRequest):
 
 class PracticeStartRequest(BaseModel):
     player_name: str = "Tu"
+    difficulty: str = "normal"  # "easy" | "normal" | "hard"
 
 
 @router.post("/practice/start")
 async def api_start_practice(req: PracticeStartRequest):
-    state = create_practice_game(req.player_name)
+    state = create_practice_game(req.player_name, req.difficulty)
 
     session_token = generate_session_token()
     save_player(state.game_id, "player_1", state.players[0].name, session_token)
@@ -577,7 +578,7 @@ def _run_bot_turn(state, bot_id: str) -> None:
     guard = 0
     while state.current_player.id == bot_id and not state.winner_id and guard < 20:
         guard += 1
-        random_bot_turn(state)
+        run_bot_turn(state, state.bot_difficulty)
         _auto_resolve_bot_pending(state, bot_id)
 
 

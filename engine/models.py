@@ -316,6 +316,7 @@ class GameState(BaseModel):
     turn_timer: int = 120  # secondi per turno; 0 = disattivato
     tutorial: Optional[Dict[str, Any]] = None  # {"tutorial_id": str, "step_index": int, "completed": bool}
     bot_player_id: Optional[str] = None  # id del giocatore controllato dal Bot, se partita di pratica
+    bot_difficulty: str = "normal"  # "easy" | "normal" | "hard"
 
     @property
     def current_player(self) -> Player:

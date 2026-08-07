@@ -170,17 +170,22 @@ const Mob = (() => {
     $('tut-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
     $('tutorial-bar-next').addEventListener('click', () => sendAction('tutorial_next', {}));
     $('tutorial-bar-exit').addEventListener('click', exitTutorial);
-    $('btn-practice').addEventListener('click', startPracticeGame);
+
+    // Sfida un Bot
+    $('btn-practice').addEventListener('click', () => { haptic(); Screens.show('bot-difficulty'); });
+    $('bot-diff-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
+    document.querySelectorAll('.difficulty-card').forEach(card => {
+      card.addEventListener('click', () => { haptic(); startPracticeGame(card.dataset.difficulty); });
+    });
   }
 
   // ---------------------------------------------------------------------------
   // Partita di pratica contro un Bot (partita reale, non scriptata)
   // ---------------------------------------------------------------------------
 
-  async function startPracticeGame() {
-    haptic();
+  async function startPracticeGame(difficulty) {
     try {
-      const res = await api('/practice/start', { player_name: 'Tu' });
+      const res = await api('/practice/start', { player_name: 'Tu', difficulty });
       sessionToken = res.session_token;
       myPlayerId = res.player_id;
       gameId = res.game_id;

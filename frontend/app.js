@@ -122,16 +122,22 @@ const App = (() => {
     document.getElementById('btn-tutorial-back').addEventListener('click', () => Renderer.showScreen('lobby'));
     document.getElementById('tutorial-bar-next').addEventListener('click', () => sendAction('tutorial_next', {}));
     document.getElementById('tutorial-bar-exit').addEventListener('click', exitTutorial);
-    document.getElementById('btn-practice').addEventListener('click', startPracticeGame);
+
+    // Sfida un Bot
+    document.getElementById('btn-practice').addEventListener('click', () => Renderer.showScreen('bot-difficulty'));
+    document.getElementById('btn-bot-difficulty-back').addEventListener('click', () => Renderer.showScreen('lobby'));
+    document.querySelectorAll('.difficulty-card').forEach(card => {
+      card.addEventListener('click', () => startPracticeGame(card.dataset.difficulty));
+    });
   }
 
   // ---------------------------------------------------------------------------
   // Partita di pratica contro un Bot (partita reale, non scriptata)
   // ---------------------------------------------------------------------------
 
-  async function startPracticeGame() {
+  async function startPracticeGame(difficulty) {
     try {
-      const res = await api('/practice/start', { player_name: 'Tu' });
+      const res = await api('/practice/start', { player_name: 'Tu', difficulty });
       sessionToken = res.session_token;
       myPlayerId = res.player_id;
       gameId = res.game_id;

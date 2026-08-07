@@ -103,12 +103,14 @@ def create_game(player_names: List[str], game_id: Optional[str] = None) -> GameS
     return state
 
 
-def create_practice_game(player_name: str, game_id: Optional[str] = None) -> GameState:
+def create_practice_game(player_name: str, difficulty: str = "normal", game_id: Optional[str] = None) -> GameState:
     """
-    Crea una partita di pratica in solitaria contro un Bot casuale (regole e
-    mazzo reali, non scriptati). Il giocatore umano parte sempre per primo,
-    per un'esperienza più diretta subito dopo i tutorial.
+    Crea una partita di pratica in solitaria contro un Bot (regole e mazzo
+    reali, non scriptati). Il giocatore umano parte sempre per primo, per
+    un'esperienza più diretta subito dopo i tutorial.
     """
+    if difficulty not in ("easy", "normal", "hard"):
+        difficulty = "normal"
     if game_id is None:
         game_id = f"vs-{uuid.uuid4().hex[:8]}"
 
@@ -126,6 +128,7 @@ def create_practice_game(player_name: str, game_id: Optional[str] = None) -> Gam
     state.first_player_index = 0
     state.turn_timer = 0
     state.bot_player_id = state.players[1].id
+    state.bot_difficulty = difficulty
     return state
 
 
@@ -668,6 +671,7 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
         "pending_interactions": state.pending_interactions,
         "tutorial": state.tutorial,
         "bot_player_id": state.bot_player_id,
+        "bot_difficulty": state.bot_difficulty if state.bot_player_id else None,
     }
 
 
