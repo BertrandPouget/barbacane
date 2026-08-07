@@ -103,6 +103,32 @@ def create_game(player_names: List[str], game_id: Optional[str] = None) -> GameS
     return state
 
 
+def create_practice_game(player_name: str, game_id: Optional[str] = None) -> GameState:
+    """
+    Crea una partita di pratica in solitaria contro un Bot casuale (regole e
+    mazzo reali, non scriptati). Il giocatore umano parte sempre per primo,
+    per un'esperienza più diretta subito dopo i tutorial.
+    """
+    if game_id is None:
+        game_id = f"vs-{uuid.uuid4().hex[:8]}"
+
+    state = create_game([player_name or "Tu", "Bot"], game_id=game_id)
+
+    if state.current_player_index != 0:
+        # create_game ha scelto a caso il Bot come primo giocatore: annulla il
+        # suo inizio turno e rifallo per il giocatore umano.
+        bot = state.players[1]
+        bot.mana_remaining = 0
+        bot.actions_remaining = 2
+        bot.hordes_activated_this_turn = []
+        state.current_player_index = 0
+        _begin_turn(state)
+    state.first_player_index = 0
+    state.turn_timer = 0
+    state.bot_player_id = state.players[1].id
+    return state
+
+
 # ---------------------------------------------------------------------------
 # Inizio/Fine turno
 # ---------------------------------------------------------------------------
@@ -640,6 +666,8 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
         "pending_search": ps,
         "search_deck": search_deck,
         "pending_interactions": state.pending_interactions,
+        "tutorial": state.tutorial,
+        "bot_player_id": state.bot_player_id,
     }
 
 

@@ -34,6 +34,15 @@ const App = (() => {
   let leavingGame = false;
 
   // ---------------------------------------------------------------------------
+  // Stato Tutorial
+  // ---------------------------------------------------------------------------
+
+  let isTutorial = false;
+  let tutorialsMeta = [];        // elenco tutorial (id, title, description, step_count)
+  let tutorialStepsCache = {};   // tutorial_id -> [step, ...] (con testo/highlight)
+  let tutorialCompletedShown = false;
+
+  // ---------------------------------------------------------------------------
   // Init
   // ---------------------------------------------------------------------------
 
@@ -107,6 +116,160 @@ const App = (() => {
     // Catalogo carte
     document.getElementById('btn-catalog').addEventListener('click', openCatalog);
     document.getElementById('btn-catalog-back').addEventListener('click', () => Renderer.showScreen('lobby'));
+
+    // Tutorial
+    document.getElementById('btn-tutorial').addEventListener('click', openTutorialList);
+    document.getElementById('btn-tutorial-back').addEventListener('click', () => Renderer.showScreen('lobby'));
+    document.getElementById('tutorial-bar-next').addEventListener('click', () => sendAction('tutorial_next', {}));
+    document.getElementById('tutorial-bar-exit').addEventListener('click', exitTutorial);
+    document.getElementById('btn-practice').addEventListener('click', startPracticeGame);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Partita di pratica contro un Bot (partita reale, non scriptata)
+  // ---------------------------------------------------------------------------
+
+  async function startPracticeGame() {
+    try {
+      const res = await api('/practice/start', { player_name: 'Tu' });
+      sessionToken = res.session_token;
+      myPlayerId = res.player_id;
+      gameId = res.game_id;
+      isCreator = false;
+      isTutorial = false;
+      enterGame(res.state);
+    } catch (e) {
+      Renderer.toast(e.message, 'error');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tutorial — elenco e avvio
+  // ---------------------------------------------------------------------------
+
+  async function openTutorialList() {
+    try {
+      if (!tutorialsMeta.length) {
+        const res = await apiFetch('/tutorials');
+        tutorialsMeta = res.tutorials || [];
+      }
+      renderTutorialListGrid();
+      Renderer.showScreen('tutorial-list');
+    } catch (e) {
+      Renderer.toast('Impossibile caricare i tutorial', 'error');
+    }
+  }
+
+  function renderTutorialListGrid() {
+    const grid = document.getElementById('tutorial-list-grid');
+    grid.innerHTML = '';
+    tutorialsMeta.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'tutorial-card';
+      card.innerHTML = `
+        <div class="tutorial-card-title">${t.title}</div>
+        <div class="tutorial-card-desc">${t.description}</div>
+        <div class="tutorial-card-steps">${t.step_count} passi</div>
+      `;
+      card.addEventListener('click', () => startTutorial(t.id));
+      grid.appendChild(card);
+    });
+  }
+
+  async function startTutorial(tutorialId) {
+    try {
+      if (!tutorialStepsCache[tutorialId]) {
+        const full = await apiFetch(`/tutorials/${tutorialId}`);
+        tutorialStepsCache[tutorialId] = full.steps || [];
+      }
+      const res = await api('/tutorial/start', { tutorial_id: tutorialId, player_name: 'Tu' });
+      sessionToken = res.session_token;
+      myPlayerId = res.player_id;
+      gameId = res.game_id;
+      isTutorial = true;
+      tutorialCompletedShown = false;
+      enterGame(res.state);
+      // Nel tutorial l'abbandono normale non ha senso (c'è il "Manichino" come
+      // avversario fittizio): nascondi il pulsante "Esci" della testata.
+      document.getElementById('btn-abandon').classList.add('hidden');
+    } catch (e) {
+      Renderer.toast(e.message, 'error');
+    }
+  }
+
+  function exitTutorial() {
+    WS.disconnect();
+    stopLocalTimer();
+    applyTutorialHighlight([]);
+    document.getElementById('tutorial-bar').classList.add('hidden');
+    document.getElementById('btn-abandon').classList.remove('hidden');
+    leavingGame = false;
+    selectedCard = null;
+    actionMode = null;
+    wallsSelected = [];
+    currentState = null;
+    gameId = null;
+    sessionToken = null;
+    myPlayerId = null;
+    isTutorial = false;
+    Renderer.showScreen('tutorial-list');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tutorial — barra istruzioni in partita
+  // ---------------------------------------------------------------------------
+
+  function applyTutorialHighlight(ids) {
+    document.querySelectorAll('.tutorial-highlight').forEach(el => el.classList.remove('tutorial-highlight'));
+    (ids || []).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('tutorial-highlight');
+    });
+  }
+
+  function updateTutorialUI(state) {
+    const bar = document.getElementById('tutorial-bar');
+    if (!isTutorial || !state.tutorial) {
+      bar.classList.add('hidden');
+      applyTutorialHighlight([]);
+      return;
+    }
+
+    const steps = tutorialStepsCache[state.tutorial.tutorial_id] || [];
+    const idx = state.tutorial.step_index;
+
+    if (state.tutorial.completed || idx >= steps.length) {
+      applyTutorialHighlight([]);
+      bar.classList.add('hidden');
+      if (!tutorialCompletedShown) {
+        tutorialCompletedShown = true;
+        Renderer.showModal(
+          'Tutorial completato! 🎉',
+          'Hai completato questo tutorial. Puoi tornare all\'elenco per provarne un altro, oppure esplorare liberamente.',
+          () => exitTutorial(),
+        );
+        document.getElementById('modal-cancel').classList.add('hidden');
+      }
+      return;
+    }
+
+    const step = steps[idx];
+    if (!step) { bar.classList.add('hidden'); return; }
+
+    bar.classList.remove('hidden');
+    document.getElementById('tutorial-bar-title').textContent = step.title || '';
+    document.getElementById('tutorial-bar-text').textContent = step.text || '';
+    applyTutorialHighlight(step.highlight);
+
+    const nextBtn = document.getElementById('tutorial-bar-next');
+    const waitingHint = document.getElementById('tutorial-bar-waiting');
+    if (step.requires_action) {
+      nextBtn.classList.add('hidden');
+      waitingHint.classList.remove('hidden');
+    } else {
+      nextBtn.classList.remove('hidden');
+      waitingHint.classList.add('hidden');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -195,6 +358,7 @@ const App = (() => {
       myPlayerId = res.player_id;
       lobbyCode = res.lobby_code;
       isCreator = true;
+      isTutorial = false;
       showWaitingRoom(res.lobby);
       connectWS();
     } catch (e) {
@@ -213,6 +377,7 @@ const App = (() => {
       myPlayerId = res.player_id;
       lobbyCode = res.lobby_code;
       isCreator = false;
+      isTutorial = false;
       showWaitingRoom(res.lobby);
       connectWS();
     } catch (e) {
@@ -505,6 +670,10 @@ const App = (() => {
     if (myPendingVelocemento) {
       _showVelocementoChoiceModal(myPlayer.pending_velocemento_buildings);
     }
+
+    // Tutorial: aggiornata per ultima, così il suo eventuale modale di
+    // completamento non viene chiuso dalla pulizia generica di modal-overlay qui sopra.
+    if (isTutorial) updateTutorialUI(state);
   }
 
   // ---------------------------------------------------------------------------
@@ -532,6 +701,8 @@ const App = (() => {
     if (myP && myP.pending_velocemento_buildings && myP.pending_velocemento_buildings.length > 0) {
       _showVelocementoChoiceModal(myP.pending_velocemento_buildings);
     }
+    // Tutorial: aggiornata per ultima (vedi nota in onStateUpdate).
+    if (isTutorial) updateTutorialUI(state);
   }
 
   // ---------------------------------------------------------------------------
@@ -2011,6 +2182,9 @@ const App = (() => {
     lobbyCode = null;
     sessionToken = null;
     myPlayerId = null;
+    isTutorial = false;
+    document.getElementById('tutorial-bar').classList.add('hidden');
+    document.getElementById('btn-abandon').classList.remove('hidden');
     Renderer.showScreen('lobby');
   }
 

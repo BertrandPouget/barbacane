@@ -20,6 +20,8 @@ from engine.game import (
     end_turn,
     check_fucina_after_action,
     abandon_game,
+    create_practice_game,
+    random_bot_turn,
 )
 from engine.actions import (
     ActionError,
@@ -45,8 +47,16 @@ from server.lobby import (
     get_lobby,
     start_game,
     authenticate_player,
+    generate_session_token,
 )
 from server.ws_manager import manager
+from engine.tutorial import (
+    list_tutorials_meta,
+    get_tutorial,
+    create_tutorial_game,
+    advance_info_step,
+)
+import engine.tutorial as tutorial_engine
 
 router = APIRouter()
 
@@ -189,6 +199,71 @@ async def api_start_game(req: StartGameRequest):
 
 
 # ---------------------------------------------------------------------------
+# REST: Tutorial (modalità singolo giocatore scriptata)
+# ---------------------------------------------------------------------------
+
+class TutorialStartRequest(BaseModel):
+    tutorial_id: str
+    player_name: str = "Tu"
+
+
+@router.get("/tutorials")
+async def api_list_tutorials():
+    return {"tutorials": list_tutorials_meta()}
+
+
+@router.get("/tutorials/{tutorial_id}")
+async def api_get_tutorial(tutorial_id: str):
+    tdef = get_tutorial(tutorial_id)
+    if tdef is None:
+        raise HTTPException(404, "Tutorial non trovato")
+    return tdef.to_dict()
+
+
+@router.post("/tutorial/start")
+async def api_start_tutorial(req: TutorialStartRequest):
+    try:
+        state = create_tutorial_game(req.tutorial_id, player_name=req.player_name)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    session_token = generate_session_token()
+    save_player(state.game_id, "player_1", state.players[0].name, session_token)
+    save_game(state, status="playing")
+
+    return {
+        "game_id": state.game_id,
+        "player_id": "player_1",
+        "session_token": session_token,
+        "state": public_state(state, "player_1"),
+    }
+
+
+# ---------------------------------------------------------------------------
+# REST: Partita di pratica contro un Bot
+# ---------------------------------------------------------------------------
+
+class PracticeStartRequest(BaseModel):
+    player_name: str = "Tu"
+
+
+@router.post("/practice/start")
+async def api_start_practice(req: PracticeStartRequest):
+    state = create_practice_game(req.player_name)
+
+    session_token = generate_session_token()
+    save_player(state.game_id, "player_1", state.players[0].name, session_token)
+    save_game(state, status="playing")
+
+    return {
+        "game_id": state.game_id,
+        "player_id": "player_1",
+        "session_token": session_token,
+        "state": public_state(state, "player_1"),
+    }
+
+
+# ---------------------------------------------------------------------------
 # REST: Stato partita
 # ---------------------------------------------------------------------------
 
@@ -271,6 +346,12 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
     # o con interazioni pendenti), quindi va gestito prima di ogni altro controllo.
     if action == "leave_game":
         return abandon_game(state, player_id)
+
+    # Tutorial: consenti solo l'azione richiesta dallo step corrente dello script
+    if state.tutorial and not state.tutorial.get("completed"):
+        _tut_err = tutorial_engine.validate_action(state, action, params)
+        if _tut_err:
+            raise ActionError(_tut_err)
 
     # Azzera carta eterea se il giocatore consuma un'azione senza giocarla
     _ETHEREAL_BREAKING = {
@@ -439,6 +520,7 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
         ),
         "next_phase": lambda: _next_phase_action(state, player_id),
         "end_turn": lambda: _end_turn_action(state, player_id),
+        "tutorial_next": lambda: _tutorial_next_action(state, player_id),
     }
     if action not in handlers:
         raise ActionError(f"Azione sconosciuta: {action}")
@@ -454,7 +536,9 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
 
     # Dopo la battaglia (o eracle_destroy), fine turno automatica se non ci sono
     # più battaglie disponibili e nessun eracle_destroy in attesa di scelta.
-    if action in ("battle", "eracle_destroy") and not state.winner_id:
+    # Nei tutorial la fine turno automatica è disattivata: il "Manichino" non
+    # gioca mai, quindi passare il turno bloccherebbe lo script.
+    if action in ("battle", "eracle_destroy") and not state.winner_id and not state.tutorial:
         eracle_pending = action == "battle" and result.get("eracle_destroy_triggered", False)
         if state.battles_remaining <= 0 and not eracle_pending:
             end_turn(state)
@@ -463,7 +547,93 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             if not cardo_move_added:
                 result["auto_end_turn"] = True
 
+    # Tutorial: se questa azione era quella richiesta dallo step corrente, avanza
+    if state.tutorial and not state.tutorial.get("completed") and action != "tutorial_next":
+        tut_result = tutorial_engine.advance_after_action(state, action, params)
+        if tut_result:
+            result["tutorial"] = tut_result
+
+    # Partita di pratica contro il Bot: risolvi subito ogni interazione/ricerca
+    # pendente che lo riguarda (es. Magiscudo contro una tua Magia, anche nel
+    # tuo stesso turno), poi — se ora tocca a lui — gioca l'intero suo turno
+    # in automatico prima di restituire lo stato al giocatore umano.
+    if state.bot_player_id and not state.winner_id:
+        _auto_resolve_bot_pending(state, state.bot_player_id)
+        if state.current_player.id == state.bot_player_id:
+            _run_bot_turn(state, state.bot_player_id)
+
     return result
+
+
+def _tutorial_next_action(state, player_id: str) -> dict:
+    if state.get_player(player_id) is None:
+        raise ActionError("Giocatore non trovato.")
+    return advance_info_step(state)
+
+
+def _run_bot_turn(state, bot_id: str) -> None:
+    """Gioca l'intero turno del Bot (partita di pratica) usando il bot casuale
+    del motore, risolvendo anche eventuali interazioni pendenti che genera."""
+    guard = 0
+    while state.current_player.id == bot_id and not state.winner_id and guard < 20:
+        guard += 1
+        random_bot_turn(state)
+        _auto_resolve_bot_pending(state, bot_id)
+
+
+def _auto_resolve_bot_pending(state, bot_id: str) -> None:
+    """Risolve automaticamente qualsiasi pending_search o pending_interactions
+    che riguardi il Bot, con scelte semplici di default, così una partita di
+    pratica non resta mai bloccata in attesa di un input che il Bot non può dare."""
+    from engine.cards import get_card, WarriorCard
+
+    guard = 0
+    while guard < 20:
+        guard += 1
+
+        if state.pending_search and state.pending_search.get("player_id") == bot_id:
+            _resolve_search_action(state, bot_id, None)
+            continue
+
+        if state.pending_interactions and state.pending_interactions[0].get("player_id") == bot_id:
+            pending = state.pending_interactions[0]
+            ptype = pending.get("type")
+            player = state.get_player(bot_id)
+
+            if ptype == "biblioteca_discard":
+                iid = player.hand[0] if player.hand else None
+                _resolve_biblioteca_action(state, bot_id, {"discard_iid": iid})
+            elif ptype == "biblioteca_wall":
+                iid = player.hand[0] if player.hand else None
+                params = {"wall_card_iid": iid, "wall_bastion_side": "left"} if iid else {}
+                _resolve_biblioteca_action(state, bot_id, params)
+            elif ptype == "agilpesca_discard":
+                iid = player.hand[0] if player.hand else None
+                if iid:
+                    _resolve_agilpesca_action(state, bot_id, {"discard_iid": iid})
+                else:
+                    state.pending_interactions.pop(0)
+            elif ptype == "cardo_move":
+                _resolve_cardo_move_action(state, bot_id, {})
+            elif ptype == "magiscudo_counter":
+                _resolve_magiscudo_counter_action(state, bot_id, {"accept": False})
+            elif ptype == "malcomune_discard":
+                species = pending.get("species")
+                warrior = next(
+                    (w for w in player.all_warriors()
+                     if isinstance(get_card(w.base_card_id), WarriorCard)
+                     and get_card(w.base_card_id).species == species),
+                    None,
+                )
+                if warrior:
+                    _resolve_malcomune_action(state, bot_id, {"warrior_iid": warrior.instance_id})
+                else:
+                    state.pending_interactions.pop(0)
+            else:
+                state.pending_interactions.pop(0)
+            continue
+
+        break
 
 
 def _resolve_search_action(state, player_id: str, chosen_iid: Optional[str]) -> dict:

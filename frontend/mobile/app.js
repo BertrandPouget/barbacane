@@ -37,6 +37,15 @@ const Mob = (() => {
   // True mentre stiamo abbandonando la partita: ignora gli update in arrivo
   let leavingGame = false;
 
+  // ---------------------------------------------------------------------------
+  // Stato Tutorial
+  // ---------------------------------------------------------------------------
+
+  let isTutorial = false;
+  let tutorialsMeta = [];        // elenco tutorial (id, title, description, step_count)
+  let tutorialStepsCache = {};   // tutorial_id -> [step, ...] (con testo/highlight)
+  let tutorialCompletedShown = false;
+
   const SESSION_KEY = 'barb_m_session';
 
   // ---------------------------------------------------------------------------
@@ -115,6 +124,11 @@ const Mob = (() => {
       gameId = stored.gameId;
       lobbyCode = stored.lobbyCode || null;
       saveSession();
+      if (state.tutorial) {
+        isTutorial = true;
+        tutorialCompletedShown = false;
+        await _ensureTutorialStepsCached(state.tutorial.tutorial_id);
+      }
       enterGame(state);
       return true;
     } catch (_) {
@@ -150,6 +164,165 @@ const Mob = (() => {
     // Catalogo carte
     $('btn-catalog').addEventListener('click', openCatalog);
     $('cat-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
+
+    // Tutorial
+    $('btn-tutorial').addEventListener('click', openTutorialList);
+    $('tut-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
+    $('tutorial-bar-next').addEventListener('click', () => sendAction('tutorial_next', {}));
+    $('tutorial-bar-exit').addEventListener('click', exitTutorial);
+    $('btn-practice').addEventListener('click', startPracticeGame);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Partita di pratica contro un Bot (partita reale, non scriptata)
+  // ---------------------------------------------------------------------------
+
+  async function startPracticeGame() {
+    haptic();
+    try {
+      const res = await api('/practice/start', { player_name: 'Tu' });
+      sessionToken = res.session_token;
+      myPlayerId = res.player_id;
+      gameId = res.game_id;
+      lobbyCode = null;
+      isCreator = false;
+      isTutorial = false;
+      saveSession();
+      enterGame(res.state);
+    } catch (e) {
+      Toast.show(e.message, 'error');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tutorial — elenco e avvio
+  // ---------------------------------------------------------------------------
+
+  async function openTutorialList() {
+    haptic();
+    try {
+      if (!tutorialsMeta.length) {
+        const res = await apiFetch('/tutorials');
+        tutorialsMeta = res.tutorials || [];
+      }
+      renderTutorialListGrid();
+      Screens.show('tutorial-list');
+    } catch (e) {
+      Toast.show('Impossibile caricare i tutorial', 'error');
+    }
+  }
+
+  function renderTutorialListGrid() {
+    const list = $('tut-list');
+    list.innerHTML = '';
+    tutorialsMeta.forEach(t => {
+      const item = el('div', { className: 'tut-item' }, [
+        el('div', { className: 'tut-item-title' }, [t.title]),
+        el('div', { className: 'tut-item-desc' }, [t.description]),
+        el('div', { className: 'tut-item-steps' }, [`${t.step_count} passi`]),
+      ]);
+      item.addEventListener('click', () => { haptic(); startTutorial(t.id); });
+      list.appendChild(item);
+    });
+  }
+
+  async function _ensureTutorialStepsCached(tutorialId) {
+    if (!tutorialStepsCache[tutorialId]) {
+      const full = await apiFetch(`/tutorials/${tutorialId}`);
+      tutorialStepsCache[tutorialId] = full.steps || [];
+    }
+  }
+
+  async function startTutorial(tutorialId) {
+    try {
+      await _ensureTutorialStepsCached(tutorialId);
+      const res = await api('/tutorial/start', { tutorial_id: tutorialId, player_name: 'Tu' });
+      sessionToken = res.session_token;
+      myPlayerId = res.player_id;
+      gameId = res.game_id;
+      lobbyCode = null;
+      isTutorial = true;
+      tutorialCompletedShown = false;
+      saveSession();
+      enterGame(res.state);
+    } catch (e) {
+      Toast.show(e.message, 'error');
+    }
+  }
+
+  function exitTutorial() {
+    haptic();
+    WS.disconnect();
+    stopLocalTimer();
+    Sheet.close(true);
+    applyTutorialHighlight([]);
+    $('tutorial-bar').hidden = true;
+    $('tb-leave').hidden = false;
+    clearSession();
+    leavingGame = false;
+    currentState = null;
+    gameId = null;
+    sessionToken = null;
+    myPlayerId = null;
+    isTutorial = false;
+    Screens.show('tutorial-list');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tutorial — barra istruzioni in partita
+  // ---------------------------------------------------------------------------
+
+  function applyTutorialHighlight(ids) {
+    document.querySelectorAll('.tutorial-highlight').forEach(e => e.classList.remove('tutorial-highlight'));
+    (ids || []).forEach(id => {
+      const e = $(id);
+      if (e) e.classList.add('tutorial-highlight');
+    });
+  }
+
+  function updateTutorialUI(state) {
+    const bar = $('tutorial-bar');
+    if (!isTutorial || !state.tutorial) {
+      bar.hidden = true;
+      applyTutorialHighlight([]);
+      return;
+    }
+
+    const steps = tutorialStepsCache[state.tutorial.tutorial_id] || [];
+    const idx = state.tutorial.step_index;
+
+    if (state.tutorial.completed || idx >= steps.length) {
+      applyTutorialHighlight([]);
+      bar.hidden = true;
+      if (!tutorialCompletedShown) {
+        tutorialCompletedShown = true;
+        Sheet.confirm(
+          'Tutorial completato! 🎉',
+          'Hai completato questo tutorial. Torna all\'elenco per provarne un altro, oppure esplora liberamente.',
+          () => exitTutorial(),
+          { yesLabel: 'Torna all\'elenco', noLabel: 'Chiudi', onNo: () => exitTutorial(), locked: true },
+        );
+      }
+      return;
+    }
+
+    const step = steps[idx];
+    if (!step) { bar.hidden = true; return; }
+
+    bar.hidden = false;
+    $('tutorial-bar-title').textContent = step.title || '';
+    $('tutorial-bar-text').textContent = step.text || '';
+    applyTutorialHighlight(step.highlight_mobile && step.highlight_mobile.length ? step.highlight_mobile : step.highlight);
+
+    const nextBtn = $('tutorial-bar-next');
+    const waitingHint = $('tutorial-bar-waiting');
+    if (step.requires_action) {
+      nextBtn.hidden = true;
+      waitingHint.hidden = false;
+    } else {
+      nextBtn.hidden = false;
+      waitingHint.hidden = true;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -244,6 +417,7 @@ const Mob = (() => {
       myPlayerId = res.player_id;
       lobbyCode = res.lobby_code;
       isCreator = true;
+      isTutorial = false;
       saveSession();
       showWaitingRoom(res.lobby);
     } catch (e) {
@@ -262,6 +436,7 @@ const Mob = (() => {
       myPlayerId = res.player_id;
       lobbyCode = res.lobby_code;
       isCreator = false;
+      isTutorial = false;
       saveSession();
       showWaitingRoom(res.lobby);
     } catch (e) {
@@ -393,11 +568,15 @@ const Mob = (() => {
     saveSession();
     connectGameWS();
     Screens.show('game');
+    $('tb-leave').hidden = isTutorial;
     _lastTurnPlayer = state.current_player_id;
     Render.game(state, myPlayerId);
     refreshDock();
     _openPendingSheets(state);
     if (state.winner_id) showGameOver(state);
+    // Tutorial: aggiornata per ultima, così un eventuale sheet di completamento
+    // non venga chiuso da altra logica di questo ciclo.
+    if (isTutorial) updateTutorialUI(state);
   }
 
   function confirmLeaveGame() {
@@ -496,6 +675,9 @@ const Mob = (() => {
     }
 
     refreshDock();
+
+    // Tutorial: aggiornata per ultima (vedi nota in enterGame).
+    if (isTutorial) updateTutorialUI(state);
   }
 
   function _openPendingSheets(state) {

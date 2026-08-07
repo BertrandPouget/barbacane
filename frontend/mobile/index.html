@@ -56,9 +56,28 @@
       <button id="btn-join" class="cta">Entra nella lobby</button>
     </div>
 
+    <button id="btn-tutorial" class="cta cta-gold cta-tutorial">🎓 Tutorial</button>
     <button id="btn-catalog" class="cta cta-catalog">Catalogo carte</button>
 
     <a class="desktop-link" href="/?desktop=1">Passa alla versione desktop</a>
+  </div>
+</section>
+
+<!-- ═══════════ SCHERMATA: TUTORIAL (elenco) ═══════════ -->
+<section id="scr-tutorial-list" class="scr">
+  <header id="tut-head" class="glass">
+    <button id="tut-back" class="tb-btn" aria-label="Torna alla lobby">←</button>
+    <span class="cat-title">Tutorial</span>
+  </header>
+  <div id="tut-scroll">
+    <p class="tut-hint">Ogni tutorial è una breve partita guidata, con carte fisse pensate solo per insegnare una meccanica.</p>
+    <div id="tut-list"></div>
+
+    <div class="tut-divider"><span>oppure</span></div>
+    <button id="btn-practice" class="tut-practice-card">
+      <div class="tut-practice-title">⚔️ Sfida un Bot</div>
+      <div class="tut-practice-desc">Una partita vera, con mazzo e regole complete, contro un avversario controllato dal computer. Mettiti alla prova con tutto quello che hai imparato.</div>
+    </button>
   </div>
 </section>
 
@@ -114,6 +133,19 @@
       <button id="tb-leave" class="tb-btn tb-leave" aria-label="Abbandona la partita">Esci</button>
     </div>
   </header>
+
+  <!-- Barra istruzioni Tutorial (visibile solo nelle partite tutorial) -->
+  <div id="tutorial-bar" hidden>
+    <div id="tutorial-bar-body">
+      <div id="tutorial-bar-title"></div>
+      <div id="tutorial-bar-text"></div>
+    </div>
+    <div id="tutorial-bar-actions">
+      <span id="tutorial-bar-waiting" hidden>👉 completa l'azione indicata</span>
+      <button id="tutorial-bar-next" class="mbtn mbtn-gold" hidden>Avanti →</button>
+      <button id="tutorial-bar-exit" class="mbtn">Esci</button>
+    </div>
+  </div>
 
   <!-- Avversari -->
   <div id="opp-rail"></div>
