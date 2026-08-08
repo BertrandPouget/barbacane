@@ -1914,12 +1914,14 @@ input:focus {
 .difficulty-card-title { font-size: 1.1rem; font-weight: bold; }
 .difficulty-card-desc  { color: var(--text); font-size: 0.9rem; margin-top: 0.3rem; }
 
-.difficulty-easy:hover  { border-color: var(--green-light); }
+.difficulty-easy:hover   { border-color: var(--green-light); }
 .difficulty-normal:hover { border-color: var(--gold); }
-.difficulty-hard:hover  { border-color: var(--red-light); }
+.difficulty-hard:hover   { border-color: var(--red-light); }
+.difficulty-expert:hover { border-color: #b388e0; }
 .difficulty-easy   .difficulty-card-title { color: var(--green-light); }
 .difficulty-normal .difficulty-card-title { color: var(--gold-light); }
 .difficulty-hard   .difficulty-card-title { color: var(--red-light); }
+.difficulty-expert .difficulty-card-title { color: #b388e0; }
 
 /* Barra istruzioni tutorial, in partita */
 

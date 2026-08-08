@@ -245,7 +245,7 @@ async def api_start_tutorial(req: TutorialStartRequest):
 
 class PracticeStartRequest(BaseModel):
     player_name: str = "Tu"
-    difficulty: str = "normal"  # "easy" | "normal" | "hard"
+    difficulty: str = "normal"  # "easy" | "normal" | "hard" | "expert"
 
 
 @router.post("/practice/start")

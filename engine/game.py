@@ -109,7 +109,7 @@ def create_practice_game(player_name: str, difficulty: str = "normal", game_id: 
     reali, non scriptati). Il giocatore umano parte sempre per primo, per
     un'esperienza più diretta subito dopo i tutorial.
     """
-    if difficulty not in ("easy", "normal", "hard"):
+    if difficulty not in ("easy", "normal", "hard", "expert"):
         difficulty = "normal"
     if game_id is None:
         game_id = f"vs-{uuid.uuid4().hex[:8]}"

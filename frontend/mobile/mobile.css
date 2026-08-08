@@ -1647,6 +1647,7 @@ input {
 .difficulty-easy   .difficulty-card-title { color: var(--green-light); }
 .difficulty-normal .difficulty-card-title { color: var(--gold-light); }
 .difficulty-hard   .difficulty-card-title { color: var(--red-light); }
+.difficulty-expert .difficulty-card-title { color: #b388e0; }
 
 /* Barra istruzioni tutorial, in partita */
 
