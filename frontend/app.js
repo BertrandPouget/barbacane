@@ -41,6 +41,7 @@ const App = (() => {
   let tutorialsMeta = [];        // elenco tutorial (id, title, description, step_count)
   let tutorialStepsCache = {};   // tutorial_id -> [step, ...] (con testo/highlight)
   let tutorialCompletedShown = false;
+  let tutorialPopupShownFor = null; // chiave "tutorial_id:step_index" dell'ultimo popup mostrato
 
   // ---------------------------------------------------------------------------
   // Init
@@ -194,6 +195,7 @@ const App = (() => {
       gameId = res.game_id;
       isTutorial = true;
       tutorialCompletedShown = false;
+      tutorialPopupShownFor = null;
       enterGame(res.state);
       // Nel tutorial l'abbandono normale non ha senso (c'è il "Manichino" come
       // avversario fittizio): nascondi il pulsante "Esci" della testata.
@@ -203,11 +205,34 @@ const App = (() => {
     }
   }
 
+  function hideTutorialPopup() {
+    document.getElementById('tutorial-popup-overlay').classList.add('hidden');
+  }
+
+  // Mostra il testo del passo come popup al centro dello schermo: si chiude
+  // (Avanti per i passi informativi, "Ho capito" per i passi d'azione) e
+  // lascia il campo libero per giocare.
+  function showTutorialPopup(step) {
+    document.getElementById('tutorial-popup-title').textContent = step.title || '';
+    document.getElementById('tutorial-popup-text').textContent = step.text || '';
+    const btn = document.getElementById('tutorial-popup-action');
+    if (step.requires_action) {
+      btn.textContent = 'Ho capito, si gioca! →';
+      btn.onclick = () => hideTutorialPopup();
+    } else {
+      btn.textContent = 'Avanti →';
+      btn.onclick = () => { hideTutorialPopup(); sendAction('tutorial_next', {}); };
+    }
+    document.getElementById('tutorial-popup-overlay').classList.remove('hidden');
+  }
+
   function exitTutorial() {
     WS.disconnect();
     stopLocalTimer();
     applyTutorialHighlight([]);
     document.getElementById('tutorial-bar').classList.add('hidden');
+    hideTutorialPopup();
+    tutorialPopupShownFor = null;
     document.getElementById('btn-abandon').classList.remove('hidden');
     leavingGame = false;
     selectedCard = null;
@@ -237,6 +262,8 @@ const App = (() => {
     const bar = document.getElementById('tutorial-bar');
     if (!isTutorial || !state.tutorial) {
       bar.classList.add('hidden');
+      hideTutorialPopup();
+      tutorialPopupShownFor = null;
       applyTutorialHighlight([]);
       return;
     }
@@ -247,6 +274,7 @@ const App = (() => {
     if (state.tutorial.completed || idx >= steps.length) {
       applyTutorialHighlight([]);
       bar.classList.add('hidden');
+      hideTutorialPopup();
       if (!tutorialCompletedShown) {
         tutorialCompletedShown = true;
         Renderer.showModal(
@@ -266,6 +294,15 @@ const App = (() => {
     document.getElementById('tutorial-bar-title').textContent = step.title || '';
     document.getElementById('tutorial-bar-text').textContent = step.text || '';
     applyTutorialHighlight(step.highlight);
+
+    // Al primo aggiornamento di stato per un nuovo passo, mostra il testo in
+    // un popup al centro dello schermo: più difficile da perdere della sola
+    // barra in alto. Si chiude subito dopo per lasciare il campo libero.
+    const stepKey = `${state.tutorial.tutorial_id}:${idx}`;
+    if (tutorialPopupShownFor !== stepKey) {
+      tutorialPopupShownFor = stepKey;
+      showTutorialPopup(step);
+    }
 
     const nextBtn = document.getElementById('tutorial-bar-next');
     const waitingHint = document.getElementById('tutorial-bar-waiting');

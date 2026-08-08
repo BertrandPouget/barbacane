@@ -938,14 +938,20 @@ def _resolve_malcomune_action(state, player_id: str, params: dict) -> dict:
 async def websocket_endpoint(websocket: WebSocket, game_id: str, player_id: str):
     await manager.connect(game_id, player_id, websocket)
 
-    # Avvisa gli altri della connessione
-    await manager.broadcast(game_id, {
-        "type": "player_connected",
-        "player_id": player_id,
-    })
+    state = load_game(game_id)
+    is_tutorial = bool(state and state.tutorial)
+
+    # Avvisa gli altri della connessione. Nei tutorial (partita scriptata in
+    # solitaria contro il Manichino) l'evento è solo rumore: comparirebbe ogni
+    # volta che si entra in un tutorial o in una partita successiva, dando la
+    # falsa impressione che qualcosa non vada.
+    if not is_tutorial:
+        await manager.broadcast(game_id, {
+            "type": "player_connected",
+            "player_id": player_id,
+        })
 
     # Invia lo stato corrente al giocatore appena connesso
-    state = load_game(game_id)
     if state:
         await manager.send_to_player(game_id, player_id, {
             "type": "state_update",
@@ -958,10 +964,11 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_id: str)
             await _handle_ws_message(game_id, player_id, data)
     except WebSocketDisconnect:
         manager.disconnect(game_id, player_id)
-        await manager.broadcast(game_id, {
-            "type": "player_disconnected",
-            "player_id": player_id,
-        })
+        if not is_tutorial:
+            await manager.broadcast(game_id, {
+                "type": "player_disconnected",
+                "player_id": player_id,
+            })
 
 
 async def _handle_ws_message(game_id: str, player_id: str, data: dict) -> None:

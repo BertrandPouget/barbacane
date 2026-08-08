@@ -123,6 +123,46 @@ class TutorialDef:
 
 DUMMY_NAME = "Manichino"
 
+# Vite del giocatore umano nei tutorial: 3 carte di specie diverse, così da non
+# dare l'impressione (falsa) che il mazzo sia fatto solo di copie ripetute
+# della stessa carta (es. 3 Giulio). Il contenuto non ha alcun effetto di
+# gioco: nei tutorial le Vite non vengono mai pescate né rivelate.
+_HUMAN_LIFE_CARDS = ["decimo_1", "madeleine_1", "eracle_1"]
+
+# Carte "di scena" con cui riempire il Mazzo comune nei tutorial: servono solo
+# a mostrare un numero di carte rimanenti verosimile nell'intestazione (il
+# Mazzo non viene mai davvero pescato in un tutorial scriptato). Scelte tra
+# le carte NON usate da nessuno script di tutorial, per non creare doppioni
+# con mano/campo/Vite.
+_DECK_FILLER_BASE_IDS = [
+    "san_patrizio", "von_reinhold", "the_pyric", "orfeus", "giulio_ii",
+    "doktor_faustus", "the_briny", "polemarco", "polemarcos", "pio_decimo",
+    "kaiser_joseph", "the_nemoral", "eracles",
+    "vitalflusso", "magiscudo", "equipotenza", "regicidio", "agilpesca",
+    "guerremoto", "arrampicarta", "investimento", "cuordipietra",
+    "bastioncontrario", "divinazione", "malcomune", "telecinesi",
+    "cercapersone", "incendifesa", "dazipazzi", "plasmattone", "cambiamente",
+    "velocemento", "plasmarmo",
+    "fucina", "biblioteca", "ariete", "catapulta", "saracinesca", "sorgiva",
+    "arena", "fossato", "scrigno", "obelisco", "decumano", "trono",
+]
+
+# 200 carte nel Mazzo comune - 6 in mano e 3 Vite per ciascuno dei 2
+# giocatori = un numero verosimile di carte rimanenti da mostrare in testata.
+_TUTORIAL_DECK_SIZE = 182
+
+
+def _build_filler_deck(count: int) -> List[str]:
+    ids: List[str] = []
+    n = 1
+    while len(ids) < count:
+        for base in _DECK_FILLER_BASE_IDS:
+            ids.append(f"{base}_{n}")
+            if len(ids) >= count:
+                break
+        n += 1
+    return ids
+
 
 def _human(state: GameState) -> Player:
     return state.players[0]
@@ -175,8 +215,8 @@ def _t1_setup_board(state: GameState) -> None:
     _set_bastion(me, "left", warrior_ids=["patrizio_2"], wall_ids=["reinhold_1"])
     _set_bastion(me, "right", wall_ids=["joseph_1", "joseph_2"])
     _set_village(me, ["estrattore_1"])
-    _set_hand(me, ["orfeo_1", "orfeo_2", "giulio_1"])
-    me.life_cards = ["giulio_2", "giulio_3", "giulio_4"]
+    _set_hand(me, ["orfeo_1", "ardolancio_1", "granaio_1"])
+    me.life_cards = list(_HUMAN_LIFE_CARDS)
     _set_resources(me, mana=3, actions=2)
     state.phase = "action"
 
@@ -204,7 +244,7 @@ TUTORIAL_ZONE_CAMPO = TutorialDef(
         ),
         TutorialStep(
             "lives", "Le Vite",
-            "Le tue Vite sono carte pescate a faccia in giù, nascoste anche a te. Quando un avversario sfonda le tue difese ne perdi una: a zero Vite sei eliminato.",
+            "Le tue Vite sono carte pescate a faccia in giù: solo tu puoi vedere quali sono, per gli avversari restano nascoste. Quando un avversario sfonda le tue difese ne perdi una: a zero Vite sei eliminato.",
             highlight=["my-life-deck"],
         ),
         TutorialStep(
@@ -244,7 +284,7 @@ def _t2_setup_intro(state: GameState) -> None:
     me = _human(state)
     _reset_field(me)
     _set_hand(me, ["patrizio_1"])
-    me.life_cards = ["giulio_2", "giulio_3", "giulio_4"]
+    me.life_cards = list(_HUMAN_LIFE_CARDS)
     _set_resources(me, mana=2, actions=2)
     state.phase = "action"
 
@@ -323,8 +363,8 @@ def _t3_setup_intro(state: GameState) -> None:
     me = _human(state)
     _reset_field(me)
     _set_vanguard(me, ["patrizio_1", "patrizio_2"])
-    _set_hand(me, ["patrizio_3"])
-    me.life_cards = ["giulio_2", "giulio_3", "giulio_4"]
+    _set_hand(me, ["giulio_1"])
+    me.life_cards = list(_HUMAN_LIFE_CARDS)
     _set_resources(me, mana=2, actions=2)
     state.phase = "action"
 
@@ -343,10 +383,11 @@ TUTORIAL_ORDA = TutorialDef(
         ),
         TutorialStep(
             "play_third", "Completa l'Orda",
-            "Gioca il terzo Patrizio in Avanscoperta per completare l'Orda.",
+            "Gioca Giulio, un altro Guerriero Elfo, in Avanscoperta: non serve che sia lo stesso Guerriero dei "
+            "primi due, basta la stessa Specie per completare l'Orda.",
             highlight=["hand-area", "my-vanguard"],
-            action="play_warrior", match={"instance_id": "patrizio_3", "region": "vanguard"},
-            hint="Gioca il terzo Patrizio in Avanscoperta.",
+            action="play_warrior", match={"instance_id": "giulio_1", "region": "vanguard"},
+            hint="Gioca Giulio (Elfo) in Avanscoperta.",
         ),
         TutorialStep(
             "phase_intro", "Fase di Schieramento",
@@ -357,14 +398,16 @@ TUTORIAL_ORDA = TutorialDef(
         ),
         TutorialStep(
             "activate_intro", "Attiva l'Orda",
-            "Ora attiva l'Orda: ogni Patrizio nell'Orda ottiene +2 Gittata.",
+            "Ora attiva l'Orda: nella finestra che si apre scegli uno dei tuoi due Patrizio. L'effetto Orda di "
+            "Patrizio si applica solo al Guerriero che selezioni, non a tutta l'Orda.",
             highlight=["btn-horde"],
             action="horde", match={"horde_card_id": "patrizio"},
-            hint="Attiva l'Orda dei Patrizio.",
+            hint="Attiva l'Orda scegliendo uno dei tuoi Patrizio.",
         ),
         TutorialStep(
             "outro", "Ottimo lavoro!",
-            "I tuoi 3 Patrizio hanno ora +2 Gittata ciascuno grazie all'Orda. Prova «La Battaglia» per imparare ad attaccare.",
+            "Il Patrizio che hai scelto ha ora +2 Gittata: gli altri due Guerrieri dell'Orda restano invariati, "
+            "perché l'effetto vale solo per la carta selezionata. Prova «La Battaglia» per imparare ad attaccare.",
             highlight=[],
         ),
     ],
@@ -380,7 +423,7 @@ def _t4_setup_intro(state: GameState) -> None:
     _reset_field(me)
     _set_vanguard(me, ["orfeo_1"])
     _set_hand(me, [])
-    me.life_cards = ["giulio_2", "giulio_3", "giulio_4"]
+    me.life_cards = list(_HUMAN_LIFE_CARDS)
     _set_resources(me, mana=0, actions=2)
     state.phase = "action"
 
@@ -456,8 +499,8 @@ TUTORIAL_BATTAGLIA = TutorialDef(
         TutorialStep(
             "outro", "Ottimo lavoro!",
             "Hai visto entrambi i casi: contro Difesa 0 il danno è passato (Muro distrutto e 1 Vita persa); contro "
-            "Difesa 3, pari al tuo Attacco, il danno è stato azzerato e nessun Muro è caduto. Hai completato tutti "
-            "i tutorial base: sei pronto per una vera partita!",
+            "Difesa 3, pari al tuo Attacco, il danno è stato azzerato e nessun Muro è caduto. Prova ora «Le Magie» "
+            "per imparare a lanciarle in versione Base e Prodigio.",
             highlight=[],
         ),
     ],
@@ -475,7 +518,7 @@ def _t5_setup_intro(state: GameState) -> None:
     # (1 Maga qualsiasi) ma NON ne attiva il Prodigio (serve Scuola Anatema).
     _set_vanguard(me, ["evelyn_1"])
     _set_hand(me, ["ardolancio_1", "ardolancio_2"])
-    me.life_cards = ["giulio_2", "giulio_3", "giulio_4"]
+    me.life_cards = list(_HUMAN_LIFE_CARDS)
     _set_resources(me, mana=0, actions=2)
     state.phase = "action"
 
@@ -523,9 +566,9 @@ TUTORIAL_MAGIE = TutorialDef(
         ),
         TutorialStep(
             "prodigio_explain", "Effetto Prodigio",
-            "Base scartato: 2 Muri su 2. Ora aggiungiamo Araminta, Maga di Scuola Anatema, al tuo schieramento: "
-            "essendo proprio la Scuola di Ardolancio, il prossimo lancio attiverà il Prodigio — fino a 4 Muri "
-            "invece di 2. Il Bastione Destro del Manichino ha esattamente 4 Muri ad aspettarti.",
+            "Fatto: il lancio Base ha scartato 2 Muri su 2! Ora aggiungiamo Araminta, Maga di Scuola Anatema, al tuo "
+            "schieramento: essendo proprio la Scuola di Ardolancio, il prossimo lancio attiverà il Prodigio — fino "
+            "a 4 Muri invece di 2. Il Bastione Destro del Manichino ha esattamente 4 Muri ad aspettarti.",
             highlight=["my-vanguard"], setup=_t5_setup_add_araminta,
         ),
         TutorialStep(
@@ -600,7 +643,7 @@ def create_tutorial_game(tutorial_id: str, player_name: str = "Tu", game_id: Opt
         first_player_index=0,
         phase="action",
         players=[human, dummy],
-        deck=[],
+        deck=_build_filler_deck(_TUTORIAL_DECK_SIZE),
         battles_remaining=1,
         turn_timer=0,
         tutorial={"tutorial_id": tutorial_id, "step_index": 0, "completed": False},

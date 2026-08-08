@@ -45,6 +45,7 @@ const Mob = (() => {
   let tutorialsMeta = [];        // elenco tutorial (id, title, description, step_count)
   let tutorialStepsCache = {};   // tutorial_id -> [step, ...] (con testo/highlight)
   let tutorialCompletedShown = false;
+  let tutorialPopupShownFor = null; // chiave "tutorial_id:step_index" dell'ultimo popup mostrato
 
   const SESSION_KEY = 'barb_m_session';
 
@@ -248,11 +249,33 @@ const Mob = (() => {
       lobbyCode = null;
       isTutorial = true;
       tutorialCompletedShown = false;
+      tutorialPopupShownFor = null;
       saveSession();
       enterGame(res.state);
     } catch (e) {
       Toast.show(e.message, 'error');
     }
+  }
+
+  function hideTutorialPopup() {
+    $('tutorial-popup-overlay').hidden = true;
+  }
+
+  // Mostra il testo del passo come popup al centro dello schermo: si chiude
+  // (Avanti per i passi informativi, "Ho capito" per i passi d'azione) e
+  // lascia il campo libero per giocare.
+  function showTutorialPopup(step) {
+    $('tutorial-popup-title').textContent = step.title || '';
+    $('tutorial-popup-text').textContent = step.text || '';
+    const btn = $('tutorial-popup-action');
+    if (step.requires_action) {
+      btn.textContent = 'Ho capito, si gioca! →';
+      btn.onclick = () => { haptic(); hideTutorialPopup(); };
+    } else {
+      btn.textContent = 'Avanti →';
+      btn.onclick = () => { haptic(); hideTutorialPopup(); sendAction('tutorial_next', {}); };
+    }
+    $('tutorial-popup-overlay').hidden = false;
   }
 
   function exitTutorial() {
@@ -262,6 +285,8 @@ const Mob = (() => {
     Sheet.close(true);
     applyTutorialHighlight([]);
     $('tutorial-bar').hidden = true;
+    hideTutorialPopup();
+    tutorialPopupShownFor = null;
     $('tb-leave').hidden = false;
     clearSession();
     leavingGame = false;
@@ -289,6 +314,8 @@ const Mob = (() => {
     const bar = $('tutorial-bar');
     if (!isTutorial || !state.tutorial) {
       bar.hidden = true;
+      hideTutorialPopup();
+      tutorialPopupShownFor = null;
       applyTutorialHighlight([]);
       return;
     }
@@ -299,6 +326,7 @@ const Mob = (() => {
     if (state.tutorial.completed || idx >= steps.length) {
       applyTutorialHighlight([]);
       bar.hidden = true;
+      hideTutorialPopup();
       if (!tutorialCompletedShown) {
         tutorialCompletedShown = true;
         Sheet.confirm(
@@ -318,6 +346,15 @@ const Mob = (() => {
     $('tutorial-bar-title').textContent = step.title || '';
     $('tutorial-bar-text').textContent = step.text || '';
     applyTutorialHighlight(step.highlight_mobile && step.highlight_mobile.length ? step.highlight_mobile : step.highlight);
+
+    // Al primo aggiornamento di stato per un nuovo passo, mostra il testo in
+    // un popup al centro dello schermo: più difficile da perdere della sola
+    // barra in alto. Si chiude subito dopo per lasciare il campo libero.
+    const stepKey = `${state.tutorial.tutorial_id}:${idx}`;
+    if (tutorialPopupShownFor !== stepKey) {
+      tutorialPopupShownFor = stepKey;
+      showTutorialPopup(step);
+    }
 
     const nextBtn = $('tutorial-bar-next');
     const waitingHint = $('tutorial-bar-waiting');

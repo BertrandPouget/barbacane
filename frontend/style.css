@@ -1831,7 +1831,7 @@ input:focus {
 #tutorial-list-header h2 { color: var(--gold); font-size: 1.2rem; margin: 0; }
 
 .tutorial-list-hint {
-  color: var(--text-dim);
+  color: var(--bg-medium);
   font-style: italic;
   font-size: 0.9rem;
   text-align: center;
@@ -1923,6 +1923,57 @@ input:focus {
 .difficulty-hard   .difficulty-card-title { color: var(--red-light); }
 .difficulty-expert .difficulty-card-title { color: #b388e0; }
 
+/* Popup centrale Tutorial: un passo alla volta, poi si chiude per lasciare
+   il campo libero e permettere di giocare. */
+
+#tutorial-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+#tutorial-popup-overlay.hidden { display: none !important; }
+
+#tutorial-popup-box {
+  background: linear-gradient(160deg, var(--bg-medium), var(--bg-light));
+  border: 2px solid var(--gold);
+  border-radius: 10px;
+  padding: 1.6rem 1.8rem;
+  min-width: 320px;
+  max-width: 460px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  animation: tutorial-popup-in 0.2s ease-out;
+}
+
+@keyframes tutorial-popup-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+#tutorial-popup-title {
+  color: var(--gold-light);
+  font-weight: bold;
+  font-size: 1.25rem;
+  margin-bottom: 0.6rem;
+}
+
+#tutorial-popup-text {
+  color: var(--text);
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+#tutorial-popup-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.2rem;
+}
+
 /* Barra istruzioni tutorial, in partita */
 
 #tutorial-bar {
@@ -1975,24 +2026,24 @@ input:focus {
 .tutorial-highlight {
   position: relative;
   z-index: 6;
-  outline: 4px solid var(--gold-light);
-  outline-offset: 4px;
+  outline: 3px solid var(--gold-light);
+  outline-offset: 3px;
   border-radius: 8px;
-  background-color: rgba(240, 206, 6, 0.14);
-  box-shadow: 0 0 0 4px rgba(240, 206, 6, 0.3), 0 0 32px 10px rgba(240, 206, 6, 0.9);
+  background-color: rgba(240, 206, 6, 0.08);
+  box-shadow: 0 0 0 2px rgba(240, 206, 6, 0.18), 0 0 14px 4px rgba(240, 206, 6, 0.4);
   animation: tutorial-glow 1.1s ease-in-out infinite;
 }
 
 @keyframes tutorial-glow {
   0%, 100% {
     outline-color: var(--gold);
-    outline-offset: 4px;
-    box-shadow: 0 0 0 3px rgba(240, 206, 6, 0.2), 0 0 16px 4px rgba(240, 206, 6, 0.55);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 1px rgba(240, 206, 6, 0.12), 0 0 8px 2px rgba(240, 206, 6, 0.3);
   }
   50% {
     outline-color: var(--gold-light);
-    outline-offset: 6px;
-    box-shadow: 0 0 0 6px rgba(240, 206, 6, 0.4), 0 0 44px 14px rgba(240, 206, 6, 1);
+    outline-offset: 4px;
+    box-shadow: 0 0 0 3px rgba(240, 206, 6, 0.22), 0 0 18px 5px rgba(240, 206, 6, 0.5);
   }
 }
 
