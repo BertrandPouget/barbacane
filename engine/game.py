@@ -731,17 +731,20 @@ def _search_deck_view(state: GameState, condition: dict) -> list:
 
 
 def _available_hordes(player: Player) -> list:
-    """Ritorna le Orde disponibili per il giocatore con info sugli effetti."""
+    """Ritorna le Orde disponibili per il giocatore con info sugli effetti.
+
+    Un'opzione per ciascun Guerriero dell'Orda, senza deduplicare per
+    horde_effect_id: effetti come quello di Patrizio ("+2 GIT a QUESTA
+    carta") si applicano a un Guerriero specifico, quindi ogni copia è una
+    scelta diversa anche se il testo dell'effetto è identico."""
     result = []
     for horde in player.check_horde_with_zones():
         warrior_data = []
-        seen_effects: set = set()
         for w in horde["warriors"]:
             card = get_card(w.base_card_id)
             if not isinstance(card, WarriorCard):
                 continue
-            if card.horde_effect_id and card.horde_effect_id not in seen_effects:
-                seen_effects.add(card.horde_effect_id)
+            if card.horde_effect_id:
                 warrior_data.append({
                     "instance_id": w.instance_id,
                     "base_card_id": w.base_card_id,

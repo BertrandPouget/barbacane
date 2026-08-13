@@ -33,6 +33,12 @@ const App = (() => {
   // True mentre stiamo abbandonando la partita: ignora gli update in arrivo
   let leavingGame = false;
 
+  // True dopo la prima registrazione degli handler WS.on: connectGameWS()
+  // viene richiamata a ogni nuova partita/tutorial, ma gli handler vanno
+  // registrati una sola volta per tutta la vita della pagina (altrimenti si
+  // accumulano e ogni evento viene gestito più volte).
+  let wsHandlersBound = false;
+
   // ---------------------------------------------------------------------------
   // Stato Tutorial
   // ---------------------------------------------------------------------------
@@ -205,13 +211,38 @@ const App = (() => {
     }
   }
 
+  let _tutorialPopupOutsideHandler = null;
+
   function hideTutorialPopup() {
     document.getElementById('tutorial-popup-overlay').classList.add('hidden');
+    if (_tutorialPopupOutsideHandler) {
+      document.removeEventListener('pointerdown', _tutorialPopupOutsideHandler, true);
+      _tutorialPopupOutsideHandler = null;
+    }
+  }
+
+  // Sposta il popup nella metà di schermo OPPOSTA a quella della zona
+  // evidenziata, così non la copre mai (il popup non ha sfondo che oscura il
+  // campo ed è "click-through" fuori dalla card, ma resta comunque meglio
+  // non sovrapporlo a ciò che sta spiegando).
+  function positionTutorialPopup(highlightIds) {
+    const overlay = document.getElementById('tutorial-popup-overlay');
+    overlay.classList.remove('align-top', 'align-bottom');
+    const rects = (highlightIds || [])
+      .map(id => document.getElementById(id))
+      .filter(Boolean)
+      .map(el => el.getBoundingClientRect())
+      .filter(r => r.width > 0 && r.height > 0);
+    if (!rects.length) return;
+    const avgMidY = rects.reduce((sum, r) => sum + (r.top + r.bottom) / 2, 0) / rects.length;
+    overlay.classList.add(avgMidY < window.innerHeight / 2 ? 'align-bottom' : 'align-top');
   }
 
   // Mostra il testo del passo come popup al centro dello schermo: si chiude
   // (Avanti per i passi informativi, "Ho capito" per i passi d'azione) e
-  // lascia il campo libero per giocare.
+  // lascia il campo libero per giocare. L'overlay non ha sfondo che oscura
+  // il campo né cattura i click: la zona evidenziata resta sempre visibile
+  // e utilizzabile anche a popup aperto.
   function showTutorialPopup(step) {
     document.getElementById('tutorial-popup-title').textContent = step.title || '';
     document.getElementById('tutorial-popup-text').textContent = step.text || '';
@@ -223,7 +254,20 @@ const App = (() => {
       btn.textContent = 'Avanti →';
       btn.onclick = () => { hideTutorialPopup(); sendAction('tutorial_next', {}); };
     }
+    positionTutorialPopup(step.highlight);
     document.getElementById('tutorial-popup-overlay').classList.remove('hidden');
+
+    // Se l'utente interagisce col resto del gioco mentre il popup è aperto
+    // (possibile perché non blocca i click), chiudilo da solo: altrimenti
+    // resterebbe visivamente sovrapposto a un modale di scelta successivo
+    // (es. "Attiva Orda"), dando l'impressione di un'interfaccia bloccata.
+    if (_tutorialPopupOutsideHandler) {
+      document.removeEventListener('pointerdown', _tutorialPopupOutsideHandler, true);
+    }
+    _tutorialPopupOutsideHandler = (e) => {
+      if (!e.target.closest('#tutorial-popup-box')) hideTutorialPopup();
+    };
+    document.addEventListener('pointerdown', _tutorialPopupOutsideHandler, true);
   }
 
   function exitTutorial() {
@@ -490,6 +534,8 @@ const App = (() => {
   function connectGameWS() {
     if (!gameId || !myPlayerId) return;
     WS.connect(gameId, myPlayerId);
+    if (wsHandlersBound) return;
+    wsHandlersBound = true;
 
     WS.on('state_update', (msg) => {
       if (msg.state) onStateUpdate(msg.state, msg.action, msg.result);

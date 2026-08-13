@@ -1926,27 +1926,40 @@ input:focus {
 /* Popup centrale Tutorial: un passo alla volta, poi si chiude per lasciare
    il campo libero e permettere di giocare. */
 
+/* Nessuno sfondo che oscura il campo e nessuna cattura dei click sull'overlay:
+   il popup deve restare leggibile e "in cima", ma senza mai bloccare la vista
+   sulla zona evidenziata né impedire di interagire con essa. */
 #tutorial-popup-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.72);
   z-index: 220;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1rem;
+  pointer-events: none;
 }
 
 #tutorial-popup-overlay.hidden { display: none !important; }
 
+/* Se la zona evidenziata è nella metà alta/bassa dello schermo, il popup si
+   sposta nella metà opposta per non coprirla. */
+#tutorial-popup-overlay.align-top    { align-items: flex-start; padding-top: 4.5rem; }
+#tutorial-popup-overlay.align-bottom { align-items: flex-end;   padding-bottom: 2rem; }
+
+/* La card NON cattura click (solo il bottone li cattura, sotto): se in una
+   finestra stretta la card finisce sopra un elemento di gioco cliccabile
+   (es. il bastione avversario), il click deve comunque raggiungerlo invece
+   di essere "rubato" dallo sfondo/testo del popup. */
 #tutorial-popup-box {
+  pointer-events: none;
   background: linear-gradient(160deg, var(--bg-medium), var(--bg-light));
   border: 2px solid var(--gold);
   border-radius: 10px;
   padding: 1.6rem 1.8rem;
   min-width: 320px;
   max-width: 460px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.8);
   animation: tutorial-popup-in 0.2s ease-out;
 }
 
@@ -1973,6 +1986,8 @@ input:focus {
   justify-content: flex-end;
   margin-top: 1.2rem;
 }
+
+#tutorial-popup-action { pointer-events: auto; }
 
 /* Barra istruzioni tutorial, in partita */
 
