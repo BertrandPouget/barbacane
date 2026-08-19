@@ -56,7 +56,12 @@ const App = (() => {
   async function init() {
     await loadCardDefs();
     bindLobbyUI();
-    Renderer.showScreen('lobby');
+    if (sessionStorage.getItem('barbacane-open-tutorial-list')) {
+      sessionStorage.removeItem('barbacane-open-tutorial-list');
+      openTutorialList();
+    } else {
+      Renderer.showScreen('lobby');
+    }
   }
 
   async function loadCardDefs() {
@@ -322,9 +327,9 @@ const App = (() => {
       if (!tutorialCompletedShown) {
         tutorialCompletedShown = true;
         Renderer.showModal(
-          'Tutorial completato! 🎉',
+          'Tutorial completato!',
           'Hai completato questo tutorial. Puoi tornare all\'elenco per provarne un altro, oppure esplorare liberamente.',
-          () => exitTutorial(),
+          () => { sessionStorage.setItem('barbacane-open-tutorial-list', '1'); window.location.reload(); },
         );
         document.getElementById('modal-cancel').classList.add('hidden');
       }

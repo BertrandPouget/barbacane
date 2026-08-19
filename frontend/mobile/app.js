@@ -63,6 +63,11 @@ const Mob = (() => {
     await loadCardDefs();
     bindLobbyUI();
     bindGameChrome();
+    if (sessionStorage.getItem('barbacane-open-tutorial-list')) {
+      sessionStorage.removeItem('barbacane-open-tutorial-list');
+      openTutorialList();
+      return;
+    }
     const resumed = await tryResume();
     if (!resumed) Screens.show('lobby');
   }
@@ -373,11 +378,15 @@ const Mob = (() => {
       hideTutorialPopup();
       if (!tutorialCompletedShown) {
         tutorialCompletedShown = true;
+        const backToTutorialList = () => {
+          sessionStorage.setItem('barbacane-open-tutorial-list', '1');
+          window.location.reload();
+        };
         Sheet.confirm(
-          'Tutorial completato! 🎉',
+          'Tutorial completato!',
           'Hai completato questo tutorial. Torna all\'elenco per provarne un altro, oppure esplora liberamente.',
-          () => exitTutorial(),
-          { yesLabel: 'Torna all\'elenco', noLabel: 'Chiudi', onNo: () => exitTutorial(), locked: true },
+          backToTutorialList,
+          { yesLabel: 'Torna all\'elenco', noLabel: 'Chiudi', onNo: backToTutorialList, locked: true },
         );
       }
       return;
