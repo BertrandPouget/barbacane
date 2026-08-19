@@ -891,8 +891,8 @@ def cuordipietra_effect(
     **kwargs,
 ) -> dict:
     """
-    Base: scegli una Recluta avversaria e aggiungila a un suo Bastione.
-    Prodigio (sostituisce): scegli qualsiasi Guerriero avversario e aggiungilo a un tuo Bastione.
+    Base: scegli una Recluta avversaria e aggiungila ai Muri di un suo Bastione.
+    Prodigio (sostituisce): scegli un Guerriero avversario e aggiungilo ai Muri di un tuo Bastione.
     """
     target = state.get_player(target_player_id) if target_player_id else None
     if target is None:
@@ -909,6 +909,7 @@ def cuordipietra_effect(
         return {"error": "Guerriero bersaglio non specificato"}
 
     warrior_to_move = None
+    source_region_name = None
     source_region = None
 
     regions = [
@@ -920,7 +921,8 @@ def cuordipietra_effect(
         for w in region_list:
             if w.instance_id == target_warrior_iid:
                 warrior_to_move = w
-                source_region = (region_name, region_list)
+                source_region_name = region_name
+                source_region = region_list
                 break
         if warrior_to_move:
             break
@@ -934,21 +936,40 @@ def cuordipietra_effect(
         if not isinstance(card, WarriorCard) or card.subtype != "recruit":
             return {"error": "Con Cuordipietra base puoi spostare solo Reclute"}
 
-    source_region[1].remove(warrior_to_move)
+    source_region.remove(warrior_to_move)
+    target.deactivate_broken_horde(warrior_to_move, source_region_name)
+
+    if warrior_to_move.evolved_from:
+        # Regola standard: se l'Eroe lascia il campo, la Recluta torna in campo con le carte assegnate.
+        from engine.deck import get_base_card_id as _get_base_id
+        recruit_inst = WarriorInstance(
+            instance_id=warrior_to_move.evolved_from,
+            base_card_id=_get_base_id(warrior_to_move.evolved_from),
+            assigned_cards=list(warrior_to_move.assigned_cards),
+            temp_modifiers={},
+        )
+        source_region.append(recruit_inst)
+    else:
+        # Diventando Muro, il Guerriero perde ogni altra funzione: le carte assegnate vanno negli scarti.
+        for ac_iid in warrior_to_move.assigned_cards:
+            state.discard_pile.append(ac_iid)
+
+    from engine.deck import make_wall_instance
+    wall = make_wall_instance(warrior_to_move.instance_id)
 
     if prodigy:
         dest_bastion = player.field.bastion_left if dest_bastion_side == "left" else player.field.bastion_right
-        dest_bastion.warriors.append(warrior_to_move)
-        result = {"warrior_moved": warrior_to_move.instance_id, "to": f"my_{dest_bastion_side}", "from_player": target.id}
+        dest_bastion.walls.append(wall)
+        result = {"warrior_to_wall": wall.instance_id, "to": f"my_{dest_bastion_side}", "from_player": target.id}
     else:
         dest_bastion = target.field.bastion_left if dest_bastion_side == "left" else target.field.bastion_right
-        dest_bastion.warriors.append(warrior_to_move)
-        result = {"warrior_moved": warrior_to_move.instance_id, "to": f"enemy_{dest_bastion_side}", "from_player": target.id}
+        dest_bastion.walls.append(wall)
+        result = {"warrior_to_wall": wall.instance_id, "to": f"enemy_{dest_bastion_side}", "from_player": target.id}
 
     state.recent_events.append({
-        "type": "warrior_moved", "card": "cuordipietra",
+        "type": "warrior_to_wall", "card": "cuordipietra",
         "player_id": player.id, "prodigy": prodigy,
-        "warrior_moved": warrior_to_move.instance_id,
+        "warrior_moved": wall.instance_id,
         "from_player": target.id, "to": result["to"],
     })
     return result

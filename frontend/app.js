@@ -410,6 +410,8 @@ const App = (() => {
           msg = `${pName} — ${cardName}: guerriero scartato`;
         } else if (ev.type === 'warrior_moved') {
           msg = `${pName} — ${cardName}: guerriero spostato`;
+        } else if (ev.type === 'warrior_to_wall') {
+          msg = `${pName} — ${cardName}: guerriero trasformato in Muro`;
         } else if (ev.type === 'wall_moved') {
           const n = ev.moved_walls ? ev.moved_walls.length : 0;
           msg = `${pName} — ${cardName}: ${n} ${n !== 1 ? 'Muri spostati' : 'Muro spostato'}`;
@@ -1305,8 +1307,14 @@ const App = (() => {
       return;
     }
 
+    // Cuordipietra: UI dedicata — scegli un Guerriero avversario (base: solo Reclute) poi il Bastione di destinazione
+    if (def.id === 'cuordipietra') {
+      _showCuordipietraOptions(instanceId, def);
+      return;
+    }
+
     const spellsNeedingTarget = [
-      'ardolancio', 'guerremoto', 'cuordipietra', 'incendifesa',
+      'ardolancio', 'guerremoto', 'incendifesa',
       'regicidio',
     ];
 
@@ -1331,6 +1339,58 @@ const App = (() => {
         instance_id: instanceId,
         target_player_id: targetId,
         target_bastion_side: side,
+      });
+    });
+  }
+
+  // Cuordipietra: base = scegli una Recluta avversaria → diventa Muro in un suo Bastione;
+  // prodigio = scegli qualsiasi Guerriero avversario → diventa Muro in un tuo Bastione.
+  function _showCuordipietraOptions(instanceId, def) {
+    if (!currentState) return;
+    const prodigy = _computeSpellProdigy(def);
+    const opponents = currentState.players.filter(p => p.id !== myPlayerId && p.lives > 0);
+
+    const options = [];
+    opponents.forEach(p => {
+      const zones = [
+        { warriors: p.field.vanguard, label: 'Avanscoperta' },
+        { warriors: p.field.bastion_left.warriors, label: 'Bastione Sinistro' },
+        { warriors: p.field.bastion_right.warriors, label: 'Bastione Destro' },
+      ];
+      zones.forEach(({ warriors, label }) => {
+        (warriors || []).forEach(w => {
+          if (!prodigy && w.subtype !== 'recruit') return;
+          options.push({ label: `${p.name} — ${label} — ${w.name}`, value: `${p.id}:${w.instance_id}` });
+        });
+      });
+    });
+
+    if (options.length === 0) {
+      Renderer.toast(prodigy ? 'Nessun Guerriero avversario disponibile.' : 'Nessuna Recluta avversaria disponibile.', 'error');
+      return;
+    }
+
+    Renderer.showChoiceModal(`${def.name} — scegli un Guerriero`, options, (choice) => {
+      const [targetPlayerId, targetWarriorIid] = choice.split(':');
+      const target = currentState.players.find(p => p.id === targetPlayerId);
+
+      const sideOptions = prodigy
+        ? [
+            { label: 'Muri del mio Bastione Sinistro', value: 'left' },
+            { label: 'Muri del mio Bastione Destro', value: 'right' },
+          ]
+        : [
+            { label: `Muri del Bastione Sinistro di ${target ? target.name : ''}`, value: 'left' },
+            { label: `Muri del Bastione Destro di ${target ? target.name : ''}`, value: 'right' },
+          ];
+
+      Renderer.showChoiceModal(`${def.name} — scegli il Bastione a cui aggiungere il Muro`, sideOptions, (destSide) => {
+        sendAction('play_spell', {
+          instance_id: instanceId,
+          target_player_id: targetPlayerId,
+          target_warrior_iid: targetWarriorIid,
+          dest_bastion_side: destSide,
+        });
       });
     });
   }

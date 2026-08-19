@@ -568,8 +568,8 @@
       "school": "anatema",
       "cost": 2,
       "cost_type": "maga",
-      "base_effect": "Scegli una Recluta avversaria e aggiungila a un suo Bastione.",
-      "prodigy_effect": "Scegli un Guerriero avversario e aggiungilo a un tuo Bastione.",
+      "base_effect": "Scegli una Recluta avversaria e aggiungila ai Muri di un suo Bastione.",
+      "prodigy_effect": "Scegli un Guerriero avversario e aggiungilo ai Muri di un tuo Bastione.",
       "prodigy_is_additive": false,
       "effect_id": "cuordipietra_effect",
       "copies": 3

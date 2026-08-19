@@ -554,6 +554,7 @@ const Mob = (() => {
     if (ev.type === 'life_gained') return `${pName} — ${cardLabel}: +${ev.lives_gained || 0} Vita`;
     if (ev.type === 'warrior_discarded') return `${pName} — ${cardLabel}: guerriero scartato`;
     if (ev.type === 'warrior_moved') return `${pName} — ${cardLabel}: guerriero spostato`;
+    if (ev.type === 'warrior_to_wall') return `${pName} — ${cardLabel}: guerriero trasformato in Muro`;
     if (ev.type === 'wall_moved') {
       const n = ev.moved_walls ? ev.moved_walls.length : 0;
       return `${pName} — ${cardLabel}: ${n} ${n !== 1 ? 'Muri spostati' : 'Muro spostato'}`;
@@ -937,6 +938,8 @@ const Mob = (() => {
       return;
     }
 
+    if (def.id === 'cuordipietra') { showCuordipietraOptions(iid, def, prodigy); return; }
+
     if (def.id === 'bastioncontrario') { showBastioncontrarioOptions(iid, def, prodigy); return; }
 
     if (def.id === 'malcomune') {
@@ -962,7 +965,7 @@ const Mob = (() => {
       return;
     }
 
-    const spellsNeedingTarget = ['ardolancio', 'guerremoto', 'cuordipietra', 'incendifesa', 'regicidio'];
+    const spellsNeedingTarget = ['ardolancio', 'guerremoto', 'incendifesa', 'regicidio'];
     if (!spellsNeedingTarget.includes(def.id) || opponents.length === 0) {
       const effText = prodigy && def.prodigy_effect
         ? (def.prodigy_is_additive ? `${def.base_effect}<br><b style="color:var(--gold)">✨ Prodigio:</b> ${def.prodigy_effect}` : `<b style="color:var(--gold)">✨ Prodigio:</b> ${def.prodigy_effect}`)
@@ -987,6 +990,54 @@ const Mob = (() => {
     Sheet.choice(`${def.name} — scegli bersaglio`, options, (choice) => {
       const [targetId, side] = choice.split(':');
       sendAction('play_spell', { instance_id: iid, target_player_id: targetId, target_bastion_side: side });
+    });
+  }
+
+  function showCuordipietraOptions(iid, def, prodigy) {
+    const opponents = currentState.players.filter(p => p.id !== myPlayerId && p.lives > 0);
+    const options = [];
+    opponents.forEach(p => {
+      const zones = [
+        { warriors: p.field.vanguard, label: 'Avanscoperta' },
+        { warriors: p.field.bastion_left.warriors, label: 'Bastione Sin.' },
+        { warriors: p.field.bastion_right.warriors, label: 'Bastione Des.' },
+      ];
+      zones.forEach(({ warriors, label }) => {
+        (warriors || []).forEach(w => {
+          if (!prodigy && w.subtype !== 'recruit') return;
+          options.push({
+            icon: '🗡️',
+            label: w.name || w.base_card_id,
+            sub: `${p.name} — ${label} · 🗡️${w.att} 🏹${w.git} 🛡️${w.dif}`,
+            value: `${p.id}:${w.instance_id}`,
+          });
+        });
+      });
+    });
+    if (options.length === 0) {
+      Toast.show(prodigy ? 'Nessun Guerriero avversario disponibile.' : 'Nessuna Recluta avversaria disponibile.', 'error');
+      return;
+    }
+    Sheet.choice(`${def.name} — scegli un Guerriero`, options, (choice) => {
+      const [targetPlayerId, targetWarriorIid] = choice.split(':');
+      const target = currentState.players.find(p => p.id === targetPlayerId);
+      const sideOptions = prodigy
+        ? [
+            { icon: '🏰', label: 'Muri — Bastione Sin. mio', value: 'left' },
+            { icon: '🏰', label: 'Muri — Bastione Des. mio', value: 'right' },
+          ]
+        : [
+            { icon: '🏰', label: `Muri — Bastione Sin. di ${target ? target.name : ''}`, value: 'left' },
+            { icon: '🏰', label: `Muri — Bastione Des. di ${target ? target.name : ''}`, value: 'right' },
+          ];
+      Sheet.choice(`${def.name} — scegli il Bastione a cui aggiungere il Muro`, sideOptions, (destSide) => {
+        sendAction('play_spell', {
+          instance_id: iid,
+          target_player_id: targetPlayerId,
+          target_warrior_iid: targetWarriorIid,
+          dest_bastion_side: destSide,
+        });
+      });
     });
   }
 
