@@ -750,21 +750,22 @@ def guerremoto_effect(
 ) -> dict:
     """
     Base: questo turno la Battaglia può essere giocata contro qualsiasi Bastione.
-    Prodigio (additivo &): aggiungi +2 al risultato dei Danni.
+    Prodigio (additivo &): prima del calcolo dei Danni, scarta fino a 2 Muri
+    casuali dal Bastione selezionato.
     """
-    damage_bonus = 2 if prodigy else 0
+    discard_walls = 2 if prodigy else 0
     player.active_effects.append({
         "type": "guerremoto",
         "any_target": True,
-        "damage_bonus": damage_bonus,
+        "discard_walls": discard_walls,
         "expires": "end_of_turn",
     })
     state.recent_events.append({
         "type": "effect", "card": "guerremoto",
         "player_id": player.id, "prodigy": prodigy,
-        "any_target": True, "damage_bonus": damage_bonus,
+        "any_target": True, "discard_walls": discard_walls,
     })
-    return {"any_target": True, "damage_bonus": damage_bonus}
+    return {"any_target": True, "discard_walls": discard_walls}
 
 
 @register_effect("arrampicarta_effect")

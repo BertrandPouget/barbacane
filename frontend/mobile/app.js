@@ -455,7 +455,8 @@ const Mob = (() => {
         const defName = playerName(result.defender_id);
         const side = result.defender_bastion === 'left' ? 'Sinistro' : 'Destro';
         Render.logPush(`⚔️ ${attName} → ${defName} [Bastione ${side}]: ` +
-          `${result.total_damage} Danni, ${result.walls_destroyed} Muri, ${result.life_lost} Vita`);
+          `${result.total_damage} Danni, ${result.walls_destroyed} Muri, ${result.life_lost} Vita` +
+          (result.walls_discarded_guerremoto ? ` (+${result.walls_discarded_guerremoto} Muri scartati da Guerremoto)` : ''));
       }
 
       // Eracle: distruggi una costruzione avversaria
@@ -588,7 +589,7 @@ const Mob = (() => {
     if (ev.type === 'effect') {
       const E = {
         magiscudo: 'Magiscudo: immune alle Magie',
-        guerremoto: `Guerremoto: attacco a qualsiasi Bastione${ev.damage_bonus ? ` +${ev.damage_bonus} Danni` : ''}`,
+        guerremoto: `Guerremoto: attacco a qualsiasi Bastione${ev.discard_walls ? `, scarta fino a ${ev.discard_walls} Muri prima dei Danni` : ''}`,
         divinazione: 'Divinazione: Mana extra al prossimo turno',
         dazipazzi: `Dazipazzi: ${ev.reset_buildings ? ev.reset_buildings.length : 0} costruzioni ripristinate`,
         fucina: `Fucina: ${ev.extra_action ? 'azione extra' : 'azione extra (D10)'}`,
@@ -965,7 +966,7 @@ const Mob = (() => {
       return;
     }
 
-    const spellsNeedingTarget = ['ardolancio', 'guerremoto', 'incendifesa', 'regicidio'];
+    const spellsNeedingTarget = ['ardolancio', 'incendifesa', 'regicidio'];
     if (!spellsNeedingTarget.includes(def.id) || opponents.length === 0) {
       const effText = prodigy && def.prodigy_effect
         ? (def.prodigy_is_additive ? `${def.base_effect}<br><b style="color:var(--gold)">✨ Prodigio:</b> ${def.prodigy_effect}` : `<b style="color:var(--gold)">✨ Prodigio:</b> ${def.prodigy_effect}`)

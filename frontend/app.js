@@ -355,7 +355,8 @@ const App = (() => {
         const defName = (state.players.find(p => p.id === result.defender_id) || {}).name || result.defender_id;
         const bastionSide = result.defender_bastion === 'left' ? 'Sinistro' : 'Destro';
         const log = `⚔ ${attName} → ${defName} [Bastione ${bastionSide}]: `
-          + `${result.total_damage} Danni, ${result.walls_destroyed} Muri, ${result.life_lost} Vita`;
+          + `${result.total_damage} Danni, ${result.walls_destroyed} Muri, ${result.life_lost} Vita`
+          + (result.walls_discarded_guerremoto ? ` (+${result.walls_discarded_guerremoto} Muri scartati da Guerremoto)` : '');
         Renderer.updateBattleLog(log);
       }
 
@@ -446,7 +447,7 @@ const App = (() => {
           msg = `${pName} — ${cardLabel} annullata: ${blockedName} è protetto da Magiscudo`;
         } else if (ev.type === 'effect') {
           if (ev.card === 'magiscudo') msg = `${pName} — Magiscudo: immune alle Magie`;
-          else if (ev.card === 'guerremoto') msg = `${pName} — Guerremoto: attacco a qualsiasi Bastione${ev.damage_bonus ? ` +${ev.damage_bonus} Danni` : ''}`;
+          else if (ev.card === 'guerremoto') msg = `${pName} — Guerremoto: attacco a qualsiasi Bastione${ev.discard_walls ? `, scarta fino a ${ev.discard_walls} Muri prima dei Danni` : ''}`;
           else if (ev.card === 'divinazione') msg = `${pName} — Divinazione: Mana extra al prossimo turno`;
           else if (ev.card === 'dazipazzi') msg = `${pName} — Dazipazzi: ${ev.reset_buildings ? ev.reset_buildings.length : 0} costruzioni ripristinate`;
           else if (ev.card === 'fucina') msg = `${pName} — Fucina: ${ev.extra_action ? 'azione extra' : 'azione extra (D10)'}`;
@@ -1314,7 +1315,7 @@ const App = (() => {
     }
 
     const spellsNeedingTarget = [
-      'ardolancio', 'guerremoto', 'incendifesa',
+      'ardolancio', 'incendifesa',
       'regicidio',
     ];
 

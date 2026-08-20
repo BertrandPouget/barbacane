@@ -527,7 +527,7 @@
       "cost": 1,
       "cost_type": "maga",
       "base_effect": "Questo turno la Battaglia può essere giocata contro un Bastione qualsiasi.",
-      "prodigy_effect": "& Aggiungi 2 Danni al risultato.",
+      "prodigy_effect": "& Prima del calcolo dei Danni, scarta fino a 2 Muri casuali dal Bastione selezionato.",
       "prodigy_is_additive": true,
       "effect_id": "guerremoto_effect",
       "copies": 4
@@ -624,8 +624,8 @@
       "school": "sortilegio",
       "cost": 2,
       "cost_type": "maga",
-      "base_effect": "Sposta fino a 3 Muri da un tuo Bastione all'altro.",
-      "prodigy_effect": "Sposta fino a 3 Muri da un Bastione a uno adiacente.",
+      "base_effect": "Sposta fino a 3 Muri casuali da un tuo Bastione all'altro.",
+      "prodigy_effect": "Sposta fino a 3 Muri casuali da un Bastione a uno adiacente.",
       "prodigy_is_additive": false,
       "effect_id": "telecinesi_effect",
       "copies": 3
