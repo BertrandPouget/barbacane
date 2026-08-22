@@ -1308,6 +1308,60 @@ const App = (() => {
       return;
     }
 
+    // Equipotenza: base = scegli un tuo Guerriero (ATT/DIF = valore maggiore dei due);
+    // prodigio (additivo): scegli anche un Guerriero qualsiasi, proprio o avversario (ATT/DIF = valore minore).
+    if (def.id === 'equipotenza') {
+      const me = currentState.players.find(p => p.id === myPlayerId);
+      const ownZones = [
+        { warriors: me.field.vanguard, label: 'Avanscoperta' },
+        { warriors: me.field.bastion_left.warriors, label: 'Bastione Sinistro' },
+        { warriors: me.field.bastion_right.warriors, label: 'Bastione Destro' },
+      ];
+      const ownOptions = [];
+      ownZones.forEach(({ warriors, label }) => {
+        (warriors || []).forEach(w => {
+          const wDef = getCardDef(w.instance_id);
+          ownOptions.push({ label: `${label} — ${wDef ? wDef.name : w.instance_id}`, value: w.instance_id });
+        });
+      });
+      if (ownOptions.length === 0) {
+        Renderer.toast('Non hai nessun Guerriero in campo.', 'error');
+        return;
+      }
+      const prodigy = _computeSpellProdigy(def);
+      Renderer.showChoiceModal(`${def.name} — scegli un tuo Guerriero (ATT/DIF al valore maggiore)`, ownOptions, (ownIid) => {
+        if (!prodigy) {
+          sendAction('play_spell', { instance_id: instanceId, own_warrior_iid: ownIid });
+          return;
+        }
+        const allOptions = [];
+        currentState.players.filter(p => p.lives > 0).forEach(p => {
+          const zones = [
+            { warriors: p.field.vanguard, label: 'Avanscoperta' },
+            { warriors: p.field.bastion_left.warriors, label: 'Bastione Sinistro' },
+            { warriors: p.field.bastion_right.warriors, label: 'Bastione Destro' },
+          ];
+          zones.forEach(({ warriors, label }) => {
+            (warriors || []).forEach(w => {
+              const wDef = getCardDef(w.instance_id);
+              allOptions.push({
+                label: `${p.id === myPlayerId ? 'Tu' : p.name} — ${label} — ${wDef ? wDef.name : w.instance_id}`,
+                value: w.instance_id,
+              });
+            });
+          });
+        });
+        if (allOptions.length === 0) {
+          sendAction('play_spell', { instance_id: instanceId, own_warrior_iid: ownIid });
+          return;
+        }
+        Renderer.showChoiceModal(`${def.name} — scegli un Guerriero (ATT/DIF al valore minore)`, allOptions, (enemyIid) => {
+          sendAction('play_spell', { instance_id: instanceId, own_warrior_iid: ownIid, enemy_warrior_iid: enemyIid });
+        });
+      });
+      return;
+    }
+
     // Cuordipietra: UI dedicata — scegli un Guerriero avversario (base: solo Reclute) poi il Bastione di destinazione
     if (def.id === 'cuordipietra') {
       _showCuordipietraOptions(instanceId, def);

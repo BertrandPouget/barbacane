@@ -256,6 +256,22 @@ def _process_deferred_effects(state: GameState, player: Player) -> None:
             if count > 0:
                 player.mana_remaining += count
                 _apply_scrigno_bonus(player, count)
+        elif etype == "equipotenza_own":
+            warrior_iid = eff.get("warrior_iid")
+            for w in player.all_warriors():
+                if w.instance_id == warrior_iid:
+                    w.temp_modifiers["att"] = w.temp_modifiers.get("att", 0) - eff.get("att_delta", 0)
+                    w.temp_modifiers["dif"] = w.temp_modifiers.get("dif", 0) - eff.get("dif_delta", 0)
+                    break
+        elif etype == "equipotenza_enemy":
+            warrior_iid = eff.get("warrior_iid")
+            target_player = state.get_player(eff.get("target_player_id"))
+            if target_player:
+                for w in target_player.all_warriors():
+                    if w.instance_id == warrior_iid:
+                        w.temp_modifiers["att"] = w.temp_modifiers.get("att", 0) - eff.get("att_delta", 0)
+                        w.temp_modifiers["dif"] = w.temp_modifiers.get("dif", 0) - eff.get("dif_delta", 0)
+                        break
         to_remove.append(eff)
     for eff in to_remove:
         player.active_effects.remove(eff)

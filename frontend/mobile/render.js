@@ -207,6 +207,8 @@ const Render = (() => {
     const myIndex = state.players.findIndex(pp => pp.id === myId);
     const leftNb = state.players[(myIndex - 1 + n) % n];
     const rightNb = state.players[(myIndex + 1) % n];
+    const me = state.players[myIndex];
+    const guerremoto = !!me && (me.active_effects || []).some(e => e.type === 'guerremoto' && e.any_target);
 
     state.players.forEach(p => {
       if (p.id === myId) return;
@@ -216,8 +218,9 @@ const Render = (() => {
       // Bastione destro di X è adiacente al Bastione sinistro di X+1:
       // se p è il mio vicino di destra posso colpire il suo Bastione S.,
       // se p è il mio vicino di sinistra posso colpire il suo Bastione D.
-      const canHitLeft = p.id === rightNb.id;
-      const canHitRight = p.id === leftNb.id;
+      // Con Guerremoto attivo (any_target) tutti i Bastioni sono bersagli validi.
+      const canHitLeft = guerremoto || p.id === rightNb.id;
+      const canHitRight = guerremoto || p.id === leftNb.id;
 
       const chip = el('button', {
         className: `opp-chip${isTurn ? ' turn' : ''}${dead ? ' dead' : ''}`,

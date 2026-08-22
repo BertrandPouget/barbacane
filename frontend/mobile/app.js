@@ -939,6 +939,52 @@ const Mob = (() => {
       return;
     }
 
+    if (def.id === 'equipotenza') {
+      const my = me();
+      const zoneLabels = { vanguard: 'Avanscoperta', bastion_left: 'Bastione Sin.', bastion_right: 'Bastione Des.' };
+      const ownOptions = [];
+      ['vanguard', 'bastion_left', 'bastion_right'].forEach(reg => {
+        const warriors = reg === 'vanguard'
+          ? my.field.vanguard
+          : (reg === 'bastion_left' ? my.field.bastion_left.warriors : my.field.bastion_right.warriors);
+        (warriors || []).forEach(w => {
+          ownOptions.push({ icon: '🗡️', label: w.name || w.base_card_id, sub: zoneLabels[reg], value: w.instance_id });
+        });
+      });
+      if (ownOptions.length === 0) { Toast.show('Non hai nessun Guerriero in campo.', 'error'); return; }
+      Sheet.choice(
+        `${def.name} — scegli un tuo Guerriero`,
+        ownOptions,
+        (ownIid) => {
+          if (!prodigy) { sendAction('play_spell', { instance_id: iid, own_warrior_iid: ownIid }); return; }
+          const allOptions = [];
+          currentState.players.filter(p => p.lives > 0).forEach(p => {
+            ['vanguard', 'bastion_left', 'bastion_right'].forEach(reg => {
+              const warriors = reg === 'vanguard'
+                ? p.field.vanguard
+                : (reg === 'bastion_left' ? p.field.bastion_left.warriors : p.field.bastion_right.warriors);
+              (warriors || []).forEach(w => {
+                allOptions.push({
+                  icon: '🗡️',
+                  label: w.name || w.base_card_id,
+                  sub: `${p.id === myPlayerId ? 'Tu' : p.name} — ${zoneLabels[reg]}`,
+                  value: w.instance_id,
+                });
+              });
+            });
+          });
+          if (allOptions.length === 0) { sendAction('play_spell', { instance_id: iid, own_warrior_iid: ownIid }); return; }
+          Sheet.choice(
+            `${def.name} — scegli un Guerriero (ATT/DIF al valore minore)`,
+            allOptions,
+            (enemyIid) => sendAction('play_spell', { instance_id: iid, own_warrior_iid: ownIid, enemy_warrior_iid: enemyIid }),
+          );
+        },
+        { subtitle: 'ATT e DIF diventano pari al valore maggiore dei due' },
+      );
+      return;
+    }
+
     if (def.id === 'cuordipietra') { showCuordipietraOptions(iid, def, prodigy); return; }
 
     if (def.id === 'bastioncontrario') { showBastioncontrarioOptions(iid, def, prodigy); return; }

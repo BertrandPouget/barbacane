@@ -592,17 +592,18 @@ def equipotenza_effect(
         own_w = _find_warrior_in_all(player, own_warrior_iid)
         if own_w:
             high = max(own_w.effective_att(), own_w.effective_dif())
-            base_att = own_w.base_card_id and __import__("engine.cards", fromlist=["CARD_REGISTRY"]).CARD_REGISTRY.get(own_w.base_card_id)
             from engine.cards import CARD_REGISTRY
             base_card = CARD_REGISTRY.get(own_w.base_card_id)
             if base_card:
+                att_delta = (high - base_card.att) - own_w.temp_modifiers.get("att", 0)
+                dif_delta = (high - base_card.dif) - own_w.temp_modifiers.get("dif", 0)
                 own_w.temp_modifiers["att"] = high - base_card.att
                 own_w.temp_modifiers["dif"] = high - base_card.dif
                 player.active_effects.append({
                     "type": "equipotenza_own",
                     "warrior_iid": own_warrior_iid,
-                    "att_was": own_w.temp_modifiers.get("att", 0),
-                    "dif_was": own_w.temp_modifiers.get("dif", 0),
+                    "att_delta": att_delta,
+                    "dif_delta": dif_delta,
                     "expires": "start_of_next_own_turn",
                 })
                 result["own_equalized"] = {"warrior": own_warrior_iid, "value": high}
@@ -621,8 +622,18 @@ def equipotenza_effect(
                 from engine.cards import CARD_REGISTRY
                 base_card = CARD_REGISTRY.get(enemy_w.base_card_id)
                 if base_card:
+                    att_delta = (low - base_card.att) - enemy_w.temp_modifiers.get("att", 0)
+                    dif_delta = (low - base_card.dif) - enemy_w.temp_modifiers.get("dif", 0)
                     enemy_w.temp_modifiers["att"] = low - base_card.att
                     enemy_w.temp_modifiers["dif"] = low - base_card.dif
+                    player.active_effects.append({
+                        "type": "equipotenza_enemy",
+                        "warrior_iid": enemy_warrior_iid,
+                        "target_player_id": p.id,
+                        "att_delta": att_delta,
+                        "dif_delta": dif_delta,
+                        "expires": "start_of_next_own_turn",
+                    })
                     result["enemy_equalized"] = {"warrior": enemy_warrior_iid, "player": p.id, "value": low}
                 break
 

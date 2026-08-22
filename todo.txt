@@ -1,0 +1,5 @@
+1. Assegnazioni (Trono, Arrampicarta, Regicidio)
+2. Testare Orde
+2.1 Rigenerare le carte con testi aggiornati
+3. Sistemare e mergiare Tutorial/Bot
+4. Revamp UI Desktop
