@@ -241,7 +241,7 @@ function renderCard(card, names){
   if(names) NAMES=names;
   const stage=document.getElementById('stage');
   if(card.type==='back'){
-    stage.innerHTML=`<div class="card" id="card" style="background:#62370a"><div class="inner" style="background:url(back.png) center/cover"></div></div>`;
+    stage.innerHTML=`<div class="card" id="card" style="background:#62370a"><div class="inner" style="background:url(retro_logo.png) center/cover, url(sfondo.png) center/cover"></div></div>`;
     return stage.querySelector('#card');
   }
   const frame = card.type==='spell' ? '#123a52' : (card.type==='building' ? '#245e33' : '#7a0000');

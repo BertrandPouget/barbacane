@@ -9,7 +9,7 @@ output/         ← PNG carte finali → usati dal frontend di Barbacane
 lib/            ← libreria condivisa: cards_data.py, image_ops.py, render.py
 assets/
   card.html     ← il renderer: unica fonte di verità per la grafica delle carte
-  sfondo.png, esagono*.png, stella*.png, spade.png, back.png  ← texture/icone usate da card.html
+  sfondo.png, esagono*.png, stella*.png, spade.png, retro_logo.png  ← texture/icone usate da card.html
 ```
 
 Gli script numerati (`1_prepare_images.py`, `2_generate_cards.py`, `3_make_print_pdf.py`) sono CLI sottili: la logica di image processing e rendering vive in `lib/`.
