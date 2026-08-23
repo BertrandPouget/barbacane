@@ -120,12 +120,44 @@ def _discard_warrior_from_player(state: GameState, player: Player, warrior_iid: 
                         temp_modifiers={},
                     )
                     region.append(recruit_inst)
+                    _reassign_buildings(player, recruit_inst.instance_id, w.assigned_cards)
                 else:
-                    for ac_iid in w.assigned_cards:
-                        state.discard_pile.append(ac_iid)
+                    _discard_assigned_cards(state, player, w.assigned_cards)
                 state.discard_pile.append(w.instance_id)
                 return True
     return False
+
+
+def _reassign_buildings(player: Player, new_warrior_iid: str, assigned_cards: List[str]) -> None:
+    """Aggiorna il riferimento assigned_warrior delle Costruzioni assegnate (es. Trono)
+    quando un Eroe scartato lascia il posto alla sua Recluta, che eredita le carte assegnate."""
+    for ac_iid in assigned_cards:
+        for b in player.field.village.buildings:
+            if b.instance_id == ac_iid:
+                b.assigned_warrior = new_warrior_iid
+                break
+
+
+def _discard_assigned_cards(state: GameState, player: Player, assigned_cards: List[str]) -> None:
+    """Scarta le carte assegnate a una Recluta che viene scartata.
+    Se una carta assegnata è una Costruzione (es. Trono), va rimossa anche dal Villaggio."""
+    for ac_iid in assigned_cards:
+        b_inst = next((b for b in player.field.village.buildings if b.instance_id == ac_iid), None)
+        if b_inst:
+            player.field.village.buildings.remove(b_inst)
+        state.discard_pile.append(ac_iid)
+
+
+def _unassign_building(player: Player, b_inst: BuildingInstance) -> None:
+    """Scollega una Costruzione assegnata dal Guerriero a cui era assegnata
+    (usato quando la Costruzione viene rimossa dal campo direttamente, es. Trono scartato)."""
+    if not b_inst.assigned_warrior:
+        return
+    for w in player.all_warriors():
+        if b_inst.instance_id in w.assigned_cards:
+            w.assigned_cards.remove(b_inst.instance_id)
+            break
+    b_inst.assigned_warrior = None
 
 
 def _find_warrior_in_all(player: Player, warrior_iid: str) -> Optional[WarriorInstance]:
@@ -422,15 +454,23 @@ def trono_effect(
     Base: assegna questa carta a un Guerriero.
     Complete: l'effetto Orda del Guerriero assegnato è sempre attivo.
     """
-    if not target_warrior_iid:
+    if not target_warrior_iid or not building_instance_id:
         return {"error": "Guerriero bersaglio non specificato"}
 
     target_w = _find_warrior_in_all(player, target_warrior_iid)
     if not target_w:
         return {"error": "Guerriero bersaglio non trovato"}
 
-    if building_instance_id and building_instance_id not in target_w.assigned_cards:
+    b_inst = next(
+        (b for b in player.field.village.buildings if b.instance_id == building_instance_id),
+        None,
+    )
+    if not b_inst:
+        return {"error": "Trono non trovato nel Villaggio"}
+
+    if building_instance_id not in target_w.assigned_cards:
         target_w.assigned_cards.append(building_instance_id)
+    b_inst.assigned_warrior = target_warrior_iid
 
     result: dict = {"assigned_to": target_warrior_iid}
 
@@ -438,13 +478,13 @@ def trono_effect(
         from engine.cards import get_card, WarriorCard
         card = get_card(target_w.base_card_id)
         if isinstance(card, WarriorCard) and card.horde_effect_id:
-            player.active_effects.append({
-                "type": "trono_horde_active",
-                "warrior_iid": target_warrior_iid,
-                "horde_effect_id": card.horde_effect_id,
-                "expires": "permanent",
-            })
+            # L'effetto Orda diventa sempre attivo: si attiva subito (come una
+            # normale attivazione manuale) e verrà ri-attivato automaticamente
+            # a ogni inizio turno del giocatore (vedi _trigger_building_start).
+            target_w.horde_active = True
+            horde_result = apply_effect(card.horde_effect_id, state, player, warrior_iid=target_warrior_iid)
             result["horde_always_active"] = card.horde_effect_id
+            result["horde_effect_result"] = horde_result
 
     state.recent_events.append({
         "type": "effect", "card": "trono",
@@ -1677,6 +1717,7 @@ def joseph_horde(state: GameState, player: Player, warrior_iid: Optional[str] = 
                 continue
             to_remove = [b for b in p.field.village.buildings if b.base_card_id == "trono"]
             for b in to_remove:
+                _unassign_building(p, b)
                 p.field.village.buildings.remove(b)
                 state.discard_pile.append(b.instance_id)
                 discarded.append({"player": p.id, "trono": b.instance_id})

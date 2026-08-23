@@ -1025,6 +1025,7 @@ const App = (() => {
 
     // Recupera dati contestuali dallo stato
     let fieldWarrior = null;
+    let fieldWarriorOwnerId = null;
     let fieldBuilding = null;
     if (currentState) {
       for (const player of currentState.players) {
@@ -1033,7 +1034,7 @@ const App = (() => {
           ...(player.field.bastion_left.warriors || []),
           ...(player.field.bastion_right.warriors || []),
         ].find(w => w.instance_id === instanceId);
-        if (w) { fieldWarrior = w; break; }
+        if (w) { fieldWarrior = w; fieldWarriorOwnerId = player.id; break; }
 
         const b = (player.field.village.buildings || []).find(b => b.instance_id === instanceId);
         if (b) { fieldBuilding = b; break; }
@@ -1094,6 +1095,18 @@ const App = (() => {
       }
     }
 
+    // Carte assegnate (es. Trono): visibili su qualsiasi Guerriero, proprio o avversario
+    if ((source === 'field' || source === 'opponent') && fieldWarrior && fieldWarrior.assigned_cards && fieldWarrior.assigned_cards.length > 0) {
+      extraButtons.push({
+        label: 'Carte assegnate',
+        className: 'btn-secondary',
+        onClick: () => {
+          Renderer.closeCardDetail();
+          _showAssignedCardsSlideshow(instanceId, fieldWarriorOwnerId, 0);
+        },
+      });
+    }
+
     // Bottone Scarta: disponibile per le proprie carte (mano, campo, villaggio) in qualsiasi momento
     let onDiscard = null;
     if (source === 'hand' || source === 'field' || source === 'village') {
@@ -1142,12 +1155,35 @@ const App = (() => {
     } else if (def.type === 'spell') {
       _showSpellOptions(instanceId, def);
     } else if (def.type === 'building') {
+      if (def.id === 'trono') {
+        _showTronoPlayOptions(instanceId, def);
+        return;
+      }
       Renderer.showModal(
         `Costruisci ${def.name}`,
         `Costo: <strong>${def.cost} Mana</strong><br>${def.base_effect || ''}`,
         () => sendAction('play_building', { instance_id: instanceId }),
       );
     }
+  }
+
+  // Trono: richiede la scelta immediata del Guerriero a cui assegnarlo
+  function _showTronoPlayOptions(instanceId, def) {
+    const myPlayer = currentState.players.find(p => p.id === myPlayerId);
+    const warriors = myPlayer ? _getAllWarriors(myPlayer) : [];
+    if (warriors.length === 0) {
+      Renderer.toast('Non hai nessun Guerriero in campo a cui assegnare il Trono.', 'error');
+      return;
+    }
+    const options = warriors.map(w => ({
+      label: `${w.name} (ATT ${w.att}  GIT ${w.git}  DIF ${w.dif})`,
+      value: w.instance_id,
+    }));
+    Renderer.showChoiceModal(
+      `Costruisci ${def.name} — scegli il Guerriero`,
+      options,
+      (warriorIid) => sendAction('play_building', { instance_id: instanceId, target_warrior_iid: warriorIid }),
+    );
   }
 
   function _showHeroPlayOptions(instanceId, def) {
@@ -2278,6 +2314,73 @@ const App = (() => {
       null,
       null,
       [],
+      navOptions,
+      def ? def.id : null
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Slideshow carte assegnate (es. Trono assegnato a un Guerriero)
+  // ---------------------------------------------------------------------------
+
+  function _findWarriorByIid(playerId, warriorIid) {
+    if (!currentState) return null;
+    const player = currentState.players.find(p => p.id === playerId);
+    if (!player) return null;
+    return [
+      ...(player.field.vanguard || []),
+      ...(player.field.bastion_left.warriors || []),
+      ...(player.field.bastion_right.warriors || []),
+    ].find(w => w.instance_id === warriorIid) || null;
+  }
+
+  function _showAssignedCardsSlideshow(warriorIid, ownerPlayerId, idx) {
+    const warrior = _findWarriorByIid(ownerPlayerId, warriorIid);
+    if (!warrior) return;
+    const assignedCards = warrior.assigned_cards || [];
+    if (assignedCards.length === 0) return;
+
+    const ac = assignedCards[idx];
+    const def = getCardDef(ac.instance_id);
+    const bodyHTML = cardDetailBodyHTML(def, ac.instance_id, null, ac.type === 'building' ? ac : null);
+
+    const isMyTurn = currentState && currentState.current_player_id === myPlayerId;
+    const isMine = ownerPlayerId === myPlayerId;
+
+    let actionLabel = null;
+    let onAction = null;
+    if (ac.type === 'building' && ac.completed === false && isMine && isMyTurn) {
+      actionLabel = 'Completa';
+      onAction = () => {
+        Renderer.closeCardDetail();
+        sendAction('complete_building', { building_instance_id: ac.instance_id });
+      };
+    }
+
+    // Badge di stato (informativo, non cliccabile): visibile sia in modalità
+    // immagine che testo, dove il corpo testuale con lo stato non compare.
+    const extraButtons = [];
+    if (ac.type === 'building') {
+      extraButtons.push({
+        label: ac.completed ? '✓ Completa' : '○ Incompleta',
+        className: 'btn-secondary',
+        disabled: true,
+        onClick: () => {},
+      });
+    }
+
+    const navOptions = {
+      onPrev: idx > 0 ? () => _showAssignedCardsSlideshow(warriorIid, ownerPlayerId, idx - 1) : null,
+      onNext: idx < assignedCards.length - 1 ? () => _showAssignedCardsSlideshow(warriorIid, ownerPlayerId, idx + 1) : null,
+    };
+
+    Renderer.showCardDetail(
+      `📌 Assegnata ${idx + 1} / ${assignedCards.length}${def ? ' — ' + def.name : ''}`,
+      bodyHTML,
+      actionLabel,
+      onAction,
+      null,
+      extraButtons,
       navOptions,
       def ? def.id : null
     );

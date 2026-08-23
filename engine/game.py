@@ -193,6 +193,18 @@ def _trigger_building_start(state: GameState, player: Player) -> None:
         elif base_id == "fucina" and b_inst.completed:
             # Fucina completata: 3a Azione garantita ogni turno
             player.actions_remaining += 1
+        elif base_id == "trono" and b_inst.completed and b_inst.assigned_warrior:
+            # Trono completo: l'effetto Orda del Guerriero assegnato è sempre
+            # attivo, si ri-attiva automaticamente a ogni inizio turno.
+            target_w = next(
+                (w for w in player.all_warriors() if w.instance_id == b_inst.assigned_warrior),
+                None,
+            )
+            if target_w:
+                w_card = get_card(target_w.base_card_id)
+                if isinstance(w_card, WarriorCard) and w_card.horde_effect_id:
+                    target_w.horde_active = True
+                    apply_effect(w_card.horde_effect_id, state, player, warrior_iid=target_w.instance_id)
 
 
 def _trigger_building_end(state: GameState, player: Player) -> int:
@@ -611,14 +623,14 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
             "hand_count": len(p.hand),
             "hand": p.hand if p.id == viewer_player_id else None,
             "field": {
-                "vanguard": [_warrior_view(w) for w in p.field.vanguard],
+                "vanguard": [_warrior_view(w, p) for w in p.field.vanguard],
                 "bastion_left": {
                     "wall_count": len(p.field.bastion_left.walls),
                     "walls": (
                         [w.instance_id for w in p.field.bastion_left.walls]
                         if p.id == viewer_player_id else None
                     ),
-                    "warriors": [_warrior_view(w) for w in p.field.bastion_left.warriors],
+                    "warriors": [_warrior_view(w, p) for w in p.field.bastion_left.warriors],
                 },
                 "bastion_right": {
                     "wall_count": len(p.field.bastion_right.walls),
@@ -626,7 +638,7 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
                         [w.instance_id for w in p.field.bastion_right.walls]
                         if p.id == viewer_player_id else None
                     ),
-                    "warriors": [_warrior_view(w) for w in p.field.bastion_right.warriors],
+                    "warriors": [_warrior_view(w, p) for w in p.field.bastion_right.warriors],
                 },
                 "village": {
                     "buildings": [_building_view(b, p if p.id == viewer_player_id else None) for b in p.field.village.buildings],
@@ -724,6 +736,9 @@ def _available_hordes(player: Player) -> list:
             card = get_card(w.base_card_id)
             if not isinstance(card, WarriorCard):
                 continue
+            if player.has_active_trono(w.instance_id):
+                # Effetto Orda già sempre attivo grazie al Trono: non riproponibile manualmente
+                continue
             if card.horde_effect_id and card.horde_effect_id not in seen_effects:
                 seen_effects.add(card.horde_effect_id)
                 warrior_data.append({
@@ -743,7 +758,7 @@ def _available_hordes(player: Player) -> list:
     return result
 
 
-def _warrior_view(w: WarriorInstance) -> dict:
+def _warrior_view(w: WarriorInstance, player: Optional[Player] = None) -> dict:
     card = get_card(w.base_card_id)
     return {
         "instance_id": w.instance_id,
@@ -755,7 +770,30 @@ def _warrior_view(w: WarriorInstance) -> dict:
         "species": card.species if isinstance(card, WarriorCard) else None,
         "subtype": card.subtype if isinstance(card, WarriorCard) else None,
         "horde_active": w.horde_active,
+        "assigned_cards": (
+            [_assigned_card_view(iid, player) for iid in w.assigned_cards]
+            if player is not None else []
+        ),
     }
+
+
+def _assigned_card_view(iid: str, player: Player) -> dict:
+    """Vista pubblica di una carta assegnata a un Guerriero (es. Trono)."""
+    from engine.deck import get_base_card_id
+    base_id = get_base_card_id(iid)
+    card = get_card(base_id)
+    result = {
+        "instance_id": iid,
+        "base_card_id": base_id,
+        "name": card.name if card else base_id,
+        "type": card.type if card else None,
+    }
+    if isinstance(card, BuildingCard):
+        b_inst = next((b for b in player.field.village.buildings if b.instance_id == iid), None)
+        if b_inst is not None:
+            result["completed"] = b_inst.completed
+            result["effect"] = card.complete_effect if b_inst.completed else card.base_effect
+    return result
 
 
 def _building_view(b: BuildingInstance, player=None) -> dict:
@@ -767,6 +805,7 @@ def _building_view(b: BuildingInstance, player=None) -> dict:
         "completed": b.completed,
         "effect": card.complete_effect if b.completed else card.base_effect
         if isinstance(card, BuildingCard) else "",
+        "assigned_warrior": b.assigned_warrior,
     }
     if b.base_card_id == "arena" and player is not None:
         result["arena_available"] = not any(

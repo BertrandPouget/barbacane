@@ -85,6 +85,7 @@ const Render = (() => {
       dataset: { type: 'warrior', instanceId: w.instance_id, baseId: w.base_card_id },
     });
     if (w.horde_active) div.classList.add('horde-active');
+    if (w.assigned_cards && w.assigned_cards.length > 0) div.classList.add('has-assigned');
 
     div.appendChild(el('div', { className: 'card-name' }, [w.name || w.base_card_id]));
     div.appendChild(el('div', {
@@ -186,7 +187,7 @@ const Render = (() => {
       el('b', {}, [value]),
     ]);
     const vg = (p.field.vanguard || []).length;
-    const vil = ((p.field.village && p.field.village.buildings) || []).length;
+    const vil = ((p.field.village && p.field.village.buildings) || []).filter(b => !b.assigned_warrior).length;
     const wallsL = p.field.bastion_left.wall_count ?? 0;
     const wallsR = p.field.bastion_right.wall_count ?? 0;
     const defL = (p.field.bastion_left.warriors || []).length;
@@ -265,10 +266,10 @@ const Render = (() => {
       ? el('div', { className: 'rg-empty' }, ['Vuota'])
       : vanguardSummary(vg));
 
-    // Villaggio
+    // Villaggio (le Costruzioni assegnate a un Guerriero, es. Trono, sono mostrate sul Guerriero)
     const vWrap = $('village-cards');
     vWrap.innerHTML = '';
-    const buildings = (me.field.village.buildings || []);
+    const buildings = (me.field.village.buildings || []).filter(b => !b.assigned_warrior);
     vWrap.appendChild(buildings.length === 0
       ? el('div', { className: 'rg-empty' }, ['Nessuna Costruzione'])
       : villageSummary(buildings));
@@ -483,7 +484,7 @@ const Render = (() => {
 
     if (!def) { wrap.appendChild(textOnly); return wrap; }
 
-    const flip = el('div', { className: 'flip' });
+    const flip = el('div', { className: ctx.assigned ? 'flip flip-assigned' : 'flip' });
     const inner = el('div', { className: 'flip-inner' });
     const front = el('div', { className: 'flip-face' });
     const img = el('img', { alt: def.name, draggable: 'false' });

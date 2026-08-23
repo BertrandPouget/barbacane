@@ -353,6 +353,7 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
         "play_building": lambda: play_building(
             state, player_id,
             params["instance_id"],
+            params.get("target_warrior_iid"),
         ),
         "complete_building": lambda: complete_building(
             state, player_id,

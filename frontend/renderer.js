@@ -211,8 +211,8 @@ const Renderer = (() => {
     if (stripActiveEl) headerEl.appendChild(stripActiveEl);
     wrapper.appendChild(headerEl);
 
-    // Villaggio
-    const buildings = (player.field.village && player.field.village.buildings) || [];
+    // Villaggio (le Costruzioni assegnate a un Guerriero, es. Trono, sono mostrate sul Guerriero stesso)
+    const buildings = ((player.field.village && player.field.village.buildings) || []).filter(b => !b.assigned_warrior);
     if (buildings.length > 0) {
       const vill = el('div', { className: 'strip-section strip-vanguard',
         style: 'border-color: var(--border); flex: 0 0 auto;' });
@@ -264,7 +264,7 @@ const Renderer = (() => {
   }
 
   function renderOppVillageInline(village) {
-    const buildings = (village && village.buildings) || [];
+    const buildings = ((village && village.buildings) || []).filter(b => !b.assigned_warrior);
     if (buildings.length === 0) return null;
     const span = el('span', { className: 'opp-village-inline' });
     span.appendChild(document.createTextNode('🏰 '));
@@ -379,7 +379,8 @@ const Renderer = (() => {
   function renderVillage(containerId, village, etherealComplete) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
-    (village.buildings || []).forEach(b => {
+    // Le Costruzioni assegnate a un Guerriero (es. Trono) sono mostrate sul Guerriero, non qui
+    (village.buildings || []).filter(b => !b.assigned_warrior).forEach(b => {
       container.appendChild(renderBuildingCard(b, true, etherealComplete));
     });
   }
@@ -510,6 +511,7 @@ const Renderer = (() => {
     }});
 
     if (warrior.horde_active) div.classList.add('horde-active');
+    if (warrior.assigned_cards && warrior.assigned_cards.length > 0) div.classList.add('has-assigned');
 
     div.appendChild(el('div', { className: 'card-name' }, [warrior.name || warrior.base_card_id]));
     div.appendChild(el('div', {

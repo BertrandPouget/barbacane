@@ -187,6 +187,14 @@ class Player(BaseModel):
             counts[school] = counts.get(school, 0) + 1
         return counts
 
+    def has_active_trono(self, warrior_iid: str) -> bool:
+        """True se il Guerriero ha un Trono completo assegnato: il suo effetto
+        Orda è già sempre attivo, quindi non va riproposto per l'attivazione manuale."""
+        return any(
+            b.base_card_id == "trono" and b.completed and b.assigned_warrior == warrior_iid
+            for b in self.field.village.buildings
+        )
+
     def check_horde_with_zones(self) -> List[Dict]:
         """Ritorna le Orde attive per zona: [{zone, species, warriors}].
         Un'Orda richiede almeno 3 Guerrieri della stessa Specie nella STESSA Zona."""
@@ -248,19 +256,22 @@ class Player(BaseModel):
         if same_species_remaining >= 3:
             return False
 
-        # Orda rotta: disattiva
+        # Orda rotta: disattiva (i Guerrieri con Trono sempre attivo restano invariati)
         self.hordes_activated_this_turn.remove(horde_key)
         for w in source_list:
             c = CARD_REGISTRY.get(w.base_card_id)
-            if isinstance(c, WarriorCard) and c.species == species:
+            if isinstance(c, WarriorCard) and c.species == species and not self.has_active_trono(w.instance_id):
                 w.horde_active = False
-        warrior.horde_active = False
+        if not self.has_active_trono(warrior.instance_id):
+            warrior.horde_active = False
 
-        # Rimuovi i bonus stat dell'Orda da active_effects
+        # Rimuovi i bonus stat dell'Orda da active_effects (non quelli da Trono sempre attivo)
         to_remove = []
         for eff in self.active_effects:
             if eff.get("type") == "horde_stat_bonus":
                 w_iid = eff.get("warrior_iid")
+                if self.has_active_trono(w_iid):
+                    continue
                 if w_iid == warrior.instance_id:
                     # Il guerriero rimosso: i suoi bonus spariscono con lui
                     to_remove.append(eff)

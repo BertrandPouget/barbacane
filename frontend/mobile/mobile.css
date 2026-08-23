@@ -27,6 +27,7 @@
   --border-gold:  #a06820;
   --brown:        #4a2008;
   --brown-light:  #7a4418;
+  --orange:       #e08020;
 
   --danger: var(--red-light);
   --ok:     var(--green-light);
@@ -895,6 +896,11 @@ input {
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.45);
 }
 
+/* Guerriero con una o più carte assegnate (es. Trono) */
+.card.has-assigned {
+  border-color: var(--orange) !important;
+}
+
 /* Carta piccola (per campo) */
 .card-sm {
   width: var(--card-w-sm);
@@ -1190,6 +1196,7 @@ input {
 .opt-row.danger .opt-label { color: var(--danger); }
 .opt-row.gold { border-color: var(--border-gold); }
 .opt-row.gold .opt-label { color: var(--gold); }
+.opt-row.has-assigned { border-color: var(--orange); }
 
 .sheet-note {
   font-size: 0.8rem;
@@ -1247,6 +1254,12 @@ input {
   font-size: 0.72rem;
 }
 .flip-back-img { padding: 0; overflow: hidden; }
+
+/* Carta assegnata (es. Trono) mostrata dallo sheet dedicato: cornice arancione */
+.flip.flip-assigned .flip-face,
+.flip.flip-assigned .flip-back {
+  border-color: var(--orange);
+}
 .flip-hint { font-size: 0.7rem; color: var(--text-faint); font-style: italic; }
 
 /* Flashcard testuale (senza immagine) */

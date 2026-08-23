@@ -825,6 +825,10 @@ const Mob = (() => {
     } else if (def.type === 'spell') {
       showSpellOptions(iid, def);
     } else if (def.type === 'building') {
+      if (def.id === 'trono') {
+        showTronoPlayOptions(iid, def);
+        return;
+      }
       Sheet.confirm(
         `Costruisci ${def.name}`,
         `Costo: <b>${def.cost} Mana</b><br>${def.base_effect || ''}`,
@@ -832,6 +836,23 @@ const Mob = (() => {
         { yesLabel: '🏗️ Costruisci' },
       );
     }
+  }
+
+  // Trono: richiede la scelta immediata del Guerriero a cui assegnarlo
+  function showTronoPlayOptions(iid, def) {
+    const my = me();
+    const warriors = my ? getAllWarriors(my) : [];
+    if (warriors.length === 0) {
+      Toast.show('Non hai nessun Guerriero in campo a cui assegnare il Trono.', 'error');
+      return;
+    }
+    Sheet.choice(`Costruisci ${def.name}`, warriors.map(w => ({
+      icon: '🗡️',
+      label: w.name || w.base_card_id,
+      sub: `🗡️${w.att} 🏹${w.git} 🛡️${w.dif}`,
+      value: w.instance_id,
+    })), (warriorIid) => sendAction('play_building', { instance_id: iid, target_warrior_iid: warriorIid }),
+    { subtitle: 'Scegli il Guerriero a cui assegnare il Trono' });
   }
 
   function showHeroPlayOptions(iid, def) {
@@ -1382,10 +1403,11 @@ const Mob = (() => {
     if (warriors.length > 0) {
       body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' }, [`🗡️ Guerrieri (${warriors.length})`]));
       warriors.forEach(w => {
-        const row = el('button', { className: `opt-row sp-${w.species || 'umano'}` }, [
+        const hasAssigned = w.assigned_cards && w.assigned_cards.length > 0;
+        const row = el('button', { className: `opt-row sp-${w.species || 'umano'}${hasAssigned ? ' has-assigned' : ''}` }, [
           el('span', { className: 'opt-icon' }, ['🗡️']),
           el('span', { className: 'opt-main' }, [
-            el('span', { className: 'opt-label' }, [w.name || w.base_card_id]),
+            el('span', { className: 'opt-label' }, [(hasAssigned ? '📌 ' : '') + (w.name || w.base_card_id)]),
             el('span', { className: 'opt-sub', style: 'display:block' },
               [`${capitalize(w.species || '')} · 🗡️${w.att} 🏹${w.git} 🛡️${w.dif}${w.horde_active ? ' · ⚡ Orda' : ''}`]),
           ]),
@@ -1458,28 +1480,36 @@ const Mob = (() => {
     const def = getCardDef(iid);
     const canMove = isMyTurn() && currentState.phase === 'schieramento';
 
+    const footer = [
+      { label: 'Scarta', className: 'mbtn-danger', onClick: () => confirmDiscard(iid, 'field') },
+    ];
+    if (w.assigned_cards && w.assigned_cards.length > 0) {
+      footer.push({
+        label: 'Carte assegnate',
+        onClick: () => { Sheet.close(true); openAssignedCardsSheet(iid, myPlayerId, 0, () => openFieldWarriorSheet(iid)); },
+      });
+    }
+    footer.push({
+      label: '⇄ Riposiziona',
+      className: 'mbtn-gold',
+      disabled: !canMove,
+      onClick: () => {
+        Sheet.close(true);
+        Sheet.choice(`Sposta ${w.name || ''}`, [
+          { icon: '⚔️', label: 'Avanscoperta', value: 'vanguard', disabled: zone === 'vanguard' },
+          { icon: '🏰', label: 'Bastione Sinistro', value: 'bastion_left', disabled: zone === 'bastion_left' },
+          { icon: '🏰', label: 'Bastione Destro', value: 'bastion_right', disabled: zone === 'bastion_right' },
+        ], (dest) => sendAction('reposition', { warrior_instance_id: iid, destination: dest }));
+      },
+    });
+    footer.push({ label: 'Chiudi', onClick: () => Sheet.close() });
+
     Sheet.open({
       title: w.name || iid,
       subtitle: `${zoneLabel}${w.horde_active ? ' · ⚡ Orda attiva' : ''}` +
         (canMove ? '' : ' — spostabile nella fase Schieramento'),
       body: Render.cardViewNode(def, { att: w.att, git: w.git, dif: w.dif, instanceId: iid }),
-      footer: [
-        { label: 'Scarta', className: 'mbtn-danger', onClick: () => confirmDiscard(iid, 'field') },
-        {
-          label: '⇄ Riposiziona',
-          className: 'mbtn-gold',
-          disabled: !canMove,
-          onClick: () => {
-            Sheet.close(true);
-            Sheet.choice(`Sposta ${w.name || ''}`, [
-              { icon: '⚔️', label: 'Avanscoperta', value: 'vanguard', disabled: zone === 'vanguard' },
-              { icon: '🏰', label: 'Bastione Sinistro', value: 'bastion_left', disabled: zone === 'bastion_left' },
-              { icon: '🏰', label: 'Bastione Destro', value: 'bastion_right', disabled: zone === 'bastion_right' },
-            ], (dest) => sendAction('reposition', { warrior_instance_id: iid, destination: dest }));
-          },
-        },
-        { label: 'Chiudi', onClick: () => Sheet.close() },
-      ],
+      footer,
     });
   }
 
@@ -1500,10 +1530,11 @@ const Mob = (() => {
     }
 
     warriors.forEach(w => {
-      const row = el('button', { className: `opt-row sp-${w.species || 'umano'}` }, [
+      const hasAssigned = w.assigned_cards && w.assigned_cards.length > 0;
+      const row = el('button', { className: `opt-row sp-${w.species || 'umano'}${hasAssigned ? ' has-assigned' : ''}` }, [
         el('span', { className: 'opt-icon' }, ['🗡️']),
         el('span', { className: 'opt-main' }, [
-          el('span', { className: 'opt-label' }, [w.name || w.base_card_id]),
+          el('span', { className: 'opt-label' }, [(hasAssigned ? '📌 ' : '') + (w.name || w.base_card_id)]),
           el('span', { className: 'opt-sub', style: 'display:block' },
             [`${capitalize(w.species || '')} · 🗡️${w.att} 🏹${w.git} 🛡️${w.dif}${w.horde_active ? ' · ⚡ Orda' : ''}`]),
         ]),
@@ -1529,7 +1560,8 @@ const Mob = (() => {
   function openVillageSheet() {
     const my = me();
     if (!my) return;
-    const buildings = my.field.village.buildings || [];
+    // Le Costruzioni assegnate a un Guerriero (es. Trono) sono mostrate sul Guerriero, non qui
+    const buildings = (my.field.village.buildings || []).filter(b => !b.assigned_warrior);
     const body = [];
 
     if (buildings.length === 0) {
@@ -1748,7 +1780,7 @@ const Mob = (() => {
     });
 
     // Villaggio
-    const buildings = (p.field.village && p.field.village.buildings) || [];
+    const buildings = ((p.field.village && p.field.village.buildings) || []).filter(b => !b.assigned_warrior);
     body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' }, ['🏰 Villaggio']));
     buildings.forEach(b => {
       const def = getCardDef(b.instance_id);
@@ -1784,11 +1816,62 @@ const Mob = (() => {
 
   function openEnemyCardSheet(w, owner) {
     const def = getCardDef(w.instance_id);
+    const footer = [];
+    if (w.assigned_cards && w.assigned_cards.length > 0) {
+      footer.push({
+        label: 'Carte assegnate',
+        onClick: () => { Sheet.close(true); openAssignedCardsSheet(w.instance_id, owner.id, 0, () => openOpponentSheet(owner.id)); },
+      });
+    }
+    footer.push({ label: '‹ Indietro', onClick: () => openOpponentSheet(owner.id) });
     Sheet.open({
       title: w.name || w.instance_id,
       subtitle: `di ${owner.name}`,
       body: Render.cardViewNode(def, { att: w.att, git: w.git, dif: w.dif }),
-      footer: [{ label: '‹ Indietro', onClick: () => openOpponentSheet(owner.id) }],
+      footer,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sheet: carte assegnate a un Guerriero (es. Trono)
+  // ---------------------------------------------------------------------------
+
+  function openAssignedCardsSheet(warriorIid, ownerPlayerId, idx, onBack) {
+    const owner = currentState.players.find(p => p.id === ownerPlayerId);
+    const warrior = owner ? getAllWarriors(owner).find(w => w.instance_id === warriorIid) : null;
+    if (!warrior) return;
+    const assignedCards = warrior.assigned_cards || [];
+    if (assignedCards.length === 0) return;
+
+    const ac = assignedCards[idx];
+    const def = getCardDef(ac.instance_id);
+    const isMine = ownerPlayerId === myPlayerId;
+    const canComplete = ac.type === 'building' && ac.completed === false && isMine && isMyTurn();
+
+    const footer = [];
+    if (canComplete) {
+      footer.push({
+        label: 'Completa',
+        className: 'mbtn-gold',
+        onClick: () => { Sheet.close(true); sendAction('complete_building', { building_instance_id: ac.instance_id }); },
+      });
+    }
+    if (onBack) footer.push({ label: '‹ Indietro', onClick: onBack });
+
+    preloadCardImages([
+      assignedCards[idx - 1] && assignedCards[idx - 1].instance_id,
+      assignedCards[idx + 1] && assignedCards[idx + 1].instance_id,
+    ]);
+    showCardNavSheet({
+      title: `📌 ${def ? def.name : ac.instance_id}`,
+      subtitle: `Assegnata a ${warrior.name || warrior.base_card_id}` +
+        (ac.completed !== undefined ? (ac.completed ? ' · ✓ Completata' : ' · Incompleta') : ''),
+      def,
+      ctx: { completed: ac.completed, instanceId: ac.instance_id, assigned: true },
+      pos: { idx, total: assignedCards.length },
+      onPrev: idx > 0 ? () => openAssignedCardsSheet(warriorIid, ownerPlayerId, idx - 1, onBack) : null,
+      onNext: idx < assignedCards.length - 1 ? () => openAssignedCardsSheet(warriorIid, ownerPlayerId, idx + 1, onBack) : null,
+      footer,
     });
   }
 

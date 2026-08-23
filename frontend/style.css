@@ -22,6 +22,7 @@
   --border-gold:  #a06820;
   --brown:        #4a2008;
   --brown-light:  #7a4418;
+  --orange:       #e08020;
 
   --card-w: 90px;
   --card-h: 130px;
@@ -896,6 +897,11 @@ input:focus {
   box-shadow: 0 0 10px rgba(255,255,255,0.45);
 }
 .ethereal-cost { color: #ffffff; font-weight: bold; }
+
+/* Guerriero con una o più carte assegnate (es. Trono) */
+.card.has-assigned {
+  border-color: var(--orange) !important;
+}
 
 /* Badge costo: esagono in alto a destra sulla carta.
    Oro = costo in Mana, azzurro = costo in Maghe, bianco = carta eterea (gratis). */
