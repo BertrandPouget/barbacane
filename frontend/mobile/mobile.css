@@ -66,8 +66,16 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+/* App shell: il documento non scorre mai. Tutto lo scorrimento avviene in
+   contenitori interni (.lobby-scroll, .wait-wrap, #cat-scroll, .sheet-body...).
+   Serve perche' lo sfondo sta su html (vedi sotto) e la sua area di
+   posizionamento e' la box di html: se il documento scorresse, sotto la prima
+   schermata resterebbe solo il colore piatto, senza immagine — invisibile in
+   Safari (lo coprono le toolbar) ma ben visibile in standalone, dove il
+   viewport arriva fino al home indicator. Blocca anche il rubber-band iOS. */
 html, body {
   height: 100%;
+  overflow: hidden;
   overscroll-behavior: none;
 }
 
@@ -84,10 +92,11 @@ html {
 }
 
 body {
+  position: fixed;
+  inset: 0;
   font-family: 'Georgia', serif;
   color: var(--text);
   background: transparent;
-  min-height: 100dvh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   user-select: none;
@@ -122,7 +131,7 @@ input {
   display: none;
   position: relative;
   z-index: 1;
-  min-height: 100dvh;
+  height: 100%;
 }
 .scr.active { display: flex; flex-direction: column; animation: scr-in 0.35s var(--ease-out); }
 
@@ -136,11 +145,16 @@ input {
 #scr-lobby { align-items: center; justify-content: center; }
 .lobby-scroll {
   width: min(430px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: calc(var(--sat) + 28px) 22px calc(var(--sab) + 26px);
   display: flex;
   flex-direction: column;
   gap: 18px;
 }
+/* i blocchi tengono l'altezza naturale: e' .lobby-scroll che scorre */
+.lobby-scroll > * { flex: 0 0 auto; }
 
 .lobby-hero { text-align: center; padding: 8px 0 4px; }
 .lobby-logo {
@@ -244,7 +258,10 @@ input {
 #scr-wait { align-items: center; justify-content: center; }
 .wait-wrap {
   width: min(430px, 100%);
-  padding: 20px 20px calc(var(--sab) + 20px);
+  max-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: calc(var(--sat) + 20px) 20px calc(var(--sab) + 20px);
 }
 .wait-card {
   width: 100%;
@@ -305,7 +322,7 @@ input {
 /* ═══════════════════════ GIOCO ═══════════════════════ */
 
 #scr-game.active {
-  height: 100dvh;
+  height: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1404,9 +1421,13 @@ input {
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  padding: 30px 26px;
+  padding: calc(var(--sat) + 30px) 26px calc(var(--sab) + 30px);
   width: min(430px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
+.over-wrap > * { flex: 0 0 auto; }
 #over-title { font-size: 2rem; color: var(--gold); }
 #over-winner { color: var(--text); font-size: 1.12rem; }
 #over-scores {
@@ -1468,7 +1489,7 @@ input {
 .cta-catalog { margin-top: 2px; }
 
 #scr-catalog.active {
-  height: 100dvh;
+  height: 100%;
   overflow: hidden;
 }
 

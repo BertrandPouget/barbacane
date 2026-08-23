@@ -43,7 +43,12 @@ const Screens = {
     document.querySelectorAll('.scr').forEach(s => s.classList.remove('active'));
     const t = $(`scr-${name}`);
     if (t) t.classList.add('active');
-    window.scrollTo(0, 0);
+    // Il documento non scorre (app shell, vedi mobile.css): riporta in cima
+    // gli scroller interni della schermata appena mostrata.
+    if (t) {
+      t.scrollTop = 0;
+      t.querySelectorAll('*').forEach(n => { if (n.scrollTop) n.scrollTop = 0; });
+    }
   },
 };
 
