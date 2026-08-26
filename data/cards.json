@@ -498,7 +498,7 @@
       "school": "sortilegio",
       "cost": 1,
       "cost_type": "maga",
-      "base_effect": "Scarta un Trono.",
+      "base_effect": "Scegli un Trono e scartalo.",
       "prodigy_effect": "& Scarta il Guerriero a cui era assegnato.",
       "prodigy_is_additive": true,
       "effect_id": "regicidio_effect",

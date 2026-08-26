@@ -650,8 +650,7 @@ const App = (() => {
 
     } else if (phase === 'schieramento') {
       document.getElementById('action-hint').textContent = 'Sposta i Guerrieri e attiva le Orde.';
-      const hasHorde = player && player.available_hordes &&
-        player.available_hordes.some(h => !h.already_activated);
+      const hasHorde = player && player.available_hordes && player.available_hordes.length > 0;
       if (hasHorde) show('btn-horde');
       show('btn-next-phase');
       document.getElementById('btn-next-phase').textContent = 'Battaglia →';
@@ -672,7 +671,7 @@ const App = (() => {
     const player = currentState.players.find(p => p.id === myPlayerId);
     if (!player) return;
 
-    const hordes = (player.available_hordes || []).filter(h => !h.already_activated);
+    const hordes = player.available_hordes || [];
     if (hordes.length === 0) {
       Renderer.toast('Nessuna Orda disponibile', 'error');
       return;
@@ -685,15 +684,23 @@ const App = (() => {
     };
     const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 
+    // Le carte già attive per il proprio gruppo non vanno riproposte (nulla da fare
+    // riselezionandole); le altre carte dello stesso gruppo permettono di cambiare
+    // l'effetto Orda attivo (disattivando quello corrente).
     const options = [];
     for (const horde of hordes) {
       const zoneName = zoneNames[horde.zone] || horde.zone;
       for (const w of horde.warriors) {
+        if (w.active) continue;
         options.push({
           label: `[${cap(horde.species)}, ${zoneName}] ${w.name}: ${w.horde_effect}`,
           value: `${w.base_card_id}|${w.instance_id}|${horde.zone}`,
         });
       }
+    }
+    if (options.length === 0) {
+      Renderer.toast('Nessuna Orda disponibile', 'error');
+      return;
     }
 
     Renderer.showChoiceModal('Attiva Effetto Orda', options, (choice) => {
@@ -1398,6 +1405,12 @@ const App = (() => {
       return;
     }
 
+    // Regicidio: UI dedicata — scegli un Trono in campo (di qualsiasi giocatore) da scartare
+    if (def.id === 'regicidio') {
+      _showRegicidioOptions(instanceId, def);
+      return;
+    }
+
     // Cuordipietra: UI dedicata — scegli un Guerriero avversario (base: solo Reclute) poi il Bastione di destinazione
     if (def.id === 'cuordipietra') {
       _showCuordipietraOptions(instanceId, def);
@@ -1406,7 +1419,6 @@ const App = (() => {
 
     const spellsNeedingTarget = [
       'ardolancio', 'incendifesa',
-      'regicidio',
     ];
 
     if (!spellsNeedingTarget.includes(def.id) || opponents.length === 0) {
@@ -1436,6 +1448,40 @@ const App = (() => {
 
   // Cuordipietra: base = scegli una Recluta avversaria → diventa Muro in un suo Bastione;
   // prodigio = scegli qualsiasi Guerriero avversario → diventa Muro in un tuo Bastione.
+  function _showRegicidioOptions(instanceId, def) {
+    if (!currentState) return;
+    const prodigy = _computeSpellProdigy(def);
+
+    const options = [];
+    currentState.players.forEach(p => {
+      (p.field.village.buildings || []).forEach(b => {
+        if (b.base_card_id !== 'trono') return;
+        let label = `${p.id === myPlayerId ? 'Tuo' : p.name} — Trono${b.completed ? ' (completo)' : ''}`;
+        if (b.assigned_warrior) {
+          const allWarriors = [...(p.field.vanguard || []), ...(p.field.bastion_left.warriors || []), ...(p.field.bastion_right.warriors || [])];
+          const warrior = allWarriors.find(w => w.instance_id === b.assigned_warrior);
+          label += ` — su ${warrior ? warrior.name : 'Guerriero'}`;
+        } else {
+          label += ' — non assegnato';
+        }
+        options.push({ label, value: `${p.id}:${b.instance_id}` });
+      });
+    });
+
+    if (options.length === 0) {
+      Renderer.toast('Non ci sono Troni in campo.', 'error');
+      return;
+    }
+
+    const title = prodigy
+      ? `${def.name} — scegli un Trono (scarta anche il suo Guerriero)`
+      : `${def.name} — scegli un Trono`;
+    Renderer.showChoiceModal(title, options, (choice) => {
+      const [targetId, tronoIid] = choice.split(':');
+      sendAction('play_spell', { instance_id: instanceId, target_player_id: targetId, target_trono_iid: tronoIid });
+    });
+  }
+
   function _showCuordipietraOptions(instanceId, def) {
     if (!currentState) return;
     const prodigy = _computeSpellProdigy(def);

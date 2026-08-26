@@ -1,4 +1,4 @@
-1. Assegnazioni (Trono fatto, Arrampicarta, Regicidio)
+1. Assegnazioni (Arrampicarta)
 2. Testare Orde (e definire quando spegnerle)
 2.1 Rigenerare le carte con testi aggiornati
 3. Sistemare e mergiare Tutorial/Bot

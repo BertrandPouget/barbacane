@@ -146,7 +146,11 @@ class Player(BaseModel):
     skip_mana_next_turn: bool = False  # Dazipazzi
     extra_battles: int = 0  # Eracles horde
     spell_cost_reductions: Dict[str, int] = Field(default_factory=dict)  # school -> reduction
-    hordes_activated_this_turn: List[str] = Field(default_factory=list)  # "{zone}:{species}" keys
+    # "{zone}:{species}" keys delle Orde con un effetto attualmente attivo. Nonostante
+    # il nome, NON viene azzerato a ogni turno: un'Orda resta attiva finché non si
+    # divide (deactivate_broken_horde) o il giocatore ne sceglie un'altra per lo
+    # stesso gruppo (deactivate_horde_for_switch).
+    hordes_activated_this_turn: List[str] = Field(default_factory=list)
     turns_completed: int = 0
     ethereal_card: Optional[str] = None      # instance_id della carta eterea (costo 0, azione 0)
     ethereal_complete: Optional[str] = None  # instance_id costruzione completabile gratis senza azione (Velocemento prodigio)
@@ -227,6 +231,54 @@ class Player(BaseModel):
                 result[sp] = h["warriors"]
         return result
 
+    def _deactivate_horde_effects(
+        self,
+        horde_key: str,
+        species: str,
+        zone_warriors: List["WarriorInstance"],
+        removed_warrior: Optional["WarriorInstance"] = None,
+    ) -> None:
+        """
+        Rimuove l'effetto Orda attivo per `horde_key`: flag `horde_active`, bonus stat
+        e ogni altro effetto taggato `from_horde_key`. I Guerrieri con Trono sempre
+        attivo restano invariati. `removed_warrior` è il Guerriero appena uscito dalla
+        zona (se la disattivazione è dovuta a una divisione), altrimenti None.
+        """
+        from engine.cards import CARD_REGISTRY, WarriorCard
+        self.hordes_activated_this_turn.remove(horde_key)
+        for w in zone_warriors:
+            c = CARD_REGISTRY.get(w.base_card_id)
+            if isinstance(c, WarriorCard) and c.species == species and not self.has_active_trono(w.instance_id):
+                w.horde_active = False
+        if removed_warrior is not None and not self.has_active_trono(removed_warrior.instance_id):
+            removed_warrior.horde_active = False
+
+        # Rimuovi i bonus stat dell'Orda da active_effects (non quelli da Trono sempre attivo)
+        to_remove = []
+        for eff in self.active_effects:
+            if eff.get("type") == "horde_stat_bonus":
+                w_iid = eff.get("warrior_iid")
+                if self.has_active_trono(w_iid):
+                    continue
+                if removed_warrior is not None and w_iid == removed_warrior.instance_id:
+                    # Il guerriero rimosso: i suoi bonus spariscono con lui
+                    to_remove.append(eff)
+                else:
+                    for w in zone_warriors:
+                        if w.instance_id == w_iid:
+                            for stat in ("att", "git", "dif"):
+                                bonus = eff.get(stat, 0)
+                                if bonus:
+                                    w.temp_modifiers[stat] = max(0, w.temp_modifiers.get(stat, 0) - bonus)
+                            to_remove.append(eff)
+                            break
+            elif eff.get("from_horde_key") == horde_key:
+                # Effetto non-stat aggiunto da questa Orda (es. reinhold_discount, araminta_return)
+                to_remove.append(eff)
+        for eff in to_remove:
+            if eff in self.active_effects:
+                self.active_effects.remove(eff)
+
     def deactivate_broken_horde(self, warrior: "WarriorInstance", source_region: str) -> bool:
         """
         Da chiamare DOPO aver rimosso `warrior` da `source_region`.
@@ -256,41 +308,25 @@ class Player(BaseModel):
         if same_species_remaining >= 3:
             return False
 
-        # Orda rotta: disattiva (i Guerrieri con Trono sempre attivo restano invariati)
-        self.hordes_activated_this_turn.remove(horde_key)
-        for w in source_list:
-            c = CARD_REGISTRY.get(w.base_card_id)
-            if isinstance(c, WarriorCard) and c.species == species and not self.has_active_trono(w.instance_id):
-                w.horde_active = False
-        if not self.has_active_trono(warrior.instance_id):
-            warrior.horde_active = False
-
-        # Rimuovi i bonus stat dell'Orda da active_effects (non quelli da Trono sempre attivo)
-        to_remove = []
-        for eff in self.active_effects:
-            if eff.get("type") == "horde_stat_bonus":
-                w_iid = eff.get("warrior_iid")
-                if self.has_active_trono(w_iid):
-                    continue
-                if w_iid == warrior.instance_id:
-                    # Il guerriero rimosso: i suoi bonus spariscono con lui
-                    to_remove.append(eff)
-                else:
-                    for w in source_list:
-                        if w.instance_id == w_iid:
-                            for stat in ("att", "git", "dif"):
-                                bonus = eff.get(stat, 0)
-                                if bonus:
-                                    w.temp_modifiers[stat] = max(0, w.temp_modifiers.get(stat, 0) - bonus)
-                            to_remove.append(eff)
-                            break
-            elif eff.get("from_horde_key") == horde_key:
-                # Effetto non-stat aggiunto da questa Orda (es. reinhold_discount, araminta_return)
-                to_remove.append(eff)
-        for eff in to_remove:
-            if eff in self.active_effects:
-                self.active_effects.remove(eff)
+        self._deactivate_horde_effects(horde_key, species, source_list, removed_warrior=warrior)
         return True
+
+    def deactivate_horde_for_switch(self, zone: str, species: str) -> None:
+        """
+        Disattiva l'effetto Orda attualmente attivo per zone+species senza che il
+        gruppo si sia diviso, in vista dell'attivazione di un altro effetto Orda
+        per lo stesso gruppo (il gruppo resta formato, cambia solo la carta scelta).
+        """
+        horde_key = f"{zone}:{species}"
+        if horde_key not in self.hordes_activated_this_turn:
+            return
+        zone_map = {
+            "vanguard": self.field.vanguard,
+            "bastion_left": self.field.bastion_left.warriors,
+            "bastion_right": self.field.bastion_right.warriors,
+        }
+        zone_warriors = zone_map.get(zone, [])
+        self._deactivate_horde_effects(horde_key, species, zone_warriors)
 
 
 # ---------------------------------------------------------------------------

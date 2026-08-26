@@ -385,6 +385,25 @@ def play_spell(
         ):
             raise ActionError("Devi scegliere un tuo Guerriero in campo.")
 
+    # Pre-validazione: regicidio richiede la scelta esplicita di un Trono in campo
+    if base_id == "regicidio":
+        any_trono = any(
+            b.base_card_id == "trono"
+            for p in state.players
+            for b in p.field.village.buildings
+        )
+        if not any_trono:
+            raise ActionError("Non ci sono Troni in campo da scartare.")
+        target_player_id = kwargs.get("target_player_id")
+        target_trono_iid = kwargs.get("target_trono_iid")
+        target_p = state.get_player(target_player_id) if target_player_id else None
+        valid_target = target_p is not None and any(
+            b.base_card_id == "trono" and b.instance_id == target_trono_iid
+            for b in target_p.field.village.buildings
+        )
+        if not valid_target:
+            raise ActionError("Devi scegliere un Trono in campo da scartare.")
+
     # Pre-validazione: velocemento richiede almeno una Costruzione in mano
     if base_id == "velocemento":
         has_building = any(
@@ -755,7 +774,9 @@ def activate_horde(
 ) -> dict:
     """
     Attiva un effetto Orda per una specifica zona+specie.
-    Ogni Orda (stessa Specie nella stessa Regione) può essere attivata una sola volta per turno.
+    Un'Orda attivata resta attiva finché non si divide (riposizionamento/scarto) o
+    finché il giocatore non sceglie un'altra carta della stessa Orda: in tal caso
+    l'effetto precedente viene prima disattivato.
     """
 
     player = _require_current_player(state, player_id)
@@ -777,12 +798,11 @@ def activate_horde(
             "non serve (e non si può) attivarlo manualmente."
         )
 
-    # Trova le Orde valide per questa specie non ancora attivate
+    # Trova le Orde valide per questa specie che includono questa carta
     all_hordes = player.check_horde_with_zones()
     candidates = [
         h for h in all_hordes
         if h["species"] == species
-        and f"{h['zone']}:{species}" not in player.hordes_activated_this_turn
         and any(w.base_card_id == horde_card_id for w in h["warriors"])
     ]
     if not candidates:
@@ -796,6 +816,18 @@ def activate_horde(
 
     horde_zone = horde["zone"]
     horde_key = f"{horde_zone}:{species}"
+
+    if horde_key in player.hordes_activated_this_turn:
+        currently_active = next(
+            (w for w in horde["warriors"]
+             if w.horde_active and not player.has_active_trono(w.instance_id)),
+            None,
+        )
+        if currently_active and currently_active.base_card_id == horde_card_id:
+            raise ActionError("Questo effetto Orda è già attivo per questo gruppo.")
+        # Scelta di un'altra carta per lo stesso gruppo: disattiva l'effetto corrente
+        # prima di attivare quello nuovo.
+        player.deactivate_horde_for_switch(horde_zone, species)
 
     # Segna visivamente la carta al centro dell'Orda (solo nella zona attivata).
     # I Guerrieri con Trono sempre attivo mantengono il proprio fulmine invariato.

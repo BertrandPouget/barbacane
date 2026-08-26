@@ -696,22 +696,12 @@ def regicidio_effect(
     **kwargs,
 ) -> dict:
     """
-    Base: scarta un Trono (da qualsiasi campo).
+    Base: scegli un Trono e scartalo.
     Prodigio (additivo &): scarta anche il Guerriero a cui era assegnato.
     """
     target = state.get_player(target_player_id) if target_player_id else None
     if target is None:
-        for p in state.players:
-            trono = next(
-                (b for b in p.field.village.buildings if b.base_card_id == "trono"),
-                None,
-            )
-            if trono:
-                target = p
-                break
-
-    if target is None:
-        return {"error": "Nessun Trono trovato"}
+        return {"error": "Nessun Trono scelto"}
 
     if target.id != player.id and _is_spell_immune(target):
         state.recent_events.append({
@@ -720,18 +710,11 @@ def regicidio_effect(
         })
         return {"blocked_by": "magiscudo", "blocked_player": target.id}
 
-    trono = None
-    if target_trono_iid:
-        trono = next(
-            (b for b in target.field.village.buildings
-             if b.base_card_id == "trono" and b.instance_id == target_trono_iid),
-            None,
-        )
-    else:
-        trono = next(
-            (b for b in target.field.village.buildings if b.base_card_id == "trono"),
-            None,
-        )
+    trono = next(
+        (b for b in target.field.village.buildings
+         if b.base_card_id == "trono" and b.instance_id == target_trono_iid),
+        None,
+    )
 
     if trono is None:
         return {"error": "Trono non trovato"}
@@ -1545,7 +1528,7 @@ def plasmarmo_effect(
 
 @register_effect("patrizio_horde")
 def patrizio_horde(state: GameState, player: Player, warrior_iid: Optional[str] = None, **kwargs) -> dict:
-    """Questa carta ottiene +2 GIT fino al prossimo turno del giocatore."""
+    """Questa carta ottiene +2 GIT."""
     w = _find_warrior(player, warrior_iid)
     if w:
         w.temp_modifiers["git"] = w.temp_modifiers.get("git", 0) + 2
@@ -1560,11 +1543,10 @@ def patrizio_horde(state: GameState, player: Player, warrior_iid: Optional[str] 
 
 @register_effect("reinhold_horde")
 def reinhold_horde(state: GameState, player: Player, **kwargs) -> dict:
-    """Il costo per completare le Sorgive è ridotto di 2 questo turno."""
+    """Il costo per completare le Sorgive è ridotto di 2."""
     player.active_effects.append({
         "type": "reinhold_sorgiva_discount",
         "discount": 2,
-        "expires": "end_of_turn",
     })
     state.recent_events.append({
         "type": "horde", "card": "reinhold",
@@ -1575,12 +1557,11 @@ def reinhold_horde(state: GameState, player: Player, **kwargs) -> dict:
 
 @register_effect("araminta_horde")
 def araminta_horde(state: GameState, player: Player, **kwargs) -> dict:
-    """Gli Anatemi a costo 1 che giochi ti ritornano in mano questo turno."""
+    """Gli Anatemi a costo 1 che giochi ti ritornano in mano."""
     player.active_effects.append({
         "type": "araminta_spell_return",
         "school": "anatema",
         "cost": 1,
-        "expires": "end_of_turn",
     })
     state.recent_events.append({
         "type": "horde", "card": "araminta",
@@ -1591,7 +1572,7 @@ def araminta_horde(state: GameState, player: Player, **kwargs) -> dict:
 
 @register_effect("orfeo_horde")
 def orfeo_horde(state: GameState, player: Player, warrior_iid: Optional[str] = None, **kwargs) -> dict:
-    """Questa carta ottiene +1 ATT e +1 DIF fino al prossimo turno del giocatore."""
+    """Questa carta ottiene +1 ATT e +1 DIF."""
     w = _find_warrior(player, warrior_iid)
     if w:
         w.temp_modifiers["att"] = w.temp_modifiers.get("att", 0) + 1
@@ -1636,12 +1617,11 @@ def faust_horde(state: GameState, player: Player, **kwargs) -> dict:
 
 @register_effect("evelyn_horde")
 def evelyn_horde(state: GameState, player: Player, **kwargs) -> dict:
-    """I Sortilegi a costo 1 che giochi questo turno vengono giocati una seconda volta."""
+    """I Sortilegi a costo 1 che giochi vengono giocati una seconda volta."""
     player.active_effects.append({
         "type": "evelyn_spell_double",
         "school": "sortilegio",
         "cost": 1,
-        "expires": "end_of_turn",
     })
     state.recent_events.append({
         "type": "horde", "card": "evelyn",
@@ -1684,7 +1664,6 @@ def decimo_horde(state: GameState, player: Player, warrior_iid: Optional[str] = 
     player.active_effects.append({
         "type": "decimo_anti_fossato",
         "warrior_iid": warrior_iid,
-        "expires": "end_of_turn",
     })
     state.recent_events.append({
         "type": "horde", "card": "decimo",
@@ -1741,7 +1720,6 @@ def madeleine_horde(state: GameState, player: Player, **kwargs) -> dict:
     player.active_effects.append({
         "type": "madeleine_prodigy_any_school",
         "school": "incantesimo",
-        "expires": "end_of_turn",
     })
     state.recent_events.append({
         "type": "horde", "card": "madeleine",
@@ -1756,7 +1734,6 @@ def eracle_horde(state: GameState, player: Player, **kwargs) -> dict:
     player.active_effects.append({
         "type": "eracle_destroy_building",
         "min_damage": 3,
-        "expires": "end_of_turn",
     })
     state.recent_events.append({
         "type": "horde", "card": "eracle",

@@ -118,21 +118,21 @@ def _begin_turn(state: GameState) -> None:
 
     # Reset stato turno
     player.actions_remaining = 2
-    player.hordes_activated_this_turn = []
     player.ethereal_card = None
     player.ethereal_complete = None
     player.pending_velocemento_buildings = []
     player.pending_velocemento_prodigy = False
-    # Pulisce flag horde_active da turni precedenti
-    for w in player.all_warriors():
-        w.horde_active = False
     state.phase = "action"
     state.battle_done_this_turn = False
     state.battles_remaining = 1 + player.extra_battles
     player.extra_battles = 0
 
-    # Rimuovi i bonus stat da effetti Orda del turno precedente
-    _clear_horde_stat_effects(player)
+    # Nota: le Orde attivate NON si disattivano a inizio turno. Un'Orda resta attiva
+    # finché non si divide (riposizionamento/scarto, vedi deactivate_broken_horde) o
+    # finché il giocatore non sceglie un altro effetto Orda per lo stesso gruppo
+    # (deactivate_horde_for_switch). Fa eccezione l'Orda del Trono, sempre riattivata
+    # qui sotto in _trigger_building_start.
+
     # Pulisce modificatori temporanei da effetti "end_of_turn" precedenti
     _clear_turn_expired_effects(player)
 
@@ -195,7 +195,9 @@ def _trigger_building_start(state: GameState, player: Player) -> None:
             player.actions_remaining += 1
         elif base_id == "trono" and b_inst.completed and b_inst.assigned_warrior:
             # Trono completo: l'effetto Orda del Guerriero assegnato è sempre
-            # attivo, si ri-attiva automaticamente a ogni inizio turno.
+            # attivo, si ri-attiva automaticamente a ogni inizio turno (indipendente
+            # dalla persistenza normale delle Orde: qui si pulisce e riapplica sempre,
+            # per evitare che i bonus si accumulino turno dopo turno).
             target_w = next(
                 (w for w in player.all_warriors() if w.instance_id == b_inst.assigned_warrior),
                 None,
@@ -203,8 +205,12 @@ def _trigger_building_start(state: GameState, player: Player) -> None:
             if target_w:
                 w_card = get_card(target_w.base_card_id)
                 if isinstance(w_card, WarriorCard) and w_card.horde_effect_id:
+                    _clear_trono_horde_effects(player, target_w.instance_id)
                     target_w.horde_active = True
+                    effects_count_before = len(player.active_effects)
                     apply_effect(w_card.horde_effect_id, state, player, warrior_iid=target_w.instance_id)
+                    for eff in player.active_effects[effects_count_before:]:
+                        eff["trono_warrior"] = target_w.instance_id
 
 
 def _trigger_building_end(state: GameState, player: Player) -> int:
@@ -227,18 +233,25 @@ def _trigger_building_end(state: GameState, player: Player) -> int:
     return bonus
 
 
-def _clear_horde_stat_effects(player: Player) -> None:
-    """Rimuove i bonus stat applicati dall'effetto Orda del turno precedente."""
+def _clear_trono_horde_effects(player: Player, warrior_iid: str) -> None:
+    """Rimuove gli effetti Orda generati dal Trono per questo Guerriero nel turno
+    precedente, prima di riapplicarli: l'effetto Orda del Trono si ri-attiva ogni
+    inizio turno (a differenza delle Orde normali, che restano attive finché non
+    si dividono o il giocatore ne sceglie un'altra), quindi va pulito e riapplicato
+    per evitare che i bonus si accumulino."""
     to_remove = []
     for eff in player.active_effects:
+        if eff.get("trono_warrior") != warrior_iid:
+            continue
         if eff.get("type") == "horde_stat_bonus":
             for w in player.all_warriors():
-                if w.instance_id == eff.get("warrior_iid"):
+                if w.instance_id == warrior_iid:
                     for stat in ("att", "git", "dif"):
                         bonus = eff.get(stat, 0)
                         if bonus:
                             w.temp_modifiers[stat] = max(0, w.temp_modifiers.get(stat, 0) - bonus)
-            to_remove.append(eff)
+                    break
+        to_remove.append(eff)
     for eff in to_remove:
         player.active_effects.remove(eff)
 
@@ -746,6 +759,7 @@ def _available_hordes(player: Player) -> list:
                     "base_card_id": w.base_card_id,
                     "name": card.name,
                     "horde_effect": card.horde_effect,
+                    "active": w.horde_active,
                 })
         horde_key = f"{horde['zone']}:{horde['species']}"
         if warrior_data:

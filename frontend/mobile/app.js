@@ -727,8 +727,7 @@ const Mob = (() => {
       }
 
     } else if (phase === 'schieramento') {
-      const hordes = my && my.available_hordes
-        ? my.available_hordes.filter(h => !h.already_activated) : [];
+      const hordes = (my && my.available_hordes) || [];
       dock.appendChild(hint('Tocca una Regione per riposizionare i Guerrieri.'));
       if (hordes.length > 0) {
         dock.appendChild(mkBtn(`⚡ Orda (${hordes.length})`, 'mbtn-warn mbtn-pulse', openHordeSheet));
@@ -1010,6 +1009,8 @@ const Mob = (() => {
 
     if (def.id === 'bastioncontrario') { showBastioncontrarioOptions(iid, def, prodigy); return; }
 
+    if (def.id === 'regicidio') { showRegicidioOptions(iid, def, prodigy); return; }
+
     if (def.id === 'malcomune') {
       const my = me();
       const zones = [
@@ -1033,7 +1034,7 @@ const Mob = (() => {
       return;
     }
 
-    const spellsNeedingTarget = ['ardolancio', 'incendifesa', 'regicidio'];
+    const spellsNeedingTarget = ['ardolancio', 'incendifesa'];
     if (!spellsNeedingTarget.includes(def.id) || opponents.length === 0) {
       const effText = prodigy && def.prodigy_effect
         ? (def.prodigy_is_additive ? `${def.base_effect}<br><b style="color:var(--gold)">✨ Prodigio:</b> ${def.prodigy_effect}` : `<b style="color:var(--gold)">✨ Prodigio:</b> ${def.prodigy_effect}`)
@@ -1137,6 +1138,34 @@ const Mob = (() => {
         sendAction('play_spell', { instance_id: iid, player1_id: p1, side1: s1, player2_id: p2, side2: s2 });
       });
     });
+  }
+
+  function showRegicidioOptions(iid, def, prodigy) {
+    const options = [];
+    currentState.players.forEach(p => {
+      (p.field.village.buildings || []).forEach(b => {
+        if (b.base_card_id !== 'trono') return;
+        let sub = p.id === myPlayerId ? 'Tuo' : p.name;
+        if (b.assigned_warrior) {
+          const warrior = [...(p.field.vanguard || []), ...(p.field.bastion_left.warriors || []), ...(p.field.bastion_right.warriors || [])]
+            .find(w => w.instance_id === b.assigned_warrior);
+          sub += warrior ? ` · su ${warrior.name || warrior.base_card_id}` : '';
+        } else {
+          sub += ' · non assegnato';
+        }
+        options.push({
+          icon: '👑',
+          label: `Trono${b.completed ? ' (completo)' : ''}`,
+          sub,
+          value: `${p.id}:${b.instance_id}`,
+        });
+      });
+    });
+    if (options.length === 0) { Toast.show('Non ci sono Troni in campo.', 'error'); return; }
+    Sheet.choice(`${def.name} — scegli un Trono`, options, (choice) => {
+      const [targetId, tronoIid] = choice.split(':');
+      sendAction('play_spell', { instance_id: iid, target_player_id: targetId, target_trono_iid: tronoIid });
+    }, prodigy ? { subtitle: 'Prodigio: verrà scartato anche il Guerriero a cui era assegnato' } : undefined);
   }
 
   function showTelecinesiOptions(iid, def, prodigy) {
@@ -1938,13 +1967,16 @@ const Mob = (() => {
   function openHordeSheet() {
     const my = me();
     if (!my || !isMyTurn()) return;
-    const hordes = (my.available_hordes || []).filter(h => !h.already_activated);
+    const hordes = my.available_hordes || [];
     if (hordes.length === 0) { Toast.show('Nessuna Orda disponibile', 'error'); return; }
 
     const zoneNames = { vanguard: 'Avanscoperta', bastion_left: 'Bastione Sin.', bastion_right: 'Bastione Des.' };
+    // Le carte già attive per il proprio gruppo non vanno riproposte; le altre carte
+    // dello stesso gruppo permettono di cambiare l'effetto Orda attivo.
     const options = [];
     hordes.forEach(h => {
       h.warriors.forEach(w => {
+        if (w.active) return;
         options.push({
           icon: '⚡',
           label: w.name,
@@ -1953,11 +1985,12 @@ const Mob = (() => {
         });
       });
     });
+    if (options.length === 0) { Toast.show('Nessuna Orda disponibile', 'error'); return; }
 
     Sheet.choice('⚡ Attiva un effetto Orda', options, (choice) => {
       const [hordeCardId, warriorIid, zone] = choice.split('|');
       sendAction('horde', { horde_card_id: hordeCardId, warrior_instance_id: warriorIid, zone });
-    }, { subtitle: 'Ogni Orda può essere attivata una sola volta per turno' });
+    }, { subtitle: 'Un\'Orda resta attiva finché non si divide o scegli un altro effetto' });
   }
 
   // ---------------------------------------------------------------------------
