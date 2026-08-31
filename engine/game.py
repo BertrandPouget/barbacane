@@ -636,14 +636,14 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
             "hand_count": len(p.hand),
             "hand": p.hand if p.id == viewer_player_id else None,
             "field": {
-                "vanguard": [_warrior_view(w, p) for w in p.field.vanguard],
+                "vanguard": [_warrior_view(w, p, viewer_player_id) for w in p.field.vanguard],
                 "bastion_left": {
                     "wall_count": len(p.field.bastion_left.walls),
                     "walls": (
                         [w.instance_id for w in p.field.bastion_left.walls]
                         if p.id == viewer_player_id else None
                     ),
-                    "warriors": [_warrior_view(w, p) for w in p.field.bastion_left.warriors],
+                    "warriors": [_warrior_view(w, p, viewer_player_id) for w in p.field.bastion_left.warriors],
                 },
                 "bastion_right": {
                     "wall_count": len(p.field.bastion_right.walls),
@@ -651,7 +651,7 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
                         [w.instance_id for w in p.field.bastion_right.walls]
                         if p.id == viewer_player_id else None
                     ),
-                    "warriors": [_warrior_view(w, p) for w in p.field.bastion_right.warriors],
+                    "warriors": [_warrior_view(w, p, viewer_player_id) for w in p.field.bastion_right.warriors],
                 },
                 "village": {
                     "buildings": [_building_view(b, p if p.id == viewer_player_id else None) for b in p.field.village.buildings],
@@ -772,7 +772,7 @@ def _available_hordes(player: Player) -> list:
     return result
 
 
-def _warrior_view(w: WarriorInstance, player: Optional[Player] = None) -> dict:
+def _warrior_view(w: WarriorInstance, player: Optional[Player] = None, viewer_player_id: Optional[str] = None) -> dict:
     card = get_card(w.base_card_id)
     return {
         "instance_id": w.instance_id,
@@ -785,29 +785,51 @@ def _warrior_view(w: WarriorInstance, player: Optional[Player] = None) -> dict:
         "subtype": card.subtype if isinstance(card, WarriorCard) else None,
         "horde_active": w.horde_active,
         "assigned_cards": (
-            [_assigned_card_view(iid, player) for iid in w.assigned_cards]
+            [_assigned_card_view(iid, player, viewer_player_id) for iid in w.assigned_cards]
             if player is not None else []
         ),
     }
 
 
-def _assigned_card_view(iid: str, player: Player) -> dict:
-    """Vista pubblica di una carta assegnata a un Guerriero (es. Trono)."""
+def _assigned_card_view(iid: str, player: Player, viewer_player_id: Optional[str] = None) -> dict:
+    """
+    Vista pubblica di una carta assegnata a un Guerriero.
+    Due casi: Costruzione assegnata (es. Trono, sempre pubblica) oppure Muro
+    assegnato (es. Arrampicarta, identità nascosta a chi non è il proprietario,
+    come i Muri nei Bastioni).
+    """
     from engine.deck import get_base_card_id
     base_id = get_base_card_id(iid)
     card = get_card(base_id)
-    result = {
-        "instance_id": iid,
-        "base_card_id": base_id,
-        "name": card.name if card else base_id,
-        "type": card.type if card else None,
-    }
+
     if isinstance(card, BuildingCard):
         b_inst = next((b for b in player.field.village.buildings if b.instance_id == iid), None)
         if b_inst is not None:
-            result["completed"] = b_inst.completed
-            result["effect"] = card.complete_effect if b_inst.completed else card.base_effect
-    return result
+            return {
+                "instance_id": iid,
+                "base_card_id": base_id,
+                "name": card.name,
+                "type": card.type,
+                "completed": b_inst.completed,
+                "effect": card.complete_effect if b_inst.completed else card.base_effect,
+            }
+
+    # Muro assegnato: identità visibile solo al proprietario
+    if player.id == viewer_player_id:
+        return {
+            "instance_id": iid,
+            "base_card_id": base_id,
+            "name": card.name if card else base_id,
+            "type": "wall",
+        }
+    # Nascosto agli avversari: nessun instance_id, così non se ne può risalire
+    # l'identità (come i Muri nel Bastione, esposti solo come wall_count)
+    return {
+        "instance_id": None,
+        "base_card_id": None,
+        "name": None,
+        "type": "wall",
+    }
 
 
 def _building_view(b: BuildingInstance, player=None) -> dict:

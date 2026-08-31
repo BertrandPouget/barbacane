@@ -898,9 +898,21 @@ input:focus {
 }
 .ethereal-cost { color: #ffffff; font-weight: bold; }
 
-/* Guerriero con una o più carte assegnate (es. Trono) */
-.card.has-assigned {
-  border-color: var(--orange) !important;
+/* Guerriero con una o più carte assegnate (es. Trono, Muri): una piccola
+   sagoma di carta "sbuca" da sopra, larga quanto il lato corto della carta,
+   staccata da un minimo spazio di separazione (invece di un bordo colorato) */
+.card.has-assigned::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  height: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--orange);
+  border-radius: 3px;
+  pointer-events: none;
 }
 
 /* Badge costo: esagono in alto a destra sulla carta.

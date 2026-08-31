@@ -413,6 +413,28 @@ def play_spell(
         if not has_building:
             raise ActionError("Non hai nessuna Costruzione in mano.")
 
+    # Pre-validazione: arrampicarta richiede la scelta esplicita di un tuo Muro
+    # e di un tuo Guerriero a cui assegnarlo
+    if base_id == "arrampicarta":
+        wall_instance_id = kwargs.get("wall_instance_id")
+        warrior_iid = kwargs.get("warrior_iid")
+        bastion_side = kwargs.get("bastion_side")
+        if not wall_instance_id or not warrior_iid:
+            raise ActionError("Devi scegliere un Muro e un Guerriero a cui assegnarlo.")
+        if bastion_side:
+            bastion = player.field.bastion_left if bastion_side == "left" else player.field.bastion_right
+            wall_found = any(w.instance_id == wall_instance_id for w in bastion.walls)
+        else:
+            wall_found = any(
+                w.instance_id == wall_instance_id
+                for b in (player.field.bastion_left, player.field.bastion_right)
+                for w in b.walls
+            )
+        if not wall_found:
+            raise ActionError("Muro non trovato nel Bastione indicato.")
+        if not any(w.instance_id == warrior_iid for w in player.all_warriors()):
+            raise ActionError("Guerriero non trovato in campo.")
+
     # Rimuovi dalla mano e consuma azione
     player.hand.remove(instance_id)
     if not is_ethereal:

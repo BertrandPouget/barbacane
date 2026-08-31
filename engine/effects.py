@@ -867,9 +867,14 @@ def arrampicarta_effect(
                     "player_id": player.id, "blocked_player": p.id,
                 })
                 continue
+            # Rimuove solo Muri assegnati (es. Arrampicarta), non Costruzioni
+            # assegnate come il Trono, che restano intoccate.
+            building_iids = {b.instance_id for b in p.field.village.buildings}
             for w in p.all_warriors():
-                if w.assigned_cards:
-                    removed_card = w.assigned_cards.pop(0)
+                wall_cards = [c for c in w.assigned_cards if c not in building_iids]
+                if wall_cards:
+                    removed_card = wall_cards[0]
+                    w.assigned_cards.remove(removed_card)
                     if w.temp_modifiers.get("git", 0) > 0:
                         w.temp_modifiers["git"] -= 1
                     state.discard_pile.append(removed_card)

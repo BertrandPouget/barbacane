@@ -1104,14 +1104,34 @@ const App = (() => {
 
     // Carte assegnate (es. Trono): visibili su qualsiasi Guerriero, proprio o avversario
     if ((source === 'field' || source === 'opponent') && fieldWarrior && fieldWarrior.assigned_cards && fieldWarrior.assigned_cards.length > 0) {
-      extraButtons.push({
-        label: 'Carte assegnate',
-        className: 'btn-secondary',
-        onClick: () => {
-          Renderer.closeCardDetail();
-          _showAssignedCardsSlideshow(instanceId, fieldWarriorOwnerId, 0);
-        },
-      });
+      const nonWallAssigned = fieldWarrior.assigned_cards.filter(ac => ac.type !== 'wall');
+      const assignedWalls = fieldWarrior.assigned_cards.filter(ac => ac.type === 'wall');
+
+      if (nonWallAssigned.length > 0) {
+        extraButtons.push({
+          label: 'Carte assegnate',
+          className: 'btn-secondary',
+          onClick: () => {
+            Renderer.closeCardDetail();
+            _showAssignedCardsSlideshow(instanceId, fieldWarriorOwnerId, 0);
+          },
+        });
+      }
+
+      // Muri assegnati (es. Arrampicarta): mostrati a testa in giù, impilati e
+      // numerati come nel Bastione — l'identità è visibile solo al proprietario.
+      if (assignedWalls.length > 0) {
+        const revealable = assignedWalls.every(ac => ac.instance_id);
+        extraButtons.push({
+          label: 'Muri assegnati',
+          className: 'btn-secondary',
+          disabled: !revealable,
+          onClick: revealable ? () => {
+            Renderer.closeCardDetail();
+            _showAssignedWallSlideshow(instanceId, fieldWarriorOwnerId, 0);
+          } : () => {},
+        });
+      }
     }
 
     // Bottone Scarta: disponibile per le proprie carte (mano, campo, villaggio) in qualsiasi momento
@@ -1283,6 +1303,28 @@ const App = (() => {
       Renderer.showChoiceModal(`${def.name} — scegli un Bastione`, bastionOptions, (side) => {
         const walls = (side === 'left' ? me.field.bastion_left : me.field.bastion_right).walls || [];
         _showSpellWallPicker(walls, side, instanceId, 0);
+      });
+      return;
+    }
+
+    // Arrampicarta: scegli un tuo Bastione → un tuo Muro → un tuo Guerriero a cui assegnarlo
+    if (def.id === 'arrampicarta') {
+      const me = currentState.players.find(p => p.id === myPlayerId);
+      const bastionOptions = [
+        { label: `Bastione Sinistro (${me.field.bastion_left.wall_count ?? 0} muri)`, value: 'left' },
+        { label: `Bastione Destro (${me.field.bastion_right.wall_count ?? 0} muri)`, value: 'right' },
+      ].filter(o => (o.value === 'left' ? me.field.bastion_left : me.field.bastion_right).wall_count > 0);
+      if (bastionOptions.length === 0) {
+        Renderer.toast('Nessun Muro nei tuoi Bastioni.', 'error');
+        return;
+      }
+      if (_getAllWarriors(me).length === 0) {
+        Renderer.toast('Non hai nessun Guerriero in campo a cui assegnare un Muro.', 'error');
+        return;
+      }
+      Renderer.showChoiceModal(`${def.name} — scegli un Bastione`, bastionOptions, (side) => {
+        const walls = (side === 'left' ? me.field.bastion_left : me.field.bastion_right).walls || [];
+        _showArrampicartaWallPicker(walls, side, instanceId, 0);
       });
       return;
     }
@@ -1727,6 +1769,50 @@ const App = (() => {
       },
       def ? def.id : null
     );
+  }
+
+  // Arrampicarta: scelta del Muro, seguita dalla scelta del Guerriero a cui assegnarlo
+  function _showArrampicartaWallPicker(walls, side, spellInstanceId, idx) {
+    const iid = walls[idx];
+    const def = getCardDef(iid);
+
+    const bodyHTML = cardDetailBodyHTML(def, iid);
+
+    Renderer.showCardDetail(
+      def ? def.name : iid,
+      bodyHTML,
+      null, null, null,
+      [{
+        label: 'Scegli',
+        className: 'btn-primary',
+        onClick: () => {
+          Renderer.closeCardDetail();
+          _showArrampicartaWarriorPicker(spellInstanceId, side, iid);
+        },
+      }],
+      {
+        onPrev: idx > 0 ? () => _showArrampicartaWallPicker(walls, side, spellInstanceId, idx - 1) : null,
+        onNext: idx < walls.length - 1 ? () => _showArrampicartaWallPicker(walls, side, spellInstanceId, idx + 1) : null,
+      },
+      def ? def.id : null
+    );
+  }
+
+  function _showArrampicartaWarriorPicker(spellInstanceId, wallSide, wallInstanceId) {
+    const me = currentState.players.find(p => p.id === myPlayerId);
+    const warriors = _getAllWarriors(me);
+    const options = warriors.map(w => ({
+      label: `${w.name} (ATT ${w.att}  GIT ${w.git}  DIF ${w.dif})`,
+      value: w.instance_id,
+    }));
+    Renderer.showChoiceModal('Arrampicarta — assegna il Muro a un Guerriero', options, (warriorIid) => {
+      sendAction('play_spell', {
+        instance_id: spellInstanceId,
+        bastion_side: wallSide,
+        wall_instance_id: wallInstanceId,
+        warrior_iid: warriorIid,
+      });
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -2383,7 +2469,7 @@ const App = (() => {
   function _showAssignedCardsSlideshow(warriorIid, ownerPlayerId, idx) {
     const warrior = _findWarriorByIid(ownerPlayerId, warriorIid);
     if (!warrior) return;
-    const assignedCards = warrior.assigned_cards || [];
+    const assignedCards = (warrior.assigned_cards || []).filter(ac => ac.type !== 'wall');
     if (assignedCards.length === 0) return;
 
     const ac = assignedCards[idx];
@@ -2427,6 +2513,33 @@ const App = (() => {
       onAction,
       null,
       extraButtons,
+      navOptions,
+      def ? def.id : null
+    );
+  }
+
+  // Muri assegnati a un Guerriero (es. Arrampicarta): a testa in giù e numerati
+  // come nel Bastione — vedibili solo per il proprietario (identità nascosta
+  // agli avversari a monte, dal server, filtrando gli instance_id).
+  function _showAssignedWallSlideshow(warriorIid, ownerPlayerId, idx) {
+    const warrior = _findWarriorByIid(ownerPlayerId, warriorIid);
+    if (!warrior) return;
+    const walls = (warrior.assigned_cards || []).filter(ac => ac.type === 'wall' && ac.instance_id);
+    if (walls.length === 0) return;
+
+    const ac = walls[idx];
+    const def = getCardDef(ac.instance_id);
+    const bodyHTML = cardDetailBodyHTML(def, ac.instance_id, null, null);
+
+    const navOptions = {
+      onPrev: idx > 0 ? () => _showAssignedWallSlideshow(warriorIid, ownerPlayerId, idx - 1) : null,
+      onNext: idx < walls.length - 1 ? () => _showAssignedWallSlideshow(warriorIid, ownerPlayerId, idx + 1) : null,
+    };
+
+    Renderer.showCardDetail(
+      `Muro assegnato ${idx + 1} / ${walls.length}${def ? ' — ' + def.name : ''}`,
+      bodyHTML,
+      null, null, null, [],
       navOptions,
       def ? def.id : null
     );

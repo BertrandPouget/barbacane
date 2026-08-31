@@ -932,6 +932,25 @@ const Mob = (() => {
       return;
     }
 
+    if (def.id === 'arrampicarta') {
+      const my = me();
+      const bastionOptions = ['left', 'right']
+        .filter(s => ((s === 'left' ? my.field.bastion_left : my.field.bastion_right).wall_count ?? 0) > 0)
+        .map(s => ({
+          icon: '🏰',
+          label: `Bastione ${s === 'left' ? 'Sinistro' : 'Destro'}`,
+          sub: `${(s === 'left' ? my.field.bastion_left : my.field.bastion_right).wall_count} muri`,
+          value: s,
+        }));
+      if (bastionOptions.length === 0) { Toast.show('Nessun Muro nei tuoi Bastioni.', 'error'); return; }
+      if (getAllWarriors(my).length === 0) { Toast.show('Non hai nessun Guerriero in campo a cui assegnare un Muro.', 'error'); return; }
+      Sheet.choice(`${def.name} — scegli un Bastione`, bastionOptions, (side) => {
+        const walls = (side === 'left' ? my.field.bastion_left : my.field.bastion_right).walls || [];
+        showArrampicartaWallPicker(walls, side, iid, 0);
+      });
+      return;
+    }
+
     if (def.id === 'cambiamente') {
       const options = [];
       opponents.forEach(p => {
@@ -1266,6 +1285,57 @@ const Mob = (() => {
     });
   }
 
+  // Selettore muro per Arrampicarta, seguito dalla scelta del Guerriero a cui assegnarlo
+  function showArrampicartaWallPicker(walls, side, spellIid, idx) {
+    if (!walls.length) return;
+    const iid = walls[idx];
+    const def = getCardDef(iid);
+    preloadCardImages([walls[idx - 1], walls[idx + 1]]);
+    showCardNavSheet({
+      title: def ? def.name : iid,
+      subtitle: `Muro ${idx + 1} di ${walls.length}`,
+      def,
+      pos: { idx, total: walls.length },
+      onPrev: idx > 0 ? () => showArrampicartaWallPicker(walls, side, spellIid, idx - 1) : null,
+      onNext: idx < walls.length - 1 ? () => showArrampicartaWallPicker(walls, side, spellIid, idx + 1) : null,
+      footer: [{
+        label: '✓ Scegli questo Muro',
+        className: 'mbtn-gold',
+        onClick: () => {
+          Sheet.close(true);
+          showArrampicartaWarriorPicker(spellIid, side, iid);
+        },
+      }],
+    });
+  }
+
+  function showArrampicartaWarriorPicker(spellIid, wallSide, wallIid) {
+    const my = me();
+    const zoneLabels = { vanguard: 'Avanscoperta', bastion_left: 'Bastione Sin.', bastion_right: 'Bastione Des.' };
+    const options = [];
+    ['vanguard', 'bastion_left', 'bastion_right'].forEach(reg => {
+      const warriors = reg === 'vanguard'
+        ? my.field.vanguard
+        : (reg === 'bastion_left' ? my.field.bastion_left.warriors : my.field.bastion_right.warriors);
+      (warriors || []).forEach(w => {
+        options.push({
+          icon: '🗡️',
+          label: w.name || w.base_card_id,
+          sub: `${zoneLabels[reg]} · 🗡️${w.att} 🏹${w.git} 🛡️${w.dif}`,
+          value: w.instance_id,
+        });
+      });
+    });
+    Sheet.choice('Arrampicarta — assegna il Muro a un Guerriero', options, (warriorIid) => {
+      sendAction('play_spell', {
+        instance_id: spellIid,
+        bastion_side: wallSide,
+        wall_instance_id: wallIid,
+        warrior_iid: warriorIid,
+      });
+    });
+  }
+
   // Precarica le immagini delle carte indicate (usato per le carte adiacenti
   // nella navigazione, così lo scorrimento non aspetta la rete)
   function preloadCardImages(iids) {
@@ -1512,10 +1582,16 @@ const Mob = (() => {
     const footer = [
       { label: 'Scarta', className: 'mbtn-danger', onClick: () => confirmDiscard(iid, 'field') },
     ];
-    if (w.assigned_cards && w.assigned_cards.length > 0) {
+    if (w.assigned_cards && w.assigned_cards.some(ac => ac.type !== 'wall')) {
       footer.push({
         label: 'Carte assegnate',
         onClick: () => { Sheet.close(true); openAssignedCardsSheet(iid, myPlayerId, 0, () => openFieldWarriorSheet(iid)); },
+      });
+    }
+    if (w.assigned_cards && w.assigned_cards.some(ac => ac.type === 'wall')) {
+      footer.push({
+        label: 'Muri assegnati',
+        onClick: () => { Sheet.close(true); openAssignedWallSheet(iid, myPlayerId, 0, () => openFieldWarriorSheet(iid)); },
       });
     }
     footer.push({
@@ -1846,10 +1922,21 @@ const Mob = (() => {
   function openEnemyCardSheet(w, owner) {
     const def = getCardDef(w.instance_id);
     const footer = [];
-    if (w.assigned_cards && w.assigned_cards.length > 0) {
+    if (w.assigned_cards && w.assigned_cards.some(ac => ac.type !== 'wall')) {
       footer.push({
         label: 'Carte assegnate',
         onClick: () => { Sheet.close(true); openAssignedCardsSheet(w.instance_id, owner.id, 0, () => openOpponentSheet(owner.id)); },
+      });
+    }
+    if (w.assigned_cards && w.assigned_cards.some(ac => ac.type === 'wall')) {
+      const walls = w.assigned_cards.filter(ac => ac.type === 'wall');
+      const revealable = walls.every(ac => ac.instance_id);
+      footer.push({
+        label: 'Muri assegnati',
+        disabled: !revealable,
+        onClick: revealable
+          ? () => { Sheet.close(true); openAssignedWallSheet(w.instance_id, owner.id, 0, () => openOpponentSheet(owner.id)); }
+          : () => {},
       });
     }
     footer.push({ label: '‹ Indietro', onClick: () => openOpponentSheet(owner.id) });
@@ -1869,7 +1956,7 @@ const Mob = (() => {
     const owner = currentState.players.find(p => p.id === ownerPlayerId);
     const warrior = owner ? getAllWarriors(owner).find(w => w.instance_id === warriorIid) : null;
     if (!warrior) return;
-    const assignedCards = warrior.assigned_cards || [];
+    const assignedCards = (warrior.assigned_cards || []).filter(ac => ac.type !== 'wall');
     if (assignedCards.length === 0) return;
 
     const ac = assignedCards[idx];
@@ -1900,6 +1987,40 @@ const Mob = (() => {
       pos: { idx, total: assignedCards.length },
       onPrev: idx > 0 ? () => openAssignedCardsSheet(warriorIid, ownerPlayerId, idx - 1, onBack) : null,
       onNext: idx < assignedCards.length - 1 ? () => openAssignedCardsSheet(warriorIid, ownerPlayerId, idx + 1, onBack) : null,
+      footer,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sheet: Muri assegnati a un Guerriero (es. Arrampicarta) — a testa in giù
+  // e numerati come nel Bastione; identità nascosta agli avversari dal server.
+  // ---------------------------------------------------------------------------
+
+  function openAssignedWallSheet(warriorIid, ownerPlayerId, idx, onBack) {
+    const owner = currentState.players.find(p => p.id === ownerPlayerId);
+    const warrior = owner ? getAllWarriors(owner).find(w => w.instance_id === warriorIid) : null;
+    if (!warrior) return;
+    const walls = (warrior.assigned_cards || []).filter(ac => ac.type === 'wall' && ac.instance_id);
+    if (walls.length === 0) return;
+
+    const ac = walls[idx];
+    const def = getCardDef(ac.instance_id);
+
+    const footer = [];
+    if (onBack) footer.push({ label: '‹ Indietro', onClick: onBack });
+
+    preloadCardImages([
+      walls[idx - 1] && walls[idx - 1].instance_id,
+      walls[idx + 1] && walls[idx + 1].instance_id,
+    ]);
+    showCardNavSheet({
+      title: def ? def.name : ac.instance_id,
+      subtitle: `Muro assegnato a ${warrior.name || warrior.base_card_id}`,
+      def,
+      ctx: { instanceId: ac.instance_id },
+      pos: { idx, total: walls.length },
+      onPrev: idx > 0 ? () => openAssignedWallSheet(warriorIid, ownerPlayerId, idx - 1, onBack) : null,
+      onNext: idx < walls.length - 1 ? () => openAssignedWallSheet(warriorIid, ownerPlayerId, idx + 1, onBack) : null,
       footer,
     });
   }
