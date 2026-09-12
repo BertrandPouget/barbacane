@@ -180,7 +180,8 @@ const Mob = (() => {
       const defs = Object.values(cardDefs).filter(c => c.type === section.type);
       if (!defs.length) return;
 
-      grid.appendChild(el('div', { className: 'cat-section-title' }, [`${section.label} (${defs.length})`]));
+      const box = el('div', { className: 'cat-section' });
+      box.appendChild(el('div', { className: 'cat-section-title' }, [section.label]));
 
       const row = el('div', { className: 'cat-cards' });
       defs.forEach(def => {
@@ -200,10 +201,10 @@ const Mob = (() => {
         cell.addEventListener('click', () => { haptic(); showCatalogCard(idx); });
         row.appendChild(cell);
       });
-      grid.appendChild(row);
+      box.appendChild(row);
+      grid.appendChild(box);
     });
 
-    $('cat-count').textContent = `${catalogList.length} carte`;
     catalogBuilt = true;
   }
 

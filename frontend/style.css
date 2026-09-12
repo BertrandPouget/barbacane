@@ -24,6 +24,13 @@
   --brown-light:  #7a4418;
   --orange:       #e08020;
 
+  /* Palette della grafica delle carte (card_factory/assets/card.html): usata
+     dove la UI deve essere coerente con le carte stampate (es. catalogo) */
+  --card-brown: #4a2c15;
+  --card-gold:  #b98a3e;
+  --card-cream: #f4dea0;
+  --card-ink:   #171009;   /* fondo su cui sono renderizzati i PNG delle carte */
+
   --card-w: 90px;
   --card-h: 130px;
   --card-w-sm: 70px;
@@ -37,7 +44,7 @@
 body {
   background: var(--bg-dark);
   color: var(--text);
-  font-family: 'Georgia', serif;
+  font-family: 'Caudex', Georgia, serif;
   min-height: 100vh;
   overflow-x: hidden;
 }
@@ -1725,25 +1732,28 @@ input:focus {
 }
 
 #catalog-header {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.7rem 1.2rem;
-  background: var(--bg-medium);
-  border-bottom: 2px solid var(--border-gold);
+  justify-content: center;
+  padding: 0.8rem 1.2rem;
+  background: rgba(23, 16, 9, 0.92);
+  border-bottom: 2px solid var(--card-gold);
   flex-shrink: 0;
 }
 
-#catalog-header h2 {
-  color: var(--gold);
-  font-size: 1.2rem;
-  margin: 0;
+#btn-catalog-back {
+  position: absolute;
+  left: 1.2rem;
 }
 
-.catalog-count {
-  color: var(--text-dim);
-  font-size: 0.85rem;
-  margin-left: auto;
+#catalog-header h2 {
+  color: var(--card-cream);
+  font-size: 1.35rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  margin: 0;
 }
 
 #catalog-scroll {
@@ -1757,37 +1767,52 @@ input:focus {
   margin: 0 auto;
 }
 
-.catalog-section-title {
-  color: var(--gold);
-  font-size: 1.05rem;
-  font-weight: 700;
-  margin: 1.4rem 0 0.7rem;
-  padding-bottom: 0.3rem;
-  border-bottom: 1px solid var(--border);
+/* Ogni sezione è un ripiano su cui le carte poggiano: senza questo contenitore
+   i PNG (rettangolari, con la cornice già disegnata) sembrano fluttuare sul
+   mattone dello sfondo. Il marrone è velato, non pieno, per non appesantire. */
+.catalog-section {
+  background: rgba(40, 18, 0, 0.58);
+  border: 1px solid rgba(185, 138, 62, 0.35);
+  border-radius: 12px;
+  padding: 0 1.3rem 1.3rem;
+  margin-top: 1.6rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
 }
 
-.catalog-section-title:first-child { margin-top: 0; }
+.catalog-section:first-child { margin-top: 0; }
+
+/* Il nome della sezione vive nella fascia ricavata in cima al ripiano */
+.catalog-section-title {
+  padding: 1.5rem 0 1.2rem;
+  text-align: center;
+  color: var(--card-cream);
+  font-size: 1.3rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+}
 
 .catalog-cards {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 .catalog-card {
-  aspect-ratio: 744 / 1039;
-  border-radius: 10px;
+  aspect-ratio: 744 / 1040;
+  /* In percentuale (non in px) così la smussatura resta allineata a quella
+     disegnata sulla carta (18px su 744x1040) a qualsiasi dimensione di griglia */
+  border-radius: 2.7% / 1.95%;
   overflow: hidden;
-  border: 2px solid var(--border-gold);
   cursor: pointer;
-  background: var(--bg-card);
+  background: var(--card-ink);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .catalog-card:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
-  border-color: var(--gold);
+  transform: translateY(-5px) scale(1.03);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.65);
 }
 
 .catalog-card img {
@@ -1805,9 +1830,14 @@ input:focus {
   justify-content: center;
   text-align: center;
   padding: 8px;
-  color: var(--text);
+  background: var(--card-brown);
+  color: var(--card-cream);
   font-weight: 700;
   font-size: 0.9rem;
+}
+
+@media (max-width: 900px) {
+  .catalog-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 @media (max-width: 640px) {

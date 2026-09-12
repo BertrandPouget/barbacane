@@ -29,6 +29,12 @@
   --brown-light:  #7a4418;
   --orange:       #e08020;
 
+  /* Palette della grafica delle carte (card_factory/assets/card.html) */
+  --card-brown: #4a2c15;
+  --card-gold:  #b98a3e;
+  --card-cream: #f4dea0;
+  --card-ink:   #171009;   /* fondo su cui sono renderizzati i PNG delle carte */
+
   --danger: var(--red-light);
   --ok:     var(--green-light);
   --info:   var(--blue-light);
@@ -95,7 +101,7 @@ html {
 body {
   position: fixed;
   inset: 0;
-  font-family: 'Georgia', serif;
+  font-family: 'Caudex', Georgia, serif;
   color: var(--text);
   background: transparent;
   overflow-x: hidden;
@@ -1507,25 +1513,24 @@ input {
 }
 
 #cat-head {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
   margin: calc(var(--sat) + 8px) 10px 0;
   padding: 7px 9px;
   border-radius: var(--r-md);
   flex: 0 0 auto;
 }
 
+#cat-back { position: absolute; left: 9px; }
+
 .cat-title {
   font-weight: 700;
   font-size: 1rem;
-  color: var(--gold);
-}
-
-.cat-count {
-  margin-left: auto;
-  font-size: 0.78rem;
-  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--card-cream);
 }
 
 #cat-scroll {
@@ -1535,16 +1540,28 @@ input {
   padding: 12px 12px calc(var(--sab) + 20px);
 }
 
-.cat-section-title {
-  color: var(--gold);
-  font-weight: 700;
-  font-size: 0.92rem;
-  margin: 16px 2px 8px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--border);
+/* Ogni sezione è un ripiano velato su cui le carte poggiano, col nome
+   della sezione nella fascia ricavata in cima (come nel desktop) */
+.cat-section {
+  background: rgba(40, 18, 0, 0.58);
+  border: 1px solid rgba(185, 138, 62, 0.35);
+  border-radius: var(--r-lg);
+  padding: 0 8px 8px;
+  margin-top: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
-.cat-section-title:first-child { margin-top: 2px; }
+.cat-section:first-child { margin-top: 0; }
+
+.cat-section-title {
+  padding: 12px 0 10px;
+  text-align: center;
+  color: var(--card-cream);
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
 
 .cat-cards {
   display: grid;
@@ -1552,11 +1569,14 @@ input {
   gap: 8px;
 }
 
+/* Nessun bordo proprio: i PNG hanno già la loro cornice colorata. Il raggio
+   in percentuale ritaglia gli angoli del fondo impressi nell'immagine. */
 .cat-card {
-  border-radius: 8px;
+  aspect-ratio: 744 / 1040;
+  border-radius: 2.7% / 1.95%;
   overflow: hidden;
-  border: 1px solid var(--border-gold);
-  background: var(--bg-dark);
+  background: var(--card-ink);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
   transition: filter 0.15s;
 }
 
@@ -1564,7 +1584,8 @@ input {
 
 .cat-card img {
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
   display: block;
 }
 
@@ -1576,7 +1597,8 @@ input {
   justify-content: center;
   text-align: center;
   padding: 4px;
-  color: var(--text);
+  background: var(--card-brown);
+  color: var(--card-cream);
   font-weight: 700;
   font-size: 0.62rem;
   line-height: 1.2;

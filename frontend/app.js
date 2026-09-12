@@ -136,10 +136,13 @@ const App = (() => {
       const defs = Object.values(cardDefs).filter(c => c.type === section.type);
       if (!defs.length) return;
 
+      const box = document.createElement('div');
+      box.className = 'catalog-section';
+
       const header = document.createElement('div');
       header.className = 'catalog-section-title';
-      header.textContent = `${section.label} (${defs.length})`;
-      grid.appendChild(header);
+      header.textContent = section.label;
+      box.appendChild(header);
 
       const row = document.createElement('div');
       row.className = 'catalog-cards';
@@ -162,10 +165,10 @@ const App = (() => {
         cell.addEventListener('click', () => showCatalogCard(idx));
         row.appendChild(cell);
       });
-      grid.appendChild(row);
+      box.appendChild(row);
+      grid.appendChild(box);
     });
 
-    document.getElementById('catalog-count').textContent = `${catalogList.length} carte`;
     catalogBuilt = true;
   }
 
