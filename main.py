@@ -40,7 +40,18 @@ async def _cleanup_loop():
 @app.on_event("startup")
 async def startup():
     from db.storage import IS_POSTGRES
-    logging.basicConfig(level=logging.INFO)
+
+    # Riusa l'handler/formatter di Uvicorn per allineare lo stile dei nostri
+    # log ("INFO:     msg") a quello delle righe stampate da Uvicorn stesso,
+    # invece del formato di default di basicConfig ("INFO:barbacane:msg").
+    # Configurato sul root logger cosi' ne beneficiano anche i logger creati
+    # con getLogger(__name__) altrove nel progetto (es. server/routes.py).
+    uvicorn_logger = logging.getLogger("uvicorn")
+    root_logger = logging.getLogger()
+    if uvicorn_logger.handlers:
+        root_logger.handlers = uvicorn_logger.handlers
+    root_logger.setLevel(logging.INFO)
+
     logger.info("[storage] Backend attivo: %s", "POSTGRES (Neon)" if IS_POSTGRES else "SQLITE (locale/effimero)")
     init_db()
     asyncio.create_task(_cleanup_loop())
