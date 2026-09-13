@@ -29,8 +29,21 @@
 </head>
 <body>
 
+<canvas id="sparks-canvas"></canvas>
+<audio id="bgm-audio" src="/assets/Tower-Defense_Looping.ogg" loop preload="auto"></audio>
+<button id="btn-music-toggle" class="music-toggle" aria-label="Attiva/disattiva musica" title="Musica">♪</button>
+
+<!-- ===== SCHERMATA: SPLASH ===== -->
+<div id="screen-splash" class="screen active">
+  <div class="splash-container">
+    <img src="/assets/logo.png" alt="Barbacane" class="splash-logo" id="splash-logo"
+         onerror="this.style.display='none'; document.getElementById('splash-title').classList.add('show')" />
+    <h1 class="game-title splash-title-fallback" id="splash-title">BARBACANE</h1>
+  </div>
+</div>
+
 <!-- ===== SCHERMATA: LOBBY ===== -->
-<div id="screen-lobby" class="screen active">
+<div id="screen-lobby" class="screen">
   <div class="lobby-container">
     <div class="logo-area">
       <img src="/assets/logo.png" alt="Barbacane" class="logo"
@@ -64,7 +77,7 @@
       </div>
     </div>
     <button id="btn-catalog" class="btn btn-secondary btn-catalog">Catalogo Carte</button>
-    <a href="/m" style="display:block;text-align:center;margin-top:14px;font-size:0.8rem;font-style:italic;color:var(--bg-medium);text-decoration:none"
+    <a href="/m" class="mobile-link"
        onclick="try{localStorage.removeItem('barbacane-desktop')}catch(e){}">Passa alla versione mobile</a>
   </div>
 </div>
@@ -281,6 +294,8 @@
   </div>
 </div>
 
+<script src="sparks.js"></script>
+<script src="audio.js"></script>
 <script src="ws.js"></script>
 <script src="renderer.js"></script>
 <script src="app.js"></script>

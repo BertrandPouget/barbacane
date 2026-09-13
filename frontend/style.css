@@ -64,6 +64,66 @@ body::before {
 .screen { display: none; }
 .screen.active { display: block; }
 
+/* ==================== SCINTILLE DI FORGIA ==================== */
+
+#sparks-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ==================== MUSICA ==================== */
+
+.music-toggle {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 400;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border-gold);
+  background: var(--bg-medium);
+  color: var(--gold);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.music-toggle:hover { opacity: 1; transform: scale(1.08); }
+.music-toggle.muted { color: var(--brown-light); }
+.music-toggle[hidden] { display: none; }
+
+/* In partita il pulsante si inserisce nella barra dell'header, a destra di "Esci" */
+.music-toggle.in-header {
+  position: static;
+  z-index: auto;
+  width: 28px;
+  height: 28px;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+/* Nel catalogo si inserisce nella barra del titolo, speculare al pulsante "Indietro" */
+.music-toggle.in-catalog-header {
+  position: absolute;
+  top: 50%;
+  right: 1.2rem;
+  left: auto;
+  transform: translateY(-50%);
+  z-index: auto;
+  width: 32px;
+  height: 32px;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+.music-toggle.in-catalog-header:hover { transform: translateY(-50%) scale(1.08); }
+
 /* ==================== LOBBY ==================== */
 
 #screen-lobby,
@@ -87,6 +147,62 @@ body::before {
 
 .logo-area { text-align: center; }
 .logo { max-width: 440px; width: 80vw; display: block; margin: 0 auto; }
+
+/* ==================== SPLASH ==================== */
+
+#screen-splash { position: relative; overflow: hidden; }
+
+.splash-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.4rem;
+  padding: 2rem;
+  cursor: pointer;
+}
+
+.splash-logo {
+  max-width: 520px;
+  width: 84vw;
+  display: block;
+  /* Il transform gestisce solo il volo verso la lobby; il filter dà il bagliore al passaggio del mouse */
+  transition: transform 0.7s cubic-bezier(0.25, 0.1, 0.25, 1), filter 0.25s ease;
+  will-change: transform;
+  filter: drop-shadow(0 0 0 transparent);
+}
+.splash-logo:hover {
+  filter: drop-shadow(0 0 26px rgba(240, 206, 6, 0.55));
+}
+
+.splash-title-fallback { display: none; }
+.splash-title-fallback.show { display: block; }
+
+/* Durante il volo lo splash è un overlay fisso: non allunga la pagina, così la
+   misura della posizione finale del logo nella lobby resta corretta. */
+#screen-splash.splash-flying {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+/* Il logo della lobby resta nascosto (ma impaginato) finché quello volante non atterra */
+.lobby-container.logo-hidden .logo-area { visibility: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-logo { transition: none !important; }
+}
+
+/* Comparsa del resto della lobby: parte mentre il logo è ancora in volo */
+@keyframes lobby-reveal {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.lobby-container.reveal .lobby-panels { animation: lobby-reveal 0.5s ease both 0.34s; }
+.lobby-container.reveal .btn-catalog  { animation: lobby-reveal 0.5s ease both 0.42s; }
+.lobby-container.reveal > a           { animation: lobby-reveal 0.5s ease both 0.5s; }
 
 .game-title {
   font-size: 3.5rem;
@@ -119,7 +235,24 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
+.panel:hover {
+  border-color: var(--gold);
+  box-shadow: 0 0 20px rgba(240, 206, 6, 0.22);
+}
+
+.mobile-link {
+  display: block;
+  text-align: center;
+  margin-top: 14px;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--bg-medium);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.mobile-link:hover { color: var(--gold); }
 
 .panel h2 {
   color: var(--gold);
@@ -144,12 +277,18 @@ input[type="number"] {
   padding: 0.5rem 0.7rem;
   font-size: 1rem;
   font-family: inherit;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:hover {
+  border-color: var(--border-gold);
+  box-shadow: 0 0 10px rgba(240, 206, 6, 0.15);
 }
 
 input:focus {
   outline: none;
   border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(240, 206, 6, 0.3);
 }
 
 /* ==================== SALA D'ATTESA ==================== */
@@ -233,6 +372,15 @@ input:focus {
 .btn:hover { filter: brightness(1.15); }
 .btn:active { transform: scale(0.97); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Nei menu (non in partita) i pulsanti si accendono anche con un bagliore */
+#screen-splash .btn:hover,
+#screen-lobby .btn:hover,
+#screen-waiting .btn:hover,
+#screen-gameover .btn:hover,
+#screen-catalog .btn:hover {
+  box-shadow: 0 0 16px rgba(240, 206, 6, 0.35);
+}
 
 .btn-primary   { background: var(--gold);        color: var(--bg-dark); font-weight: bold; }
 .btn-secondary { background: var(--bg-light);     color: var(--text);   border: 1px solid var(--border); }
