@@ -159,6 +159,31 @@ def _begin_turn(state: GameState) -> None:
     # Effetti differiti dal turno precedente (investimento prodigio, divinazione)
     _process_deferred_effects(state, player)
 
+    # Orda di Giulio già attiva: cerca Giulio II e aggiungilo alla mano
+    _trigger_giulio_horde_start(state, player)
+
+
+def _trigger_giulio_horde_start(state: GameState, player: Player) -> None:
+    """Se l'Orda di Giulio è già attiva (attivata in un turno precedente), a inizio
+    turno cerca Giulio II nel mazzo e lo aggiunge alla mano (state.pending_search)."""
+    if state.pending_search is not None:
+        return
+    for w in player.all_warriors():
+        if not w.horde_active:
+            continue
+        card = get_card(w.base_card_id)
+        if isinstance(card, WarriorCard) and card.horde_effect_id == "giulio_horde":
+            state.pending_search = {
+                "player_id": player.id,
+                "context": "giulio_horde",
+                "condition": {"type": "base_card_id", "value": "giulio_ii"},
+            }
+            state.recent_events.append({
+                "type": "search", "card": "giulio",
+                "player_id": player.id, "search_pending": True,
+            })
+            break
+
 
 def _is_biblioteca_suppressed(state: GameState, player: Player) -> bool:
     """Controlla se un avversario ha attivo faust_biblioteca_suppress contro questo giocatore."""

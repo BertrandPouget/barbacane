@@ -1593,17 +1593,14 @@ def orfeo_horde(state: GameState, player: Player, warrior_iid: Optional[str] = N
 
 @register_effect("giulio_horde")
 def giulio_horde(state: GameState, player: Player, **kwargs) -> dict:
-    """Il giocatore cerca Giulio II nel mazzo e lo aggiunge alla mano."""
-    state.pending_search = {
-        "player_id": player.id,
-        "context": "giulio_horde",
-        "condition": {"type": "base_card_id", "value": "giulio_ii"},
-    }
+    """Attiva l'Orda di Giulio: finché resta attiva, a inizio di ogni turno del
+    giocatore la ricerca di Giulio II viene innescata da `_trigger_giulio_horde_start`
+    (engine/game.py), non da questo effetto."""
     state.recent_events.append({
-        "type": "search", "card": "giulio",
-        "player_id": player.id, "search_pending": True,
+        "type": "horde", "card": "giulio",
+        "player_id": player.id, "activated": True,
     })
-    return {"search_pending": True}
+    return {"activated": True}
 
 
 @register_effect("faust_horde")
