@@ -122,7 +122,6 @@ def create_practice_game(player_name: str, difficulty: str = "normal", game_id: 
         bot = state.players[1]
         bot.mana_remaining = 0
         bot.actions_remaining = 2
-        bot.hordes_activated_this_turn = []
         state.current_player_index = 0
         _begin_turn(state)
     state.first_player_index = 0
@@ -147,21 +146,21 @@ def _begin_turn(state: GameState) -> None:
 
     # Reset stato turno
     player.actions_remaining = 2
-    player.hordes_activated_this_turn = []
     player.ethereal_card = None
     player.ethereal_complete = None
     player.pending_velocemento_buildings = []
     player.pending_velocemento_prodigy = False
-    # Pulisce flag horde_active da turni precedenti
-    for w in player.all_warriors():
-        w.horde_active = False
     state.phase = "action"
     state.battle_done_this_turn = False
     state.battles_remaining = 1 + player.extra_battles
     player.extra_battles = 0
 
-    # Rimuovi i bonus stat da effetti Orda del turno precedente
-    _clear_horde_stat_effects(player)
+    # Nota: le Orde attivate NON si disattivano a inizio turno. Un'Orda resta attiva
+    # finché non si divide (riposizionamento/scarto, vedi deactivate_broken_horde) o
+    # finché il giocatore non sceglie un altro effetto Orda per lo stesso gruppo
+    # (deactivate_horde_for_switch). Fa eccezione l'Orda del Trono, sempre riattivata
+    # qui sotto in _trigger_building_start.
+
     # Pulisce modificatori temporanei da effetti "end_of_turn" precedenti
     _clear_turn_expired_effects(player)
 
@@ -187,6 +186,31 @@ def _begin_turn(state: GameState) -> None:
 
     # Effetti differiti dal turno precedente (investimento prodigio, divinazione)
     _process_deferred_effects(state, player)
+
+    # Orda di Giulio già attiva: cerca Giulio II e aggiungilo alla mano
+    _trigger_giulio_horde_start(state, player)
+
+
+def _trigger_giulio_horde_start(state: GameState, player: Player) -> None:
+    """Se l'Orda di Giulio è già attiva (attivata in un turno precedente), a inizio
+    turno cerca Giulio II nel mazzo e lo aggiunge alla mano (state.pending_search)."""
+    if state.pending_search is not None:
+        return
+    for w in player.all_warriors():
+        if not w.horde_active:
+            continue
+        card = get_card(w.base_card_id)
+        if isinstance(card, WarriorCard) and card.horde_effect_id == "giulio_horde":
+            state.pending_search = {
+                "player_id": player.id,
+                "context": "giulio_horde",
+                "condition": {"type": "base_card_id", "value": "giulio_ii"},
+            }
+            state.recent_events.append({
+                "type": "search", "card": "giulio",
+                "player_id": player.id, "search_pending": True,
+            })
+            break
 
 
 def _is_biblioteca_suppressed(state: GameState, player: Player) -> bool:
@@ -222,6 +246,24 @@ def _trigger_building_start(state: GameState, player: Player) -> None:
         elif base_id == "fucina" and b_inst.completed:
             # Fucina completata: 3a Azione garantita ogni turno
             player.actions_remaining += 1
+        elif base_id == "trono" and b_inst.completed and b_inst.assigned_warrior:
+            # Trono completo: l'effetto Orda del Guerriero assegnato è sempre
+            # attivo, si ri-attiva automaticamente a ogni inizio turno (indipendente
+            # dalla persistenza normale delle Orde: qui si pulisce e riapplica sempre,
+            # per evitare che i bonus si accumulino turno dopo turno).
+            target_w = next(
+                (w for w in player.all_warriors() if w.instance_id == b_inst.assigned_warrior),
+                None,
+            )
+            if target_w:
+                w_card = get_card(target_w.base_card_id)
+                if isinstance(w_card, WarriorCard) and w_card.horde_effect_id:
+                    _clear_trono_horde_effects(player, target_w.instance_id)
+                    target_w.horde_active = True
+                    effects_count_before = len(player.active_effects)
+                    apply_effect(w_card.horde_effect_id, state, player, warrior_iid=target_w.instance_id)
+                    for eff in player.active_effects[effects_count_before:]:
+                        eff["trono_warrior"] = target_w.instance_id
 
 
 def _trigger_building_end(state: GameState, player: Player) -> int:
@@ -244,18 +286,25 @@ def _trigger_building_end(state: GameState, player: Player) -> int:
     return bonus
 
 
-def _clear_horde_stat_effects(player: Player) -> None:
-    """Rimuove i bonus stat applicati dall'effetto Orda del turno precedente."""
+def _clear_trono_horde_effects(player: Player, warrior_iid: str) -> None:
+    """Rimuove gli effetti Orda generati dal Trono per questo Guerriero nel turno
+    precedente, prima di riapplicarli: l'effetto Orda del Trono si ri-attiva ogni
+    inizio turno (a differenza delle Orde normali, che restano attive finché non
+    si dividono o il giocatore ne sceglie un'altra), quindi va pulito e riapplicato
+    per evitare che i bonus si accumulino."""
     to_remove = []
     for eff in player.active_effects:
+        if eff.get("trono_warrior") != warrior_iid:
+            continue
         if eff.get("type") == "horde_stat_bonus":
             for w in player.all_warriors():
-                if w.instance_id == eff.get("warrior_iid"):
+                if w.instance_id == warrior_iid:
                     for stat in ("att", "git", "dif"):
                         bonus = eff.get(stat, 0)
                         if bonus:
                             w.temp_modifiers[stat] = max(0, w.temp_modifiers.get(stat, 0) - bonus)
-            to_remove.append(eff)
+                    break
+        to_remove.append(eff)
     for eff in to_remove:
         player.active_effects.remove(eff)
 
@@ -285,6 +334,22 @@ def _process_deferred_effects(state: GameState, player: Player) -> None:
             if count > 0:
                 player.mana_remaining += count
                 _apply_scrigno_bonus(player, count)
+        elif etype == "equipotenza_own":
+            warrior_iid = eff.get("warrior_iid")
+            for w in player.all_warriors():
+                if w.instance_id == warrior_iid:
+                    w.temp_modifiers["att"] = w.temp_modifiers.get("att", 0) - eff.get("att_delta", 0)
+                    w.temp_modifiers["dif"] = w.temp_modifiers.get("dif", 0) - eff.get("dif_delta", 0)
+                    break
+        elif etype == "equipotenza_enemy":
+            warrior_iid = eff.get("warrior_iid")
+            target_player = state.get_player(eff.get("target_player_id"))
+            if target_player:
+                for w in target_player.all_warriors():
+                    if w.instance_id == warrior_iid:
+                        w.temp_modifiers["att"] = w.temp_modifiers.get("att", 0) - eff.get("att_delta", 0)
+                        w.temp_modifiers["dif"] = w.temp_modifiers.get("dif", 0) - eff.get("dif_delta", 0)
+                        break
         to_remove.append(eff)
     for eff in to_remove:
         player.active_effects.remove(eff)
@@ -624,14 +689,14 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
             "hand_count": len(p.hand),
             "hand": p.hand if p.id == viewer_player_id else None,
             "field": {
-                "vanguard": [_warrior_view(w) for w in p.field.vanguard],
+                "vanguard": [_warrior_view(w, p, viewer_player_id) for w in p.field.vanguard],
                 "bastion_left": {
                     "wall_count": len(p.field.bastion_left.walls),
                     "walls": (
                         [w.instance_id for w in p.field.bastion_left.walls]
                         if p.id == viewer_player_id else None
                     ),
-                    "warriors": [_warrior_view(w) for w in p.field.bastion_left.warriors],
+                    "warriors": [_warrior_view(w, p, viewer_player_id) for w in p.field.bastion_left.warriors],
                 },
                 "bastion_right": {
                     "wall_count": len(p.field.bastion_right.walls),
@@ -639,7 +704,7 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
                         [w.instance_id for w in p.field.bastion_right.walls]
                         if p.id == viewer_player_id else None
                     ),
-                    "warriors": [_warrior_view(w) for w in p.field.bastion_right.warriors],
+                    "warriors": [_warrior_view(w, p, viewer_player_id) for w in p.field.bastion_right.warriors],
                 },
                 "village": {
                     "buildings": [_building_view(b, p if p.id == viewer_player_id else None) for b in p.field.village.buildings],
@@ -744,12 +809,16 @@ def _available_hordes(player: Player) -> list:
             card = get_card(w.base_card_id)
             if not isinstance(card, WarriorCard):
                 continue
+            if player.has_active_trono(w.instance_id):
+                # Effetto Orda già sempre attivo grazie al Trono: non riproponibile manualmente
+                continue
             if card.horde_effect_id:
                 warrior_data.append({
                     "instance_id": w.instance_id,
                     "base_card_id": w.base_card_id,
                     "name": card.name,
                     "horde_effect": card.horde_effect,
+                    "active": w.horde_active,
                 })
         horde_key = f"{horde['zone']}:{horde['species']}"
         if warrior_data:
@@ -762,7 +831,7 @@ def _available_hordes(player: Player) -> list:
     return result
 
 
-def _warrior_view(w: WarriorInstance) -> dict:
+def _warrior_view(w: WarriorInstance, player: Optional[Player] = None, viewer_player_id: Optional[str] = None) -> dict:
     card = get_card(w.base_card_id)
     return {
         "instance_id": w.instance_id,
@@ -774,6 +843,51 @@ def _warrior_view(w: WarriorInstance) -> dict:
         "species": card.species if isinstance(card, WarriorCard) else None,
         "subtype": card.subtype if isinstance(card, WarriorCard) else None,
         "horde_active": w.horde_active,
+        "assigned_cards": (
+            [_assigned_card_view(iid, player, viewer_player_id) for iid in w.assigned_cards]
+            if player is not None else []
+        ),
+    }
+
+
+def _assigned_card_view(iid: str, player: Player, viewer_player_id: Optional[str] = None) -> dict:
+    """
+    Vista pubblica di una carta assegnata a un Guerriero.
+    Due casi: Costruzione assegnata (es. Trono, sempre pubblica) oppure Muro
+    assegnato (es. Arrampicarta, identità nascosta a chi non è il proprietario,
+    come i Muri nei Bastioni).
+    """
+    from engine.deck import get_base_card_id
+    base_id = get_base_card_id(iid)
+    card = get_card(base_id)
+
+    if isinstance(card, BuildingCard):
+        b_inst = next((b for b in player.field.village.buildings if b.instance_id == iid), None)
+        if b_inst is not None:
+            return {
+                "instance_id": iid,
+                "base_card_id": base_id,
+                "name": card.name,
+                "type": card.type,
+                "completed": b_inst.completed,
+                "effect": card.complete_effect if b_inst.completed else card.base_effect,
+            }
+
+    # Muro assegnato: identità visibile solo al proprietario
+    if player.id == viewer_player_id:
+        return {
+            "instance_id": iid,
+            "base_card_id": base_id,
+            "name": card.name if card else base_id,
+            "type": "wall",
+        }
+    # Nascosto agli avversari: nessun instance_id, così non se ne può risalire
+    # l'identità (come i Muri nel Bastione, esposti solo come wall_count)
+    return {
+        "instance_id": None,
+        "base_card_id": None,
+        "name": None,
+        "type": "wall",
     }
 
 
@@ -786,6 +900,7 @@ def _building_view(b: BuildingInstance, player=None) -> dict:
         "completed": b.completed,
         "effect": card.complete_effect if b.completed else card.base_effect
         if isinstance(card, BuildingCard) else "",
+        "assigned_warrior": b.assigned_warrior,
     }
     if b.base_card_id == "arena" and player is not None:
         result["arena_available"] = not any(

@@ -275,7 +275,18 @@ def _generate_candidates(state: GameState, player_id: str, difficulty: str = "no
 
         elif isinstance(card, BuildingCard):
             if player.mana_remaining >= card.cost:
-                candidates.append((_score_building_play(card, hard), ("play_building", iid)))
+                # Il Trono va assegnato subito a un proprio Guerriero: senza
+                # bersaglio play_building lo rifiuta, quindi o si sceglie qui
+                # a chi darlo o non è una mossa disponibile.
+                target_w = None
+                if base_id == "trono":
+                    target_w = _best_trono_target(player)
+                    if target_w is None:
+                        continue
+                candidates.append((
+                    _score_building_play(card, hard),
+                    ("play_building", iid, target_w),
+                ))
 
         elif isinstance(card, SpellCard):
             if card.effect_id in _SPELL_EFFECT_EXCLUDE:
@@ -328,8 +339,8 @@ def _apply_spec(state: GameState, player_id: str, spec: ActionSpec) -> dict:
         _, iid, region = spec
         return play_warrior(state, player_id, iid, region)
     if kind == "play_building":
-        _, iid = spec
-        return play_building(state, player_id, iid)
+        _, iid, target_warrior_iid = spec
+        return play_building(state, player_id, iid, target_warrior_iid)
     if kind == "play_spell":
         _, iid, kwargs = spec
         return play_spell(state, player_id, iid, **kwargs)
@@ -431,6 +442,25 @@ def _best_horde_region(player: Player, species: str) -> Tuple[Optional[str], flo
 def _score_building_play(card: BuildingCard, hard: bool = False) -> float:
     base = 1.0 + card.cost * 0.2
     return base * 1.3 if hard else base
+
+
+def _best_trono_target(player: Player) -> Optional[str]:
+    """Guerriero a cui conviene assegnare il Trono: rende sempre attivo il suo
+    effetto Orda, quindi ha senso solo su un Guerriero che un effetto Orda ce
+    l'ha. A parità, il più forte (è anche quello che si vuole tenere in campo).
+    Ritorna None se nessun Guerriero è idoneo."""
+    best, best_value = None, float("-inf")
+    for w in player.all_warriors():
+        try:
+            card = get_card(w.base_card_id)
+        except KeyError:
+            continue
+        if not isinstance(card, WarriorCard) or not card.horde_effect_id:
+            continue
+        value = card.att + card.git + card.dif
+        if value > best_value:
+            best, best_value = w.instance_id, value
+    return best
 
 
 def _score_spell(card: SpellCard, player: Player) -> float:

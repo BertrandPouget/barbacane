@@ -54,14 +54,79 @@ const App = (() => {
   // ---------------------------------------------------------------------------
 
   async function init() {
+    Sparks.init();
+    BgMusic.init();
     await loadCardDefs();
     bindLobbyUI();
+    bindSplashUI();
     if (sessionStorage.getItem('barbacane-open-tutorial-list')) {
+      // Ritorno da un tutorial: la pagina si ricarica, quindi niente splash,
+      // si va diritti alla lista dei tutorial.
       sessionStorage.removeItem('barbacane-open-tutorial-list');
       openTutorialList();
     } else {
-      Renderer.showScreen('lobby');
+      Renderer.showScreen('splash');
     }
+  }
+
+  // La splash mostra solo il logo: cliccandolo (primo gesto utente, sblocca
+  // anche l'audio) sale verso la sua posizione e appare il resto della lobby.
+  function bindSplashUI() {
+    const splash = document.getElementById('screen-splash');
+    if (!splash) return;
+    splash.addEventListener('click', enterFromSplash, { once: true });
+  }
+
+  function enterFromSplash() {
+    const splash = document.getElementById('screen-splash');
+    const lobby = document.getElementById('screen-lobby');
+    if (!splash || !lobby) return;
+
+    BgMusic.start();   // questo click è il gesto che sblocca l'audio
+
+    const splashLogo = document.getElementById('splash-logo');
+    const lobbyLogo = lobby.querySelector('.logo');
+    const container = lobby.querySelector('.lobby-container');
+    const reducedMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Impagina la lobby (ancora invisibile) per misurare dove deve atterrare il logo.
+    // Lo splash diventa un overlay fisso così non allunga la pagina falsando la misura.
+    container.classList.add('logo-hidden', 'reveal');
+    splash.classList.add('splash-flying');
+    lobby.classList.add('active');
+
+    const land = () => {
+      container.classList.remove('logo-hidden');
+      splash.classList.remove('splash-flying', 'splash-exit');
+      if (splashLogo) splashLogo.style.transform = '';
+      Renderer.showScreen('lobby');
+    };
+
+    const from = splashLogo ? splashLogo.getBoundingClientRect() : null;
+    const to = lobbyLogo ? lobbyLogo.getBoundingClientRect() : null;
+    // Se il logo non è caricato (fallback testuale) non c'è niente da far volare
+    if (reducedMotion || !from || !to || from.width === 0 || to.width === 0) {
+      land();
+      return;
+    }
+
+    const scale = to.width / from.width;
+    const dx = (to.left + to.width / 2) - (from.left + from.width / 2);
+    const dy = (to.top + to.height / 2) - (from.top + from.height / 2);
+
+    splash.classList.add('splash-exit');
+    requestAnimationFrame(() => {
+      splashLogo.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+    });
+
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      land();
+    };
+    splashLogo.addEventListener('transitionend', finish, { once: true });
+    setTimeout(finish, 950); // rete di sicurezza se la transizione non parte
   }
 
   async function loadCardDefs() {
@@ -391,10 +456,13 @@ const App = (() => {
       const defs = Object.values(cardDefs).filter(c => c.type === section.type);
       if (!defs.length) return;
 
+      const box = document.createElement('div');
+      box.className = 'catalog-section';
+
       const header = document.createElement('div');
       header.className = 'catalog-section-title';
-      header.textContent = `${section.label} (${defs.length})`;
-      grid.appendChild(header);
+      header.textContent = section.label;
+      box.appendChild(header);
 
       const row = document.createElement('div');
       row.className = 'catalog-cards';
@@ -417,10 +485,10 @@ const App = (() => {
         cell.addEventListener('click', () => showCatalogCard(idx));
         row.appendChild(cell);
       });
-      grid.appendChild(row);
+      box.appendChild(row);
+      grid.appendChild(box);
     });
 
-    document.getElementById('catalog-count').textContent = `${catalogList.length} carte`;
     catalogBuilt = true;
   }
 
@@ -614,7 +682,8 @@ const App = (() => {
         const defName = (state.players.find(p => p.id === result.defender_id) || {}).name || result.defender_id;
         const bastionSide = result.defender_bastion === 'left' ? 'Sinistro' : 'Destro';
         const log = `⚔ ${attName} → ${defName} [Bastione ${bastionSide}]: `
-          + `${result.total_damage} Danni, ${result.walls_destroyed} Muri, ${result.life_lost} Vita`;
+          + `${result.total_damage} Danni, ${result.walls_destroyed} Muri, ${result.life_lost} Vita`
+          + (result.walls_discarded_guerremoto ? ` (+${result.walls_discarded_guerremoto} Muri scartati da Guerremoto)` : '');
         Renderer.updateBattleLog(log);
       }
 
@@ -669,6 +738,8 @@ const App = (() => {
           msg = `${pName} — ${cardName}: guerriero scartato`;
         } else if (ev.type === 'warrior_moved') {
           msg = `${pName} — ${cardName}: guerriero spostato`;
+        } else if (ev.type === 'warrior_to_wall') {
+          msg = `${pName} — ${cardName}: guerriero trasformato in Muro`;
         } else if (ev.type === 'wall_moved') {
           const n = ev.moved_walls ? ev.moved_walls.length : 0;
           msg = `${pName} — ${cardName}: ${n} ${n !== 1 ? 'Muri spostati' : 'Muro spostato'}`;
@@ -703,7 +774,7 @@ const App = (() => {
           msg = `${pName} — ${cardLabel} annullata: ${blockedName} è protetto da Magiscudo`;
         } else if (ev.type === 'effect') {
           if (ev.card === 'magiscudo') msg = `${pName} — Magiscudo: immune alle Magie`;
-          else if (ev.card === 'guerremoto') msg = `${pName} — Guerremoto: attacco a qualsiasi Bastione${ev.damage_bonus ? ` +${ev.damage_bonus} Danni` : ''}`;
+          else if (ev.card === 'guerremoto') msg = `${pName} — Guerremoto: attacco a qualsiasi Bastione${ev.discard_walls ? `, scarta fino a ${ev.discard_walls} Muri prima dei Danni` : ''}`;
           else if (ev.card === 'divinazione') msg = `${pName} — Divinazione: Mana extra al prossimo turno`;
           else if (ev.card === 'dazipazzi') msg = `${pName} — Dazipazzi: ${ev.reset_buildings ? ev.reset_buildings.length : 0} costruzioni ripristinate`;
           else if (ev.card === 'fucina') msg = `${pName} — Fucina: ${ev.extra_action ? 'azione extra' : 'azione extra (D10)'}`;
@@ -912,8 +983,7 @@ const App = (() => {
 
     } else if (phase === 'schieramento') {
       document.getElementById('action-hint').textContent = 'Sposta i Guerrieri e attiva le Orde.';
-      const hasHorde = player && player.available_hordes &&
-        player.available_hordes.some(h => !h.already_activated);
+      const hasHorde = player && player.available_hordes && player.available_hordes.length > 0;
       if (hasHorde) show('btn-horde');
       show('btn-next-phase');
       document.getElementById('btn-next-phase').textContent = 'Battaglia →';
@@ -934,7 +1004,7 @@ const App = (() => {
     const player = currentState.players.find(p => p.id === myPlayerId);
     if (!player) return;
 
-    const hordes = (player.available_hordes || []).filter(h => !h.already_activated);
+    const hordes = player.available_hordes || [];
     if (hordes.length === 0) {
       Renderer.toast('Nessuna Orda disponibile', 'error');
       return;
@@ -947,15 +1017,23 @@ const App = (() => {
     };
     const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 
+    // Le carte già attive per il proprio gruppo non vanno riproposte (nulla da fare
+    // riselezionandole); le altre carte dello stesso gruppo permettono di cambiare
+    // l'effetto Orda attivo (disattivando quello corrente).
     const options = [];
     for (const horde of hordes) {
       const zoneName = zoneNames[horde.zone] || horde.zone;
       for (const w of horde.warriors) {
+        if (w.active) continue;
         options.push({
           label: `[${cap(horde.species)}, ${zoneName}] ${w.name}: ${w.horde_effect}`,
           value: `${w.base_card_id}|${w.instance_id}|${horde.zone}`,
         });
       }
+    }
+    if (options.length === 0) {
+      Renderer.toast('Nessuna Orda disponibile', 'error');
+      return;
     }
 
     Renderer.showChoiceModal('Attiva Effetto Orda', options, (choice) => {
@@ -1287,6 +1365,7 @@ const App = (() => {
 
     // Recupera dati contestuali dallo stato
     let fieldWarrior = null;
+    let fieldWarriorOwnerId = null;
     let fieldBuilding = null;
     if (currentState) {
       for (const player of currentState.players) {
@@ -1295,7 +1374,7 @@ const App = (() => {
           ...(player.field.bastion_left.warriors || []),
           ...(player.field.bastion_right.warriors || []),
         ].find(w => w.instance_id === instanceId);
-        if (w) { fieldWarrior = w; break; }
+        if (w) { fieldWarrior = w; fieldWarriorOwnerId = player.id; break; }
 
         const b = (player.field.village.buildings || []).find(b => b.instance_id === instanceId);
         if (b) { fieldBuilding = b; break; }
@@ -1356,6 +1435,38 @@ const App = (() => {
       }
     }
 
+    // Carte assegnate (es. Trono): visibili su qualsiasi Guerriero, proprio o avversario
+    if ((source === 'field' || source === 'opponent') && fieldWarrior && fieldWarrior.assigned_cards && fieldWarrior.assigned_cards.length > 0) {
+      const nonWallAssigned = fieldWarrior.assigned_cards.filter(ac => ac.type !== 'wall');
+      const assignedWalls = fieldWarrior.assigned_cards.filter(ac => ac.type === 'wall');
+
+      if (nonWallAssigned.length > 0) {
+        extraButtons.push({
+          label: 'Carte assegnate',
+          className: 'btn-secondary',
+          onClick: () => {
+            Renderer.closeCardDetail();
+            _showAssignedCardsSlideshow(instanceId, fieldWarriorOwnerId, 0);
+          },
+        });
+      }
+
+      // Muri assegnati (es. Arrampicarta): mostrati a testa in giù, impilati e
+      // numerati come nel Bastione — l'identità è visibile solo al proprietario.
+      if (assignedWalls.length > 0) {
+        const revealable = assignedWalls.every(ac => ac.instance_id);
+        extraButtons.push({
+          label: 'Muri assegnati',
+          className: 'btn-secondary',
+          disabled: !revealable,
+          onClick: revealable ? () => {
+            Renderer.closeCardDetail();
+            _showAssignedWallSlideshow(instanceId, fieldWarriorOwnerId, 0);
+          } : () => {},
+        });
+      }
+    }
+
     // Bottone Scarta: disponibile per le proprie carte (mano, campo, villaggio) in qualsiasi momento
     let onDiscard = null;
     if (source === 'hand' || source === 'field' || source === 'village') {
@@ -1404,12 +1515,35 @@ const App = (() => {
     } else if (def.type === 'spell') {
       _showSpellOptions(instanceId, def);
     } else if (def.type === 'building') {
+      if (def.id === 'trono') {
+        _showTronoPlayOptions(instanceId, def);
+        return;
+      }
       Renderer.showModal(
         `Costruisci ${def.name}`,
         `Costo: <strong>${def.cost} Mana</strong><br>${def.base_effect || ''}`,
         () => sendAction('play_building', { instance_id: instanceId }),
       );
     }
+  }
+
+  // Trono: richiede la scelta immediata del Guerriero a cui assegnarlo
+  function _showTronoPlayOptions(instanceId, def) {
+    const myPlayer = currentState.players.find(p => p.id === myPlayerId);
+    const warriors = myPlayer ? _getAllWarriors(myPlayer) : [];
+    if (warriors.length === 0) {
+      Renderer.toast('Non hai nessun Guerriero in campo a cui assegnare il Trono.', 'error');
+      return;
+    }
+    const options = warriors.map(w => ({
+      label: `${w.name} (ATT ${w.att}  GIT ${w.git}  DIF ${w.dif})`,
+      value: w.instance_id,
+    }));
+    Renderer.showChoiceModal(
+      `Costruisci ${def.name} — scegli il Guerriero`,
+      options,
+      (warriorIid) => sendAction('play_building', { instance_id: instanceId, target_warrior_iid: warriorIid }),
+    );
   }
 
   function _showHeroPlayOptions(instanceId, def) {
@@ -1506,6 +1640,28 @@ const App = (() => {
       return;
     }
 
+    // Arrampicarta: scegli un tuo Bastione → un tuo Muro → un tuo Guerriero a cui assegnarlo
+    if (def.id === 'arrampicarta') {
+      const me = currentState.players.find(p => p.id === myPlayerId);
+      const bastionOptions = [
+        { label: `Bastione Sinistro (${me.field.bastion_left.wall_count ?? 0} muri)`, value: 'left' },
+        { label: `Bastione Destro (${me.field.bastion_right.wall_count ?? 0} muri)`, value: 'right' },
+      ].filter(o => (o.value === 'left' ? me.field.bastion_left : me.field.bastion_right).wall_count > 0);
+      if (bastionOptions.length === 0) {
+        Renderer.toast('Nessun Muro nei tuoi Bastioni.', 'error');
+        return;
+      }
+      if (_getAllWarriors(me).length === 0) {
+        Renderer.toast('Non hai nessun Guerriero in campo a cui assegnare un Muro.', 'error');
+        return;
+      }
+      Renderer.showChoiceModal(`${def.name} — scegli un Bastione`, bastionOptions, (side) => {
+        const walls = (side === 'left' ? me.field.bastion_left : me.field.bastion_right).walls || [];
+        _showArrampicartaWallPicker(walls, side, instanceId, 0);
+      });
+      return;
+    }
+
     // Cambiamente: scegli un guerriero avversario
     if (def.id === 'cambiamente') {
       const options = [];
@@ -1570,9 +1726,74 @@ const App = (() => {
       return;
     }
 
+    // Equipotenza: base = scegli un tuo Guerriero (ATT/DIF = valore maggiore dei due);
+    // prodigio (additivo): scegli anche un Guerriero qualsiasi, proprio o avversario (ATT/DIF = valore minore).
+    if (def.id === 'equipotenza') {
+      const me = currentState.players.find(p => p.id === myPlayerId);
+      const ownZones = [
+        { warriors: me.field.vanguard, label: 'Avanscoperta' },
+        { warriors: me.field.bastion_left.warriors, label: 'Bastione Sinistro' },
+        { warriors: me.field.bastion_right.warriors, label: 'Bastione Destro' },
+      ];
+      const ownOptions = [];
+      ownZones.forEach(({ warriors, label }) => {
+        (warriors || []).forEach(w => {
+          const wDef = getCardDef(w.instance_id);
+          ownOptions.push({ label: `${label} — ${wDef ? wDef.name : w.instance_id}`, value: w.instance_id });
+        });
+      });
+      if (ownOptions.length === 0) {
+        Renderer.toast('Non hai nessun Guerriero in campo.', 'error');
+        return;
+      }
+      const prodigy = _computeSpellProdigy(def);
+      Renderer.showChoiceModal(`${def.name} — scegli un tuo Guerriero (ATT/DIF al valore maggiore)`, ownOptions, (ownIid) => {
+        if (!prodigy) {
+          sendAction('play_spell', { instance_id: instanceId, own_warrior_iid: ownIid });
+          return;
+        }
+        const allOptions = [];
+        currentState.players.filter(p => p.lives > 0).forEach(p => {
+          const zones = [
+            { warriors: p.field.vanguard, label: 'Avanscoperta' },
+            { warriors: p.field.bastion_left.warriors, label: 'Bastione Sinistro' },
+            { warriors: p.field.bastion_right.warriors, label: 'Bastione Destro' },
+          ];
+          zones.forEach(({ warriors, label }) => {
+            (warriors || []).forEach(w => {
+              const wDef = getCardDef(w.instance_id);
+              allOptions.push({
+                label: `${p.id === myPlayerId ? 'Tu' : p.name} — ${label} — ${wDef ? wDef.name : w.instance_id}`,
+                value: w.instance_id,
+              });
+            });
+          });
+        });
+        if (allOptions.length === 0) {
+          sendAction('play_spell', { instance_id: instanceId, own_warrior_iid: ownIid });
+          return;
+        }
+        Renderer.showChoiceModal(`${def.name} — scegli un Guerriero (ATT/DIF al valore minore)`, allOptions, (enemyIid) => {
+          sendAction('play_spell', { instance_id: instanceId, own_warrior_iid: ownIid, enemy_warrior_iid: enemyIid });
+        });
+      });
+      return;
+    }
+
+    // Regicidio: UI dedicata — scegli un Trono in campo (di qualsiasi giocatore) da scartare
+    if (def.id === 'regicidio') {
+      _showRegicidioOptions(instanceId, def);
+      return;
+    }
+
+    // Cuordipietra: UI dedicata — scegli un Guerriero avversario (base: solo Reclute) poi il Bastione di destinazione
+    if (def.id === 'cuordipietra') {
+      _showCuordipietraOptions(instanceId, def);
+      return;
+    }
+
     const spellsNeedingTarget = [
-      'ardolancio', 'guerremoto', 'cuordipietra', 'incendifesa',
-      'regicidio',
+      'ardolancio', 'incendifesa',
     ];
 
     if (!spellsNeedingTarget.includes(def.id) || opponents.length === 0) {
@@ -1596,6 +1817,92 @@ const App = (() => {
         instance_id: instanceId,
         target_player_id: targetId,
         target_bastion_side: side,
+      });
+    });
+  }
+
+  // Cuordipietra: base = scegli una Recluta avversaria → diventa Muro in un suo Bastione;
+  // prodigio = scegli qualsiasi Guerriero avversario → diventa Muro in un tuo Bastione.
+  function _showRegicidioOptions(instanceId, def) {
+    if (!currentState) return;
+    const prodigy = _computeSpellProdigy(def);
+
+    const options = [];
+    currentState.players.forEach(p => {
+      (p.field.village.buildings || []).forEach(b => {
+        if (b.base_card_id !== 'trono') return;
+        let label = `${p.id === myPlayerId ? 'Tuo' : p.name} — Trono${b.completed ? ' (completo)' : ''}`;
+        if (b.assigned_warrior) {
+          const allWarriors = [...(p.field.vanguard || []), ...(p.field.bastion_left.warriors || []), ...(p.field.bastion_right.warriors || [])];
+          const warrior = allWarriors.find(w => w.instance_id === b.assigned_warrior);
+          label += ` — su ${warrior ? warrior.name : 'Guerriero'}`;
+        } else {
+          label += ' — non assegnato';
+        }
+        options.push({ label, value: `${p.id}:${b.instance_id}` });
+      });
+    });
+
+    if (options.length === 0) {
+      Renderer.toast('Non ci sono Troni in campo.', 'error');
+      return;
+    }
+
+    const title = prodigy
+      ? `${def.name} — scegli un Trono (scarta anche il suo Guerriero)`
+      : `${def.name} — scegli un Trono`;
+    Renderer.showChoiceModal(title, options, (choice) => {
+      const [targetId, tronoIid] = choice.split(':');
+      sendAction('play_spell', { instance_id: instanceId, target_player_id: targetId, target_trono_iid: tronoIid });
+    });
+  }
+
+  function _showCuordipietraOptions(instanceId, def) {
+    if (!currentState) return;
+    const prodigy = _computeSpellProdigy(def);
+    const opponents = currentState.players.filter(p => p.id !== myPlayerId && p.lives > 0);
+
+    const options = [];
+    opponents.forEach(p => {
+      const zones = [
+        { warriors: p.field.vanguard, label: 'Avanscoperta' },
+        { warriors: p.field.bastion_left.warriors, label: 'Bastione Sinistro' },
+        { warriors: p.field.bastion_right.warriors, label: 'Bastione Destro' },
+      ];
+      zones.forEach(({ warriors, label }) => {
+        (warriors || []).forEach(w => {
+          if (!prodigy && w.subtype !== 'recruit') return;
+          options.push({ label: `${p.name} — ${label} — ${w.name}`, value: `${p.id}:${w.instance_id}` });
+        });
+      });
+    });
+
+    if (options.length === 0) {
+      Renderer.toast(prodigy ? 'Nessun Guerriero avversario disponibile.' : 'Nessuna Recluta avversaria disponibile.', 'error');
+      return;
+    }
+
+    Renderer.showChoiceModal(`${def.name} — scegli un Guerriero`, options, (choice) => {
+      const [targetPlayerId, targetWarriorIid] = choice.split(':');
+      const target = currentState.players.find(p => p.id === targetPlayerId);
+
+      const sideOptions = prodigy
+        ? [
+            { label: 'Muri del mio Bastione Sinistro', value: 'left' },
+            { label: 'Muri del mio Bastione Destro', value: 'right' },
+          ]
+        : [
+            { label: `Muri del Bastione Sinistro di ${target ? target.name : ''}`, value: 'left' },
+            { label: `Muri del Bastione Destro di ${target ? target.name : ''}`, value: 'right' },
+          ];
+
+      Renderer.showChoiceModal(`${def.name} — scegli il Bastione a cui aggiungere il Muro`, sideOptions, (destSide) => {
+        sendAction('play_spell', {
+          instance_id: instanceId,
+          target_player_id: targetPlayerId,
+          target_warrior_iid: targetWarriorIid,
+          dest_bastion_side: destSide,
+        });
       });
     });
   }
@@ -1795,6 +2102,50 @@ const App = (() => {
       },
       def ? def.id : null
     );
+  }
+
+  // Arrampicarta: scelta del Muro, seguita dalla scelta del Guerriero a cui assegnarlo
+  function _showArrampicartaWallPicker(walls, side, spellInstanceId, idx) {
+    const iid = walls[idx];
+    const def = getCardDef(iid);
+
+    const bodyHTML = cardDetailBodyHTML(def, iid);
+
+    Renderer.showCardDetail(
+      def ? def.name : iid,
+      bodyHTML,
+      null, null, null,
+      [{
+        label: 'Scegli',
+        className: 'btn-primary',
+        onClick: () => {
+          Renderer.closeCardDetail();
+          _showArrampicartaWarriorPicker(spellInstanceId, side, iid);
+        },
+      }],
+      {
+        onPrev: idx > 0 ? () => _showArrampicartaWallPicker(walls, side, spellInstanceId, idx - 1) : null,
+        onNext: idx < walls.length - 1 ? () => _showArrampicartaWallPicker(walls, side, spellInstanceId, idx + 1) : null,
+      },
+      def ? def.id : null
+    );
+  }
+
+  function _showArrampicartaWarriorPicker(spellInstanceId, wallSide, wallInstanceId) {
+    const me = currentState.players.find(p => p.id === myPlayerId);
+    const warriors = _getAllWarriors(me);
+    const options = warriors.map(w => ({
+      label: `${w.name} (ATT ${w.att}  GIT ${w.git}  DIF ${w.dif})`,
+      value: w.instance_id,
+    }));
+    Renderer.showChoiceModal('Arrampicarta — assegna il Muro a un Guerriero', options, (warriorIid) => {
+      sendAction('play_spell', {
+        instance_id: spellInstanceId,
+        bastion_side: wallSide,
+        wall_instance_id: wallInstanceId,
+        warrior_iid: warriorIid,
+      });
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -2431,6 +2782,100 @@ const App = (() => {
       null,
       null,
       [],
+      navOptions,
+      def ? def.id : null
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Slideshow carte assegnate (es. Trono assegnato a un Guerriero)
+  // ---------------------------------------------------------------------------
+
+  function _findWarriorByIid(playerId, warriorIid) {
+    if (!currentState) return null;
+    const player = currentState.players.find(p => p.id === playerId);
+    if (!player) return null;
+    return [
+      ...(player.field.vanguard || []),
+      ...(player.field.bastion_left.warriors || []),
+      ...(player.field.bastion_right.warriors || []),
+    ].find(w => w.instance_id === warriorIid) || null;
+  }
+
+  function _showAssignedCardsSlideshow(warriorIid, ownerPlayerId, idx) {
+    const warrior = _findWarriorByIid(ownerPlayerId, warriorIid);
+    if (!warrior) return;
+    const assignedCards = (warrior.assigned_cards || []).filter(ac => ac.type !== 'wall');
+    if (assignedCards.length === 0) return;
+
+    const ac = assignedCards[idx];
+    const def = getCardDef(ac.instance_id);
+    const bodyHTML = cardDetailBodyHTML(def, ac.instance_id, null, ac.type === 'building' ? ac : null);
+
+    const isMyTurn = currentState && currentState.current_player_id === myPlayerId;
+    const isMine = ownerPlayerId === myPlayerId;
+
+    let actionLabel = null;
+    let onAction = null;
+    if (ac.type === 'building' && ac.completed === false && isMine && isMyTurn) {
+      actionLabel = 'Completa';
+      onAction = () => {
+        Renderer.closeCardDetail();
+        sendAction('complete_building', { building_instance_id: ac.instance_id });
+      };
+    }
+
+    // Badge di stato (informativo, non cliccabile): visibile sia in modalità
+    // immagine che testo, dove il corpo testuale con lo stato non compare.
+    const extraButtons = [];
+    if (ac.type === 'building') {
+      extraButtons.push({
+        label: ac.completed ? '✓ Completa' : '○ Incompleta',
+        className: 'btn-secondary',
+        disabled: true,
+        onClick: () => {},
+      });
+    }
+
+    const navOptions = {
+      onPrev: idx > 0 ? () => _showAssignedCardsSlideshow(warriorIid, ownerPlayerId, idx - 1) : null,
+      onNext: idx < assignedCards.length - 1 ? () => _showAssignedCardsSlideshow(warriorIid, ownerPlayerId, idx + 1) : null,
+    };
+
+    Renderer.showCardDetail(
+      `📌 Assegnata ${idx + 1} / ${assignedCards.length}${def ? ' — ' + def.name : ''}`,
+      bodyHTML,
+      actionLabel,
+      onAction,
+      null,
+      extraButtons,
+      navOptions,
+      def ? def.id : null
+    );
+  }
+
+  // Muri assegnati a un Guerriero (es. Arrampicarta): a testa in giù e numerati
+  // come nel Bastione — vedibili solo per il proprietario (identità nascosta
+  // agli avversari a monte, dal server, filtrando gli instance_id).
+  function _showAssignedWallSlideshow(warriorIid, ownerPlayerId, idx) {
+    const warrior = _findWarriorByIid(ownerPlayerId, warriorIid);
+    if (!warrior) return;
+    const walls = (warrior.assigned_cards || []).filter(ac => ac.type === 'wall' && ac.instance_id);
+    if (walls.length === 0) return;
+
+    const ac = walls[idx];
+    const def = getCardDef(ac.instance_id);
+    const bodyHTML = cardDetailBodyHTML(def, ac.instance_id, null, null);
+
+    const navOptions = {
+      onPrev: idx > 0 ? () => _showAssignedWallSlideshow(warriorIid, ownerPlayerId, idx - 1) : null,
+      onNext: idx < walls.length - 1 ? () => _showAssignedWallSlideshow(warriorIid, ownerPlayerId, idx + 1) : null,
+    };
+
+    Renderer.showCardDetail(
+      `Muro assegnato ${idx + 1} / ${walls.length}${def ? ' — ' + def.name : ''}`,
+      bodyHTML,
+      null, null, null, [],
       navOptions,
       def ? def.id : null
     );

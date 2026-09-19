@@ -14,6 +14,7 @@ Fossato (REGOLE CORRETTE):
 """
 
 from __future__ import annotations
+import random
 from typing import List, Optional, Tuple
 
 from engine.models import (
@@ -295,12 +296,6 @@ def resolve_battle(
     # Statistiche attaccante
     att_att, att_git = attacker_stats(attacker)
 
-    # Controlla Guerremoto per bonus danni
-    damage_bonus = 0
-    for eff in attacker.active_effects:
-        if eff.get("type") == "guerremoto":
-            damage_bonus += eff.get("damage_bonus", 0)
-
     # Controlla decimo_anti_fossato: se il difensore ha Fossato, raddoppia la GIT dell'orda
     for eff in attacker.active_effects:
         if eff.get("type") == "decimo_anti_fossato":
@@ -318,9 +313,29 @@ def resolve_battle(
     # Statistiche difensore
     def_dif, def_git = defender_stats(defender, defender_bastion_side)
 
+    # Guerremoto prodigio: prima del calcolo dei Danni, scarta fino a N Muri
+    # casuali dal Bastione bersaglio
+    guerremoto_discard_walls = 0
+    for eff in attacker.active_effects:
+        if eff.get("type") == "guerremoto":
+            guerremoto_discard_walls += eff.get("discard_walls", 0)
+
+    walls_discarded_guerremoto = 0
+    if guerremoto_discard_walls > 0:
+        target_bastion = (
+            defender.field.bastion_left if defender_bastion_side == "left"
+            else defender.field.bastion_right
+        )
+        n = min(guerremoto_discard_walls, len(target_bastion.walls))
+        if n > 0:
+            chosen = random.sample(target_bastion.walls, n)
+            for wall in chosen:
+                target_bastion.walls.remove(wall)
+                state.discard_pile.append(wall.instance_id)
+            walls_discarded_guerremoto = n
+
     # Danni
     dmg_att, dmg_git, total_dmg = calculate_damage(att_att, att_git, def_dif, def_git)
-    total_dmg += damage_bonus
 
     walls_destroyed = 0
     life_lost = 0
@@ -356,7 +371,7 @@ def resolve_battle(
         "dmg_attack": dmg_att,
         "dmg_ranged": dmg_git,
         "total_damage": total_dmg,
-        "damage_bonus": damage_bonus,
+        "walls_discarded_guerremoto": walls_discarded_guerremoto,
         "walls_destroyed": walls_destroyed,
         "life_lost": life_lost,
         "eracle_destroy_triggered": eracle_destroy_triggered,

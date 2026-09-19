@@ -43,9 +43,48 @@ const Screens = {
     document.querySelectorAll('.scr').forEach(s => s.classList.remove('active'));
     const t = $(`scr-${name}`);
     if (t) t.classList.add('active');
-    window.scrollTo(0, 0);
+    // Il documento non scorre (app shell, vedi mobile.css): riporta in cima
+    // gli scroller interni della schermata appena mostrata.
+    if (t) {
+      t.scrollTop = 0;
+      t.querySelectorAll('*').forEach(n => { if (n.scrollTop) n.scrollTop = 0; });
+    }
+    if (window.Sparks) Sparks.setScreen(name);
+    placeMusicToggle(name);
   },
 };
+
+// In partita e nel catalogo il pulsante musica vive nell'header della
+// schermata (rispettivamente accanto a "Esci" e speculare a "←"); altrove
+// resta fisso in alto a destra, come sul desktop.
+const MUSIC_HOME_CLASSES = ['in-header', 'in-catalog-header'];
+
+function placeMusicToggle(name) {
+  const btn = $('btn-music-toggle');
+  if (!btn) return;
+
+  // Nella splash la musica è ancora muta finché non si tocca il logo: il
+  // pulsante non ha senso finché non parte, quindi resta nascosto.
+  btn.hidden = (name === 'splash');
+
+  let target = null;
+  let cls = null;
+  if (name === 'game') {
+    target = document.querySelector('#topbar .tb-right');
+    cls = 'in-header';
+  } else if (name === 'catalog') {
+    target = $('cat-head');
+    cls = 'in-catalog-header';
+  }
+
+  if (target) {
+    if (btn.parentElement !== target) target.appendChild(btn);
+    MUSIC_HOME_CLASSES.forEach(c => btn.classList.toggle(c, c === cls));
+  } else if (MUSIC_HOME_CLASSES.some(c => btn.classList.contains(c))) {
+    document.body.appendChild(btn);
+    MUSIC_HOME_CLASSES.forEach(c => btn.classList.remove(c));
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Toast
@@ -268,7 +307,7 @@ const Sheet = (() => {
 function spawnConfetti() {
   const box = $('confetti');
   if (!box || box.childElementCount > 0) return;
-  const colors = ['#f0ce06', '#ff9a3d', '#4a9a58', '#4a7aaa', '#9966cc', '#e04040'];
+  const colors = ['#fbc402', '#ff9a3d', '#4a9a58', '#4a7aaa', '#9966cc', '#e04040'];
   for (let i = 0; i < 34; i++) {
     const c = el('i', {
       style: `left:${Math.random() * 100}vw;` +

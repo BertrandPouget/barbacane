@@ -7,6 +7,8 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧱</text></svg>" />
   <link rel="apple-touch-icon" href="/assets/logo_app.png" />
   <meta name="apple-mobile-web-app-title" content="Barbacane" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Caudex:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet" />
   <script>
     // Da telefono si viene reindirizzati al frontend mobile (/m).
     // ?desktop=1 forza (e memorizza) la versione desktop.
@@ -27,8 +29,21 @@
 </head>
 <body>
 
+<canvas id="sparks-canvas"></canvas>
+<audio id="bgm-audio" src="/assets/Tower-Defense_Looping.ogg" loop preload="auto"></audio>
+<button id="btn-music-toggle" class="music-toggle" aria-label="Attiva/disattiva musica" title="Musica">♪</button>
+
+<!-- ===== SCHERMATA: SPLASH ===== -->
+<div id="screen-splash" class="screen active">
+  <div class="splash-container">
+    <img src="/assets/logo.png" alt="Barbacane" class="splash-logo" id="splash-logo"
+         onerror="this.style.display='none'; document.getElementById('splash-title').classList.add('show')" />
+    <h1 class="game-title splash-title-fallback" id="splash-title">BARBACANE</h1>
+  </div>
+</div>
+
 <!-- ===== SCHERMATA: LOBBY ===== -->
-<div id="screen-lobby" class="screen active">
+<div id="screen-lobby" class="screen">
   <div class="lobby-container">
     <div class="logo-area">
       <img src="/assets/logo.png" alt="Barbacane" class="logo"
@@ -66,7 +81,7 @@
       <button id="btn-practice" class="btn btn-primary btn-practice">Sfida un Bot</button>
     </div>
     <button id="btn-catalog" class="btn btn-secondary btn-catalog">Catalogo Carte</button>
-    <a href="/m" style="display:block;text-align:center;margin-top:14px;font-size:0.8rem;font-style:italic;color:var(--bg-medium);text-decoration:none"
+    <a href="/m" class="mobile-link"
        onclick="try{localStorage.removeItem('barbacane-desktop')}catch(e){}">Passa alla versione mobile</a>
   </div>
 </div>
@@ -76,7 +91,6 @@
   <div id="catalog-header">
     <button id="btn-catalog-back" class="btn btn-secondary btn-small">← Indietro</button>
     <h2>Catalogo Carte</h2>
-    <span id="catalog-count" class="catalog-count"></span>
   </div>
   <div id="catalog-scroll">
     <div id="catalog-grid"></div>
@@ -345,6 +359,8 @@
   </div>
 </div>
 
+<script src="sparks.js"></script>
+<script src="audio.js"></script>
 <script src="ws.js"></script>
 <script src="renderer.js"></script>
 <script src="app.js"></script>

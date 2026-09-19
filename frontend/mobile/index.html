@@ -12,12 +12,27 @@
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/assets/logo_app.png" />
   <meta name="apple-mobile-web-app-title" content="Barbacane" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Caudex:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/mobile/mobile.css" />
 </head>
 <body>
 
+<canvas id="sparks-canvas"></canvas>
+<audio id="bgm-audio" src="/assets/Tower-Defense_Looping.ogg" loop preload="auto"></audio>
+<button id="btn-music-toggle" class="music-toggle" aria-label="Attiva/disattiva musica" title="Musica">♪</button>
+
+<!-- ═══════════ SCHERMATA: SPLASH ═══════════ -->
+<section id="scr-splash" class="scr active">
+  <div class="splash-tap">
+    <img src="/assets/logo.png" alt="Barbacane" class="splash-logo" id="splash-logo"
+         onerror="this.style.display='none'; document.getElementById('splash-title').classList.add('show')" />
+    <h1 class="splash-title-fallback" id="splash-title">BARBACANE</h1>
+  </div>
+</section>
+
 <!-- ═══════════ SCHERMATA: LOBBY ═══════════ -->
-<section id="scr-lobby" class="scr active">
+<section id="scr-lobby" class="scr">
   <div class="lobby-scroll">
     <div class="lobby-hero">
       <img src="/assets/logo.png" alt="" class="lobby-logo"
@@ -110,7 +125,6 @@
   <header id="cat-head" class="glass">
     <button id="cat-back" class="tb-btn" aria-label="Torna alla lobby">←</button>
     <span class="cat-title">Catalogo carte</span>
-    <span id="cat-count" class="cat-count"></span>
   </header>
   <div id="cat-scroll">
     <div id="cat-grid"></div>
@@ -271,6 +285,8 @@
 <div id="turn-banner" hidden><span id="turn-banner-text"></span></div>
 <div id="toasts"></div>
 
+<script src="/sparks.js"></script>
+<script src="/audio.js"></script>
 <script src="/ws.js"></script>
 <script src="/mobile/ui.js"></script>
 <script src="/mobile/render.js"></script>

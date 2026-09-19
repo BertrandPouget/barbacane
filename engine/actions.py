@@ -28,7 +28,13 @@ from engine.deck import (
     make_wall_instance,
     get_base_card_id,
 )
-from engine.effects import apply_effect, EFFECT_REGISTRY
+from engine.effects import (
+    apply_effect,
+    EFFECT_REGISTRY,
+    _discard_warrior_from_player,
+    _reassign_buildings,
+    _unassign_building,
+)
 import random as _random
 
 
@@ -192,6 +198,8 @@ def evolve_warrior(
             idx = region_list.index(recruit)
             region_list[idx] = hero_inst
             break
+
+    _reassign_buildings(player, hero_instance_id, recruit.assigned_cards)
 
     # Aggiorna i riferimenti warrior_iid negli effetti orda stat
     for eff in player.active_effects:
@@ -369,6 +377,33 @@ def play_spell(
         ):
             raise ActionError("Devi scegliere un tuo Guerriero in campo.")
 
+    # Pre-validazione: equipotenza richiede la scelta esplicita di un proprio Guerriero
+    if base_id == "equipotenza":
+        own_warrior_iid = kwargs.get("own_warrior_iid")
+        if not own_warrior_iid or not any(
+            w.instance_id == own_warrior_iid for w in player.all_warriors()
+        ):
+            raise ActionError("Devi scegliere un tuo Guerriero in campo.")
+
+    # Pre-validazione: regicidio richiede la scelta esplicita di un Trono in campo
+    if base_id == "regicidio":
+        any_trono = any(
+            b.base_card_id == "trono"
+            for p in state.players
+            for b in p.field.village.buildings
+        )
+        if not any_trono:
+            raise ActionError("Non ci sono Troni in campo da scartare.")
+        target_player_id = kwargs.get("target_player_id")
+        target_trono_iid = kwargs.get("target_trono_iid")
+        target_p = state.get_player(target_player_id) if target_player_id else None
+        valid_target = target_p is not None and any(
+            b.base_card_id == "trono" and b.instance_id == target_trono_iid
+            for b in target_p.field.village.buildings
+        )
+        if not valid_target:
+            raise ActionError("Devi scegliere un Trono in campo da scartare.")
+
     # Pre-validazione: velocemento richiede almeno una Costruzione in mano
     if base_id == "velocemento":
         has_building = any(
@@ -377,6 +412,28 @@ def play_spell(
         )
         if not has_building:
             raise ActionError("Non hai nessuna Costruzione in mano.")
+
+    # Pre-validazione: arrampicarta richiede la scelta esplicita di un tuo Muro
+    # e di un tuo Guerriero a cui assegnarlo
+    if base_id == "arrampicarta":
+        wall_instance_id = kwargs.get("wall_instance_id")
+        warrior_iid = kwargs.get("warrior_iid")
+        bastion_side = kwargs.get("bastion_side")
+        if not wall_instance_id or not warrior_iid:
+            raise ActionError("Devi scegliere un Muro e un Guerriero a cui assegnarlo.")
+        if bastion_side:
+            bastion = player.field.bastion_left if bastion_side == "left" else player.field.bastion_right
+            wall_found = any(w.instance_id == wall_instance_id for w in bastion.walls)
+        else:
+            wall_found = any(
+                w.instance_id == wall_instance_id
+                for b in (player.field.bastion_left, player.field.bastion_right)
+                for w in b.walls
+            )
+        if not wall_found:
+            raise ActionError("Muro non trovato nel Bastione indicato.")
+        if not any(w.instance_id == warrior_iid for w in player.all_warriors()):
+            raise ActionError("Guerriero non trovato in campo.")
 
     # Rimuovi dalla mano e consuma azione
     player.hand.remove(instance_id)
@@ -426,11 +483,13 @@ def play_building(
     state: GameState,
     player_id: str,
     instance_id: str,
+    target_warrior_iid: Optional[str] = None,
 ) -> dict:
     """
     Piazza una Costruzione nel Villaggio (incompleta).
     Costo: Mana pari al costo. Consuma 1 Azione.
     Cardo/Decumano si completano automaticamente (completion_cost = 0).
+    Trono richiede target_warrior_iid: viene assegnato subito a un proprio Guerriero.
     """
     player = _require_current_player(state, player_id)
     is_ethereal = player.ethereal_card == instance_id
@@ -443,6 +502,13 @@ def play_building(
     if not isinstance(card, BuildingCard):
         raise ActionError(f"{instance_id} non è una Costruzione.")
 
+    # Pre-validazione: trono richiede la scelta esplicita di un proprio Guerriero
+    if base_id == "trono":
+        if not target_warrior_iid or not any(
+            w.instance_id == target_warrior_iid for w in player.all_warriors()
+        ):
+            raise ActionError("Devi scegliere un tuo Guerriero a cui assegnare il Trono.")
+
     cost = card.cost if not is_ethereal else 0
     if player.mana_remaining < cost:
         raise ActionError(f"Mana insufficiente: {player.mana_remaining}/{cost}.")
@@ -453,7 +519,7 @@ def play_building(
         player.actions_remaining -= 1
     player.ethereal_card = None
 
-    b_inst = _place_building(state, player, instance_id)
+    b_inst = _place_building(state, player, instance_id, target_warrior_iid=target_warrior_iid)
     state.add_log(player_id, "play_building", card=instance_id, completed=b_inst.completed)
     return {"card": instance_id, "completed": b_inst.completed}
 
@@ -463,6 +529,7 @@ def _place_building(
     player: Player,
     instance_id: str,
     free: bool = False,
+    target_warrior_iid: Optional[str] = None,
 ) -> BuildingInstance:
     """Posiziona una Costruzione nel Villaggio. Se free=True salta il costo Mana."""
     base_id = get_base_card_id(instance_id)
@@ -480,6 +547,9 @@ def _place_building(
     if card.auto_complete:
         b_inst.completed = True
         apply_effect(card.effect_id, state, player, completed=True)
+    elif base_id == "trono":
+        apply_effect(card.effect_id, state, player, completed=False,
+                     target_warrior_iid=target_warrior_iid, building_instance_id=instance_id)
     else:
         # Effetto base attivo (passivo, verrà applicato nei trigger appropriati)
         pass
@@ -545,6 +615,10 @@ def complete_building(
         player.actions_remaining -= 1
     player.ethereal_complete = None
     b_inst.completed = True
+
+    if base_id == "trono":
+        apply_effect(card.effect_id, state, player, completed=True,
+                     target_warrior_iid=b_inst.assigned_warrior, building_instance_id=building_instance_id)
 
     # Fucina completata mid-turno: concede subito l'azione aggiuntiva
     if base_id == "fucina":
@@ -722,7 +796,9 @@ def activate_horde(
 ) -> dict:
     """
     Attiva un effetto Orda per una specifica zona+specie.
-    Ogni Orda (stessa Specie nella stessa Regione) può essere attivata una sola volta per turno.
+    Un'Orda attivata resta attiva finché non si divide (riposizionamento/scarto) o
+    finché il giocatore non sceglie un'altra carta della stessa Orda: in tal caso
+    l'effetto precedente viene prima disattivato.
     """
 
     player = _require_current_player(state, player_id)
@@ -736,12 +812,19 @@ def activate_horde(
     if not horde_effect_id:
         raise ActionError(f"La carta {horde_card_id} non ha effetto Orda.")
 
-    # Trova le Orde valide per questa specie non ancora attivate
+    # Un Guerriero con Trono completo assegnato ha l'effetto Orda già sempre attivo:
+    # non va riattivato manualmente.
+    if warrior_instance_id and player.has_active_trono(warrior_instance_id):
+        raise ActionError(
+            "Questo Guerriero ha già l'effetto Orda sempre attivo grazie al Trono: "
+            "non serve (e non si può) attivarlo manualmente."
+        )
+
+    # Trova le Orde valide per questa specie che includono questa carta
     all_hordes = player.check_horde_with_zones()
     candidates = [
         h for h in all_hordes
         if h["species"] == species
-        and f"{h['zone']}:{species}" not in player.hordes_activated_this_turn
         and any(w.base_card_id == horde_card_id for w in h["warriors"])
     ]
     if not candidates:
@@ -756,8 +839,23 @@ def activate_horde(
     horde_zone = horde["zone"]
     horde_key = f"{horde_zone}:{species}"
 
-    # Segna visivamente la carta al centro dell'Orda (solo nella zona attivata)
+    if horde_key in player.hordes_activated_this_turn:
+        currently_active = next(
+            (w for w in horde["warriors"]
+             if w.horde_active and not player.has_active_trono(w.instance_id)),
+            None,
+        )
+        if currently_active and currently_active.base_card_id == horde_card_id:
+            raise ActionError("Questo effetto Orda è già attivo per questo gruppo.")
+        # Scelta di un'altra carta per lo stesso gruppo: disattiva l'effetto corrente
+        # prima di attivare quello nuovo.
+        player.deactivate_horde_for_switch(horde_zone, species)
+
+    # Segna visivamente la carta al centro dell'Orda (solo nella zona attivata).
+    # I Guerrieri con Trono sempre attivo mantengono il proprio fulmine invariato.
     for w in horde["warriors"]:
+        if player.has_active_trono(w.instance_id):
+            continue
         w.horde_active = (w.base_card_id == horde_card_id)
 
     # Snapshot per taggare i nuovi effetti con horde_key (usato da deactivate_broken_horde)
@@ -915,6 +1013,7 @@ def eracle_destroy(
     if b is None:
         raise ActionError("Costruzione non trovata nel Villaggio avversario.")
 
+    _unassign_building(target, b)
     target.field.village.buildings.remove(b)
     state.discard_pile.append(b.instance_id)
     player.active_effects.remove(eracle_eff)
@@ -949,39 +1048,8 @@ def discard_card(
         state.discard_pile.append(instance_id)
 
     elif source == "field":
-        warrior = None
-        region_name = None
-        for rname, rlist in _warrior_regions(player):
-            for w in rlist:
-                if w.instance_id == instance_id:
-                    warrior = w
-                    region_name = rname
-                    break
-            if warrior:
-                break
-        if warrior is None:
+        if not _discard_warrior_from_player(state, player, instance_id):
             raise ActionError(f"Guerriero {instance_id} non trovato in campo.")
-
-        region_list = _get_region(player, region_name)
-        region_list.remove(warrior)
-        player.deactivate_broken_horde(warrior, region_name)
-
-        if warrior.evolved_from:
-            # Eroe scartato: la Recluta torna in campo con le carte assegnate
-            recruit_iid = warrior.evolved_from
-            recruit_inst = WarriorInstance(
-                instance_id=recruit_iid,
-                base_card_id=get_base_card_id(recruit_iid),
-                assigned_cards=list(warrior.assigned_cards),
-                temp_modifiers={},
-            )
-            region_list.append(recruit_inst)
-        else:
-            # Recluta scartata: anche le carte assegnate vanno negli scarti
-            for ac_iid in warrior.assigned_cards:
-                state.discard_pile.append(ac_iid)
-
-        state.discard_pile.append(instance_id)
 
     elif source == "village":
         b_inst = next(
@@ -990,6 +1058,7 @@ def discard_card(
         )
         if b_inst is None:
             raise ActionError(f"Costruzione {instance_id} non trovata nel Villaggio.")
+        _unassign_building(player, b_inst)
         player.field.village.buildings.remove(b_inst)
         state.discard_pile.append(instance_id)
 

@@ -12,8 +12,8 @@
   --bg-medium:    #2c1800;
   --bg-light:     #3e2408;
   --bg-card:      #281200;
-  --gold:         #f0ce06;
-  --gold-light:   #ffe040;
+  --gold:         #fbc402;
+  --gold-light:   #ffd042;
   --red:          #b03030;
   --red-light:    #e04040;
   --green:        #2d6b3a;
@@ -27,6 +27,13 @@
   --border-gold:  #a06820;
   --brown:        #4a2008;
   --brown-light:  #7a4418;
+  --orange:       #e08020;
+
+  /* Palette della grafica delle carte (card_factory/assets/card.html) */
+  --card-brown: #4a2c15;
+  --card-gold:  #b98a3e;
+  --card-cream: #f4dea0;
+  --card-ink:   #171009;   /* fondo su cui sono renderizzati i PNG delle carte */
 
   --danger: var(--red-light);
   --ok:     var(--green-light);
@@ -66,8 +73,16 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+/* App shell: il documento non scorre mai. Tutto lo scorrimento avviene in
+   contenitori interni (.lobby-scroll, .wait-wrap, #cat-scroll, .sheet-body...).
+   Serve perche' lo sfondo sta su html (vedi sotto) e la sua area di
+   posizionamento e' la box di html: se il documento scorresse, sotto la prima
+   schermata resterebbe solo il colore piatto, senza immagine — invisibile in
+   Safari (lo coprono le toolbar) ma ben visibile in standalone, dove il
+   viewport arriva fino al home indicator. Blocca anche il rubber-band iOS. */
 html, body {
   height: 100%;
+  overflow: hidden;
   overscroll-behavior: none;
 }
 
@@ -84,10 +99,11 @@ html {
 }
 
 body {
-  font-family: 'Georgia', serif;
+  position: fixed;
+  inset: 0;
+  font-family: 'Caudex', Georgia, serif;
   color: var(--text);
   background: transparent;
-  min-height: 100dvh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   user-select: none;
@@ -116,13 +132,68 @@ input {
 
 [hidden] { display: none !important; }
 
+/* ═══════════════════════ SCINTILLE DI FORGIA ═══════════════════════ */
+
+#sparks-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ═══════════════════════ MUSICA ═══════════════════════ */
+
+.music-toggle {
+  position: fixed;
+  top: calc(var(--sat) + 10px);
+  right: 10px;
+  z-index: 400;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border-gold);
+  background: var(--bg-medium);
+  color: var(--gold);
+  font-size: 1.1rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.85;
+}
+.music-toggle.muted { color: var(--brown-light); }
+.music-toggle[hidden] { display: none; }
+
+/* In partita si inserisce nella barra superiore, accanto a "Esci" */
+.music-toggle.in-header {
+  position: static;
+  z-index: auto;
+  width: 28px;
+  height: 28px;
+  font-size: 0.85rem;
+}
+
+/* Nel catalogo si inserisce nell'header del titolo, speculare a "←" */
+.music-toggle.in-catalog-header {
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  left: auto;
+  transform: translateY(-50%);
+  z-index: auto;
+  width: 30px;
+  height: 30px;
+  font-size: 0.9rem;
+}
+.music-toggle.in-catalog-header:active { transform: translateY(calc(-50% + 1px)); }
+
 /* ── Schermate ─────────────────────────────────────────────────────── */
 
 .scr {
   display: none;
   position: relative;
   z-index: 1;
-  min-height: 100dvh;
+  height: 100%;
 }
 .scr.active { display: flex; flex-direction: column; animation: scr-in 0.35s var(--ease-out); }
 
@@ -131,21 +202,85 @@ input {
   to   { opacity: 1; transform: none; }
 }
 
+/* ═══════════════════════ SPLASH ═══════════════════════ */
+
+#scr-splash { align-items: center; justify-content: center; }
+
+.splash-tap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  cursor: pointer;
+}
+
+.splash-logo {
+  width: min(320px, 78vw);
+  height: auto;
+  /* Il transform gestisce solo il volo verso la lobby */
+  transition: transform 0.7s cubic-bezier(0.25, 0.1, 0.25, 1);
+  will-change: transform;
+}
+
+.splash-title-fallback {
+  display: none;
+  font-size: clamp(1.8rem, 9vw, 2.6rem);
+  letter-spacing: 0.28em;
+  padding-left: 0.28em; /* compensa il tracking */
+  color: var(--gold);
+  text-shadow: 0 0 20px rgba(200, 168, 75, 0.5);
+}
+.splash-title-fallback.show { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-logo { transition: none !important; }
+}
+
+/* Durante il volo verso la lobby lo splash diventa un overlay fisso: non deve
+   allungare la pagina, altrimenti la misura della posizione del logo di
+   lobby (fatta mentre lo splash è ancora davanti) risulterebbe sbagliata. */
+#scr-splash.splash-flying {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  animation: none;
+}
+
+/* Il logo della lobby resta nascosto (ma impaginato) finché quello volante non atterra */
+.lobby-scroll.logo-hidden .lobby-hero { visibility: hidden; }
+
+/* Comparsa del resto della lobby: parte mentre il logo è ancora in volo */
+@keyframes lobby-reveal {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+.lobby-scroll.reveal > .seg-tabs     { animation: lobby-reveal 0.5s ease both 0.30s; }
+.lobby-scroll.reveal > .lobby-pane   { animation: lobby-reveal 0.5s ease both 0.38s; }
+.lobby-scroll.reveal > .lobby-solo-row { animation: lobby-reveal 0.5s ease both 0.42s; }
+.lobby-scroll.reveal > .cta-catalog  { animation: lobby-reveal 0.5s ease both 0.46s; }
+.lobby-scroll.reveal > .desktop-link { animation: lobby-reveal 0.5s ease both 0.54s; }
+
 /* ═══════════════════════ LOBBY ═══════════════════════ */
 
 #scr-lobby { align-items: center; justify-content: center; }
 .lobby-scroll {
   width: min(430px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: calc(var(--sat) + 28px) 22px calc(var(--sab) + 26px);
   display: flex;
   flex-direction: column;
   gap: 18px;
 }
+/* i blocchi tengono l'altezza naturale: e' .lobby-scroll che scorre */
+.lobby-scroll > * { flex: 0 0 auto; }
 
 .lobby-hero { text-align: center; padding: 8px 0 4px; }
 .lobby-logo {
   width: 150px; height: auto;
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
 }
 .lobby-title {
   font-size: clamp(1.4rem, 7.4vw, 2.1rem);
@@ -244,7 +379,10 @@ input {
 #scr-wait { align-items: center; justify-content: center; }
 .wait-wrap {
   width: min(430px, 100%);
-  padding: 20px 20px calc(var(--sab) + 20px);
+  max-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: calc(var(--sat) + 20px) 20px calc(var(--sab) + 20px);
 }
 .wait-card {
   width: 100%;
@@ -305,7 +443,7 @@ input {
 /* ═══════════════════════ GIOCO ═══════════════════════ */
 
 #scr-game.active {
-  height: 100dvh;
+  height: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -442,7 +580,7 @@ input {
 .opp-chip.turn {
   border-color: var(--gold);
   border-width: 2px;
-  box-shadow: 0 0 16px rgba(240, 206, 6, 0.45);
+  box-shadow: 0 0 16px rgba(251, 196, 2, 0.45);
   padding: 6px 8px;
 }
 .opp-chip.dead { opacity: 0.4; filter: grayscale(0.8); }
@@ -605,7 +743,7 @@ input {
    solo bordo oro, lo sfondo resta quello normale del tassello. */
 .rg-tile.hot {
   border-color: var(--gold);
-  box-shadow: inset 0 0 8px rgba(240, 206, 6, 0.18);
+  box-shadow: inset 0 0 8px rgba(251, 196, 2, 0.18);
 }
 
 .rg-cards {
@@ -803,8 +941,8 @@ input {
 }
 .mbtn-pulse { animation: mbtn-pulse 1.8s ease-in-out infinite; }
 @keyframes mbtn-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(240, 206, 6, 0.5); }
-  50%      { box-shadow: 0 0 0 6px rgba(240, 206, 6, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 196, 2, 0.5); }
+  50%      { box-shadow: 0 0 0 6px rgba(251, 196, 2, 0); }
 }
 
 /* ── Vassoio muri ── */
@@ -876,6 +1014,11 @@ input {
 .card.ethereal {
   border-color: #ffffff !important;
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.45);
+}
+
+/* Guerriero con una o più carte assegnate (es. Trono) */
+.card.has-assigned {
+  border-color: var(--orange) !important;
 }
 
 /* Carta piccola (per campo) */
@@ -1173,6 +1316,7 @@ input {
 .opt-row.danger .opt-label { color: var(--danger); }
 .opt-row.gold { border-color: var(--border-gold); }
 .opt-row.gold .opt-label { color: var(--gold); }
+.opt-row.has-assigned { border-color: var(--orange); }
 
 .sheet-note {
   font-size: 0.8rem;
@@ -1230,6 +1374,12 @@ input {
   font-size: 0.72rem;
 }
 .flip-back-img { padding: 0; overflow: hidden; }
+
+/* Carta assegnata (es. Trono) mostrata dallo sheet dedicato: cornice arancione */
+.flip.flip-assigned .flip-face,
+.flip.flip-assigned .flip-back {
+  border-color: var(--orange);
+}
 .flip-hint { font-size: 0.7rem; color: var(--text-faint); font-style: italic; }
 
 /* Flashcard testuale (senza immagine) */
@@ -1404,9 +1554,13 @@ input {
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  padding: 30px 26px;
+  padding: calc(var(--sat) + 30px) 26px calc(var(--sab) + 30px);
   width: min(430px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
+.over-wrap > * { flex: 0 0 auto; }
 #over-title { font-size: 2rem; color: var(--gold); }
 #over-winner { color: var(--text); font-size: 1.12rem; }
 #over-scores {
@@ -1468,30 +1622,29 @@ input {
 .cta-catalog { margin-top: 2px; }
 
 #scr-catalog.active {
-  height: 100dvh;
+  height: 100%;
   overflow: hidden;
 }
 
 #cat-head {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
   margin: calc(var(--sat) + 8px) 10px 0;
   padding: 7px 9px;
   border-radius: var(--r-md);
   flex: 0 0 auto;
 }
 
+#cat-back { position: absolute; left: 9px; }
+
 .cat-title {
   font-weight: 700;
   font-size: 1rem;
-  color: var(--gold);
-}
-
-.cat-count {
-  margin-left: auto;
-  font-size: 0.78rem;
-  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--card-cream);
 }
 
 #cat-scroll {
@@ -1501,16 +1654,28 @@ input {
   padding: 12px 12px calc(var(--sab) + 20px);
 }
 
-.cat-section-title {
-  color: var(--gold);
-  font-weight: 700;
-  font-size: 0.92rem;
-  margin: 16px 2px 8px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--border);
+/* Ogni sezione è un ripiano velato su cui le carte poggiano, col nome
+   della sezione nella fascia ricavata in cima (come nel desktop) */
+.cat-section {
+  background: rgba(40, 18, 0, 0.58);
+  border: 1px solid rgba(185, 138, 62, 0.35);
+  border-radius: var(--r-lg);
+  padding: 0 8px 8px;
+  margin-top: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
-.cat-section-title:first-child { margin-top: 2px; }
+.cat-section:first-child { margin-top: 0; }
+
+.cat-section-title {
+  padding: 12px 0 10px;
+  text-align: center;
+  color: var(--card-cream);
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
 
 .cat-cards {
   display: grid;
@@ -1518,11 +1683,14 @@ input {
   gap: 8px;
 }
 
+/* Nessun bordo proprio: i PNG hanno già la loro cornice colorata. Il raggio
+   in percentuale ritaglia gli angoli del fondo impressi nell'immagine. */
 .cat-card {
-  border-radius: 8px;
+  aspect-ratio: 744 / 1040;
+  border-radius: 2.7% / 1.95%;
   overflow: hidden;
-  border: 1px solid var(--border-gold);
-  background: var(--bg-dark);
+  background: var(--card-ink);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
   transition: filter 0.15s;
 }
 
@@ -1530,7 +1698,8 @@ input {
 
 .cat-card img {
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
   display: block;
 }
 
@@ -1542,7 +1711,8 @@ input {
   justify-content: center;
   text-align: center;
   padding: 4px;
-  color: var(--text);
+  background: var(--card-brown);
+  color: var(--card-cream);
   font-weight: 700;
   font-size: 0.62rem;
   line-height: 1.2;

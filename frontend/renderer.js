@@ -94,6 +94,11 @@ const Renderer = (() => {
   //   'across'        → 4p: nessun bastione adj; campo completo visibile ma non attaccabile
   // ---------------------------------------------------------------------------
 
+  function _guerremotoActive(state) {
+    const myPlayer = state.players.find(p => p.id === _myPlayerId);
+    return !!myPlayer && (myPlayer.active_effects || []).some(e => e.type === 'guerremoto' && e.any_target);
+  }
+
   function renderTopOpponent(player, state, role) {
     const isActive = player.id === state.current_player_id;
     const div = el('div', { className: `opponent-field${isActive ? ' active-player' : ''}`,
@@ -113,8 +118,10 @@ const Renderer = (() => {
 
     // Bastioni SPECCHIATI: B.D. a sinistra, B.S. a destra
     // isAdj: across → nessuno; both → tutti; left-neighbor → solo sx; right-neighbor → solo dx
-    const leftAdj  = role === 'both' || role === 'left-neighbor';
-    const rightAdj = role === 'both' || role === 'right-neighbor';
+    // Con Guerremoto attivo (any_target) tutti i Bastioni diventano bersagli validi.
+    const guerremotoActive = _guerremotoActive(state);
+    const leftAdj  = guerremotoActive || role === 'both' || role === 'left-neighbor';
+    const rightAdj = guerremotoActive || role === 'both' || role === 'right-neighbor';
 
     const row = el('div', { className: 'opp-regions-row' });
     row.appendChild(renderOppBastionCell(player.field.bastion_right, player.id, 'right', leftAdj));
@@ -180,11 +187,16 @@ const Renderer = (() => {
   }
 
   function renderSideStrip(player, state, mySide) {
-    const isAdj_side = mySide === 'left' ? 'right' : 'left'; // lato del loro bastione adj
+    const isAdj_side    = mySide === 'left' ? 'right' : 'left'; // lato del loro bastione adj
+    const nonAdj_side   = mySide === 'left' ? 'left'  : 'right';
     const adjBastion    = mySide === 'left' ? player.field.bastion_right : player.field.bastion_left;
     const nonAdjBastion = mySide === 'left' ? player.field.bastion_left  : player.field.bastion_right;
     const adjLabel    = mySide === 'left' ? 'Bastione D. (Possibile Bersaglio)' : 'Bastione S. (Possibile Bersaglio)';
-    const nonAdjLabel = mySide === 'left' ? 'Bastione S.' : 'Bastione D.';
+    // Con Guerremoto attivo (any_target) anche il Bastione non adiacente è un bersaglio valido.
+    const guerremotoActive = _guerremotoActive(state);
+    const nonAdjLabel = guerremotoActive
+      ? (mySide === 'left' ? 'Bastione S. (Possibile Bersaglio)' : 'Bastione D. (Possibile Bersaglio)')
+      : (mySide === 'left' ? 'Bastione S.' : 'Bastione D.');
     const wrapper = el('div', { className: 'strip-player' +
       (player.id === state.current_player_id ? ' active-player-content' : '') });
 
@@ -199,8 +211,8 @@ const Renderer = (() => {
     if (stripActiveEl) headerEl.appendChild(stripActiveEl);
     wrapper.appendChild(headerEl);
 
-    // Villaggio
-    const buildings = (player.field.village && player.field.village.buildings) || [];
+    // Villaggio (le Costruzioni assegnate a un Guerriero, es. Trono, sono mostrate sul Guerriero stesso)
+    const buildings = ((player.field.village && player.field.village.buildings) || []).filter(b => !b.assigned_warrior);
     if (buildings.length > 0) {
       const vill = el('div', { className: 'strip-section strip-vanguard',
         style: 'border-color: var(--border); flex: 0 0 auto;' });
@@ -214,8 +226,9 @@ const Renderer = (() => {
       wrapper.appendChild(vill);
     }
 
-    // Bastione NON adiacente (dimmer, in alto)
-    const nonAdj = el('div', { className: 'strip-section nonadj' });
+    // Bastione NON adiacente (dimmer, in alto; diventa attack-target con Guerremoto attivo)
+    const nonAdj = el('div', { className: `strip-section nonadj${guerremotoActive ? ' attack-target' : ''}`,
+      dataset: guerremotoActive ? { targetPlayerId: player.id, targetSide: nonAdj_side } : {} });
     nonAdj.appendChild(el('div', { className: 'strip-section-label' }, [nonAdjLabel]));
     nonAdj.appendChild(el('div', { className: 'opp-wall-count' }, [`🧱 ${nonAdjBastion.wall_count}`]));
     if (nonAdjBastion.warriors && nonAdjBastion.warriors.length > 0) {
@@ -251,7 +264,7 @@ const Renderer = (() => {
   }
 
   function renderOppVillageInline(village) {
-    const buildings = (village && village.buildings) || [];
+    const buildings = ((village && village.buildings) || []).filter(b => !b.assigned_warrior);
     if (buildings.length === 0) return null;
     const span = el('span', { className: 'opp-village-inline' });
     span.appendChild(document.createTextNode('🏰 '));
@@ -366,7 +379,8 @@ const Renderer = (() => {
   function renderVillage(containerId, village, etherealComplete) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
-    (village.buildings || []).forEach(b => {
+    // Le Costruzioni assegnate a un Guerriero (es. Trono) sono mostrate sul Guerriero, non qui
+    (village.buildings || []).filter(b => !b.assigned_warrior).forEach(b => {
       container.appendChild(renderBuildingCard(b, true, etherealComplete));
     });
   }
@@ -394,7 +408,7 @@ const Renderer = (() => {
 
   const ACTIVE_EFFECT_CONFIG = {
     'spell_immune':            { baseCardId: 'magiscudo',    label: 'Magiscudo',    desc: () => 'Le Magie non hanno effetto su di te fino al prossimo turno.' },
-    'guerremoto':              { baseCardId: 'guerremoto',   label: 'Guerremoto',   desc: ef => `Puoi attaccare qualsiasi Bastione${ef.damage_bonus ? ` (+${ef.damage_bonus} Danni)` : ''}.` },
+    'guerremoto':              { baseCardId: 'guerremoto',   label: 'Guerremoto',   desc: ef => `Puoi attaccare qualsiasi Bastione${ef.discard_walls ? ` (scarta fino a ${ef.discard_walls} Muri prima dei Danni)` : ''}.` },
     'investimento_deferred':   { baseCardId: 'investimento', label: 'Investimento', desc: ef => `+${ef.mana || 2} Mana all'inizio del prossimo turno.` },
     'divinazione_incantesimo': { baseCardId: 'divinazione',  label: 'Divinazione',  desc: () => 'Ricevi un Incantesimo gratuito a inizio prossimo turno.' },
     'divinazione_all_mage':    { baseCardId: 'divinazione',  label: 'Divinazione',  desc: () => '+1 Maga a inizio prossimo turno.' },
@@ -497,6 +511,7 @@ const Renderer = (() => {
     }});
 
     if (warrior.horde_active) div.classList.add('horde-active');
+    if (warrior.assigned_cards && warrior.assigned_cards.length > 0) div.classList.add('has-assigned');
 
     div.appendChild(el('div', { className: 'card-name' }, [warrior.name || warrior.base_card_id]));
     div.appendChild(el('div', {
@@ -826,6 +841,39 @@ const Renderer = (() => {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     const target = document.getElementById(`screen-${name}`);
     if (target) target.classList.add('active');
+    if (window.Sparks) Sparks.setScreen(name);
+    placeMusicToggle(name);
+  }
+
+  // In partita e nel catalogo il pulsante musica vive nella barra dell'header
+  // (rispettivamente dopo "Esci" e accanto al titolo); altrove resta fisso in alto a destra.
+  const MUSIC_HOME_CLASSES = ['in-header', 'in-catalog-header'];
+
+  function placeMusicToggle(name) {
+    const btn = document.getElementById('btn-music-toggle');
+    if (!btn) return;
+
+    // Nella splash la musica è ancora muta finché non si preme il logo: il
+    // pulsante non ha senso finché non parte, quindi resta nascosto.
+    btn.hidden = (name === 'splash');
+
+    let target = null;
+    let cls = null;
+    if (name === 'game') {
+      target = document.querySelector('#game-header .header-right');
+      cls = 'in-header';
+    } else if (name === 'catalog') {
+      target = document.getElementById('catalog-header');
+      cls = 'in-catalog-header';
+    }
+
+    if (target) {
+      if (btn.parentElement !== target) target.appendChild(btn);
+      MUSIC_HOME_CLASSES.forEach(c => btn.classList.toggle(c, c === cls));
+    } else if (MUSIC_HOME_CLASSES.some(c => btn.classList.contains(c))) {
+      document.body.appendChild(btn);
+      MUSIC_HOME_CLASSES.forEach(c => btn.classList.remove(c));
+    }
   }
 
   // ---------------------------------------------------------------------------

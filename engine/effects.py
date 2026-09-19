@@ -120,12 +120,44 @@ def _discard_warrior_from_player(state: GameState, player: Player, warrior_iid: 
                         temp_modifiers={},
                     )
                     region.append(recruit_inst)
+                    _reassign_buildings(player, recruit_inst.instance_id, w.assigned_cards)
                 else:
-                    for ac_iid in w.assigned_cards:
-                        state.discard_pile.append(ac_iid)
+                    _discard_assigned_cards(state, player, w.assigned_cards)
                 state.discard_pile.append(w.instance_id)
                 return True
     return False
+
+
+def _reassign_buildings(player: Player, new_warrior_iid: str, assigned_cards: List[str]) -> None:
+    """Aggiorna il riferimento assigned_warrior delle Costruzioni assegnate (es. Trono)
+    quando un Eroe scartato lascia il posto alla sua Recluta, che eredita le carte assegnate."""
+    for ac_iid in assigned_cards:
+        for b in player.field.village.buildings:
+            if b.instance_id == ac_iid:
+                b.assigned_warrior = new_warrior_iid
+                break
+
+
+def _discard_assigned_cards(state: GameState, player: Player, assigned_cards: List[str]) -> None:
+    """Scarta le carte assegnate a una Recluta che viene scartata.
+    Se una carta assegnata è una Costruzione (es. Trono), va rimossa anche dal Villaggio."""
+    for ac_iid in assigned_cards:
+        b_inst = next((b for b in player.field.village.buildings if b.instance_id == ac_iid), None)
+        if b_inst:
+            player.field.village.buildings.remove(b_inst)
+        state.discard_pile.append(ac_iid)
+
+
+def _unassign_building(player: Player, b_inst: BuildingInstance) -> None:
+    """Scollega una Costruzione assegnata dal Guerriero a cui era assegnata
+    (usato quando la Costruzione viene rimossa dal campo direttamente, es. Trono scartato)."""
+    if not b_inst.assigned_warrior:
+        return
+    for w in player.all_warriors():
+        if b_inst.instance_id in w.assigned_cards:
+            w.assigned_cards.remove(b_inst.instance_id)
+            break
+    b_inst.assigned_warrior = None
 
 
 def _find_warrior_in_all(player: Player, warrior_iid: str) -> Optional[WarriorInstance]:
@@ -422,15 +454,23 @@ def trono_effect(
     Base: assegna questa carta a un Guerriero.
     Complete: l'effetto Orda del Guerriero assegnato è sempre attivo.
     """
-    if not target_warrior_iid:
+    if not target_warrior_iid or not building_instance_id:
         return {"error": "Guerriero bersaglio non specificato"}
 
     target_w = _find_warrior_in_all(player, target_warrior_iid)
     if not target_w:
         return {"error": "Guerriero bersaglio non trovato"}
 
-    if building_instance_id and building_instance_id not in target_w.assigned_cards:
+    b_inst = next(
+        (b for b in player.field.village.buildings if b.instance_id == building_instance_id),
+        None,
+    )
+    if not b_inst:
+        return {"error": "Trono non trovato nel Villaggio"}
+
+    if building_instance_id not in target_w.assigned_cards:
         target_w.assigned_cards.append(building_instance_id)
+    b_inst.assigned_warrior = target_warrior_iid
 
     result: dict = {"assigned_to": target_warrior_iid}
 
@@ -438,13 +478,13 @@ def trono_effect(
         from engine.cards import get_card, WarriorCard
         card = get_card(target_w.base_card_id)
         if isinstance(card, WarriorCard) and card.horde_effect_id:
-            player.active_effects.append({
-                "type": "trono_horde_active",
-                "warrior_iid": target_warrior_iid,
-                "horde_effect_id": card.horde_effect_id,
-                "expires": "permanent",
-            })
+            # L'effetto Orda diventa sempre attivo: si attiva subito (come una
+            # normale attivazione manuale) e verrà ri-attivato automaticamente
+            # a ogni inizio turno del giocatore (vedi _trigger_building_start).
+            target_w.horde_active = True
+            horde_result = apply_effect(card.horde_effect_id, state, player, warrior_iid=target_warrior_iid)
             result["horde_always_active"] = card.horde_effect_id
+            result["horde_effect_result"] = horde_result
 
     state.recent_events.append({
         "type": "effect", "card": "trono",
@@ -592,17 +632,18 @@ def equipotenza_effect(
         own_w = _find_warrior_in_all(player, own_warrior_iid)
         if own_w:
             high = max(own_w.effective_att(), own_w.effective_dif())
-            base_att = own_w.base_card_id and __import__("engine.cards", fromlist=["CARD_REGISTRY"]).CARD_REGISTRY.get(own_w.base_card_id)
             from engine.cards import CARD_REGISTRY
             base_card = CARD_REGISTRY.get(own_w.base_card_id)
             if base_card:
+                att_delta = (high - base_card.att) - own_w.temp_modifiers.get("att", 0)
+                dif_delta = (high - base_card.dif) - own_w.temp_modifiers.get("dif", 0)
                 own_w.temp_modifiers["att"] = high - base_card.att
                 own_w.temp_modifiers["dif"] = high - base_card.dif
                 player.active_effects.append({
                     "type": "equipotenza_own",
                     "warrior_iid": own_warrior_iid,
-                    "att_was": own_w.temp_modifiers.get("att", 0),
-                    "dif_was": own_w.temp_modifiers.get("dif", 0),
+                    "att_delta": att_delta,
+                    "dif_delta": dif_delta,
                     "expires": "start_of_next_own_turn",
                 })
                 result["own_equalized"] = {"warrior": own_warrior_iid, "value": high}
@@ -621,8 +662,18 @@ def equipotenza_effect(
                 from engine.cards import CARD_REGISTRY
                 base_card = CARD_REGISTRY.get(enemy_w.base_card_id)
                 if base_card:
+                    att_delta = (low - base_card.att) - enemy_w.temp_modifiers.get("att", 0)
+                    dif_delta = (low - base_card.dif) - enemy_w.temp_modifiers.get("dif", 0)
                     enemy_w.temp_modifiers["att"] = low - base_card.att
                     enemy_w.temp_modifiers["dif"] = low - base_card.dif
+                    player.active_effects.append({
+                        "type": "equipotenza_enemy",
+                        "warrior_iid": enemy_warrior_iid,
+                        "target_player_id": p.id,
+                        "att_delta": att_delta,
+                        "dif_delta": dif_delta,
+                        "expires": "start_of_next_own_turn",
+                    })
                     result["enemy_equalized"] = {"warrior": enemy_warrior_iid, "player": p.id, "value": low}
                 break
 
@@ -645,22 +696,12 @@ def regicidio_effect(
     **kwargs,
 ) -> dict:
     """
-    Base: scarta un Trono (da qualsiasi campo).
+    Base: scegli un Trono e scartalo.
     Prodigio (additivo &): scarta anche il Guerriero a cui era assegnato.
     """
     target = state.get_player(target_player_id) if target_player_id else None
     if target is None:
-        for p in state.players:
-            trono = next(
-                (b for b in p.field.village.buildings if b.base_card_id == "trono"),
-                None,
-            )
-            if trono:
-                target = p
-                break
-
-    if target is None:
-        return {"error": "Nessun Trono trovato"}
+        return {"error": "Nessun Trono scelto"}
 
     if target.id != player.id and _is_spell_immune(target):
         state.recent_events.append({
@@ -669,18 +710,11 @@ def regicidio_effect(
         })
         return {"blocked_by": "magiscudo", "blocked_player": target.id}
 
-    trono = None
-    if target_trono_iid:
-        trono = next(
-            (b for b in target.field.village.buildings
-             if b.base_card_id == "trono" and b.instance_id == target_trono_iid),
-            None,
-        )
-    else:
-        trono = next(
-            (b for b in target.field.village.buildings if b.base_card_id == "trono"),
-            None,
-        )
+    trono = next(
+        (b for b in target.field.village.buildings
+         if b.base_card_id == "trono" and b.instance_id == target_trono_iid),
+        None,
+    )
 
     if trono is None:
         return {"error": "Trono non trovato"}
@@ -750,21 +784,22 @@ def guerremoto_effect(
 ) -> dict:
     """
     Base: questo turno la Battaglia può essere giocata contro qualsiasi Bastione.
-    Prodigio (additivo &): aggiungi +2 al risultato dei Danni.
+    Prodigio (additivo &): prima del calcolo dei Danni, scarta fino a 2 Muri
+    casuali dal Bastione selezionato.
     """
-    damage_bonus = 2 if prodigy else 0
+    discard_walls = 2 if prodigy else 0
     player.active_effects.append({
         "type": "guerremoto",
         "any_target": True,
-        "damage_bonus": damage_bonus,
+        "discard_walls": discard_walls,
         "expires": "end_of_turn",
     })
     state.recent_events.append({
         "type": "effect", "card": "guerremoto",
         "player_id": player.id, "prodigy": prodigy,
-        "any_target": True, "damage_bonus": damage_bonus,
+        "any_target": True, "discard_walls": discard_walls,
     })
-    return {"any_target": True, "damage_bonus": damage_bonus}
+    return {"any_target": True, "discard_walls": discard_walls}
 
 
 @register_effect("arrampicarta_effect")
@@ -832,9 +867,14 @@ def arrampicarta_effect(
                     "player_id": player.id, "blocked_player": p.id,
                 })
                 continue
+            # Rimuove solo Muri assegnati (es. Arrampicarta), non Costruzioni
+            # assegnate come il Trono, che restano intoccate.
+            building_iids = {b.instance_id for b in p.field.village.buildings}
             for w in p.all_warriors():
-                if w.assigned_cards:
-                    removed_card = w.assigned_cards.pop(0)
+                wall_cards = [c for c in w.assigned_cards if c not in building_iids]
+                if wall_cards:
+                    removed_card = wall_cards[0]
+                    w.assigned_cards.remove(removed_card)
                     if w.temp_modifiers.get("git", 0) > 0:
                         w.temp_modifiers["git"] -= 1
                     state.discard_pile.append(removed_card)
@@ -891,8 +931,8 @@ def cuordipietra_effect(
     **kwargs,
 ) -> dict:
     """
-    Base: scegli una Recluta avversaria e aggiungila a un suo Bastione.
-    Prodigio (sostituisce): scegli qualsiasi Guerriero avversario e aggiungilo a un tuo Bastione.
+    Base: scegli una Recluta avversaria e aggiungila ai Muri di un suo Bastione.
+    Prodigio (sostituisce): scegli un Guerriero avversario e aggiungilo ai Muri di un tuo Bastione.
     """
     target = state.get_player(target_player_id) if target_player_id else None
     if target is None:
@@ -909,6 +949,7 @@ def cuordipietra_effect(
         return {"error": "Guerriero bersaglio non specificato"}
 
     warrior_to_move = None
+    source_region_name = None
     source_region = None
 
     regions = [
@@ -920,7 +961,8 @@ def cuordipietra_effect(
         for w in region_list:
             if w.instance_id == target_warrior_iid:
                 warrior_to_move = w
-                source_region = (region_name, region_list)
+                source_region_name = region_name
+                source_region = region_list
                 break
         if warrior_to_move:
             break
@@ -934,21 +976,40 @@ def cuordipietra_effect(
         if not isinstance(card, WarriorCard) or card.subtype != "recruit":
             return {"error": "Con Cuordipietra base puoi spostare solo Reclute"}
 
-    source_region[1].remove(warrior_to_move)
+    source_region.remove(warrior_to_move)
+    target.deactivate_broken_horde(warrior_to_move, source_region_name)
+
+    if warrior_to_move.evolved_from:
+        # Regola standard: se l'Eroe lascia il campo, la Recluta torna in campo con le carte assegnate.
+        from engine.deck import get_base_card_id as _get_base_id
+        recruit_inst = WarriorInstance(
+            instance_id=warrior_to_move.evolved_from,
+            base_card_id=_get_base_id(warrior_to_move.evolved_from),
+            assigned_cards=list(warrior_to_move.assigned_cards),
+            temp_modifiers={},
+        )
+        source_region.append(recruit_inst)
+    else:
+        # Diventando Muro, il Guerriero perde ogni altra funzione: le carte assegnate vanno negli scarti.
+        for ac_iid in warrior_to_move.assigned_cards:
+            state.discard_pile.append(ac_iid)
+
+    from engine.deck import make_wall_instance
+    wall = make_wall_instance(warrior_to_move.instance_id)
 
     if prodigy:
         dest_bastion = player.field.bastion_left if dest_bastion_side == "left" else player.field.bastion_right
-        dest_bastion.warriors.append(warrior_to_move)
-        result = {"warrior_moved": warrior_to_move.instance_id, "to": f"my_{dest_bastion_side}", "from_player": target.id}
+        dest_bastion.walls.append(wall)
+        result = {"warrior_to_wall": wall.instance_id, "to": f"my_{dest_bastion_side}", "from_player": target.id}
     else:
         dest_bastion = target.field.bastion_left if dest_bastion_side == "left" else target.field.bastion_right
-        dest_bastion.warriors.append(warrior_to_move)
-        result = {"warrior_moved": warrior_to_move.instance_id, "to": f"enemy_{dest_bastion_side}", "from_player": target.id}
+        dest_bastion.walls.append(wall)
+        result = {"warrior_to_wall": wall.instance_id, "to": f"enemy_{dest_bastion_side}", "from_player": target.id}
 
     state.recent_events.append({
-        "type": "warrior_moved", "card": "cuordipietra",
+        "type": "warrior_to_wall", "card": "cuordipietra",
         "player_id": player.id, "prodigy": prodigy,
-        "warrior_moved": warrior_to_move.instance_id,
+        "warrior_moved": wall.instance_id,
         "from_player": target.id, "to": result["to"],
     })
     return result
@@ -1472,7 +1533,7 @@ def plasmarmo_effect(
 
 @register_effect("patrizio_horde")
 def patrizio_horde(state: GameState, player: Player, warrior_iid: Optional[str] = None, **kwargs) -> dict:
-    """Questa carta ottiene +2 GIT fino al prossimo turno del giocatore."""
+    """Questa carta ottiene +2 GIT."""
     w = _find_warrior(player, warrior_iid)
     if w:
         w.temp_modifiers["git"] = w.temp_modifiers.get("git", 0) + 2
@@ -1487,11 +1548,10 @@ def patrizio_horde(state: GameState, player: Player, warrior_iid: Optional[str] 
 
 @register_effect("reinhold_horde")
 def reinhold_horde(state: GameState, player: Player, **kwargs) -> dict:
-    """Il costo per completare le Sorgive è ridotto di 2 questo turno."""
+    """Il costo per completare le Sorgive è ridotto di 2."""
     player.active_effects.append({
         "type": "reinhold_sorgiva_discount",
         "discount": 2,
-        "expires": "end_of_turn",
     })
     state.recent_events.append({
         "type": "horde", "card": "reinhold",
@@ -1502,12 +1562,11 @@ def reinhold_horde(state: GameState, player: Player, **kwargs) -> dict:
 
 @register_effect("araminta_horde")
 def araminta_horde(state: GameState, player: Player, **kwargs) -> dict:
-    """Gli Anatemi a costo 1 che giochi ti ritornano in mano questo turno."""
+    """Gli Anatemi a costo 1 che giochi ti ritornano in mano."""
     player.active_effects.append({
         "type": "araminta_spell_return",
         "school": "anatema",
         "cost": 1,
-        "expires": "end_of_turn",
     })
     state.recent_events.append({
         "type": "horde", "card": "araminta",
@@ -1518,7 +1577,7 @@ def araminta_horde(state: GameState, player: Player, **kwargs) -> dict:
 
 @register_effect("orfeo_horde")
 def orfeo_horde(state: GameState, player: Player, warrior_iid: Optional[str] = None, **kwargs) -> dict:
-    """Questa carta ottiene +1 ATT e +1 DIF fino al prossimo turno del giocatore."""
+    """Questa carta ottiene +1 ATT e +1 DIF."""
     w = _find_warrior(player, warrior_iid)
     if w:
         w.temp_modifiers["att"] = w.temp_modifiers.get("att", 0) + 1
@@ -1534,17 +1593,14 @@ def orfeo_horde(state: GameState, player: Player, warrior_iid: Optional[str] = N
 
 @register_effect("giulio_horde")
 def giulio_horde(state: GameState, player: Player, **kwargs) -> dict:
-    """Il giocatore cerca Giulio II nel mazzo e lo aggiunge alla mano."""
-    state.pending_search = {
-        "player_id": player.id,
-        "context": "giulio_horde",
-        "condition": {"type": "base_card_id", "value": "giulio_ii"},
-    }
+    """Attiva l'Orda di Giulio: finché resta attiva, a inizio di ogni turno del
+    giocatore la ricerca di Giulio II viene innescata da `_trigger_giulio_horde_start`
+    (engine/game.py), non da questo effetto."""
     state.recent_events.append({
-        "type": "search", "card": "giulio",
-        "player_id": player.id, "search_pending": True,
+        "type": "horde", "card": "giulio",
+        "player_id": player.id, "activated": True,
     })
-    return {"search_pending": True}
+    return {"activated": True}
 
 
 @register_effect("faust_horde")
@@ -1563,12 +1619,11 @@ def faust_horde(state: GameState, player: Player, **kwargs) -> dict:
 
 @register_effect("evelyn_horde")
 def evelyn_horde(state: GameState, player: Player, **kwargs) -> dict:
-    """I Sortilegi a costo 1 che giochi questo turno vengono giocati una seconda volta."""
+    """I Sortilegi a costo 1 che giochi vengono giocati una seconda volta."""
     player.active_effects.append({
         "type": "evelyn_spell_double",
         "school": "sortilegio",
         "cost": 1,
-        "expires": "end_of_turn",
     })
     state.recent_events.append({
         "type": "horde", "card": "evelyn",
@@ -1611,7 +1666,6 @@ def decimo_horde(state: GameState, player: Player, warrior_iid: Optional[str] = 
     player.active_effects.append({
         "type": "decimo_anti_fossato",
         "warrior_iid": warrior_iid,
-        "expires": "end_of_turn",
     })
     state.recent_events.append({
         "type": "horde", "card": "decimo",
@@ -1644,6 +1698,7 @@ def joseph_horde(state: GameState, player: Player, warrior_iid: Optional[str] = 
                 continue
             to_remove = [b for b in p.field.village.buildings if b.base_card_id == "trono"]
             for b in to_remove:
+                _unassign_building(p, b)
                 p.field.village.buildings.remove(b)
                 state.discard_pile.append(b.instance_id)
                 discarded.append({"player": p.id, "trono": b.instance_id})
@@ -1667,7 +1722,6 @@ def madeleine_horde(state: GameState, player: Player, **kwargs) -> dict:
     player.active_effects.append({
         "type": "madeleine_prodigy_any_school",
         "school": "incantesimo",
-        "expires": "end_of_turn",
     })
     state.recent_events.append({
         "type": "horde", "card": "madeleine",
@@ -1682,7 +1736,6 @@ def eracle_horde(state: GameState, player: Player, **kwargs) -> dict:
     player.active_effects.append({
         "type": "eracle_destroy_building",
         "min_damage": 3,
-        "expires": "end_of_turn",
     })
     state.recent_events.append({
         "type": "horde", "card": "eracle",
