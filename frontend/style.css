@@ -8,8 +8,8 @@
   --bg-medium:    #2c1800;
   --bg-light:     #3e2408;
   --bg-card:      #281200;
-  --gold:         #f0ce06;
-  --gold-light:   #ffe040;
+  --gold:         #fbc402;
+  --gold-light:   #ffd042;
   --red:          #b03030;
   --red-light:    #e04040;
   --green:        #2d6b3a;
@@ -173,7 +173,7 @@ body::before {
   filter: drop-shadow(0 0 0 transparent);
 }
 .splash-logo:hover {
-  filter: drop-shadow(0 0 26px rgba(240, 206, 6, 0.55));
+  filter: drop-shadow(0 0 26px rgba(251, 196, 2, 0.55));
 }
 
 .splash-title-fallback { display: none; }
@@ -239,7 +239,7 @@ body::before {
 }
 .panel:hover {
   border-color: var(--gold);
-  box-shadow: 0 0 20px rgba(240, 206, 6, 0.22);
+  box-shadow: 0 0 20px rgba(251, 196, 2, 0.22);
 }
 
 .mobile-link {
@@ -282,13 +282,13 @@ input[type="number"] {
 
 input:hover {
   border-color: var(--border-gold);
-  box-shadow: 0 0 10px rgba(240, 206, 6, 0.15);
+  box-shadow: 0 0 10px rgba(251, 196, 2, 0.15);
 }
 
 input:focus {
   outline: none;
   border-color: var(--gold);
-  box-shadow: 0 0 12px rgba(240, 206, 6, 0.3);
+  box-shadow: 0 0 12px rgba(251, 196, 2, 0.3);
 }
 
 /* ==================== SALA D'ATTESA ==================== */
@@ -379,7 +379,7 @@ input:focus {
 #screen-waiting .btn:hover,
 #screen-gameover .btn:hover,
 #screen-catalog .btn:hover {
-  box-shadow: 0 0 16px rgba(240, 206, 6, 0.35);
+  box-shadow: 0 0 16px rgba(251, 196, 2, 0.35);
 }
 
 .btn-primary   { background: var(--gold);        color: var(--bg-dark); font-weight: bold; }
@@ -502,13 +502,13 @@ input:focus {
 #right-strip { border-left:  none; }
 #left-strip.hidden, #right-strip.hidden { display: none; }
 
-#left-strip.active-player-strip  { border-right-color: rgba(240, 206, 6, 0.4); }
-#right-strip.active-player-strip { border-left-color:  rgba(240, 206, 6, 0.4); }
+#left-strip.active-player-strip  { border-right-color: rgba(251, 196, 2, 0.4); }
+#right-strip.active-player-strip { border-left-color:  rgba(251, 196, 2, 0.4); }
 
 .strip-player.active-player-content {
   border-color: var(--gold);
   border-width: 2px;
-  box-shadow: 0 0 16px rgba(240, 206, 6, 0.45);
+  box-shadow: 0 0 16px rgba(251, 196, 2, 0.45);
 }
 
 .strip-player {
@@ -599,7 +599,7 @@ input:focus {
 .opponent-field.active-player {
   border-color: var(--gold);
   border-width: 2px;
-  box-shadow: 0 0 16px rgba(240, 206, 6, 0.45);
+  box-shadow: 0 0 16px rgba(251, 196, 2, 0.45);
 }
 
 .opponent-field.damaged { animation: flash-red 0.5s; }

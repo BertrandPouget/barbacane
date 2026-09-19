@@ -12,8 +12,8 @@
   --bg-medium:    #2c1800;
   --bg-light:     #3e2408;
   --bg-card:      #281200;
-  --gold:         #f0ce06;
-  --gold-light:   #ffe040;
+  --gold:         #fbc402;
+  --gold-light:   #ffd042;
   --red:          #b03030;
   --red-light:    #e04040;
   --green:        #2d6b3a;
@@ -218,7 +218,6 @@ input {
 .splash-logo {
   width: min(320px, 78vw);
   height: auto;
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
   /* Il transform gestisce solo il volo verso la lobby */
   transition: transform 0.7s cubic-bezier(0.25, 0.1, 0.25, 1);
   will-change: transform;
@@ -281,7 +280,6 @@ input {
 .lobby-hero { text-align: center; padding: 8px 0 4px; }
 .lobby-logo {
   width: 150px; height: auto;
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
 }
 .lobby-title {
   font-size: clamp(1.4rem, 7.4vw, 2.1rem);
@@ -581,7 +579,7 @@ input {
 .opp-chip.turn {
   border-color: var(--gold);
   border-width: 2px;
-  box-shadow: 0 0 16px rgba(240, 206, 6, 0.45);
+  box-shadow: 0 0 16px rgba(251, 196, 2, 0.45);
   padding: 6px 8px;
 }
 .opp-chip.dead { opacity: 0.4; filter: grayscale(0.8); }
@@ -744,7 +742,7 @@ input {
    solo bordo oro, lo sfondo resta quello normale del tassello. */
 .rg-tile.hot {
   border-color: var(--gold);
-  box-shadow: inset 0 0 8px rgba(240, 206, 6, 0.18);
+  box-shadow: inset 0 0 8px rgba(251, 196, 2, 0.18);
 }
 
 .rg-cards {
@@ -942,8 +940,8 @@ input {
 }
 .mbtn-pulse { animation: mbtn-pulse 1.8s ease-in-out infinite; }
 @keyframes mbtn-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(240, 206, 6, 0.5); }
-  50%      { box-shadow: 0 0 0 6px rgba(240, 206, 6, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 196, 2, 0.5); }
+  50%      { box-shadow: 0 0 0 6px rgba(251, 196, 2, 0); }
 }
 
 /* ── Vassoio muri ── */
