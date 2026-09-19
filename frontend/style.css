@@ -17,11 +17,11 @@
   --blue:         #2a4a8a;
   --blue-light:   #4a7aaa;
   --text:         #f0e0b8;
-  --text-dim:     #a88050;
+  --text-dim:     #d1a94a;
   --border:       #6a3010;
   --border-gold:  #a06820;
   --brown:        #4a2008;
-  --brown-light:  #7a4418;
+  --brown-light:  #c9a227;
   --orange:       #e08020;
 
   /* Palette della grafica delle carte (card_factory/assets/card.html): usata
@@ -249,7 +249,7 @@ body::before {
   margin-top: 14px;
   font-size: 0.8rem;
   font-style: italic;
-  color: var(--bg-medium);
+  color: var(--text-dim);
   text-decoration: none;
   transition: color 0.2s ease;
 }
@@ -580,7 +580,7 @@ input:focus {
 /* Badge posizione nel campo avversario (top-opponents in 4p) */
 .opp-position-badge {
   font-size: 0.65rem;
-  color: var(--border-gold);
+  color: var(--text-dim);
   font-style: italic;
   margin-left: auto;
   white-space: nowrap;
@@ -1672,7 +1672,7 @@ input:focus {
 }
 
 .phase-sep {
-  color: var(--border);
+  color: var(--border-gold);
   font-size: 0.65rem;
 }
 
@@ -2028,7 +2028,7 @@ input:focus {
 #tutorial-list-header h2 { color: var(--gold); font-size: 1.2rem; margin: 0; }
 
 .tutorial-list-hint {
-  color: var(--bg-medium);
+  color: var(--text-dim);
   font-style: italic;
   font-size: 0.9rem;
   text-align: center;
