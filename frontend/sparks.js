@@ -18,14 +18,18 @@ const Sparks = (() => {
   const SPRITE_SIZE  = 96;
   const SPRITE_STEPS = 14;
 
+  // maxParticles segue il rate: a regime le particelle vive sono circa
+  // (vita media / intervallo di spawn), quindi un tetto troppo basso
+  // annullerebbe l'aumento del rate.
   const CONFIG = {
-    high: { spawnIntervalMs: 190, maxParticles: 26, sizeMin: 5.5, sizeMax: 12.5,
+    high: { spawnIntervalMs: 146, maxParticles: 34, sizeMin: 5.5, sizeMax: 12.5,
             speedMin: 110, speedMax: 230, lifeMin: 3200, lifeMax: 6000, maxAlpha: 1.0 },
-    low:  { spawnIntervalMs: 900, maxParticles:  6, sizeMin: 4.8, sizeMax: 10.0,
+    low:  { spawnIntervalMs: 692, maxParticles:  8, sizeMin: 4.8, sizeMax: 10.0,
             speedMin:  95, speedMax: 190, lifeMin: 2800, lifeMax: 4800, maxAlpha: 0.85 },
   };
 
   let canvas, ctx, w, h;
+  let sizeFactor = 1;   // < 1 sui client con schermo piccolo (vedi init)
   let chunkMask = null;
   let sprites = [];
   let particles = [];
@@ -39,9 +43,12 @@ const Sparks = (() => {
     return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
 
-  function init() {
+  // options.sizeFactor rimpicciolisce i brandelli: sullo schermo del telefono
+  // le stesse dimensioni del desktop occupano troppa larghezza.
+  function init(options = {}) {
     canvas = document.getElementById('sparks-canvas');
     if (!canvas) return;
+    if (options.sizeFactor) sizeFactor = options.sizeFactor;
     ctx = canvas.getContext('2d');
     buildSprites();
     resize();
@@ -136,7 +143,7 @@ const Sparks = (() => {
 
   function makeParticle(cfg) {
     const big = Math.random() < 0.16;
-    const size = (cfg.sizeMin + Math.random() * (cfg.sizeMax - cfg.sizeMin)) * (big ? 1.5 : 1);
+    const size = (cfg.sizeMin + Math.random() * (cfg.sizeMax - cfg.sizeMin)) * (big ? 1.5 : 1) * sizeFactor;
     const speed = (cfg.speedMin + Math.random() * (cfg.speedMax - cfg.speedMin)) * (big ? 0.85 : 1);
     return {
       x: Math.random() * w,

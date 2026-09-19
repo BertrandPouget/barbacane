@@ -132,6 +132,61 @@ input {
 
 [hidden] { display: none !important; }
 
+/* ═══════════════════════ SCINTILLE DI FORGIA ═══════════════════════ */
+
+#sparks-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ═══════════════════════ MUSICA ═══════════════════════ */
+
+.music-toggle {
+  position: fixed;
+  top: calc(var(--sat) + 10px);
+  right: 10px;
+  z-index: 400;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border-gold);
+  background: var(--bg-medium);
+  color: var(--gold);
+  font-size: 1.1rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.85;
+}
+.music-toggle.muted { color: var(--brown-light); }
+.music-toggle[hidden] { display: none; }
+
+/* In partita si inserisce nella barra superiore, accanto a "Esci" */
+.music-toggle.in-header {
+  position: static;
+  z-index: auto;
+  width: 28px;
+  height: 28px;
+  font-size: 0.85rem;
+}
+
+/* Nel catalogo si inserisce nell'header del titolo, speculare a "←" */
+.music-toggle.in-catalog-header {
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  left: auto;
+  transform: translateY(-50%);
+  z-index: auto;
+  width: 30px;
+  height: 30px;
+  font-size: 0.9rem;
+}
+.music-toggle.in-catalog-header:active { transform: translateY(calc(-50% + 1px)); }
+
 /* ── Schermate ─────────────────────────────────────────────────────── */
 
 .scr {
@@ -146,6 +201,66 @@ input {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: none; }
 }
+
+/* ═══════════════════════ SPLASH ═══════════════════════ */
+
+#scr-splash { align-items: center; justify-content: center; }
+
+.splash-tap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  cursor: pointer;
+}
+
+.splash-logo {
+  width: min(320px, 78vw);
+  height: auto;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
+  /* Il transform gestisce solo il volo verso la lobby */
+  transition: transform 0.7s cubic-bezier(0.25, 0.1, 0.25, 1);
+  will-change: transform;
+}
+
+.splash-title-fallback {
+  display: none;
+  font-size: clamp(1.8rem, 9vw, 2.6rem);
+  letter-spacing: 0.28em;
+  padding-left: 0.28em; /* compensa il tracking */
+  color: var(--gold);
+  text-shadow: 0 0 20px rgba(200, 168, 75, 0.5);
+}
+.splash-title-fallback.show { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .splash-logo { transition: none !important; }
+}
+
+/* Durante il volo verso la lobby lo splash diventa un overlay fisso: non deve
+   allungare la pagina, altrimenti la misura della posizione del logo di
+   lobby (fatta mentre lo splash è ancora davanti) risulterebbe sbagliata. */
+#scr-splash.splash-flying {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  animation: none;
+}
+
+/* Il logo della lobby resta nascosto (ma impaginato) finché quello volante non atterra */
+.lobby-scroll.logo-hidden .lobby-hero { visibility: hidden; }
+
+/* Comparsa del resto della lobby: parte mentre il logo è ancora in volo */
+@keyframes lobby-reveal {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+.lobby-scroll.reveal > .seg-tabs     { animation: lobby-reveal 0.5s ease both 0.30s; }
+.lobby-scroll.reveal > .lobby-pane   { animation: lobby-reveal 0.5s ease both 0.38s; }
+.lobby-scroll.reveal > .cta-catalog  { animation: lobby-reveal 0.5s ease both 0.46s; }
+.lobby-scroll.reveal > .desktop-link { animation: lobby-reveal 0.5s ease both 0.54s; }
 
 /* ═══════════════════════ LOBBY ═══════════════════════ */
 

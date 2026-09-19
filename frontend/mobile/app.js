@@ -44,11 +44,73 @@ const Mob = (() => {
   // ---------------------------------------------------------------------------
 
   async function init() {
+    Sparks.init({ sizeFactor: 0.42 });
+    BgMusic.init();
     await loadCardDefs();
     bindLobbyUI();
     bindGameChrome();
+    bindSplashUI();
     const resumed = await tryResume();
-    if (!resumed) Screens.show('lobby');
+    if (!resumed) Screens.show('splash');
+  }
+
+  // La splash mostra solo il logo: toccandolo (primo gesto utente, sblocca
+  // anche l'audio) sale verso la sua posizione e appare il resto della lobby.
+  function bindSplashUI() {
+    const splash = $('scr-splash');
+    if (!splash) return;
+    splash.addEventListener('click', enterFromSplash, { once: true });
+  }
+
+  function enterFromSplash() {
+    const splash = $('scr-splash');
+    const lobby = $('scr-lobby');
+    if (!splash || !lobby) return;
+
+    BgMusic.start();   // questo tocco è il gesto che sblocca l'audio
+
+    const splashLogo = $('splash-logo');
+    const lobbyLogo = lobby.querySelector('.lobby-logo');
+    const scroll = lobby.querySelector('.lobby-scroll');
+    const reducedMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Impagina la lobby (ancora invisibile) per misurare dove deve atterrare il logo.
+    // Lo splash diventa un overlay fisso così non allunga la pagina falsando la misura.
+    scroll.classList.add('logo-hidden', 'reveal');
+    splash.classList.add('splash-flying');
+    lobby.classList.add('active');
+
+    const land = () => {
+      scroll.classList.remove('logo-hidden');
+      splash.classList.remove('splash-flying');
+      if (splashLogo) splashLogo.style.transform = '';
+      Screens.show('lobby');
+    };
+
+    const from = splashLogo ? splashLogo.getBoundingClientRect() : null;
+    const to = lobbyLogo ? lobbyLogo.getBoundingClientRect() : null;
+    // Se il logo non è caricato (fallback testuale) non c'è niente da far volare
+    if (reducedMotion || !from || !to || from.width === 0 || to.width === 0) {
+      land();
+      return;
+    }
+
+    const scale = to.width / from.width;
+    const dx = (to.left + to.width / 2) - (from.left + from.width / 2);
+    const dy = (to.top + to.height / 2) - (from.top + from.height / 2);
+
+    requestAnimationFrame(() => {
+      splashLogo.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+    });
+
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      land();
+    };
+    splashLogo.addEventListener('transitionend', finish, { once: true });
+    setTimeout(finish, 950); // rete di sicurezza se la transizione non parte
   }
 
   async function loadCardDefs() {
