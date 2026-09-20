@@ -22,6 +22,11 @@ const App = (() => {
   let actionMode = null;    // null | 'play_card' | 'complete_building' | 'add_walls'
   let wallsSelected = [];   // [{instanceId, bastion: 'left'|'right'}]
 
+  // Orda di Evelyn: base_card_id della Magia da rigiocare una seconda volta.
+  // Finché è valorizzato, le sendAction('play_spell') vengono convertite in
+  // 'recast_spell' (stessa UI di targeting, azione diversa).
+  let recastPending = null;
+
   // Modalità battaglia
   let battleMode = false;
   let battleTargets = [];   // [{playerId, playerIndex, side}]
@@ -340,9 +345,21 @@ const App = (() => {
     document.addEventListener('pointerdown', _tutorialPopupOutsideHandler, true);
   }
 
+  // Chiude modali e azzera le interazioni in attesa: uscendo da una partita
+  // (o da un tutorial) non devono sopravvivere nella partita successiva.
+  function _clearPendingUI() {
+    document.getElementById('modal-overlay').classList.add('hidden');
+    document.getElementById('modal-confirm').onclick = null;
+    document.getElementById('modal-cancel').onclick = null;
+    recastPending = null;
+    battleMode = false;
+    battleTargets = [];
+  }
+
   function exitTutorial() {
     WS.disconnect();
     stopLocalTimer();
+    _clearPendingUI();
     applyTutorialHighlight([]);
     document.getElementById('tutorial-bar').classList.add('hidden');
     hideTutorialPopup();
@@ -826,6 +843,8 @@ const App = (() => {
         _showMagiscudoCounterModal(myPendingInteraction, state);
       } else if (myPendingInteraction.type === 'malcomune_discard') {
         _showMalcomuneDiscardModal(myPendingInteraction, state);
+      } else if (myPendingInteraction.type === 'evelyn_recast') {
+        _showEvelynRecastModal(myPendingInteraction);
       } else {
         _showBibliotecaModal(myPendingInteraction, state);
       }
@@ -860,6 +879,7 @@ const App = (() => {
       else if (myPending.type === 'agilpesca_discard') _showAgilpescaDiscardModal(state);
       else if (myPending.type === 'magiscudo_counter') _showMagiscudoCounterModal(myPending, state);
       else if (myPending.type === 'malcomune_discard') _showMalcomuneDiscardModal(myPending, state);
+      else if (myPending.type === 'evelyn_recast') _showEvelynRecastModal(myPending);
       else _showBibliotecaModal(myPending, state);
     }
     const myP = state.players && state.players.find(p => p.id === myPlayerId);
@@ -932,6 +952,8 @@ const App = (() => {
       } else if (myPendingInteraction.type === 'agilpesca_discard') {
         document.getElementById('action-hint').textContent = '🎣 Agilpesca: scegli una carta da scartare.';
         _showAgilpescaDiscardModal(currentState);
+      } else if (myPendingInteraction.type === 'evelyn_recast') {
+        document.getElementById('action-hint').textContent = '✨ Orda di Evelyn: rigioca la Magia o rinuncia.';
       } else if (myPendingInteraction.type !== 'magiscudo_counter') {
         document.getElementById('action-hint').textContent = '📚 Biblioteca: scegli una carta prima di continuare.';
         _showBibliotecaModal(myPendingInteraction, currentState);
@@ -1821,6 +1843,39 @@ const App = (() => {
     });
   }
 
+  // Orda di Evelyn: la Magia appena giocata va giocata una seconda volta, con
+  // nuovi bersagli. Riusa la stessa UI di targeting della prima giocata: il
+  // flag recastPending fa convertire la play_spell finale in recast_spell.
+  function _showEvelynRecastModal(pending) {
+    const baseId = pending.base_card_id;
+    const def = cardDefs[baseId];
+    const name = def ? def.name : baseId;
+    Renderer.showModal(
+      'Orda di Evelyn',
+      `<strong>${name}</strong> viene giocata una seconda volta: scegli i nuovi bersagli.`,
+      () => {
+        recastPending = baseId;
+        _showSpellOptions(baseId, def);
+        // Se il targeting non è possibile (nessun bersaglio valido) il flusso
+        // si chiude con un toast senza aprire nulla: riproponi la scelta,
+        // altrimenti l'interazione resterebbe in sospeso senza UI.
+        setTimeout(() => {
+          const overlay = document.getElementById('modal-overlay');
+          if (recastPending && overlay.classList.contains('hidden')) {
+            recastPending = null;
+            _showEvelynRecastModal(pending);
+          }
+        }, 50);
+      },
+      () => {
+        recastPending = null;
+        sendAction('recast_spell', { base_card_id: baseId, skip: true });
+      },
+    );
+    document.getElementById('modal-confirm').textContent = 'Rigioca';
+    document.getElementById('modal-cancel').textContent = 'Rinuncia';
+  }
+
   // Cuordipietra: base = scegli una Recluta avversaria → diventa Muro in un suo Bastione;
   // prodigio = scegli qualsiasi Guerriero avversario → diventa Muro in un tuo Bastione.
   function _showRegicidioOptions(instanceId, def) {
@@ -2550,6 +2605,12 @@ const App = (() => {
   // ---------------------------------------------------------------------------
 
   async function sendAction(action, params = {}) {
+    if (recastPending && action === 'play_spell') {
+      const { instance_id, ...rest } = params;
+      action = 'recast_spell';
+      params = { base_card_id: recastPending, ...rest };
+      recastPending = null;
+    }
     if (WS && gameId) {
       WS.sendAction(action, params);
       return;
@@ -2618,6 +2679,7 @@ const App = (() => {
     WS.disconnect();
     stopLobbyPolling();
     stopLocalTimer();
+    _clearPendingUI();
     leavingGame = false;
     selectedCard = null;
     actionMode = null;

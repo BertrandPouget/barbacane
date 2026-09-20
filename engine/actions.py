@@ -282,6 +282,11 @@ def _apply_spell_post_effects(
     if evelyn_eff and not result.get("returned_to_hand"):
         result["needs_recast"] = True
         result["recast_base_id"] = base_id
+        state.pending_interactions.append({
+            "type": "evelyn_recast",
+            "player_id": player.id,
+            "base_card_id": base_id,
+        })
 
 
 def play_spell(
@@ -955,16 +960,23 @@ def recast_spell(
     """
     player = _require_current_player(state, player_id)
 
-    evelyn_eff = next(
-        (e for e in player.active_effects if e.get("type") == "evelyn_spell_double"),
-        None,
-    )
-    if evelyn_eff is None:
-        raise ActionError("Effetto Evelyn Orda non attivo.")
+    pending = state.pending_interactions[0] if state.pending_interactions else None
+    if not pending or pending.get("type") != "evelyn_recast" or pending.get("player_id") != player_id:
+        raise ActionError("Nessuna ripetizione Evelyn in attesa.")
+    if pending.get("base_card_id") != base_card_id:
+        raise ActionError("La Magia da rigiocare non corrisponde a quella in attesa.")
 
     card = get_card(base_card_id)
     if not isinstance(card, SpellCard):
         raise ActionError(f"{base_card_id} non è una Magia.")
+
+    # Il giocatore può rinunciare alla seconda giocata (es. non ci sono più bersagli validi)
+    if kwargs.pop("skip", False):
+        state.pending_interactions.pop(0)
+        state.add_log(player_id, "recast_spell_skipped", card=base_card_id)
+        return {"card": base_card_id, "skipped": True}
+
+    state.pending_interactions.pop(0)
 
     # Prodigio: stessa logica della prima giocata
     mages_count = len(player.mages_in_field())

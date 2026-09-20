@@ -21,13 +21,18 @@ const WS = (() => {
   const handlers = {};
 
   function connect(gId, pId) {
+    // Cambio di partita (es. tutorial -> partita vera): chiudi la vecchia
+    // connessione, altrimenti _open() la vedrebbe ancora aperta e le azioni
+    // continuerebbero a essere inviate alla partita precedente.
+    if (socket && (gameId !== gId || playerId !== pId)) _teardown();
     gameId = gId;
     playerId = pId;
     _open();
   }
 
   function _open() {
-    if (socket && socket.readyState === WebSocket.OPEN) return;
+    if (socket && (socket.readyState === WebSocket.OPEN ||
+                   socket.readyState === WebSocket.CONNECTING)) return;
 
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
     const url = `${protocol}://${location.host}/ws/${gameId}/${playerId}`;
@@ -117,11 +122,26 @@ const WS = (() => {
     (handlers['*'] || []).forEach(h => h(type, data));
   }
 
-  function disconnect() {
+  function _teardown() {
     _stopKeepalive();
     clearTimeout(reconnectTimer);
-    if (socket) socket.close();
+    reconnectTimer = null;
+    if (socket) {
+      // Stacca gli handler prima di chiudere: onclose scatta in modo asincrono
+      // e rischierebbe di riprogrammare una riconnessione alla vecchia partita.
+      socket.onopen = null;
+      socket.onclose = null;
+      socket.onerror = null;
+      socket.onmessage = null;
+      socket.close();
+    }
     socket = null;
+  }
+
+  function disconnect() {
+    _teardown();
+    gameId = null;
+    playerId = null;
   }
 
   return { connect, send, sendAction, on, off, disconnect };

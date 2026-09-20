@@ -400,6 +400,7 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
             "agilpesca_discard": "resolve_agilpesca",
             "magiscudo_counter": "resolve_magiscudo_counter",
             "malcomune_discard": "resolve_malcomune",
+            "evelyn_recast": "recast_spell",
         }.get(_pending_type)
         if _allowed and action != _allowed:
             if _pending_type in ("biblioteca_discard", "biblioteca_wall"):
@@ -410,6 +411,8 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
                 raise ActionError("In attesa della risposta di Magiscudo del bersaglio.")
             elif _pending_type == "malcomune_discard":
                 raise ActionError("In attesa della scelta del Guerriero da scartare (Malcomune).")
+            elif _pending_type == "evelyn_recast":
+                raise ActionError("Orda di Evelyn: devi rigiocare la Magia (o rinunciare).")
             else:
                 raise ActionError("C'è un'interazione Cardo in attesa di risoluzione.")
 

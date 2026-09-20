@@ -764,6 +764,10 @@ const Renderer = (() => {
     const cancelBtn  = document.getElementById('modal-cancel');
     confirmBtn.classList.remove('hidden');
     cancelBtn.classList.remove('hidden');
+    // I modali dedicati (Magiscudo, Evelyn, ...) riscrivono le etichette dei
+    // pulsanti: ripristinale, sono condivise da tutti i modali.
+    confirmBtn.textContent = 'Conferma';
+    cancelBtn.textContent = 'Annulla';
 
     const cleanup = () => {
       document.getElementById('modal-overlay').classList.add('hidden');
@@ -800,6 +804,8 @@ const Renderer = (() => {
     const cancelBtn  = document.getElementById('modal-cancel');
     confirmBtn.classList.remove('hidden');
     cancelBtn.classList.remove('hidden');
+    confirmBtn.textContent = 'Conferma';
+    cancelBtn.textContent = 'Annulla';
 
     confirmBtn.onclick = () => {
       overlay.classList.add('hidden');

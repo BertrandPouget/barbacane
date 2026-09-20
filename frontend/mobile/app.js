@@ -37,6 +37,10 @@ const Mob = (() => {
   // True mentre stiamo abbandonando la partita: ignora gli update in arrivo
   let leavingGame = false;
 
+  // Orda di Evelyn: base_card_id della Magia da rigiocare. Finché è valorizzato,
+  // le sendAction('play_spell') diventano 'recast_spell' (stessa UI di targeting).
+  let recastPending = null;
+
   // True dopo la prima registrazione degli handler WS.on: connectGameWS()
   // viene richiamata a ogni nuova partita/tutorial, ma gli handler vanno
   // registrati una sola volta per tutta la vita della pagina (altrimenti si
@@ -393,6 +397,7 @@ const Mob = (() => {
 
   function exitTutorial() {
     haptic();
+    recastPending = null;
     WS.disconnect();
     stopLocalTimer();
     Sheet.close(true);
@@ -857,6 +862,7 @@ const Mob = (() => {
       else if (myPending.type === 'agilpesca_discard') showAgilpescaSheet();
       else if (myPending.type === 'magiscudo_counter') showMagiscudoSheet(myPending);
       else if (myPending.type === 'malcomune_discard') showMalcomuneSheet(myPending);
+      else if (myPending.type === 'evelyn_recast') showEvelynRecastSheet(myPending);
       else showBibliotecaSheet(myPending);
       return true;
     }
@@ -2611,6 +2617,47 @@ const Mob = (() => {
     { subtitle: 'Scegli una carta da scartare', locked: true, cancelLabel: null });
   }
 
+  // Orda di Evelyn: la Magia appena giocata va rigiocata, con nuovi bersagli.
+  // Riusa la UI di targeting della prima giocata (vedi recastPending).
+  function showEvelynRecastSheet(pending) {
+    const baseId = pending.base_card_id;
+    const def = cardDefs[baseId];
+    Sheet.open({
+      title: '✨ Orda di Evelyn',
+      subtitle: `${def ? def.name : baseId} viene giocata una seconda volta: scegli i nuovi bersagli.`,
+      body: def ? Render.cardViewNode(def, {}) : [],
+      footer: [
+        {
+          label: 'Rinuncia',
+          onClick: () => {
+            Sheet.close(true);
+            recastPending = null;
+            sendAction('recast_spell', { base_card_id: baseId, skip: true });
+          },
+        },
+        {
+          label: '✨ Rigioca',
+          className: 'mbtn-gold',
+          onClick: () => {
+            Sheet.close(true);
+            recastPending = baseId;
+            showSpellOptions(baseId, def);
+            // Se il targeting non è possibile il flusso si chiude con un toast
+            // senza aprire nulla: riproponi la scelta, altrimenti l'interazione
+            // resterebbe in sospeso senza UI.
+            setTimeout(() => {
+              if (recastPending && !Sheet.isOpen()) {
+                recastPending = null;
+                showEvelynRecastSheet(pending);
+              }
+            }, 50);
+          },
+        },
+      ],
+      locked: true,
+    });
+  }
+
   function showMagiscudoSheet(pending) {
     const caster = playerName(pending.caster_id);
     const spellDef = getCardDef(pending.spell_iid);
@@ -2752,6 +2799,12 @@ const Mob = (() => {
   // ---------------------------------------------------------------------------
 
   async function sendAction(action, params = {}) {
+    if (recastPending && action === 'play_spell') {
+      const { instance_id, ...rest } = params;
+      action = 'recast_spell';
+      params = { base_card_id: recastPending, ...rest };
+      recastPending = null;
+    }
     _animateAction(action, params);
     if (WS && gameId) {
       WS.sendAction(action, params);
