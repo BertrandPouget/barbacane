@@ -161,6 +161,8 @@ Ogni copia di carta ha un `instance_id` univoco (es. `"patrizio_3"`) composto da
 
 ### Schema Database
 
+Le foreign key sono attive su entrambi i backend (SQLite le ignora senza un `PRAGMA foreign_keys=ON` esplicito, Postgres le applica sempre): l'ordine di scrittura è quindi sempre **prima `save_game`, poi `save_player`**.
+
 `db/storage.py` supporta due backend con la stessa API: **Postgres** (Neon, in produzione) se la variabile d'ambiente `DATABASE_URL` è impostata, altrimenti **SQLite** locale (sviluppo). Le query usano il placeholder `?` convertito a `%s` per Postgres (`_q()`); i timestamp sono stringhe ISO 8601 UTC generate lato Python, così il SQL è identico sui due backend.
 
 ```sql
@@ -172,8 +174,9 @@ CREATE TABLE games (
     created_at TEXT, updated_at TEXT   -- ISO 8601 UTC, scritti da Python
 );
 CREATE TABLE players (
-    player_id TEXT PRIMARY KEY, game_id TEXT REFERENCES games(game_id),
-    name TEXT NOT NULL, session_token TEXT UNIQUE, connected INTEGER DEFAULT 1
+    player_id TEXT NOT NULL, game_id TEXT NOT NULL REFERENCES games(game_id),
+    name TEXT NOT NULL, session_token TEXT UNIQUE, connected INTEGER DEFAULT 1,
+    PRIMARY KEY (game_id, player_id)   -- "player_1" e' riusato da ogni partita
 );
 ```
 

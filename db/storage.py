@@ -13,6 +13,7 @@ resta identico sui due backend.
 
 from __future__ import annotations
 import json
+import logging
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -20,6 +21,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from engine.models import GameState
+
+logger = logging.getLogger("barbacane")
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 IS_POSTGRES = bool(DATABASE_URL)
@@ -52,6 +55,10 @@ def get_conn():
         conn = sqlite3.connect(get_db_path(), timeout=10)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
+        # SQLite ignora le foreign key se non le si abilita esplicitamente,
+        # Postgres le applica sempre: senza questo PRAGMA una violazione di
+        # vincolo passa inosservata in sviluppo e rompe solo in produzione.
+        conn.execute("PRAGMA foreign_keys=ON")
     try:
         yield conn
         conn.commit()
@@ -60,6 +67,71 @@ def get_conn():
         raise
     finally:
         conn.close()
+
+
+def _legacy_players_pk(conn) -> bool:
+    """
+    True se la tabella `players` esiste ancora con la vecchia chiave primaria
+    sul solo `player_id`. Gli id ("player_1"..."player_4") sono riassegnati
+    identici a ogni partita, quindi quella chiave permetteva una sola riga per
+    id in tutto il database: ogni nuova partita rubava la riga (e il token) a
+    quella precedente.
+    """
+    if IS_POSTGRES:
+        row = conn.execute("""
+            SELECT count(*) AS n
+              FROM information_schema.table_constraints t
+              JOIN information_schema.key_column_usage k
+                ON k.constraint_name = t.constraint_name
+               AND k.table_schema = t.table_schema
+             WHERE t.table_name = 'players'
+               AND t.table_schema = current_schema()
+               AND t.constraint_type = 'PRIMARY KEY'
+        """).fetchone()
+        return bool(row) and row["n"] == 1
+    rows = conn.execute("PRAGMA table_info(players)").fetchall()
+    return len([r for r in rows if r["pk"]]) == 1
+
+
+def _migrate_players_pk(conn) -> None:
+    """
+    Porta `players` alla chiave primaria (game_id, player_id).
+
+    La tabella viene ricreata invece che alterata: il rename in-place non è
+    portabile, perché su Postgres i vincoli (`players_pkey`, l'unique sul
+    token) restano legati alla tabella rinominata e vanno in conflitto con
+    quelli della nuova. Le righe sono al massimo una manciata, quindi si
+    leggono, si ricrea la tabella e si reinseriscono.
+    """
+    if not _legacy_players_pk(conn):
+        return
+    # Il JOIN scarta le righe orfane (partita gia' cancellata). Con la vecchia
+    # SQLite senza foreign key attive potevano essercene; reinserirle ora
+    # violerebbe il vincolo e farebbe fallire l'avvio.
+    rows = conn.execute("""
+        SELECT p.player_id, p.game_id, p.name, p.session_token, p.connected
+          FROM players p
+          JOIN games g ON g.game_id = p.game_id
+    """).fetchall()
+    conn.execute("DROP TABLE players")
+    conn.execute("""
+        CREATE TABLE players (
+            player_id     TEXT NOT NULL,
+            game_id       TEXT NOT NULL REFERENCES games(game_id),
+            name          TEXT NOT NULL,
+            session_token TEXT UNIQUE,
+            connected     INTEGER DEFAULT 1,
+            PRIMARY KEY (game_id, player_id)
+        )
+    """)
+    for r in rows:
+        if not r["game_id"]:
+            continue  # riga orfana: senza partita non serve a nessuno
+        conn.execute(
+            _q("INSERT INTO players (player_id, game_id, name, session_token, connected)"
+               " VALUES (?, ?, ?, ?, ?)"),
+            (r["player_id"], r["game_id"], r["name"], r["session_token"], r["connected"]),
+        )
 
 
 def init_db() -> None:
@@ -77,15 +149,26 @@ def init_db() -> None:
         """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS players (
-                player_id     TEXT PRIMARY KEY,
-                game_id       TEXT REFERENCES games(game_id),
+                player_id     TEXT NOT NULL,
+                game_id       TEXT NOT NULL REFERENCES games(game_id),
                 name          TEXT NOT NULL,
                 session_token TEXT UNIQUE,
-                connected     INTEGER DEFAULT 1
+                connected     INTEGER DEFAULT 1,
+                PRIMARY KEY (game_id, player_id)
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_games_lobby ON games(lobby_code)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_players_game ON players(game_id)")
+
+    # La migrazione gira in una transazione separata e i suoi errori non sono
+    # fatali: se fallisce si resta sullo schema vecchio (che funziona, solo con
+    # il limite di una riga per player_id) invece di impedire l'avvio del
+    # servizio. Il CREATE qui sopra e' un no-op quando la tabella esiste gia'.
+    try:
+        with get_conn() as conn:
+            _migrate_players_pk(conn)
+    except Exception as e:
+        logger.error("[db] Migrazione della chiave di players fallita: %s", e)
 
 
 def save_game(state: GameState, lobby_code: Optional[str] = None, status: str = "playing") -> None:
@@ -183,22 +266,24 @@ def cleanup_games(finished_grace_minutes: int = 5, stale_hours: float = 1) -> in
 
 def save_player(game_id: str, player_id: str, name: str, session_token: str) -> None:
     """
-    Salva/aggiorna la riga del giocatore. `player_id` (es. "player_1") NON è
-    un identificatore stabile tra partite diverse: ogni nuova lobby/tutorial/
-    partita di pratica riassegna gli stessi id in base all'ordine di ingresso,
-    quindi una riga esistente va sempre risincronizzata con la partita e il
-    token correnti, non solo marcata "connected" (altrimenti l'autenticazione
-    via DB — usata quando la lobby non è più in memoria, come per tutorial e
-    partite contro il Bot — punterebbe ancora alla partita precedente).
+    Salva/aggiorna la riga del giocatore.
+
+    `player_id` (es. "player_1") NON identifica un giocatore: ogni lobby,
+    tutorial o partita contro il Bot riassegna gli stessi id in base all'ordine
+    di ingresso. La riga è quindi identificata dalla coppia (game_id,
+    player_id), e ogni partita ha le proprie: due partite in corso nello stesso
+    momento non si sovrascrivono più il token a vicenda.
     """
     with get_conn() as conn:
         existing = conn.execute(
-            _q("SELECT player_id FROM players WHERE player_id = ?"), (player_id,)
+            _q("SELECT player_id FROM players WHERE game_id = ? AND player_id = ?"),
+            (game_id, player_id),
         ).fetchone()
         if existing:
             conn.execute(
-                _q("UPDATE players SET game_id = ?, name = ?, session_token = ?, connected = 1 WHERE player_id = ?"),
-                (game_id, name, session_token, player_id),
+                _q("UPDATE players SET name = ?, session_token = ?, connected = 1"
+                   " WHERE game_id = ? AND player_id = ?"),
+                (name, session_token, game_id, player_id),
             )
         else:
             conn.execute(
@@ -215,11 +300,12 @@ def get_player_by_token(session_token: str) -> Optional[dict]:
         return dict(row) if row else None
 
 
-def set_player_connected(player_id: str, connected: bool) -> None:
+def set_player_connected(game_id: str, player_id: str, connected: bool) -> None:
+    # `player_id` da solo non è univoco tra partite: serve anche il game_id.
     with get_conn() as conn:
         conn.execute(
-            _q("UPDATE players SET connected = ? WHERE player_id = ?"),
-            (1 if connected else 0, player_id),
+            _q("UPDATE players SET connected = ? WHERE game_id = ? AND player_id = ?"),
+            (1 if connected else 0, game_id, player_id),
         )
 
 

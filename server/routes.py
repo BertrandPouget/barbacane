@@ -228,8 +228,10 @@ async def api_start_tutorial(req: TutorialStartRequest):
         raise HTTPException(400, str(e))
 
     session_token = generate_session_token()
-    save_player(state.game_id, "player_1", state.players[0].name, session_token)
+    # La riga del giocatore ha una FK su games(game_id): la partita va salvata
+    # per prima, altrimenti su Postgres (produzione) l'INSERT fallisce.
     save_game(state, status="playing")
+    save_player(state.game_id, "player_1", state.players[0].name, session_token)
 
     return {
         "game_id": state.game_id,
@@ -253,8 +255,10 @@ async def api_start_practice(req: PracticeStartRequest):
     state = create_practice_game(req.player_name, req.difficulty)
 
     session_token = generate_session_token()
-    save_player(state.game_id, "player_1", state.players[0].name, session_token)
+    # La riga del giocatore ha una FK su games(game_id): la partita va salvata
+    # per prima, altrimenti su Postgres (produzione) l'INSERT fallisce.
     save_game(state, status="playing")
+    save_player(state.game_id, "player_1", state.players[0].name, session_token)
 
     return {
         "game_id": state.game_id,
