@@ -54,9 +54,9 @@ const Screens = {
   },
 };
 
-// In partita e nel catalogo il pulsante musica vive nell'header della
-// schermata (rispettivamente accanto a "Esci" e speculare a "←"); altrove
-// resta fisso in alto a destra, come sul desktop.
+// In partita, nel catalogo e nelle schermate di scelta tutorial/bot il pulsante
+// musica vive nell'header della schermata (rispettivamente accanto a "Esci" e
+// speculare a "←"); altrove resta fisso in alto a destra, come sul desktop.
 const MUSIC_HOME_CLASSES = ['in-header', 'in-catalog-header'];
 
 function placeMusicToggle(name) {
@@ -74,6 +74,12 @@ function placeMusicToggle(name) {
     cls = 'in-header';
   } else if (name === 'catalog') {
     target = $('cat-head');
+    cls = 'in-catalog-header';
+  } else if (name === 'tutorial-list') {
+    target = $('tut-head');
+    cls = 'in-catalog-header';
+  } else if (name === 'bot-difficulty') {
+    target = $('bot-diff-head');
     cls = 'in-catalog-header';
   }
 

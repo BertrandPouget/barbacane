@@ -1735,6 +1735,7 @@ input {
 }
 
 #tut-head {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1781,6 +1782,7 @@ input {
 }
 
 #bot-diff-head {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;

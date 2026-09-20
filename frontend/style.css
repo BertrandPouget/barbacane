@@ -2016,6 +2016,7 @@ input:focus {
 }
 
 #tutorial-list-header {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -2073,6 +2074,7 @@ input:focus {
 }
 
 #bot-difficulty-header {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 1rem;

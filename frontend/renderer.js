@@ -845,8 +845,9 @@ const Renderer = (() => {
     placeMusicToggle(name);
   }
 
-  // In partita e nel catalogo il pulsante musica vive nella barra dell'header
-  // (rispettivamente dopo "Esci" e accanto al titolo); altrove resta fisso in alto a destra.
+  // In partita, nel catalogo e nelle schermate di scelta tutorial/bot il pulsante
+  // musica vive nella barra dell'header (rispettivamente dopo "Esci" e accanto al
+  // titolo); altrove resta fisso in alto a destra.
   const MUSIC_HOME_CLASSES = ['in-header', 'in-catalog-header'];
 
   function placeMusicToggle(name) {
@@ -864,6 +865,12 @@ const Renderer = (() => {
       cls = 'in-header';
     } else if (name === 'catalog') {
       target = document.getElementById('catalog-header');
+      cls = 'in-catalog-header';
+    } else if (name === 'tutorial-list') {
+      target = document.getElementById('tutorial-list-header');
+      cls = 'in-catalog-header';
+    } else if (name === 'bot-difficulty') {
+      target = document.getElementById('bot-difficulty-header');
       cls = 'in-catalog-header';
     }
 
