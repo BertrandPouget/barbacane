@@ -1903,6 +1903,12 @@ const Mob = (() => {
     const canMove = isMyTurn() && currentState.phase === 'schieramento';
 
     const footer = [];
+    if (w.evolved_from) {
+      footer.push({
+        label: 'Recluta',
+        onClick: () => { Sheet.close(true); openRecruitSheet(w.evolved_from, w.name || iid, () => openFieldWarriorSheet(iid)); },
+      });
+    }
     if (w.assigned_cards && w.assigned_cards.some(ac => ac.type !== 'wall')) {
       footer.push({
         label: 'Carte assegnate',
@@ -2241,6 +2247,12 @@ const Mob = (() => {
   function openEnemyCardSheet(w, owner) {
     const def = getCardDef(w.instance_id);
     const footer = [];
+    if (w.evolved_from) {
+      footer.push({
+        label: 'Recluta',
+        onClick: () => { Sheet.close(true); openRecruitSheet(w.evolved_from, w.name || w.instance_id, () => openEnemyCardSheet(w, owner)); },
+      });
+    }
     if (w.assigned_cards && w.assigned_cards.some(ac => ac.type !== 'wall')) {
       footer.push({
         label: 'Carte assegnate',
@@ -2264,6 +2276,24 @@ const Mob = (() => {
       subtitle: `di ${owner.name}`,
       body: Render.cardViewNode(def, { att: w.att, git: w.git, dif: w.dif }),
       footer,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sheet: Recluta sotto un Eroe evoluto — l'Eroe ne conserva l'effetto Orda,
+  // ma la sua carta non lo riporta.
+  // ---------------------------------------------------------------------------
+
+  function openRecruitSheet(recruitIid, heroName, onBack) {
+    const def = getCardDef(recruitIid);
+    Sheet.open({
+      title: def ? def.name : recruitIid,
+      subtitle: `Recluta di ${heroName}`,
+      body: Render.cardViewNode(def, { instanceId: recruitIid }),
+      footer: [
+        { label: 'Eroe', onClick: () => { Sheet.close(true); if (onBack) onBack(); } },
+        { label: 'Chiudi', onClick: () => Sheet.close() },
+      ],
     });
   }
 

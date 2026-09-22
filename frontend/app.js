@@ -1457,6 +1457,19 @@ const App = (() => {
       }
     }
 
+    // Recluta sotto l'Eroe: l'Eroe ne conserva l'effetto Orda, ma la sua carta
+    // non lo riporta — il pulsante mostra la Recluta, da cui si torna all'Eroe.
+    if ((source === 'field' || source === 'opponent') && fieldWarrior && fieldWarrior.evolved_from) {
+      extraButtons.push({
+        label: 'Recluta',
+        className: 'btn-secondary',
+        onClick: () => {
+          Renderer.closeCardDetail();
+          _showRecruitDetail(fieldWarrior.evolved_from, instanceId, source);
+        },
+      });
+    }
+
     // Carte assegnate (es. Trono): visibili su qualsiasi Guerriero, proprio o avversario
     if ((source === 'field' || source === 'opponent') && fieldWarrior && fieldWarrior.assigned_cards && fieldWarrior.assigned_cards.length > 0) {
       const nonWallAssigned = fieldWarrior.assigned_cards.filter(ac => ac.type !== 'wall');
@@ -2822,6 +2835,36 @@ const App = (() => {
       null,
       [],
       navOptions,
+      def ? def.id : null
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Recluta sotto un Eroe evoluto
+  // ---------------------------------------------------------------------------
+
+  function _showRecruitDetail(recruitIid, heroIid, heroSource) {
+    const def = getCardDef(recruitIid);
+    const heroDef = getCardDef(heroIid);
+    const bodyHTML = cardDetailBodyHTML(def, recruitIid);
+
+    const extraButtons = [{
+      label: 'Eroe',
+      className: 'btn-secondary',
+      onClick: () => {
+        Renderer.closeCardDetail();
+        showCardDetail(heroIid, heroSource);
+      },
+    }];
+
+    Renderer.showCardDetail(
+      `Recluta di ${heroDef ? heroDef.name : heroIid}${def ? ' — ' + def.name : ''}`,
+      bodyHTML,
+      null,
+      null,
+      null,
+      extraButtons,
+      null,
       def ? def.id : null
     );
   }

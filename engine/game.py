@@ -843,6 +843,9 @@ def _warrior_view(w: WarriorInstance, player: Optional[Player] = None, viewer_pl
         "species": card.species if isinstance(card, WarriorCard) else None,
         "subtype": card.subtype if isinstance(card, WarriorCard) else None,
         "horde_active": w.horde_active,
+        # L'Eroe conserva l'effetto Orda della Recluta sotto di lui: il client
+        # mostra la Recluta (pubblica) su richiesta, propria o avversaria.
+        "evolved_from": w.evolved_from,
         "assigned_cards": (
             [_assigned_card_view(iid, player, viewer_player_id) for iid in w.assigned_cards]
             if player is not None else []
