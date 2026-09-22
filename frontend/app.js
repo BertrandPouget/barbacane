@@ -1500,7 +1500,14 @@ const App = (() => {
     }
 
     const title = def ? def.name : (fieldWarrior ? (fieldWarrior.name || instanceId) : instanceId);
-    const baseId = def ? def.id : null;
+    let baseId = def ? def.id : null;
+    let fallbackBaseId = null;
+    // Easter egg: mostra l'illustrazione alternativa dell'Obelisco quando la
+    // costruzione è completa, con fallback sulla carta ufficiale se manca.
+    if (baseId === 'obelisco' && fieldBuilding && fieldBuilding.completed) {
+      baseId = 'obelisco_completo';
+      fallbackBaseId = 'obelisco';
+    }
 
     // Frecce di navigazione per le carte in mano
     let navOptions = null;
@@ -1516,7 +1523,7 @@ const App = (() => {
       }
     }
 
-    Renderer.showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons, navOptions, baseId);
+    Renderer.showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons, navOptions, baseId, fallbackBaseId);
   }
 
   function showPlayOptions(instanceId, def) {

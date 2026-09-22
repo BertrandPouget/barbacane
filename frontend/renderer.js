@@ -632,7 +632,7 @@ const Renderer = (() => {
   // Card detail overlay
   // ---------------------------------------------------------------------------
 
-  function showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons = [], navOptions = null, baseCardId = null) {
+  function showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons = [], navOptions = null, baseCardId = null, fallbackBaseCardId = null) {
     const overlay = document.getElementById('card-detail-overlay');
 
     function _setupNav(prevId, nextId) {
@@ -740,7 +740,19 @@ const Renderer = (() => {
       const imgUrl = `/card_images/${baseCardId}.png`;
       const probe = new window.Image();
       probe.onload = () => _showImageMode(imgUrl);
-      probe.onerror = () => _showTextMode();
+      probe.onerror = () => {
+        // Easter egg (es. obelisco_completo): se il PNG alternativo manca,
+        // torna alla carta ufficiale invece di scadere a modalità testo.
+        if (fallbackBaseCardId) {
+          const fallbackUrl = `/card_images/${fallbackBaseCardId}.png`;
+          const fallbackProbe = new window.Image();
+          fallbackProbe.onload = () => _showImageMode(fallbackUrl);
+          fallbackProbe.onerror = () => _showTextMode();
+          fallbackProbe.src = fallbackUrl;
+        } else {
+          _showTextMode();
+        }
+      };
       probe.src = imgUrl;
     } else {
       _showTextMode();
