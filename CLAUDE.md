@@ -218,7 +218,9 @@ Se il mazzo si esaurisce, la pila degli scarti viene mescolata e diventa il nuov
 
 ### Operazioni gratuite (non consumano Azione)
 
-`reposition_warrior`, `activate_horde`, `battle`, `discard_card`, `retrieve_wall`, `discard_wall`, `arena_activate`, `recast_spell` (Evelyn), `eracle_destroy`
+`reposition_warrior`, `activate_horde`, `battle`, `arena_activate`, `recast_spell` (Evelyn), `eracle_destroy`
+
+Una carta già in campo non si tocca liberamente: non esiste né lo scarto libero né il recupero di un Muro in mano. Una carta (in mano, in campo, Muro, Costruzione o Vita) lascia la sua posizione solo quando è l'effetto di una carta a richiederlo (Regicidio, Malcomune, Biblioteca, Agilpesca, Arena, Guerremoto, Plasmattone, Plasmarmo, ecc.).
 
 ### Tipologie di Carte
 

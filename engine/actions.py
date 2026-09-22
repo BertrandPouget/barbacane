@@ -31,7 +31,6 @@ from engine.deck import (
 from engine.effects import (
     apply_effect,
     EFFECT_REGISTRY,
-    _discard_warrior_from_player,
     _reassign_buildings,
     _unassign_building,
 )
@@ -681,52 +680,6 @@ def add_wall(
     return {"walls": placed}
 
 
-def retrieve_wall(
-    state: GameState,
-    player_id: str,
-    instance_id: str,
-    bastion_side: str,  # "left" | "right"
-) -> dict:
-    """
-    Riporta un Muro dalla mano (lo toglie dal Bastione).
-    Non consuma Azioni. Richiede che sia il turno del giocatore.
-    """
-    player = _require_current_player(state, player_id)
-    if bastion_side not in ("left", "right"):
-        raise ActionError(f"Lato Bastione non valido: {bastion_side}.")
-    bastion = player.field.bastion_left if bastion_side == "left" else player.field.bastion_right
-    wall = next((w for w in bastion.walls if w.instance_id == instance_id), None)
-    if wall is None:
-        raise ActionError(f"Il muro {instance_id} non è nel Bastione {bastion_side}.")
-    bastion.walls.remove(wall)
-    player.hand.append(instance_id)
-    state.add_log(player_id, "retrieve_wall", card=instance_id, bastion=bastion_side)
-    return {"retrieved": instance_id}
-
-
-def discard_wall(
-    state: GameState,
-    player_id: str,
-    instance_id: str,
-    bastion_side: str,  # "left" | "right"
-) -> dict:
-    """
-    Scarta un Muro dal Bastione (va negli scarti).
-    Non consuma Azioni. Richiede che sia il turno del giocatore.
-    """
-    player = _require_current_player(state, player_id)
-    if bastion_side not in ("left", "right"):
-        raise ActionError(f"Lato Bastione non valido: {bastion_side}.")
-    bastion = player.field.bastion_left if bastion_side == "left" else player.field.bastion_right
-    wall = next((w for w in bastion.walls if w.instance_id == instance_id), None)
-    if wall is None:
-        raise ActionError(f"Il muro {instance_id} non è nel Bastione {bastion_side}.")
-    bastion.walls.remove(wall)
-    state.discard_pile.append(instance_id)
-    state.add_log(player_id, "discard_wall", card=instance_id, bastion=bastion_side)
-    return {"discarded": instance_id}
-
-
 # ---------------------------------------------------------------------------
 # 7. Riposiziona Guerrieri
 # ---------------------------------------------------------------------------
@@ -1035,47 +988,3 @@ def eracle_destroy(
     return {"destroyed": building_instance_id, "from_player": target_player_id}
 
 
-# ---------------------------------------------------------------------------
-# 11. Scarta carta (dalla mano o dal campo, senza vincoli di turno)
-# ---------------------------------------------------------------------------
-
-def discard_card(
-    state: GameState,
-    player_id: str,
-    instance_id: str,
-    source: str,  # "hand" | "field" | "village"
-) -> dict:
-    """
-    Scarta una carta dalla mano o dal campo.
-    Non richiede che sia il turno del giocatore. Non consuma Azioni.
-    """
-    player = state.get_player(player_id)
-    if player is None:
-        raise ActionError(f"Giocatore {player_id} non trovato.")
-
-    if source == "hand":
-        if instance_id not in player.hand:
-            raise ActionError(f"La carta {instance_id} non è nella tua mano.")
-        player.hand.remove(instance_id)
-        state.discard_pile.append(instance_id)
-
-    elif source == "field":
-        if not _discard_warrior_from_player(state, player, instance_id):
-            raise ActionError(f"Guerriero {instance_id} non trovato in campo.")
-
-    elif source == "village":
-        b_inst = next(
-            (b for b in player.field.village.buildings if b.instance_id == instance_id),
-            None,
-        )
-        if b_inst is None:
-            raise ActionError(f"Costruzione {instance_id} non trovata nel Villaggio.")
-        _unassign_building(player, b_inst)
-        player.field.village.buildings.remove(b_inst)
-        state.discard_pile.append(instance_id)
-
-    else:
-        raise ActionError(f"Sorgente non valida: {source}.")
-
-    state.add_log(player_id, "discard_card", card=instance_id, source=source)
-    return {"discarded": instance_id, "source": source}

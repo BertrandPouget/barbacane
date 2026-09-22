@@ -1489,15 +1489,7 @@ const App = (() => {
       }
     }
 
-    // Bottone Scarta: disponibile per le proprie carte (mano, campo, villaggio) in qualsiasi momento
-    let onDiscard = null;
-    if (source === 'hand' || source === 'field' || source === 'village') {
-      const discardSource = source === 'field' ? 'field' : (source === 'village' ? 'village' : 'hand');
-      onDiscard = () => {
-        Renderer.closeCardDetail();
-        sendAction('discard', { instance_id: instanceId, source: discardSource });
-      };
-    }
+    const onDiscard = null;
 
     const title = def ? def.name : (fieldWarrior ? (fieldWarrior.name || instanceId) : instanceId);
     let baseId = def ? def.id : null;
@@ -2755,28 +2747,6 @@ const App = (() => {
       bodyHTML = `<div class="detail-dim">${iid}</div>`;
     }
 
-    const isMyTurn = currentState && currentState.current_player_id === myPlayerId;
-    const extraButtons = [
-      {
-        label: 'Riprendi',
-        className: 'btn-primary',
-        disabled: !isMyTurn,
-        onClick: () => {
-          Renderer.closeCardDetail();
-          sendAction('retrieve_wall', { instance_id: iid, bastion_side: side });
-        },
-      },
-      {
-        label: 'Scarta',
-        className: 'btn-danger',
-        disabled: !isMyTurn,
-        onClick: () => {
-          Renderer.closeCardDetail();
-          sendAction('discard_wall', { instance_id: iid, bastion_side: side });
-        },
-      },
-    ];
-
     const navOptions = {
       onPrev: idx > 0 ? () => showWallSlideshow(walls, side, idx - 1) : null,
       onNext: idx < walls.length - 1 ? () => showWallSlideshow(walls, side, idx + 1) : null,
@@ -2788,7 +2758,7 @@ const App = (() => {
       null,
       null,
       null,
-      extraButtons,
+      [],
       navOptions,
       def ? def.id : null
     );

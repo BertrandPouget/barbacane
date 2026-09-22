@@ -1120,11 +1120,6 @@ const Mob = (() => {
 
     const footer = [];
     footer.push({
-      label: 'Scarta',
-      className: 'mbtn-danger',
-      onClick: () => confirmDiscard(iid, 'hand'),
-    });
-    footer.push({
       label: isEthereal ? '✧ Gioca gratis' : 'Gioca',
       className: 'mbtn-gold',
       disabled: !canAct,
@@ -1148,16 +1143,6 @@ const Mob = (() => {
       onNext: idx >= 0 && idx < hand.length - 1 ? () => openHandCardSheet(hand[idx + 1]) : null,
       footer,
     });
-  }
-
-  function confirmDiscard(iid, source) {
-    const def = getCardDef(iid);
-    Sheet.confirm(
-      `Scartare ${def ? def.name : 'la carta'}?`,
-      'La carta andrà nella pila degli scarti.',
-      () => sendAction('discard', { instance_id: iid, source }),
-      { yesLabel: 'Scarta', danger: true },
-    );
   }
 
   function showPlayOptions(iid, def) {
@@ -1879,7 +1864,6 @@ const Mob = (() => {
   function showMyWallSheet(walls, side, idx) {
     const iid = walls[idx];
     const def = getCardDef(iid);
-    const turnOk = isMyTurn();
     preloadCardImages([walls[idx - 1], walls[idx + 1]]);
     showCardNavSheet({
       title: `🧱 ${def ? def.name : iid}`,
@@ -1888,19 +1872,7 @@ const Mob = (() => {
       pos: { idx, total: walls.length },
       onPrev: idx > 0 ? () => showMyWallSheet(walls, side, idx - 1) : null,
       onNext: idx < walls.length - 1 ? () => showMyWallSheet(walls, side, idx + 1) : null,
-      footer: [
-        {
-          label: 'Riprendi in mano',
-          disabled: !turnOk,
-          onClick: () => { Sheet.close(true); sendAction('retrieve_wall', { instance_id: iid, bastion_side: side }); },
-        },
-        {
-          label: 'Scarta',
-          className: 'mbtn-danger',
-          disabled: !turnOk,
-          onClick: () => { Sheet.close(true); sendAction('discard_wall', { instance_id: iid, bastion_side: side }); },
-        },
-      ],
+      footer: [],
     });
   }
 
@@ -1930,9 +1902,7 @@ const Mob = (() => {
     const def = getCardDef(iid);
     const canMove = isMyTurn() && currentState.phase === 'schieramento';
 
-    const footer = [
-      { label: 'Scarta', className: 'mbtn-danger', onClick: () => confirmDiscard(iid, 'field') },
-    ];
+    const footer = [];
     if (w.assigned_cards && w.assigned_cards.some(ac => ac.type !== 'wall')) {
       footer.push({
         label: 'Carte assegnate',
@@ -2061,9 +2031,7 @@ const Mob = (() => {
     const costLabel = discount > 0 ? `${rawCost}→${effCost}` : `${rawCost}`;
     const isEth = my.ethereal_complete === iid;
 
-    const footer = [
-      { label: 'Scarta', className: 'mbtn-danger', onClick: () => confirmDiscard(iid, 'village') },
-    ];
+    const footer = [];
 
     if (def && def.id === 'arena') {
       footer.push({
