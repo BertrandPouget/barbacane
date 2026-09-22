@@ -66,13 +66,15 @@ class ConnectionManager:
         self,
         game_id: str,
         player_id: str,
-        seconds: int = 120,
+        seconds: int = 0,
         on_expire_callback=None,
     ) -> None:
         """
         Avvia il timer per il turno. Allo scadere chiama on_expire_callback(game_id, player_id).
         """
         self.cancel_turn_timer(game_id)
+        if seconds <= 0:
+            return  # timer disattivato
 
         async def _timer():
             # Avvisa a 15 secondi

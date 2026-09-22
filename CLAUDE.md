@@ -381,7 +381,7 @@ Il client invia solo intenzioni; il server valida tutto (turno, azioni rimanenti
 
 ### Timer per Turno
 
-120s per turno (disattivabile in lobby). Allo scadere `_on_turn_expire()` in `routes.py` forza `end_turn`. Il client mostra countdown con avviso visivo a 15s.
+Timer disattivato di default; attivabile in lobby impostando i secondi per turno (0 = nessun timer). Allo scadere `_on_turn_expire()` in `routes.py` forza `end_turn`. Il client mostra countdown con avviso visivo a 15s.
 
 ### Animazioni Frontend
 

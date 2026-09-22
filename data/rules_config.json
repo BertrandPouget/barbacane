@@ -6,7 +6,7 @@
     "initial_hand_size": 5,
     "max_hand_size": 5,
     "actions_per_turn": 2,
-    "turn_timer_seconds": 120,
+    "turn_timer_seconds": 0,
     "disconnect_timeout_seconds": 120
   },
   "mana_schedule": {

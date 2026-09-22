@@ -527,7 +527,8 @@ const App = (() => {
 
   async function onCreateLobby() {
     const name = document.getElementById('create-name').value.trim();
-    const timer = parseInt(document.getElementById('create-timer').value) || 120;
+    const rawTimer = parseInt(document.getElementById('create-timer').value, 10);
+    const timer = Number.isFinite(rawTimer) && rawTimer > 0 ? rawTimer : 0;
     if (!name) { Renderer.toast('Inserisci il tuo nome', 'error'); return; }
     try {
       const res = await api('/lobby/create', { player_name: name, turn_timer: timer });
@@ -821,12 +822,6 @@ const App = (() => {
       document.getElementById('modal-overlay').classList.add('hidden');
     }
     _refreshActionUI();
-
-    // Reset timer display quando ricevi un state update (il turn_started WS lo riavvierà)
-    if (state.current_player_id === myPlayerId) {
-      stopLocalTimer();
-      Renderer.hideTimer();
-    }
 
     // Mostra il modale di ricerca se siamo noi a dover scegliere
     if (state.pending_search && state.pending_search.player_id === myPlayerId && state.search_deck) {

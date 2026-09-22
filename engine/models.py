@@ -360,7 +360,7 @@ class GameState(BaseModel):
     recent_events: List[Dict[str, Any]] = Field(default_factory=list)  # D10 rolls, cleared each action
     pending_search: Optional[Dict[str, Any]] = None  # set when a cerca effect awaits player choice
     pending_interactions: List[Dict[str, Any]] = Field(default_factory=list)  # queue of building interactions awaiting player choice
-    turn_timer: int = 120  # secondi per turno; 0 = disattivato
+    turn_timer: int = 0  # secondi per turno; 0 = disattivato (default)
     tutorial: Optional[Dict[str, Any]] = None  # {"tutorial_id": str, "step_index": int, "completed": bool}
     bot_player_id: Optional[str] = None  # id del giocatore controllato dal Bot, se partita di pratica
     bot_difficulty: str = "normal"  # "easy" | "normal" | "hard" | "expert"

@@ -113,7 +113,7 @@ async def _start_turn_timer(game_id: str, state) -> None:
 
 class CreateLobbyRequest(BaseModel):
     player_name: str
-    turn_timer: int = 120
+    turn_timer: int = 0
 
 
 class JoinLobbyRequest(BaseModel):

@@ -32,7 +32,7 @@ class LobbyPlayer:
 
 
 class LobbyInfo:
-    def __init__(self, lobby_code: str, creator_id: str, turn_timer: int = 120):
+    def __init__(self, lobby_code: str, creator_id: str, turn_timer: int = 0):
         self.lobby_code = lobby_code
         self.creator_id = creator_id
         self.turn_timer = turn_timer  # secondi; 0 = disattivato
@@ -70,7 +70,7 @@ def generate_session_token() -> str:
     return secrets.token_urlsafe(32)
 
 
-def create_lobby(creator_name: str, turn_timer: int = 120) -> dict:
+def create_lobby(creator_name: str, turn_timer: int = 0) -> dict:
     """
     Crea una nuova lobby.
     Ritorna {lobby_code, player_id, session_token}.
