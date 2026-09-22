@@ -1226,8 +1226,17 @@ const Mob = (() => {
     const my = me();
     if (!my || !def) return false;
     const all = getAllWarriors(my);
-    const sameSchool = all.filter(w => (getCardDef(w.instance_id) || {}).school === def.school).length;
-    return sameSchool >= def.cost && def.cost > 0;
+    // Orda Madeleine: i Prodigi degli Incantesimi si attivano indipendentemente
+    // dalla Scuola delle Maghe -> contano tutte le Maghe in campo.
+    const madeleineActive = (my.active_effects || []).some(
+      e => e.type === 'madeleine_prodigy_any_school'
+    );
+    const countable = all.filter(w => {
+      const d = getCardDef(w.instance_id) || {};
+      if (madeleineActive && def.school === 'incantesimo') return d.species === 'maga';
+      return d.school === def.school;
+    }).length;
+    return countable >= def.cost && def.cost > 0;
   }
 
   function getAllWarriors(player) {
