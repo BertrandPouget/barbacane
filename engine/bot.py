@@ -34,6 +34,7 @@ from engine.cards import get_card, WarriorCard, SpellCard, BuildingCard
 from engine.deck import get_base_card_id
 from engine.actions import (
     ActionError,
+    _troni_blocked,
     play_warrior,
     play_building,
     play_spell,
@@ -280,6 +281,8 @@ def _generate_candidates(state: GameState, player_id: str, difficulty: str = "no
                 # a chi darlo o non è una mossa disponibile.
                 target_w = None
                 if base_id == "trono":
+                    if _troni_blocked(state, player):
+                        continue  # Orda Joseph avversaria: i Troni sono vietati
                     target_w = _best_trono_target(player)
                     if target_w is None:
                         continue

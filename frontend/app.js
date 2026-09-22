@@ -780,7 +780,7 @@ const App = (() => {
           else if (ev.card === 'giulio') msg = `${pName} — Orda Giulio: ricerca nel mazzo`;
           else if (ev.card === 'madeleine') msg = `${pName} — Orda Madeleine: Prodigi liberi da Scuola`;
           else if (ev.card === 'decimo') msg = `${pName} — Orda Decimo: anti-Fossato`;
-          else if (ev.card === 'joseph') msg = `${pName} — Orda Joseph: ${ev.has_trono ? 'Troni avversari scartati' : 'nessun Trono assegnato'}`;
+          else if (ev.card === 'joseph') msg = `${pName} — Orda Joseph: ${(ev.enemy_troni_discarded || []).length ? 'Troni avversari scartati' : 'Troni avversari bloccati'}`;
           else if (ev.card === 'eracle') msg = `${pName} — Orda Eracle: distruggi Costruzione se ≥3 Danni`;
           else msg = `${pName} — Orda ${cardName}`;
         } else if (ev.type === 'abandon') {

@@ -927,7 +927,7 @@ const Mob = (() => {
         giulio: 'Orda Giulio: ricerca nel mazzo',
         madeleine: 'Orda Madeleine: Prodigi liberi da Scuola',
         decimo: 'Orda Decimo: anti-Fossato',
-        joseph: `Orda Joseph: ${ev.has_trono ? 'Troni avversari scartati' : 'nessun Trono assegnato'}`,
+        joseph: `Orda Joseph: ${(ev.enemy_troni_discarded || []).length ? 'Troni avversari scartati' : 'Troni avversari bloccati'}`,
         eracle: 'Orda Eracle: distruggi Costruzione se ≥3 Danni',
       };
       return `${pName} — ${H[ev.card] || `Orda ${cardLabel}`}`;

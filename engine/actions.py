@@ -66,6 +66,16 @@ def _require_in_hand(player: Player, instance_id: str) -> None:
         raise ActionError(f"La carta {instance_id} non è nella tua mano.")
 
 
+def _troni_blocked(state: GameState, player: Player) -> bool:
+    """Controlla se un avversario ha attivo joseph_no_troni contro questo giocatore."""
+    for opp in state.players:
+        if opp.id == player.id:
+            continue
+        if any(e.get("type") == "joseph_no_troni" for e in opp.active_effects):
+            return True
+    return False
+
+
 # ---------------------------------------------------------------------------
 # 1. Gioca Guerriero
 # ---------------------------------------------------------------------------
@@ -508,6 +518,8 @@ def play_building(
 
     # Pre-validazione: trono richiede la scelta esplicita di un proprio Guerriero
     if base_id == "trono":
+        if _troni_blocked(state, player):
+            raise ActionError("Un'Orda Joseph avversaria ti impedisce di giocare Troni.")
         if not target_warrior_iid or not any(
             w.instance_id == target_warrior_iid for w in player.all_warriors()
         ):

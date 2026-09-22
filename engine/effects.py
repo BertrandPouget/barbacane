@@ -1676,44 +1676,27 @@ def decimo_horde(state: GameState, player: Player, warrior_iid: Optional[str] = 
 
 @register_effect("joseph_horde")
 def joseph_horde(state: GameState, player: Player, warrior_iid: Optional[str] = None, **kwargs) -> dict:
-    """Se questa carta ha un Trono assegnato, gli avversari non possono avere o giocare Troni. Scartali."""
-    w = _find_warrior(player, warrior_iid)
-    has_trono = False
-    if w:
-        from engine.deck import get_base_card_id
-        for card_iid in w.assigned_cards:
-            base_id = get_base_card_id(card_iid)
-            if base_id == "trono":
-                has_trono = True
-                break
-
-    if has_trono:
-        player.active_effects.append({
-            "type": "joseph_no_troni",
-            "expires": "permanent",
-        })
-        discarded = []
-        for p in state.players:
-            if p.id == player.id:
-                continue
-            to_remove = [b for b in p.field.village.buildings if b.base_card_id == "trono"]
-            for b in to_remove:
-                _unassign_building(p, b)
-                p.field.village.buildings.remove(b)
-                state.discard_pile.append(b.instance_id)
-                discarded.append({"player": p.id, "trono": b.instance_id})
-        state.recent_events.append({
-            "type": "horde", "card": "joseph",
-            "player_id": player.id, "has_trono": True,
-            "enemy_troni_discarded": discarded,
-        })
-        return {"has_trono": True, "enemy_troni_discarded": discarded}
-
+    """I tuoi avversari non possono avere o giocare Troni. Scartali."""
+    player.active_effects.append({
+        "type": "joseph_no_troni",
+        "expires": "permanent",
+    })
+    discarded = []
+    for p in state.players:
+        if p.id == player.id:
+            continue
+        to_remove = [b for b in p.field.village.buildings if b.base_card_id == "trono"]
+        for b in to_remove:
+            _unassign_building(p, b)
+            p.field.village.buildings.remove(b)
+            state.discard_pile.append(b.instance_id)
+            discarded.append({"player": p.id, "trono": b.instance_id})
     state.recent_events.append({
         "type": "horde", "card": "joseph",
-        "player_id": player.id, "has_trono": False,
+        "player_id": player.id,
+        "enemy_troni_discarded": discarded,
     })
-    return {"has_trono": False}
+    return {"enemy_troni_discarded": discarded}
 
 
 @register_effect("madeleine_horde")
