@@ -900,6 +900,9 @@ const Renderer = (() => {
     } else if (name === 'bot-difficulty') {
       target = document.getElementById('bot-difficulty-header');
       cls = 'in-catalog-header';
+    } else if (name === 'multiplayer') {
+      target = document.getElementById('multiplayer-header');
+      cls = 'in-catalog-header';
     }
 
     if (target) {

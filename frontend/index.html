@@ -51,6 +51,34 @@
       <h1 class="game-title" id="lobby-title">BARBACANE</h1>
     </div>
 
+    <!-- Le due modalità di gioco -->
+    <div class="home-modes">
+      <button id="btn-mode-single" class="home-mode">
+        <span class="home-mode-title">Giocatore Singolo</span>
+        <span class="home-mode-art"><img src="/assets/home/patrizio.png" alt="" class="art-patrizio" /></span>
+        <span class="home-mode-desc">Una partita completa contro il computer, con quattro livelli di difficoltà.</span>
+      </button>
+      <button id="btn-mode-multi" class="home-mode">
+        <span class="home-mode-title">Multigiocatore</span>
+        <span class="home-mode-art"><span class="art-pair"><img src="/assets/home/reinhold.png" alt="" class="art-reinhold" /><img src="/assets/home/araminta.png" alt="" class="art-araminta" /></span></span>
+        <span class="home-mode-desc">Crea una partita o unisciti a quella di un amico, da 2 a 4 giocatori.</span>
+      </button>
+    </div>
+
+    <!-- Voci secondarie -->
+    <div class="home-extras">
+      <button id="btn-tutorial" class="btn btn-secondary home-extra">Tutorial</button>
+      <button id="btn-catalog" class="btn btn-secondary home-extra">Catalogo Carte</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SCHERMATA: MULTIGIOCATORE (crea / unisciti) ===== -->
+<div id="screen-multiplayer" class="screen">
+  <div id="multiplayer-header">
+    <button id="btn-multiplayer-back" class="btn btn-secondary btn-small">← Indietro</button>
+    <h2>Multigiocatore</h2>
+  </div>
     <div class="lobby-panels">
       <!-- Crea Partita -->
       <div class="panel">
@@ -76,14 +104,6 @@
         <button id="btn-join" class="btn btn-secondary">Entra</button>
       </div>
     </div>
-    <div class="lobby-solo-row">
-      <button id="btn-tutorial" class="btn btn-primary btn-tutorial">Tutorial</button>
-      <button id="btn-practice" class="btn btn-primary btn-practice">Sfida un Bot</button>
-    </div>
-    <button id="btn-catalog" class="btn btn-secondary btn-catalog">Catalogo Carte</button>
-    <a href="/m" class="mobile-link"
-       onclick="try{localStorage.removeItem('barbacane-desktop')}catch(e){}">Passa alla versione mobile</a>
-  </div>
 </div>
 
 <!-- ===== SCHERMATA: CATALOGO CARTE ===== -->
@@ -111,9 +131,8 @@
 <div id="screen-bot-difficulty" class="screen">
   <div id="bot-difficulty-header">
     <button id="btn-bot-difficulty-back" class="btn btn-secondary btn-small">← Indietro</button>
-    <h2>Sfida un Bot</h2>
+    <h2>Giocatore singolo</h2>
   </div>
-  <p class="tutorial-list-hint">Una partita vera, con mazzo e regole complete, contro un avversario controllato dal computer. Scegli la difficoltà.</p>
   <div id="bot-difficulty-grid">
     <button class="difficulty-card difficulty-easy" data-difficulty="easy">
       <div class="difficulty-card-title">🟢 Facile</div>

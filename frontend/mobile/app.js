@@ -69,13 +69,6 @@ const Mob = (() => {
     bindLobbyUI();
     bindGameChrome();
     bindSplashUI();
-    if (sessionStorage.getItem('barbacane-open-tutorial-list')) {
-      // Ritorno da un tutorial: la pagina si ricarica, quindi niente splash,
-      // si va diritti alla lista dei tutorial.
-      sessionStorage.removeItem('barbacane-open-tutorial-list');
-      openTutorialList();
-      return;
-    }
     const resumed = await tryResume();
     if (!resumed) Screens.show('splash');
   }
@@ -250,7 +243,9 @@ const Mob = (() => {
     $('tutorial-panel-exit').addEventListener('click', exitTutorial);
     $('tutorial-panel-next').addEventListener('click', (e) => {
       haptic();
-      if (tutorialCompletedShown) { _backToTutorialList(); return; }
+      // Fine tutorial: si torna all'elenco senza ricaricare la pagina, che
+      // interromperebbe la musica (il browser non la fa ripartire da solo).
+      if (tutorialCompletedShown) { exitTutorial(); return; }
       // Disabilitato fino al passo successivo: un doppio tocco salterebbe un passo.
       e.currentTarget.disabled = true;
       sendAction('tutorial_next', {});
@@ -269,7 +264,9 @@ const Mob = (() => {
     });
 
     // Sfida un Bot
-    $('btn-practice').addEventListener('click', () => { haptic(); Screens.show('bot-difficulty'); });
+    $('btn-mode-single').addEventListener('click', () => { haptic(); Screens.show('bot-difficulty'); });
+    $('btn-mode-multi').addEventListener('click', () => { haptic(); Screens.show('multi'); });
+    $('multi-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
     $('bot-diff-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
     document.querySelectorAll('.difficulty-card').forEach(card => {
       card.addEventListener('click', () => { haptic(); startPracticeGame(card.dataset.difficulty); });
@@ -422,11 +419,6 @@ const Mob = (() => {
     const panel = $('tutorial-panel');
     panel.hidden = false;
     Spotlight.show([], panel);
-  }
-
-  function _backToTutorialList() {
-    sessionStorage.setItem('barbacane-open-tutorial-list', '1');
-    window.location.reload();
   }
 
   function hideTutorialStep() {

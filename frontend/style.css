@@ -200,10 +200,107 @@ body::before {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.lobby-container.reveal .lobby-panels   { animation: lobby-reveal 0.5s ease both 0.34s; }
-.lobby-container.reveal .lobby-solo-row { animation: lobby-reveal 0.5s ease both 0.38s; }
-.lobby-container.reveal .btn-catalog    { animation: lobby-reveal 0.5s ease both 0.42s; }
-.lobby-container.reveal > a             { animation: lobby-reveal 0.5s ease both 0.5s; }
+.lobby-container.reveal .home-modes  { animation: lobby-reveal 0.5s ease both 0.34s; }
+.lobby-container.reveal .home-extras { animation: lobby-reveal 0.5s ease both 0.44s; }
+
+/* ==================== HOME ==================== */
+
+/* Le due modalità: pannelli verticali, con l'aspetto dei pannelli Crea / Unisciti */
+.home-modes {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.home-mode {
+  width: 324px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 1.5rem 1rem;
+  background: var(--bg-medium);
+  border: 1px solid var(--border-gold);
+  border-radius: 8px;
+  font-family: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.home-mode:hover {
+  border-color: var(--gold);
+  box-shadow: 0 0 20px rgba(251, 196, 2, 0.22);
+}
+
+.home-mode-title {
+  color: var(--gold);
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.home-mode-desc {
+  min-height: 2.8em;  /* 2 righe: stessa altezza nei due pannelli */
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+/* Illustrazione della modalità. Le figure sono ritagliate sul contenuto in
+   assets/home/. Le illustrazioni originali condividono la stessa tela, ma
+   Reinhold e Araminta vi hanno la testa più piccola di Patrizio: qui sono
+   ingranditi del 20% perché le tre teste risultino simili. L'area ha
+   un'altezza fissa (la figura più alta) e le figure poggiano sul suo fondo,
+   subito sopra la descrizione: essendo le descrizioni alte uguali
+   (min-height), nei due pannelli le figure partono dalla stessa linea. Nella coppia Reinhold (a cui nel PNG è stato
+   tolto il martello, che lo teneva lontano da Araminta) sta a sinistra,
+   davanti: i capelli di Araminta passano dietro di lui. La
+   trasparenza è sul gruppo, non sulle singole immagini: dove le figure si
+   sovrappongono quella dietro non traspare attraverso quella davanti. */
+.home-mode-art {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  width: 100%;
+  height: 168px;
+  opacity: 0.7;
+}
+
+.home-mode-art img { display: block; flex: 0 0 auto; }
+.art-pair { display: flex; align-items: flex-end; }
+.art-patrizio { height: 148px; }
+.art-reinhold { height: 166px; margin-right: -136px; position: relative; z-index: 1; }
+.art-araminta { height: 162px; }
+
+/* Tutorial e Catalogo Carte: uno sopra l'altro, larghi quanto la riga dei
+   due pannelli (2 × 324px + 2rem di spazio), come su mobile. */
+.home-extras {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: min(100%, calc(2 * 324px + 2rem));
+}
+
+.home-extra { width: 100%; padding: 0.6rem 1.6rem; }
+
+/* ==================== MULTIGIOCATORE ==================== */
+
+#screen-multiplayer.active {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Giocatore singolo e Multigiocatore: l'intestazione resta in alto, le scelte
+   si centrano in verticale nello spazio che resta (margini automatici). Il
+   padding in basso compensa l'altezza dell'intestazione, così il blocco
+   risulta centrato rispetto allo schermo. */
+#screen-multiplayer .lobby-panels { margin: auto; padding: 0 1.2rem; }
+
+#screen-multiplayer.active,
+#screen-bot-difficulty.active { padding-bottom: 4rem; }
 
 .game-title {
   font-size: 3.5rem;
@@ -242,18 +339,6 @@ body::before {
   border-color: var(--gold);
   box-shadow: 0 0 20px rgba(251, 196, 2, 0.22);
 }
-
-.mobile-link {
-  display: block;
-  text-align: center;
-  margin-top: 14px;
-  font-size: 0.8rem;
-  font-style: italic;
-  color: var(--text-dim);
-  text-decoration: none;
-  transition: color 0.2s ease;
-}
-.mobile-link:hover { color: var(--gold); }
 
 .panel h2 {
   color: var(--gold);
@@ -1886,12 +1971,6 @@ input:focus {
 
 /* ==================== CATALOGO CARTE ==================== */
 
-.btn-catalog {
-  display: block;
-  margin: 18px auto 0;
-  padding: 0.6rem 1.6rem;
-}
-
 #screen-catalog.active {
   display: flex;
   flex-direction: column;
@@ -2014,38 +2093,44 @@ input:focus {
 
 /* ==================== TUTORIAL ==================== */
 
-.lobby-solo-row {
-  display: flex;
-  justify-content: center;
-  gap: 0.8rem;
-  margin-top: 0.4rem;
-  flex-wrap: wrap;
-}
-
-.btn-tutorial,
-.btn-practice {
-  padding: 0.7rem 1.6rem;
-  font-size: 1.05rem;
-}
-
 #screen-tutorial-list.active {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
 }
 
-#tutorial-list-header {
+/* Intestazioni delle schermate di menu: stesso stile di quella del catalogo
+   (titolo crema maiuscolo al centro, «Indietro» a sinistra, filetto dorato). */
+#tutorial-list-header,
+#bot-difficulty-header,
+#multiplayer-header {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.7rem 1.2rem;
-  background: var(--bg-medium);
-  border-bottom: 2px solid var(--border-gold);
+  justify-content: center;
+  padding: 0.8rem 1.2rem;
+  background: rgba(23, 16, 9, 0.92);
+  border-bottom: 2px solid var(--card-gold);
   flex-shrink: 0;
 }
 
-#tutorial-list-header h2 { color: var(--gold); font-size: 1.2rem; margin: 0; }
+#tutorial-list-header .btn,
+#bot-difficulty-header .btn,
+#multiplayer-header .btn {
+  position: absolute;
+  left: 1.2rem;
+}
+
+#tutorial-list-header h2,
+#bot-difficulty-header h2,
+#multiplayer-header h2 {
+  color: var(--card-cream);
+  font-size: 1.35rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  margin: 0;
+}
 
 .tutorial-list-hint {
   color: var(--text-dim);
@@ -2092,21 +2177,10 @@ input:focus {
   min-height: 100vh;
 }
 
-#bot-difficulty-header {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.7rem 1.2rem;
-  background: var(--bg-medium);
-  border-bottom: 2px solid var(--border-gold);
-  flex-shrink: 0;
-}
-#bot-difficulty-header h2 { color: var(--gold); font-size: 1.2rem; margin: 0; }
 
 #bot-difficulty-grid {
   max-width: 760px;
-  margin: 1.2rem auto;
+  margin: auto;
   padding: 0 1.2rem;
   display: flex;
   flex-direction: column;

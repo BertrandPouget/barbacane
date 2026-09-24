@@ -81,6 +81,9 @@ function placeMusicToggle(name) {
   } else if (name === 'bot-difficulty') {
     target = $('bot-diff-head');
     cls = 'in-catalog-header';
+  } else if (name === 'multi') {
+    target = $('multi-head');
+    cls = 'in-catalog-header';
   }
 
   if (target) {

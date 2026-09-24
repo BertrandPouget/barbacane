@@ -63,14 +63,7 @@ const App = (() => {
     await loadCardDefs();
     bindLobbyUI();
     bindSplashUI();
-    if (sessionStorage.getItem('barbacane-open-tutorial-list')) {
-      // Ritorno da un tutorial: la pagina si ricarica, quindi niente splash,
-      // si va diritti alla lista dei tutorial.
-      sessionStorage.removeItem('barbacane-open-tutorial-list');
-      openTutorialList();
-    } else {
-      Renderer.showScreen('splash');
-    }
+    Renderer.showScreen('splash');
   }
 
   // La splash mostra solo il logo: cliccandolo (primo gesto utente, sblocca
@@ -203,7 +196,9 @@ const App = (() => {
     document.getElementById('btn-tutorial-back').addEventListener('click', () => Renderer.showScreen('lobby'));
     document.getElementById('tutorial-panel-exit').addEventListener('click', exitTutorial);
     document.getElementById('tutorial-panel-next').addEventListener('click', (e) => {
-      if (tutorialCompletedShown) { _backToTutorialList(); return; }
+      // Fine tutorial: si torna all'elenco senza ricaricare la pagina, che
+      // interromperebbe la musica (il browser non la fa ripartire da solo).
+      if (tutorialCompletedShown) { exitTutorial(); return; }
       // Disabilitato fino al passo successivo: un doppio click salterebbe un passo.
       e.currentTarget.disabled = true;
       sendAction('tutorial_next', {});
@@ -222,7 +217,9 @@ const App = (() => {
     });
 
     // Sfida un Bot
-    document.getElementById('btn-practice').addEventListener('click', () => Renderer.showScreen('bot-difficulty'));
+    document.getElementById('btn-mode-single').addEventListener('click', () => Renderer.showScreen('bot-difficulty'));
+    document.getElementById('btn-mode-multi').addEventListener('click', () => Renderer.showScreen('multiplayer'));
+    document.getElementById('btn-multiplayer-back').addEventListener('click', () => Renderer.showScreen('lobby'));
     document.getElementById('btn-bot-difficulty-back').addEventListener('click', () => Renderer.showScreen('lobby'));
     document.querySelectorAll('.difficulty-card').forEach(card => {
       card.addEventListener('click', () => startPracticeGame(card.dataset.difficulty));
@@ -383,11 +380,6 @@ const App = (() => {
     const panel = document.getElementById('tutorial-panel');
     panel.classList.remove('hidden');
     Spotlight.show([], panel);
-  }
-
-  function _backToTutorialList() {
-    sessionStorage.setItem('barbacane-open-tutorial-list', '1');
-    window.location.reload();
   }
 
   function hideTutorialStep() {
