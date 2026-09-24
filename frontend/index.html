@@ -168,19 +168,6 @@
     </div>
   </div>
 
-  <!-- Barra istruzioni Tutorial (visibile solo nelle partite tutorial) -->
-  <div id="tutorial-bar" class="hidden">
-    <div id="tutorial-bar-body">
-      <div id="tutorial-bar-title"></div>
-      <div id="tutorial-bar-text"></div>
-    </div>
-    <div id="tutorial-bar-actions">
-      <span id="tutorial-bar-waiting" class="hidden">👉 Completa l'azione indicata sul campo</span>
-      <button id="tutorial-bar-next" class="btn btn-primary btn-small hidden">Avanti →</button>
-      <button id="tutorial-bar-exit" class="btn btn-secondary btn-small">Esci dal Tutorial</button>
-    </div>
-  </div>
-
   <!-- Area principale: tavolo da gioco -->
   <div id="game-table">
 
@@ -283,13 +270,37 @@
 
   </div><!-- /game-table -->
 
-  <!-- Popup centrale Tutorial: appare a ogni nuovo passo, si chiude per lasciare giocare -->
-  <div id="tutorial-popup-overlay" class="hidden">
-    <div id="tutorial-popup-box">
-      <div id="tutorial-popup-title"></div>
-      <div id="tutorial-popup-text"></div>
-      <div id="tutorial-popup-actions">
-        <button id="tutorial-popup-action" class="btn btn-primary">Avanti →</button>
+  <!-- Pannello dei passi Tutorial: si piazza accanto alla zona evidenziata (spotlight.js) -->
+  <div id="tutorial-panel" class="tut-panel hidden">
+    <div id="tutorial-panel-progress" class="tut-panel-progress"></div>
+    <div id="tutorial-panel-title" class="tut-panel-title"></div>
+    <div id="tutorial-panel-text" class="tut-panel-text"></div>
+    <div id="tutorial-panel-waiting" class="tut-panel-waiting hidden">👉 Completa l'azione indicata sul campo</div>
+    <div class="tut-panel-actions">
+      <button id="tutorial-panel-exit" class="btn btn-secondary">Esci</button>
+      <div class="tut-panel-nav">
+        <button id="tutorial-panel-prev" class="btn btn-secondary hidden">← Indietro</button>
+        <button id="tutorial-panel-next" class="btn btn-primary">Avanti →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- tutorial "Anatomia di una Carta": carta a schermo intero con la sezione spiegata evidenziata -->
+  <div id="card-anatomy-overlay" class="hidden">
+    <div id="card-anatomy-card">
+      <img id="card-anatomy-img" alt="" />
+      <div id="card-anatomy-focus"></div>
+    </div>
+    <div id="card-anatomy-panel" class="tut-panel">
+      <div id="card-anatomy-progress" class="tut-panel-progress"></div>
+      <div id="card-anatomy-title" class="tut-panel-title"></div>
+      <div id="card-anatomy-text" class="tut-panel-text"></div>
+      <div class="tut-panel-actions">
+        <button id="card-anatomy-exit" class="btn btn-secondary">Esci</button>
+        <div class="tut-panel-nav">
+          <button id="card-anatomy-prev" class="btn btn-secondary hidden">← Indietro</button>
+          <button id="card-anatomy-next" class="btn btn-primary">Avanti →</button>
+        </div>
       </div>
     </div>
   </div>
@@ -362,6 +373,7 @@
 <script src="sparks.js"></script>
 <script src="audio.js"></script>
 <script src="ws.js"></script>
+<script src="spotlight.js"></script>
 <script src="renderer.js"></script>
 <script src="app.js"></script>
 </body>

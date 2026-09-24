@@ -881,6 +881,22 @@ input:focus {
   transition: border-color 0.2s, background 0.2s;
 }
 
+/* Riga di carte di Avanscoperta e Bastioni: scorre in orizzontale invece di
+   andare a capo (vedi renderer.js → _regionCardsRow). Il padding in alto lascia
+   spazio al sollevamento delle carte al passaggio del mouse. */
+.region-cards {
+  flex: 0 0 100%;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-top: 4px;
+}
+
+.region-cards > * { flex-shrink: 0; }
+
 .region.vanguard    { flex: 2; min-width: 120px; }
 .region.bastion     { flex: 1; min-width: 80px; cursor: pointer; }
 .region.bastion:hover { border-color: var(--text-dim); }
@@ -1010,6 +1026,9 @@ input:focus {
   padding-top: 16px;
   padding-bottom: 4px;
   justify-content: center;
+  /* Altezza fissa anche a mano vuota: altrimenti la zona in basso si
+     accorcia, il campo scende e il mazzo delle Vite viene tagliato. */
+  min-height: calc(var(--card-h-hand) + 20px);
 }
 
 /* ==================== CARTA ==================== */
@@ -2122,146 +2141,174 @@ input:focus {
 .difficulty-hard   .difficulty-card-title { color: var(--red-light); }
 .difficulty-expert .difficulty-card-title { color: #b388e0; }
 
-/* Popup centrale Tutorial: un passo alla volta, poi si chiude per lasciare
-   il campo libero e permettere di giocare. */
+/* ---------------------------------------------------------------------------
+   Tutorial — occhio di bue (spotlight.js) e pannello dei passi.
+   Tutto lo schermo si scurisce tranne le zone spiegate, circondate da un
+   anello dorato; al cambio di passo buchi, anelli e pannello scivolano nella
+   nuova posizione. Lo strato scuro sta sotto modali e dettaglio carta (200+),
+   così le scelte di gioco aperte durante un passo restano in primo piano.
+   --------------------------------------------------------------------------- */
 
-/* Nessuno sfondo che oscura il campo e nessuna cattura dei click sull'overlay:
-   il popup deve restare leggibile e "in cima", ma senza mai bloccare la vista
-   sulla zona evidenziata né impedire di interagire con essa. */
-#tutorial-popup-overlay {
+#spotlight {
   position: fixed;
   inset: 0;
-  z-index: 220;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
+  z-index: 150;
   pointer-events: none;
 }
 
-#tutorial-popup-overlay.hidden { display: none !important; }
+#spotlight[hidden] { display: none; }
 
-/* Se la zona evidenziata è nella metà alta/bassa dello schermo, il popup si
-   sposta nella metà opposta per non coprirla. */
-#tutorial-popup-overlay.align-top    { align-items: flex-start; padding-top: 4.5rem; }
-#tutorial-popup-overlay.align-bottom { align-items: flex-end;   padding-bottom: 2rem; }
+.spotlight-shade {
+  position: absolute;
+  inset: 0;
+  fill: rgba(10, 5, 0, 0.7);
+  animation: spotlight-fade-in 0.3s ease-out;
+}
 
-/* La card NON cattura click (solo il bottone li cattura, sotto): se in una
-   finestra stretta la card finisce sopra un elemento di gioco cliccabile
-   (es. il bastione avversario), il click deve comunque raggiungerlo invece
-   di essere "rubato" dallo sfondo/testo del popup. */
-#tutorial-popup-box {
-  pointer-events: none;
+@keyframes spotlight-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.spotlight-ring {
+  position: fixed;
+  border: 3px solid var(--gold);
+  border-radius: 10px;
+  box-shadow: 0 0 18px var(--gold), inset 0 0 12px rgba(251, 196, 2, 0.25);
+  animation: spotlight-ring-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes spotlight-ring-pulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(251, 196, 2, 0.6), inset 0 0 8px rgba(251, 196, 2, 0.15); }
+  50%      { box-shadow: 0 0 22px var(--gold),            inset 0 0 14px rgba(251, 196, 2, 0.3); }
+}
+
+/* Pannello dei passi: stesso aspetto nel tour del campo e nell'anatomia carta */
+.tut-panel {
   background: linear-gradient(160deg, var(--bg-medium), var(--bg-light));
   border: 2px solid var(--gold);
   border-radius: 10px;
-  padding: 1.6rem 1.8rem;
-  min-width: 320px;
-  max-width: 460px;
+  padding: 1.4rem 1.6rem;
   box-shadow: 0 12px 44px rgba(0, 0, 0, 0.8);
-  animation: tutorial-popup-in 0.2s ease-out;
 }
 
-@keyframes tutorial-popup-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+.tut-panel-progress {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-bottom: 0.4rem;
 }
 
-#tutorial-popup-title {
+.tut-panel-title {
   color: var(--gold-light);
   font-weight: bold;
-  font-size: 1.25rem;
+  font-size: 1.3rem;
   margin-bottom: 0.6rem;
 }
 
-#tutorial-popup-text {
+.tut-panel-text {
   color: var(--text);
-  font-size: 0.98rem;
-  line-height: 1.5;
-}
-
-#tutorial-popup-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 1.2rem;
-}
-
-#tutorial-popup-action { pointer-events: auto; }
-
-/* Barra istruzioni tutorial, in partita */
-
-#tutorial-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  background: linear-gradient(90deg, var(--bg-medium), var(--bg-light));
-  border-bottom: 2px solid var(--gold);
-  padding: 0.7rem 1.2rem;
-  flex-wrap: wrap;
-}
-
-#tutorial-bar.hidden { display: none !important; }
-
-#tutorial-bar-body { flex: 1; min-width: 220px; }
-
-#tutorial-bar-title {
-  color: var(--gold-light);
-  font-weight: bold;
   font-size: 1rem;
+  line-height: 1.55;
 }
 
-#tutorial-bar-text {
-  color: var(--text);
-  font-size: 0.88rem;
-  margin-top: 0.15rem;
-}
-
-#tutorial-bar-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  flex-shrink: 0;
-}
-
-#tutorial-bar-waiting {
+.tut-panel-waiting {
+  margin-top: 0.9rem;
   color: var(--gold-light);
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-style: italic;
   animation: tutorial-pulse 1.4s ease-in-out infinite;
 }
+
+.tut-panel-waiting.hidden { display: none; }
 
 @keyframes tutorial-pulse {
   0%, 100% { opacity: 0.55; }
   50%      { opacity: 1; }
 }
 
-/* Elemento del campo evidenziato dal tutorial */
-.tutorial-highlight {
+.tut-panel-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: 1.3rem;
+}
+
+.tut-panel-actions .hidden { display: none; }
+
+.tut-panel-actions button { white-space: nowrap; }
+
+.tut-panel-nav {
+  display: flex;
+  gap: 0.6rem;
+}
+
+#tutorial-panel {
+  position: fixed;
+  z-index: 160;
+  width: min(400px, calc(100vw - 24px));
+  animation: tutorial-panel-in 0.3s ease-out;
+}
+
+#tutorial-panel.hidden { display: none !important; }
+
+#tutorial-panel.spotlight-panel-placed {
+  transition: left 0.38s ease, top 0.38s ease;
+}
+
+@keyframes tutorial-panel-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* tutorial "Anatomia di una Carta": la carta occupa quasi tutto lo schermo e
+   un riquadro dorato si sposta sulla sezione spiegata; l'ombra enorme del
+   riquadro (ritagliata dalla carta) scurisce tutto il resto. */
+#card-anatomy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 230;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2.5rem;
+  padding: 2rem;
+  background: rgba(10, 5, 0, 0.94);
+}
+
+#card-anatomy-overlay.hidden { display: none !important; }
+
+#card-anatomy-card {
   position: relative;
-  z-index: 6;
-  outline: 3px solid var(--gold-light);
-  outline-offset: 3px;
+  flex: 0 0 auto;
+  width: min(calc(88vh * 744 / 1039), calc(100vw - 480px));
+  aspect-ratio: 744 / 1039;
+  border-radius: 2.4% / 1.7%;
+  overflow: hidden;
+  background: var(--card-ink);
+  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.8);
+}
+
+#card-anatomy-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#card-anatomy-focus {
+  position: absolute;
+  border: 3px solid var(--gold);
   border-radius: 8px;
-  background-color: rgba(240, 206, 6, 0.08);
-  box-shadow: 0 0 0 2px rgba(240, 206, 6, 0.18), 0 0 14px 4px rgba(240, 206, 6, 0.4);
-  animation: tutorial-glow 1.1s ease-in-out infinite;
+  box-shadow: 0 0 0 200vmax rgba(10, 5, 0, 0.62), 0 0 18px var(--gold);
+  transition: left 0.35s ease, top 0.35s ease, width 0.35s ease, height 0.35s ease;
+  pointer-events: none;
 }
 
-@keyframes tutorial-glow {
-  0%, 100% {
-    outline-color: var(--gold);
-    outline-offset: 3px;
-    box-shadow: 0 0 0 1px rgba(240, 206, 6, 0.12), 0 0 8px 2px rgba(240, 206, 6, 0.3);
-  }
-  50% {
-    outline-color: var(--gold-light);
-    outline-offset: 4px;
-    box-shadow: 0 0 0 3px rgba(240, 206, 6, 0.22), 0 0 18px 5px rgba(240, 206, 6, 0.5);
-  }
-}
+#card-anatomy-focus.hidden { display: none; }
 
-@media (max-width: 640px) {
-  #tutorial-bar { flex-direction: column; align-items: stretch; text-align: center; }
-  #tutorial-bar-actions { justify-content: center; }
+#card-anatomy-panel { flex: 0 1 380px; }
+
+@media (max-width: 800px) {
+  #card-anatomy-overlay { flex-direction: column; gap: 1rem; padding: 1rem; }
+  #card-anatomy-card { width: min(calc(58vh * 744 / 1039), 92vw); }
+  #card-anatomy-panel { flex: 0 0 auto; width: 100%; max-width: 460px; padding: 1rem 1.2rem; }
 }

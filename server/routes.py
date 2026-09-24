@@ -512,6 +512,7 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
         "next_phase": lambda: _next_phase_action(state, player_id),
         "end_turn": lambda: _end_turn_action(state, player_id),
         "tutorial_next": lambda: _tutorial_next_action(state, player_id),
+        "tutorial_prev": lambda: _tutorial_prev_action(state, player_id),
     }
     if action not in handlers:
         raise ActionError(f"Azione sconosciuta: {action}")
@@ -539,7 +540,7 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
                 result["auto_end_turn"] = True
 
     # Tutorial: se questa azione era quella richiesta dallo step corrente, avanza
-    if state.tutorial and not state.tutorial.get("completed") and action != "tutorial_next":
+    if state.tutorial and not state.tutorial.get("completed") and action not in ("tutorial_next", "tutorial_prev"):
         tut_result = tutorial_engine.advance_after_action(state, action, params)
         if tut_result:
             result["tutorial"] = tut_result
@@ -560,6 +561,12 @@ def _tutorial_next_action(state, player_id: str) -> dict:
     if state.get_player(player_id) is None:
         raise ActionError("Giocatore non trovato.")
     return advance_info_step(state)
+
+
+def _tutorial_prev_action(state, player_id: str) -> dict:
+    if state.get_player(player_id) is None:
+        raise ActionError("Giocatore non trovato.")
+    return tutorial_engine.go_back(state)
 
 
 def _run_bot_turn(state, bot_id: str) -> None:

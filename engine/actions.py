@@ -821,18 +821,26 @@ def activate_horde(
         # prima di attivare quello nuovo.
         player.deactivate_horde_for_switch(horde_zone, species)
 
+    # La carta al centro dell'Orda è il Guerriero scelto, non ogni copia della
+    # stessa carta: con due Patrizio nell'Orda il fulmine (e l'effetto, es.
+    # "Questa carta ottiene +2 GIT") va solo a quello selezionato. Senza
+    # istanza indicata si prende la prima copia della carta nell'Orda.
+    chosen = next((w for w in horde["warriors"]
+                   if w.instance_id == warrior_instance_id and w.base_card_id == horde_card_id), None) \
+        or next(w for w in horde["warriors"] if w.base_card_id == horde_card_id)
+
     # Segna visivamente la carta al centro dell'Orda (solo nella zona attivata).
     # I Guerrieri con Trono sempre attivo mantengono il proprio fulmine invariato.
     for w in horde["warriors"]:
         if player.has_active_trono(w.instance_id):
             continue
-        w.horde_active = (w.base_card_id == horde_card_id)
+        w.horde_active = (w.instance_id == chosen.instance_id)
 
     # Snapshot per taggare i nuovi effetti con horde_key (usato da deactivate_broken_horde)
     effects_count_before = len(player.active_effects)
 
     result = apply_effect(horde_effect_id, state, player,
-                          warrior_iid=warrior_instance_id, **kwargs)
+                          warrior_iid=chosen.instance_id, **kwargs)
 
     for eff in player.active_effects[effects_count_before:]:
         eff["from_horde_key"] = horde_key

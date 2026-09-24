@@ -1,4 +1,0 @@
-1. Testare Orde (e definire quando spegnerle)
-1.1 Rigenerare le carte con testi aggiornati
-2. Sistemare e mergiare Tutorial/Bot
-3. Revamp UI Desktop

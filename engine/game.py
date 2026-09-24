@@ -659,6 +659,12 @@ def _clear_battle_effects(player: Player) -> None:
 # Stato pubblico (per broadcast ai client)
 # ---------------------------------------------------------------------------
 
+def _tutorial_view(state: GameState) -> Optional[dict]:
+    # Import locale: engine.tutorial importa a sua volta moduli del motore.
+    from engine.tutorial import public_view
+    return public_view(state)
+
+
 def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> dict:
     """
     Ritorna una vista dello stato di gioco sicura per il broadcast.
@@ -734,7 +740,7 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
         "pending_search": ps,
         "search_deck": search_deck,
         "pending_interactions": state.pending_interactions,
-        "tutorial": state.tutorial,
+        "tutorial": _tutorial_view(state),
         "bot_player_id": state.bot_player_id,
         "bot_difficulty": state.bot_difficulty if state.bot_player_id else None,
     }

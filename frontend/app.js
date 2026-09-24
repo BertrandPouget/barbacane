@@ -52,7 +52,6 @@ const App = (() => {
   let tutorialsMeta = [];        // elenco tutorial (id, title, description, step_count)
   let tutorialStepsCache = {};   // tutorial_id -> [step, ...] (con testo/highlight)
   let tutorialCompletedShown = false;
-  let tutorialPopupShownFor = null; // chiave "tutorial_id:step_index" dell'ultimo popup mostrato
 
   // ---------------------------------------------------------------------------
   // Init
@@ -202,8 +201,25 @@ const App = (() => {
     // Tutorial
     document.getElementById('btn-tutorial').addEventListener('click', openTutorialList);
     document.getElementById('btn-tutorial-back').addEventListener('click', () => Renderer.showScreen('lobby'));
-    document.getElementById('tutorial-bar-next').addEventListener('click', () => sendAction('tutorial_next', {}));
-    document.getElementById('tutorial-bar-exit').addEventListener('click', exitTutorial);
+    document.getElementById('tutorial-panel-exit').addEventListener('click', exitTutorial);
+    document.getElementById('tutorial-panel-next').addEventListener('click', (e) => {
+      if (tutorialCompletedShown) { _backToTutorialList(); return; }
+      // Disabilitato fino al passo successivo: un doppio click salterebbe un passo.
+      e.currentTarget.disabled = true;
+      sendAction('tutorial_next', {});
+    });
+    ['tutorial-panel-prev', 'card-anatomy-prev'].forEach(id => {
+      document.getElementById(id).addEventListener('click', (e) => {
+        e.currentTarget.disabled = true;
+        sendAction('tutorial_prev', {});
+      });
+    });
+    document.getElementById('card-anatomy-exit').addEventListener('click', exitTutorial);
+    document.getElementById('card-anatomy-next').addEventListener('click', (e) => {
+      // Disabilitato fino al passo successivo: un doppio click salterebbe un passo.
+      e.currentTarget.disabled = true;
+      sendAction('tutorial_next', {});
+    });
 
     // Sfida un Bot
     document.getElementById('btn-practice').addEventListener('click', () => Renderer.showScreen('bot-difficulty'));
@@ -276,7 +292,6 @@ const App = (() => {
       gameId = res.game_id;
       isTutorial = true;
       tutorialCompletedShown = false;
-      tutorialPopupShownFor = null;
       enterGame(res.state);
       // Nel tutorial l'abbandono normale non ha senso (c'è il "Manichino" come
       // avversario fittizio): nascondi il pulsante "Esci" della testata.
@@ -284,65 +299,6 @@ const App = (() => {
     } catch (e) {
       Renderer.toast(e.message, 'error');
     }
-  }
-
-  let _tutorialPopupOutsideHandler = null;
-
-  function hideTutorialPopup() {
-    document.getElementById('tutorial-popup-overlay').classList.add('hidden');
-    if (_tutorialPopupOutsideHandler) {
-      document.removeEventListener('pointerdown', _tutorialPopupOutsideHandler, true);
-      _tutorialPopupOutsideHandler = null;
-    }
-  }
-
-  // Sposta il popup nella metà di schermo OPPOSTA a quella della zona
-  // evidenziata, così non la copre mai (il popup non ha sfondo che oscura il
-  // campo ed è "click-through" fuori dalla card, ma resta comunque meglio
-  // non sovrapporlo a ciò che sta spiegando).
-  function positionTutorialPopup(highlightIds) {
-    const overlay = document.getElementById('tutorial-popup-overlay');
-    overlay.classList.remove('align-top', 'align-bottom');
-    const rects = (highlightIds || [])
-      .map(id => document.getElementById(id))
-      .filter(Boolean)
-      .map(el => el.getBoundingClientRect())
-      .filter(r => r.width > 0 && r.height > 0);
-    if (!rects.length) return;
-    const avgMidY = rects.reduce((sum, r) => sum + (r.top + r.bottom) / 2, 0) / rects.length;
-    overlay.classList.add(avgMidY < window.innerHeight / 2 ? 'align-bottom' : 'align-top');
-  }
-
-  // Mostra il testo del passo come popup al centro dello schermo: si chiude
-  // (Avanti per i passi informativi, "Ho capito" per i passi d'azione) e
-  // lascia il campo libero per giocare. L'overlay non ha sfondo che oscura
-  // il campo né cattura i click: la zona evidenziata resta sempre visibile
-  // e utilizzabile anche a popup aperto.
-  function showTutorialPopup(step) {
-    document.getElementById('tutorial-popup-title').textContent = step.title || '';
-    document.getElementById('tutorial-popup-text').textContent = step.text || '';
-    const btn = document.getElementById('tutorial-popup-action');
-    if (step.requires_action) {
-      btn.textContent = 'Ho capito, si gioca! →';
-      btn.onclick = () => hideTutorialPopup();
-    } else {
-      btn.textContent = 'Avanti →';
-      btn.onclick = () => { hideTutorialPopup(); sendAction('tutorial_next', {}); };
-    }
-    positionTutorialPopup(step.highlight);
-    document.getElementById('tutorial-popup-overlay').classList.remove('hidden');
-
-    // Se l'utente interagisce col resto del gioco mentre il popup è aperto
-    // (possibile perché non blocca i click), chiudilo da solo: altrimenti
-    // resterebbe visivamente sovrapposto a un modale di scelta successivo
-    // (es. "Attiva Orda"), dando l'impressione di un'interfaccia bloccata.
-    if (_tutorialPopupOutsideHandler) {
-      document.removeEventListener('pointerdown', _tutorialPopupOutsideHandler, true);
-    }
-    _tutorialPopupOutsideHandler = (e) => {
-      if (!e.target.closest('#tutorial-popup-box')) hideTutorialPopup();
-    };
-    document.addEventListener('pointerdown', _tutorialPopupOutsideHandler, true);
   }
 
   // Chiude modali e azzera le interazioni in attesa: uscendo da una partita
@@ -360,10 +316,8 @@ const App = (() => {
     WS.disconnect();
     stopLocalTimer();
     _clearPendingUI();
-    applyTutorialHighlight([]);
-    document.getElementById('tutorial-bar').classList.add('hidden');
-    hideTutorialPopup();
-    tutorialPopupShownFor = null;
+    hideTutorialStep();
+    hideCardAnatomy();
     document.getElementById('btn-abandon').classList.remove('hidden');
     leavingGame = false;
     selectedCard = null;
@@ -378,24 +332,107 @@ const App = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Tutorial — barra istruzioni in partita
+  // Tutorial — occhio di bue sul campo e pannello dei passi
   // ---------------------------------------------------------------------------
 
-  function applyTutorialHighlight(ids) {
-    document.querySelectorAll('.tutorial-highlight').forEach(el => el.classList.remove('tutorial-highlight'));
-    (ids || []).forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.classList.add('tutorial-highlight');
+  // Tutto lo schermo si scurisce tranne le zone del passo corrente (spotlight.js);
+  // il pannello col testo si piazza accanto e resta visibile anche nei passi
+  // d'azione, dove al posto di "Avanti" invita a compiere la mossa sul campo.
+  // «← Indietro» compare solo se il server lo consente: si torna solo a un
+  // passo di spiegazione, mai a prima di una mossa già giocata.
+  function _setTutorialBackButton(id, canGoBack) {
+    const btn = document.getElementById(id);
+    btn.classList.toggle('hidden', !canGoBack);
+    btn.disabled = false;
+  }
+
+  function showTutorialStep(step, idx, steps, canGoBack) {
+    const panel = document.getElementById('tutorial-panel');
+    document.getElementById('tutorial-panel-progress').textContent = `Passo ${idx + 1} di ${steps.length}`;
+    document.getElementById('tutorial-panel-title').textContent = step.title || '';
+    document.getElementById('tutorial-panel-text').textContent = step.text || '';
+    const nextBtn = document.getElementById('tutorial-panel-next');
+    nextBtn.textContent = 'Avanti →';
+    nextBtn.classList.toggle('hidden', !!step.requires_action);
+    nextBtn.disabled = false;
+    document.getElementById('tutorial-panel-exit').classList.remove('hidden');
+    document.getElementById('tutorial-panel-waiting').classList.toggle('hidden', !step.requires_action);
+    _setTutorialBackButton('tutorial-panel-prev', canGoBack);
+    panel.classList.remove('hidden');
+    Spotlight.show(step.highlight || [], panel);
+  }
+
+  // Fine tutorial: stesso pannello dei passi, centrato a schermo spento, con
+  // un solo pulsante per tornare all'elenco (e il nome del tutorial successivo).
+  function showTutorialCompleted(tutorialId) {
+    const idx = tutorialsMeta.findIndex(t => t.id === tutorialId);
+    const current = tutorialsMeta[idx];
+    const next = idx >= 0 ? tutorialsMeta[idx + 1] : null;
+    document.getElementById('tutorial-panel-progress').textContent = current ? current.title : '';
+    document.getElementById('tutorial-panel-title').textContent = 'Tutorial completato!';
+    document.getElementById('tutorial-panel-text').textContent = next
+      ? `Torna all'elenco per provare il prossimo: «${next.title}».`
+      : (idx >= 0 ? 'Hai completato tutti i tutorial: sei pronto per una vera partita.'
+                  : 'Torna all\'elenco per provarne un altro.');
+    const nextBtn = document.getElementById('tutorial-panel-next');
+    nextBtn.textContent = 'Torna all\'elenco →';
+    nextBtn.classList.remove('hidden');
+    nextBtn.disabled = false;
+    ['tutorial-panel-exit', 'tutorial-panel-prev', 'tutorial-panel-waiting']
+      .forEach(id => document.getElementById(id).classList.add('hidden'));
+    const panel = document.getElementById('tutorial-panel');
+    panel.classList.remove('hidden');
+    Spotlight.show([], panel);
+  }
+
+  function _backToTutorialList() {
+    sessionStorage.setItem('barbacane-open-tutorial-list', '1');
+    window.location.reload();
+  }
+
+  function hideTutorialStep() {
+    Spotlight.hide();
+    document.getElementById('tutorial-panel').classList.add('hidden');
+  }
+
+  // Passi con card_focus (tutorial "Anatomia di una Carta"): la carta appare a
+  // schermo intero e il riquadro evidenzia la sezione spiegata. rect è in
+  // percentuale della carta ([x, y, w, h]); null = carta intera, niente riquadro.
+  function showCardAnatomy(step, idx, steps, canGoBack) {
+    const focus = step.card_focus;
+    // Precarica le altre carte del tutorial, così il cambio carta non sfarfalla.
+    steps.forEach(s => {
+      if (s.card_focus) new window.Image().src = `/card_images/${s.card_focus.card}.png`;
     });
+    const img = document.getElementById('card-anatomy-img');
+    const src = `/card_images/${focus.card}.png`;
+    if (img.getAttribute('src') !== src) img.setAttribute('src', src);
+
+    const box = document.getElementById('card-anatomy-focus');
+    if (focus.rect) {
+      const [x, y, w, h] = focus.rect;
+      Object.assign(box.style, { left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%` });
+      box.classList.remove('hidden');
+    } else {
+      box.classList.add('hidden');
+    }
+
+    document.getElementById('card-anatomy-progress').textContent = `Passo ${idx + 1} di ${steps.length}`;
+    document.getElementById('card-anatomy-title').textContent = step.title || '';
+    document.getElementById('card-anatomy-text').textContent = step.text || '';
+    document.getElementById('card-anatomy-next').disabled = false;
+    _setTutorialBackButton('card-anatomy-prev', canGoBack);
+    document.getElementById('card-anatomy-overlay').classList.remove('hidden');
+  }
+
+  function hideCardAnatomy() {
+    document.getElementById('card-anatomy-overlay').classList.add('hidden');
   }
 
   function updateTutorialUI(state) {
-    const bar = document.getElementById('tutorial-bar');
     if (!isTutorial || !state.tutorial) {
-      bar.classList.add('hidden');
-      hideTutorialPopup();
-      tutorialPopupShownFor = null;
-      applyTutorialHighlight([]);
+      hideCardAnatomy();
+      hideTutorialStep();
       return;
     }
 
@@ -403,47 +440,24 @@ const App = (() => {
     const idx = state.tutorial.step_index;
 
     if (state.tutorial.completed || idx >= steps.length) {
-      applyTutorialHighlight([]);
-      bar.classList.add('hidden');
-      hideTutorialPopup();
+      hideCardAnatomy();
       if (!tutorialCompletedShown) {
         tutorialCompletedShown = true;
-        Renderer.showModal(
-          'Tutorial completato!',
-          'Hai completato questo tutorial. Puoi tornare all\'elenco per provarne un altro, oppure esplorare liberamente.',
-          () => { sessionStorage.setItem('barbacane-open-tutorial-list', '1'); window.location.reload(); },
-        );
-        document.getElementById('modal-cancel').classList.add('hidden');
+        showTutorialCompleted(state.tutorial.tutorial_id);
       }
       return;
     }
 
     const step = steps[idx];
-    if (!step) { bar.classList.add('hidden'); return; }
+    if (!step) { hideTutorialStep(); return; }
 
-    bar.classList.remove('hidden');
-    document.getElementById('tutorial-bar-title').textContent = step.title || '';
-    document.getElementById('tutorial-bar-text').textContent = step.text || '';
-    applyTutorialHighlight(step.highlight);
-
-    // Al primo aggiornamento di stato per un nuovo passo, mostra il testo in
-    // un popup al centro dello schermo: più difficile da perdere della sola
-    // barra in alto. Si chiude subito dopo per lasciare il campo libero.
-    const stepKey = `${state.tutorial.tutorial_id}:${idx}`;
-    if (tutorialPopupShownFor !== stepKey) {
-      tutorialPopupShownFor = stepKey;
-      showTutorialPopup(step);
+    if (step.card_focus) {
+      hideTutorialStep();
+      showCardAnatomy(step, idx, steps, !!state.tutorial.can_go_back);
+      return;
     }
-
-    const nextBtn = document.getElementById('tutorial-bar-next');
-    const waitingHint = document.getElementById('tutorial-bar-waiting');
-    if (step.requires_action) {
-      nextBtn.classList.add('hidden');
-      waitingHint.classList.remove('hidden');
-    } else {
-      nextBtn.classList.remove('hidden');
-      waitingHint.classList.add('hidden');
-    }
+    hideCardAnatomy();
+    showTutorialStep(step, idx, steps, !!state.tutorial.can_go_back);
   }
 
   // ---------------------------------------------------------------------------
@@ -2705,7 +2719,8 @@ const App = (() => {
     sessionToken = null;
     myPlayerId = null;
     isTutorial = false;
-    document.getElementById('tutorial-bar').classList.add('hidden');
+    hideTutorialStep();
+    hideCardAnatomy();
     document.getElementById('btn-abandon').classList.remove('hidden');
     Renderer.showScreen('lobby');
   }

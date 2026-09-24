@@ -314,12 +314,21 @@ const Renderer = (() => {
     return Math.max(...warriors.map(w => w[key] || 0));
   }
 
+  // Le carte di una regione stanno in una riga che scorre in orizzontale invece
+  // di andare a capo: con molti Guerrieri il campo non cambia altezza.
+  function _regionCardsRow(container) {
+    const row = el('div', { className: 'region-cards' });
+    container.appendChild(row);
+    return row;
+  }
+
   function renderRegion(containerId, warriors, kind, interactive) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
+    const row = _regionCardsRow(container);
     (warriors || []).forEach(w => {
       const card = renderWarriorCard(w, true, interactive);
-      container.appendChild(card);
+      row.appendChild(card);
     });
     if (kind === 'warrior' && (warriors || []).length > 0) {
       container.appendChild(el('div', { className: 'region-stats-recap' },
@@ -330,18 +339,19 @@ const Renderer = (() => {
   function renderBastionRegion(containerId, bastion, side, interactive) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
+    const row = _regionCardsRow(container);
 
     // Muri come carta-stack singola
     const walls = bastion.walls || [];
     if (walls.length > 0) {
-      container.appendChild(renderWallStack(walls, side, interactive));
+      row.appendChild(renderWallStack(walls, side, interactive));
     } else if (bastion.wall_count > 0) {
-      container.appendChild(renderWallStackOpaque(bastion.wall_count));
+      row.appendChild(renderWallStackOpaque(bastion.wall_count));
     }
 
     // Guerrieri
     (bastion.warriors || []).forEach(w => {
-      container.appendChild(renderWarriorCard(w, true, interactive));
+      row.appendChild(renderWarriorCard(w, true, interactive));
     });
     if ((bastion.warriors || []).length > 0) {
       container.appendChild(el('div', { className: 'region-stats-recap' },
