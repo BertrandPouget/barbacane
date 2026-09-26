@@ -785,8 +785,8 @@
       "cost": 1,
       "cost_type": "mana",
       "completion_cost": 1,
-      "base_effect": "Quando attacchi, ottieni +1 ATT.",
-      "complete_effect": "Quando attacchi, ottieni +2 ATT.",
+      "base_effect": "In Battaglia, i tuoi Guerrieri ottengono +1 ATT.",
+      "complete_effect": "In Battaglia, i tuoi Guerrieri ottengono +2 ATT.",
       "effect_id": "ariete_effect",
       "copies": 4
     },
@@ -797,8 +797,8 @@
       "cost": 2,
       "cost_type": "mana",
       "completion_cost": 2,
-      "base_effect": "Quando attacchi o difendi, ottieni +1 GIT.",
-      "complete_effect": "Quando attacchi o difendi, ottieni +2 GIT.",
+      "base_effect": "In Battaglia, i tuoi Guerrieri ottengono +1 GIT.",
+      "complete_effect": "In Battaglia, i tuoi Guerrieri ottengono +2 GIT.",
       "effect_id": "catapulta_effect",
       "copies": 4
     },
@@ -809,8 +809,8 @@
       "cost": 1,
       "cost_type": "mana",
       "completion_cost": 1,
-      "base_effect": "Quando difendi, ottieni +1 DIF.",
-      "complete_effect": "Quando difendi, ottieni +2 DIF.",
+      "base_effect": "In Battaglia, i tuoi Guerrieri ottengono +1 DIF.",
+      "complete_effect": "In Battaglia, i tuoi Guerrieri ottengono +2 DIF.",
       "effect_id": "saracinesca_effect",
       "copies": 4
     },

@@ -749,7 +749,8 @@ TUTORIAL_BATTAGLIA = TutorialDef(
             "adjacency", "Chi Puoi Attaccare",
             "Puoi attaccare solo i Bastioni avversari adiacenti ai tuoi: il tuo Bastione Destro confina con il "
             "Bastione Sinistro del giocatore alla tua destra, e viceversa. In due giocatori entrambi i Bastioni "
-            "del Manichino sono adiacenti ai tuoi.",
+            "del Manichino sono adiacenti ai tuoi. Non puoi attaccare un giocatore che non abbia ancora giocato "
+            "almeno un turno.",
             highlight=["top-opponents", "my-bastion-left", "my-bastion-right"],
         ),
         TutorialStep(

@@ -175,8 +175,12 @@ def attacker_stats(attacker: Player) -> Tuple[int, int]:
     warriors = attacker.field.vanguard
     max_att = max((_effective_att(w) for w in warriors), default=0)
     max_git = max((_effective_git(w) for w in warriors), default=0)
+    if not warriors:
+        return max_att, max_git
 
-    # Bonus da costruzioni: Ariete (+ATT), Catapulta (+GIT)
+    # Bonus da costruzioni: Ariete (+ATT), Catapulta (+GIT). Valgono per ogni
+    # Guerriero in Battaglia, quindi si sommano una volta al massimo; senza
+    # Guerrieri non c'è nessuno a cui darli.
     att_bonus = 0
     git_bonus = 0
     for b_inst in attacker.field.village.buildings:
@@ -208,8 +212,10 @@ def defender_stats(defender: Player, bastion_side: str) -> Tuple[int, int]:
     # Bonus temporaneo sul bastione (da Saracinesca, Equipotenza, ecc.)
     max_dif += bastion.dif_bonus
 
-    # Saracinesca: bonus DIF passivo da costruzione
-    # Catapulta: bonus GIT anche in difesa
+    # Saracinesca (+DIF), Catapulta (+GIT): come in attacco valgono per ogni
+    # Guerriero in Battaglia, quindi un Bastione vuoto non ne beneficia.
+    if not warriors:
+        return max_dif, max_git
     for b_inst in defender.field.village.buildings:
         card = get_card(b_inst.base_card_id)
         if not isinstance(card, BuildingCard):
