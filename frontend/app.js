@@ -37,6 +37,8 @@ const App = (() => {
 
   // True mentre stiamo abbandonando la partita: ignora gli update in arrivo
   let leavingGame = false;
+  let lastTurnPlayer = null;   // per il banner di cambio turno
+  let turnBannerTimer = null;
 
   // True dopo la prima registrazione degli handler WS.on: connectGameWS()
   // viene richiamata a ogni nuova partita/tutorial, ma gli handler vanno
@@ -683,9 +685,15 @@ const App = (() => {
 
   function onStateUpdate(state, action, result) {
     if (leavingGame) return;
+    const prevTurnPlayer = lastTurnPlayer;
     currentState = state;
+    lastTurnPlayer = state.current_player_id;
     if (battleMode) exitBattleMode();
     Renderer.render(state, myPlayerId);
+
+    if (prevTurnPlayer !== state.current_player_id && !state.winner_id) {
+      _showTurnBanner(state);
+    }
 
     if (result) {
       // Flash danno sul campo del difensore
@@ -869,6 +877,7 @@ const App = (() => {
     stopLobbyPolling();
     gameId = gameId || state.game_id;
     currentState = state;
+    lastTurnPlayer = state.current_player_id;
     connectGameWS();
     Renderer.showScreen('game');
     Renderer.render(state, myPlayerId);
@@ -889,6 +898,20 @@ const App = (() => {
     }
     // Tutorial: aggiornata per ultima (vedi nota in onStateUpdate).
     if (isTutorial) updateTutorialUI(state);
+  }
+
+  function _showTurnBanner(state) {
+    const player = state.players.find(p => p.id === state.current_player_id);
+    const banner = document.getElementById('turn-banner');
+    clearTimeout(turnBannerTimer);
+    banner.classList.add('hidden');
+    void banner.offsetWidth;  // forza il replay dell'animazione
+    document.getElementById('turn-banner-text').textContent = state.current_player_id === myPlayerId
+      ? 'Il tuo turno'
+      : `Il turno di ${player ? player.name : state.current_player_id}`;
+    banner.classList.toggle('subtle', state.current_player_id !== myPlayerId);
+    banner.classList.remove('hidden');
+    turnBannerTimer = setTimeout(() => banner.classList.add('hidden'), 1950);
   }
 
   // ---------------------------------------------------------------------------

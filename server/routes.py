@@ -244,7 +244,7 @@ async def api_start_tutorial(req: TutorialStartRequest):
 
 class PracticeStartRequest(BaseModel):
     player_name: str = "Tu"
-    difficulty: str = "normal"  # "easy" | "normal" | "hard" | "expert"
+    difficulty: str = "normal"  # "easy" | "normal" | "hard"
 
 
 @router.post("/practice/start")
@@ -320,6 +320,7 @@ async def api_game_action(req: GameActionRequest):
     # Timer: riavvia quando il turno cambia davvero (non se cardo_move è in attesa)
     if result.get("turn_ended") or result.get("auto_end_turn") or state.winner_id:
         await _start_turn_timer(req.game_id, state)
+    _schedule_bot_turn(state)
 
     return {"result": result, "state": public_state(state, player_id)}
 
@@ -547,12 +548,11 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
 
     # Partita di pratica contro il Bot: risolvi subito ogni interazione/ricerca
     # pendente che lo riguarda (es. Magiscudo contro una tua Magia, anche nel
-    # tuo stesso turno), poi — se ora tocca a lui — gioca l'intero suo turno
-    # in automatico prima di restituire lo stato al giocatore umano.
+    # tuo stesso turno). Se ora tocca a lui, il suo turno NON si gioca qui:
+    # lo avvia _schedule_bot_turn dopo il salvataggio, così il giocatore
+    # vede prima il passaggio di turno e poi le mosse del Bot.
     if state.bot_player_id and not state.winner_id:
         _auto_resolve_bot_pending(state, state.bot_player_id)
-        if state.current_player.id == state.bot_player_id:
-            _run_bot_turn(state, state.bot_player_id)
 
     return result
 
@@ -569,9 +569,62 @@ def _tutorial_prev_action(state, player_id: str) -> dict:
     return tutorial_engine.go_back(state)
 
 
+# Durata minima del turno del Bot, pensiero incluso: un Bot che risponde
+# istantaneamente è straniante, e il giocatore deve avere il tempo di vedere
+# il banner del cambio turno prima che arrivino le sue mosse.
+_BOT_THINK_SECONDS = 1.8
+_bot_turns_running: set = set()
+_bot_tasks: set = set()
+
+
+def _schedule_bot_turn(state) -> None:
+    """Se in questa partita di pratica tocca al Bot, avvia il suo turno in
+    background (una sola volta per partita). Va chiamata DOPO aver salvato e
+    inviato lo stato: il turno del Bot riparte dallo stato salvato."""
+    if not state.bot_player_id or state.winner_id:
+        return
+    if state.current_player.id != state.bot_player_id or state.game_id in _bot_turns_running:
+        return
+    _bot_turns_running.add(state.game_id)
+    task = asyncio.create_task(_play_bot_turn(state.game_id))
+    _bot_tasks.add(task)  # riferimento forte: asyncio tiene solo riferimenti deboli ai task
+    task.add_done_callback(_bot_tasks.discard)
+
+
+async def _play_bot_turn(game_id: str) -> None:
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+    try:
+        state = load_game(game_id)
+        if state is None or state.winner_id or not state.bot_player_id:
+            return
+        if state.current_player.id != state.bot_player_id:
+            return
+        # Il calcolo gira in un thread: 'expert' può impiegare qualche decimo
+        # di secondo e non deve bloccare il server per le altre partite.
+        await asyncio.to_thread(_run_bot_turn, state, state.bot_player_id)
+        remaining = _BOT_THINK_SECONDS - (loop.time() - started)
+        if remaining > 0:
+            await asyncio.sleep(remaining)
+
+        status = "finished" if state.winner_id else "playing"
+        save_game(state, status=status)
+        for pid in manager.connected_players(game_id):
+            await manager.send_to_player(game_id, pid, {
+                "type": "state_update",
+                "action": "bot_turn",
+                "result": {},
+                "state": public_state(state, pid),
+            })
+    except Exception as e:
+        logger.error("[bot] Errore nel turno del Bot %s: %s", game_id, e)
+    finally:
+        _bot_turns_running.discard(game_id)
+
+
 def _run_bot_turn(state, bot_id: str) -> None:
-    """Gioca l'intero turno del Bot (partita di pratica) usando il bot casuale
-    del motore, risolvendo anche eventuali interazioni pendenti che genera."""
+    """Gioca l'intero turno del Bot (partita di pratica), risolvendo anche
+    eventuali interazioni pendenti che genera."""
     guard = 0
     while state.current_player.id == bot_id and not state.winner_id and guard < 20:
         guard += 1
@@ -954,6 +1007,9 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_id: str)
             "type": "state_update",
             "state": public_state(state, player_id),
         })
+        # Riconnessione a una partita rimasta al turno del Bot (es. server
+        # riavviato mentre il Bot pensava): riprende da dove si era fermato.
+        _schedule_bot_turn(state)
 
     try:
         while True:
@@ -996,6 +1052,7 @@ async def _handle_ws_message(game_id: str, player_id: str, data: dict) -> None:
             # Timer: riavvia quando il turno cambia davvero (non se cardo_move è in attesa)
             if result.get("turn_ended") or result.get("auto_end_turn") or state.winner_id:
                 await _start_turn_timer(game_id, state)
+            _schedule_bot_turn(state)
         except ActionError as e:
             await manager.send_to_player(game_id, player_id, {
                 "type": "error", "message": str(e)

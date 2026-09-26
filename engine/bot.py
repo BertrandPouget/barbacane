@@ -8,26 +8,34 @@ azioni del turno insieme, non una alla volta: valutare le azioni in modo
 puramente "greedy" (la migliore, poi la migliore delle rimanenti) spreca
 spesso Mana o sinergie che una coppia diversa avrebbe sfruttato meglio.
 
-Quattro difficoltà:
-- "easy":   il bot casuale storico del motore (random_bot_turn), usato
-            così com'è — nessuna strategia reale.
-- "normal": valuta le azioni una alla volta (greedy) con punteggio euristico,
+Tre difficoltà:
+- "easy":   valuta le azioni una alla volta (greedy) con punteggio euristico,
             e sceglie con una lotteria pesata sulle 3 migliori (non sempre la
             più forte), per restare imperfetto e battibile.
-- "hard":   valuta le COPPIE di azioni del turno (simulando la 1a per capire
+- "normal": valuta le COPPIE di azioni del turno (simulando la 1a per capire
             quale lascia la 2a migliore, tramite una copia dello stato) usando
             un punteggio statico del campo, e sceglie sempre la combinazione
             con la valutazione più alta — nessuna casualità.
-- "expert": come "hard", ma la copia di simulazione prosegue fino a fine
+- "hard":   come "normal", ma la copia di simulazione prosegue fino a fine
             turno (Riposizionamento, Orda, Battaglia inclusi) prima di
             valutare: la scelta delle 2 azioni è quindi ottimizzata per il
             danno/Vite effettivamente ottenuti QUESTO turno, non per un
             punteggio statico del campo. Raggio di ricerca più ampio.
+            In più stima la MINACCIA del prossimo turno avversario
+            (_ThreatModel): conta le carte come farebbe un giocatore esperto
+            (composizione del mazzo nota, meno le carte visibili) per
+            campionare le mani possibili dell'avversario, e con quelle
+            valuta quanto danno potrebbe subire ogni suo Bastione. Il
+            Riposizionamento (_optimize_reposition) bilancia quindi attacco
+            di questo turno e difesa del prossimo, invece di ammassare tutto
+            in Avanscoperta.
 """
 
 from __future__ import annotations
 import random
-from typing import List, Optional, Tuple
+from collections import Counter
+from itertools import combinations
+from typing import Dict, List, Optional, Tuple
 
 from engine.models import GameState, Player, WarriorInstance
 from engine.cards import get_card, WarriorCard, SpellCard, BuildingCard
@@ -48,8 +56,9 @@ from engine.battle import (
     attacker_stats,
     defender_stats,
     calculate_damage,
+    battle_building_bonus,
 )
-from engine.game import end_turn, random_bot_turn, do_battle, check_fucina_after_action, _bot_try_horde
+from engine.game import end_turn, do_battle, check_fucina_after_action, _bot_try_horde
 
 # Magie con targeting troppo specifico (assegnazione multipla, scelta di un
 # Trono, scambio di Bastioni tra due giocatori) per un bundle di kwargs
@@ -61,7 +70,7 @@ _ZONE_NAMES = ("vanguard", "bastion_left", "bastion_right")
 # Uno "spec" è una tupla (tipo, ...parametri) che descrive un'azione in modo
 # indipendente dallo stato su cui verrà eseguita: permette di generare i
 # candidati una volta e poi applicarli sia allo stato reale sia a una copia
-# di simulazione (per il lookahead di "hard").
+# di simulazione (per il lookahead di "normal" e "hard").
 ActionSpec = Tuple
 
 
@@ -69,38 +78,49 @@ ActionSpec = Tuple
 # Entry point
 # ---------------------------------------------------------------------------
 
+# Partite salvate prima del passaggio da 4 a 3 livelli
+_LEGACY_DIFFICULTY = {"expert": "hard"}
+
+
 def run_bot_turn(state: GameState, difficulty: str = "normal") -> None:
     """Gioca l'intero turno del giocatore corrente (deve essere il Bot)."""
-    if difficulty == "easy":
-        random_bot_turn(state)
-        return
-
+    difficulty = _LEGACY_DIFFICULTY.get(difficulty, difficulty)
     player_id = state.current_player.id
-    _play_actions(state, player_id, difficulty)
-    _maybe_fucina_bonus_action(state, player_id, difficulty)
-    _reposition_for_hordes(state, player_id)
+    threat = _ThreatModel(state, player_id) if difficulty == "hard" else None
+    _play_actions(state, player_id, difficulty, threat)
+    _maybe_fucina_bonus_action(state, player_id, difficulty, threat)
+    if threat is not None:
+        _optimize_reposition(state, player_id, threat)
+    else:
+        _reposition_for_hordes(state, player_id)
     _bot_try_horde(state, state.get_player(player_id))
-    _bot_battle(state, player_id)
+    _bot_battle(state, player_id, smart=threat is not None)
     end_turn(state)
 
 
-def _maybe_fucina_bonus_action(state: GameState, player_id: str, difficulty: str) -> None:
+def _maybe_fucina_bonus_action(state: GameState, player_id: str, difficulty: str,
+                               threat: Optional["_ThreatModel"] = None) -> None:
     """Se una Fucina base concede un'Azione extra dopo aver esaurito le due
     normali, giocala anche lei invece di sprecarla."""
     player = state.get_player(player_id)
     result = check_fucina_after_action(state, player)
     if result and player.actions_remaining > 0:
-        _play_actions(state, player_id, difficulty)
+        _play_actions(state, player_id, difficulty, threat)
 
 
 # ---------------------------------------------------------------------------
 # Fase Azioni
 # ---------------------------------------------------------------------------
 
-def _play_actions(state: GameState, player_id: str, difficulty: str) -> None:
+def _play_actions(state: GameState, player_id: str, difficulty: str,
+                  threat: Optional["_ThreatModel"] = None) -> None:
     player = state.get_player(player_id)
     while player.actions_remaining > 0:
-        if difficulty in ("hard", "expert") and player.actions_remaining >= 2:
+        if difficulty == "hard":
+            # Anche con una sola Azione rimasta la valutazione a fine turno
+            # (minaccia inclusa) è più affidabile del punteggio statico.
+            done = _play_best_pair(state, player_id, difficulty, threat)
+        elif difficulty == "normal" and player.actions_remaining >= 2:
             done = _play_best_pair(state, player_id, difficulty)
         else:
             done = _play_best_single(state, player_id, difficulty)
@@ -125,11 +145,35 @@ def _play_best_single(state: GameState, player_id: str, difficulty: str) -> bool
 
 
 # raggio di ricerca (candidati esaminati per la 1a e la 2a azione) per coppia
-_BEAM = {"hard": (5, 3), "expert": (7, 4)}
+_BEAM = {"normal": (5, 3), "hard": (10, 6)}
 
 
-def _play_best_pair(state: GameState, player_id: str, difficulty: str) -> bool:
-    """Per 'hard'/'expert': tra le migliori azioni possibili ora, sceglie
+def _sim_copy(state: GameState) -> GameState:
+    """Copia di simulazione senza il log della partita: il log cresce a ogni
+    azione, alla simulazione non serve e copiarlo ogni volta domina il costo
+    del lookahead."""
+    log = state.log
+    state.log = []
+    try:
+        return state.model_copy(deep=True)
+    finally:
+        state.log = log
+
+
+def _beam(candidates: List[Tuple[float, ActionSpec]], width: int, difficulty: str) -> List[Tuple[float, ActionSpec]]:
+    """Le `width` migliori per punteggio euristico. In 'hard' i Muri entrano
+    sempre nel raggio: il loro valore dipende dalla minaccia avversaria, che
+    il punteggio euristico non vede, quindi decide la simulazione."""
+    candidates = sorted(candidates, key=lambda c: c[0], reverse=True)
+    top = candidates[:width]
+    if difficulty == "hard":
+        top += [c for c in candidates[width:] if c[1][0] == "add_wall"]
+    return top
+
+
+def _play_best_pair(state: GameState, player_id: str, difficulty: str,
+                    threat: Optional["_ThreatModel"] = None) -> bool:
+    """Per 'normal'/'hard': tra le migliori azioni possibili ora, sceglie
     quella che porta al MIGLIOR ESITO dopo aver giocato anche la seconda
     azione del turno di conseguenza — non semplicemente la migliore "sul
     momento". Prova ogni combinazione su una copia dello stato, sceglie la
@@ -140,12 +184,15 @@ def _play_best_pair(state: GameState, player_id: str, difficulty: str) -> bool:
     candidates = _generate_candidates(state, player_id, difficulty)
     if not candidates:
         return False
-    candidates.sort(key=lambda c: c[0], reverse=True)
-    top_first = candidates[:beam_first]
+    top_first = _beam(candidates, beam_first, difficulty)
 
     best_spec, best_value = None, float("-inf")
+    if difficulty == "hard":
+        # 'hard' può anche non fare nulla: tenere una carta in mano è
+        # meglio che sprecarla in una mossa che peggiora la posizione.
+        best_value = _evaluate_outcome(state, player_id, difficulty, threat)
     for _, spec1 in top_first:
-        sim = state.model_copy(deep=True)
+        sim = _sim_copy(state)
         try:
             _apply_spec(sim, player_id, spec1)
         except ActionError:
@@ -153,17 +200,18 @@ def _play_best_pair(state: GameState, player_id: str, difficulty: str) -> bool:
 
         # Valore raggiungibile con SOLO la prima azione (nel caso la seconda
         # non porti a nulla di meglio, es. mano vuota dopo aver giocato).
-        best_for_this_first = _evaluate_outcome(sim, player_id, difficulty)
+        best_for_this_first = _evaluate_outcome(sim, player_id, difficulty, threat)
 
-        second_candidates = _generate_candidates(sim, player_id, difficulty)
-        second_candidates.sort(key=lambda c: c[0], reverse=True)
-        for _, spec2 in second_candidates[:beam_second]:
-            sim2 = sim.model_copy(deep=True)
+        second_candidates = []
+        if sim.get_player(player_id).actions_remaining > 0:
+            second_candidates = _beam(_generate_candidates(sim, player_id, difficulty), beam_second, difficulty)
+        for _, spec2 in second_candidates:
+            sim2 = _sim_copy(sim)
             try:
                 _apply_spec(sim2, player_id, spec2)
             except ActionError:
                 continue
-            best_for_this_first = max(best_for_this_first, _evaluate_outcome(sim2, player_id, difficulty))
+            best_for_this_first = max(best_for_this_first, _evaluate_outcome(sim2, player_id, difficulty, threat))
 
         if best_for_this_first > best_value:
             best_value, best_spec = best_for_this_first, spec1
@@ -177,60 +225,45 @@ def _play_best_pair(state: GameState, player_id: str, difficulty: str) -> bool:
         return False
 
 
-def _evaluate_outcome(sim: GameState, player_id: str, difficulty: str) -> float:
-    """'hard' valuta lo stato del campo così com'è dopo le azioni. 'expert'
+def _evaluate_outcome(sim: GameState, player_id: str, difficulty: str,
+                      threat: Optional["_ThreatModel"] = None) -> float:
+    """'normal' valuta lo stato del campo così com'è dopo le azioni. 'hard'
     prosegue la simulazione fino a fine turno (Riposizionamento, Orda,
     Battaglia) su una COPIA separata, così la scelta delle 2 azioni è
     ottimizzata per il risultato reale del turno, non per un proxy statico —
-    e sottrae anche il rischio difensivo: quanto danno subirebbe al PROSSIMO
-    turno dell'avversario, calcolato col suo attuale potenziale offensivo
-    (informazione pubblica: Guerrieri in Avanscoperta visibili a tutti). Così
-    non pianifica solo per il turno in corso, ma pesa anche il contraccolpo —
-    es. preferisce rinforzare un Bastione debole invece di sovraccaricare
-    l'Avanscoperta, se l'avversario è già pronto a colpire forte."""
-    if difficulty != "expert":
+    e sottrae la perdita attesa al PROSSIMO turno dell'avversario
+    (_ThreatModel), così pesa anche il contraccolpo: es. preferisce
+    rinforzare un Bastione scoperto invece di sovraccaricare l'Avanscoperta,
+    se l'avversario è pronto a colpire forte."""
+    if difficulty != "hard":
         return _evaluate_board(sim, player_id)
+    if threat is None:
+        threat = _ThreatModel(sim, player_id)
 
-    turn_sim = sim.model_copy(deep=True)
-    opponent_id = _opponent(turn_sim, player_id).id
-    opp_lives_before = turn_sim.get_player(opponent_id).lives
+    turn_sim = _sim_copy(sim)
+    opponent = _opponent(turn_sim, player_id)
+    lives_before = opponent.lives
+    walls_before = len(opponent.field.bastion_left.walls) + len(opponent.field.bastion_right.walls)
 
-    _reposition_for_hordes(turn_sim, player_id)
+    _optimize_reposition(turn_sim, player_id, threat)
     _bot_try_horde(turn_sim, turn_sim.get_player(player_id))
-    _bot_battle(turn_sim, player_id)
+    _bot_battle(turn_sim, player_id, smart=True)
 
-    opp_lives_after = turn_sim.get_player(opponent_id).lives
-    life_swing = opp_lives_before - opp_lives_after
+    opponent = turn_sim.get_player(opponent.id)
+    if not opponent.is_alive:
+        return 1000.0
+    lives_lost = lives_before - opponent.lives
+    walls_lost = walls_before - (len(opponent.field.bastion_left.walls) + len(opponent.field.bastion_right.walls))
 
-    value = _evaluate_board(turn_sim, player_id) + life_swing * 10.0
-    value -= _expected_incoming_damage(turn_sim, player_id, opponent_id) * 2.5
+    value = _evaluate_board(turn_sim, player_id)
+    value += lives_lost * _LIFE_VALUE + max(0, walls_lost) * _WALL_VALUE
+    value -= threat.expected_loss(turn_sim.get_player(player_id), opponent)
     return value
-
-
-def _expected_incoming_damage(state: GameState, player_id: str, opponent_id: str) -> float:
-    """Stima il danno che l'avversario infliggerebbe se attaccasse ORA il mio
-    Bastione più conveniente per lui, usando il SUO attuale potenziale
-    offensivo (pubblico) contro le MIE difese risultanti da questa
-    simulazione. Non richiede conoscere la sua mano: è lo stesso calcolo che
-    farebbe lui stesso guardando il campo (vedi _bot_battle)."""
-    player = state.get_player(player_id)
-    opponent = state.get_player(opponent_id)
-    if not opponent.field.vanguard:
-        return 0.0
-    att_att, att_git = attacker_stats(opponent)
-    worst = 0.0
-    for side in ("left", "right"):
-        def_dif, def_git = defender_stats(player, side)
-        _, _, total = calculate_damage(att_att, att_git, def_dif, def_git)
-        walls = len(player.field.bastion_left.walls if side == "left" else player.field.bastion_right.walls)
-        unabsorbed = max(0.0, total - walls)
-        worst = max(worst, unabsorbed)
-    return worst
 
 
 def _softened_order(candidates: List[Tuple[float, ActionSpec]], difficulty: str) -> List[Tuple[float, ActionSpec]]:
     """Sceglie la prima mossa con una lotteria pesata sulle 3 migliori, per
-    non essere sempre perfettamente ottimale (usato da 'normal')."""
+    non essere sempre perfettamente ottimale (usato da 'easy')."""
     if len(candidates) <= 1:
         return candidates
     top_n = min(3, len(candidates))
@@ -241,15 +274,15 @@ def _softened_order(candidates: List[Tuple[float, ActionSpec]], difficulty: str)
     return [chosen] + rest
 
 
-def _generate_candidates(state: GameState, player_id: str, difficulty: str = "normal") -> List[Tuple[float, ActionSpec]]:
+def _generate_candidates(state: GameState, player_id: str, difficulty: str = "easy") -> List[Tuple[float, ActionSpec]]:
     """Genera tutte le azioni legalmente tentabili in questo momento, con il
     loro punteggio euristico, come "spec" indipendenti dallo stato. In
-    'hard'/'expert' i pesi favoriscono di più lo sviluppo del campo (Guerrieri
-    via via più grossi, Orde, Evoluzioni) rispetto a 'normal', che pesa quasi
+    'normal'/'hard' i pesi favoriscono di più lo sviluppo del campo (Guerrieri
+    via via più grossi, Orde, Evoluzioni) rispetto a 'easy', che pesa quasi
     solo l'efficienza statistiche/costo."""
     player = state.get_player(player_id)
     opponent = _opponent(state, player_id)
-    hard = difficulty in ("hard", "expert")
+    planner = difficulty in ("normal", "hard")
     candidates: List[Tuple[float, ActionSpec]] = []
 
     for iid in player.hand:
@@ -263,10 +296,10 @@ def _generate_candidates(state: GameState, player_id: str, difficulty: str = "no
             if card.subtype == "hero":
                 continue  # gestito sotto, come evoluzione
             if player.mana_remaining >= card.cost:
-                score, region = _score_warrior(card, player, hard)
+                score, region = _score_warrior(card, player, planner)
                 candidates.append((score, ("play_warrior", iid, region)))
-                if hard:
-                    # 'hard' lascia che sia la valutazione della coppia di
+                if planner:
+                    # 'normal' lascia che sia la valutazione della coppia di
                     # azioni a scegliere tra Avanscoperta (attacco) e
                     # Bastione (difesa), invece di deciderlo con una regola
                     # fissa uguale per ogni carta.
@@ -287,7 +320,7 @@ def _generate_candidates(state: GameState, player_id: str, difficulty: str = "no
                     if target_w is None:
                         continue
                 candidates.append((
-                    _score_building_play(card, hard),
+                    _score_building_play(card, planner),
                     ("play_building", iid, target_w),
                 ))
 
@@ -299,6 +332,14 @@ def _generate_candidates(state: GameState, player_id: str, difficulty: str = "no
                 score = _score_spell(card, player)
                 kwargs = _default_spell_kwargs(player, opponent)
                 candidates.append((score, ("play_spell", iid, kwargs)))
+                if difficulty == "hard":
+                    # Il Bastione bersaglio "più debole per DIF" non è sempre
+                    # il migliore (es. Ardolancio conviene dove ci sono meno
+                    # Muri): la simulazione prova anche l'altro.
+                    other = "right" if kwargs["target_bastion_side"] == "left" else "left"
+                    candidates.append((score * 0.99, ("play_spell", iid, {
+                        **kwargs, "target_bastion_side": other, "dest_bastion_side": other,
+                    })))
 
     # Evolvi: Recluta già in campo + il suo Eroe in mano
     for iid in player.hand:
@@ -310,7 +351,7 @@ def _generate_candidates(state: GameState, player_id: str, difficulty: str = "no
         if isinstance(card, WarriorCard) and card.subtype == "hero" and player.mana_remaining >= card.cost:
             recruit = _find_evolvable_recruit(player, card)
             if recruit:
-                candidates.append((14.0 if hard else 8.0, ("evolve", recruit.instance_id, iid)))
+                candidates.append((14.0 if planner else 8.0, ("evolve", recruit.instance_id, iid)))
 
     # Completa Costruzioni incomplete già in campo
     for b in player.field.village.buildings:
@@ -319,17 +360,27 @@ def _generate_candidates(state: GameState, player_id: str, difficulty: str = "no
         card = get_card(b.base_card_id)
         if isinstance(card, BuildingCard) and player.mana_remaining >= card.completion_cost:
             base_score = 4.0 + card.completion_cost * 0.3
-            candidates.append((base_score * 1.5 if hard else base_score, ("complete_building", b.instance_id)))
+            candidates.append((base_score * 1.5 if planner else base_score, ("complete_building", b.instance_id)))
 
-    # Muri: opzione sempre disponibile se c'è qualcosa in mano — 'hard' le
+    # Muri: opzione sempre disponibile se c'è qualcosa in mano — 'normal' le
     # evita quando possibile, preferendo sviluppare il campo
     if player.hand:
-        ordered = sorted(player.hand, key=_raw_card_value)
+        values = _hand_values(player)
+        ordered = sorted(player.hand, key=values.get)
         n = min(3, len(ordered))
         side = _weaker_bastion_side(player)
         walls = [{"instance_id": iid, "bastion": side} for iid in ordered[:n]]
         wall_score = _score_walls(player)
-        candidates.append((wall_score * 0.5 if hard else wall_score, ("add_wall", walls)))
+        candidates.append((wall_score * 0.5 if planner else wall_score, ("add_wall", walls)))
+        if difficulty == "hard":
+            # Lato e quantità dei Muri li sceglie la simulazione, in base alla
+            # minaccia: anche un solo Muro (tenendo le altre carte in mano) o
+            # tutti sull'altro Bastione.
+            other = "right" if side == "left" else "left"
+            variants = {(other, n), (side, 1), (other, 1)} - {(side, n)}
+            for s, count in sorted(variants):
+                walls_v = [{"instance_id": iid, "bastion": s} for iid in ordered[:count]]
+                candidates.append((wall_score * 0.5, ("add_wall", walls_v)))
 
     return candidates
 
@@ -360,7 +411,7 @@ def _apply_spec(state: GameState, player_id: str, spec: ActionSpec) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Valutazione dello stato (usata solo dal lookahead di "hard")
+# Valutazione dello stato (usata dal lookahead di "normal" e "hard")
 # ---------------------------------------------------------------------------
 
 def _evaluate_board(state: GameState, player_id: str) -> float:
@@ -393,8 +444,11 @@ def _evaluate_board(state: GameState, player_id: str) -> float:
     # Mana avanzato e non speso è un'occasione persa
     score -= player.mana_remaining * 0.3
 
-    # La mano residua ha comunque un valore (carte per i turni successivi)
-    score += sum(_raw_card_value(iid) for iid in player.hand) * 0.3
+    # La mano ha un valore (carte per i turni successivi), ma a fine turno si
+    # pesca fino al limite: una carta spesa (es. come Muro) viene rimpiazzata
+    # da una pescata, quindi ogni posto libero vale una pesca media.
+    free_slots = max(0, _HAND_LIMIT - len(player.hand))
+    score += (sum(_hand_values(player).values()) + free_slots * _expected_draw_value(state, player)) * 0.3
 
     return score
 
@@ -403,17 +457,17 @@ def _evaluate_board(state: GameState, player_id: str) -> float:
 # Valutazione carte
 # ---------------------------------------------------------------------------
 
-def _score_warrior(card: WarriorCard, player: Player, hard: bool = False) -> Tuple[float, str]:
+def _score_warrior(card: WarriorCard, player: Player, planner: bool = False) -> Tuple[float, str]:
     stat_total = card.att + card.git + card.dif
     score = stat_total / max(card.cost, 1)
-    if hard:
-        # 'hard' pesa anche il valore assoluto delle statistiche, non solo
+    if planner:
+        # 'normal' pesa anche il valore assoluto delle statistiche, non solo
         # l'efficienza per Mana: sviluppa Guerrieri via via più forti invece
         # di preferire sempre il più "economico".
         score += stat_total * 0.15
     zone, bonus = _best_horde_region(player, card.species)
     if zone:
-        if hard:
+        if planner:
             bonus *= 1.5
         return score + bonus, zone
     region = "vanguard" if (card.att + card.git) >= card.dif else _weaker_bastion_side(player)
@@ -442,9 +496,9 @@ def _best_horde_region(player: Player, species: str) -> Tuple[Optional[str], flo
     return best_zone, best_bonus
 
 
-def _score_building_play(card: BuildingCard, hard: bool = False) -> float:
+def _score_building_play(card: BuildingCard, planner: bool = False) -> float:
     base = 1.0 + card.cost * 0.2
-    return base * 1.3 if hard else base
+    return base * 1.3 if planner else base
 
 
 def _best_trono_target(player: Player) -> Optional[str]:
@@ -478,21 +532,65 @@ def _score_walls(player: Player) -> float:
     return max(0.3, 2.0 - my_walls * 0.3)
 
 
-def _raw_card_value(iid: str) -> float:
-    """Valore 'grezzo' di una carta in mano, usato solo per scegliere quali
-    carte convenga sacrificare come Muri (le più deboli per primo)."""
-    base_id = get_base_card_id(iid)
+# Una carta che oggi non si può giocare (Eroe senza la sua Recluta, Magia
+# senza Maghe) vale solo una frazione del suo valore: è il primo candidato
+# a diventare Muro.
+_DEAD_CARD_FACTOR = 0.25
+_HAND_LIMIT = 6
+
+
+def _card_value(base_id: str, player: Player, hand_bases: List[str]) -> float:
+    """Valore di una carta per `player`, dato il suo campo e la sua mano.
+    Un Eroe conta pieno solo se la sua Recluta è in campo o in mano; una
+    Magia solo se c'è almeno una Maga in campo o in mano."""
     try:
         card = get_card(base_id)
     except KeyError:
         return 0.0
     if isinstance(card, WarriorCard):
-        return (card.att + card.git + card.dif) / max(card.cost, 1)
+        value = (card.att + card.git + card.dif) / max(card.cost, 1)
+        if card.subtype == "hero":
+            recruit = card.evolves_from
+            reachable = recruit in hand_bases or any(w.base_card_id == recruit for w in player.all_warriors())
+            if not reachable:
+                value *= _DEAD_CARD_FACTOR
+        return value
     if isinstance(card, BuildingCard):
         return 1.0 + card.cost * 0.2
     if isinstance(card, SpellCard):
-        return 1.5 + card.cost * 0.3
+        value = 1.5 + card.cost * 0.3
+        mages = player.mages_in_field() or any(
+            isinstance(c := get_card(b), WarriorCard) and c.species == "maga" for b in hand_bases
+        )
+        return value if mages else value * _DEAD_CARD_FACTOR
     return 0.0
+
+
+def _hand_values(player: Player) -> Dict[str, float]:
+    """Valore di ogni carta in mano (instance_id -> valore)."""
+    hand_bases = [get_base_card_id(iid) for iid in player.hand]
+    return {iid: _card_value(b, player, hand_bases) for iid, b in zip(player.hand, hand_bases)}
+
+
+def _expected_draw_value(state: GameState, player: Player) -> float:
+    """Valore medio della carta che `player` pescherà a fine turno. Conta le
+    carte come per la mano avversaria (_ThreatModel): la pesca arriva
+    dall'insieme delle carte che il bot non vede, ciascuna valutata rispetto
+    al SUO campo e alla sua mano."""
+    unseen: Counter = Counter()
+    for other in state.players:
+        if other.id == player.id:
+            continue
+        unseen.update(get_base_card_id(i) for i in other.hand)
+        unseen.update(get_base_card_id(i) for i in other.life_cards)
+        for b in (other.field.bastion_left, other.field.bastion_right):
+            unseen.update(get_base_card_id(w.instance_id) for w in b.walls)
+    unseen.update(get_base_card_id(i) for i in state.deck)
+    total = sum(unseen.values())
+    if not total:
+        return 0.0
+    hand_bases = [get_base_card_id(iid) for iid in player.hand]
+    return sum(_card_value(b, player, hand_bases) * n for b, n in unseen.items()) / total
 
 
 # ---------------------------------------------------------------------------
@@ -571,6 +669,315 @@ def _weaker_enemy_bastion_side(opponent: Player) -> str:
 
 
 # ---------------------------------------------------------------------------
+# 'hard': perdite in Battaglia, minaccia avversaria, riposizionamento
+# ---------------------------------------------------------------------------
+
+# Valori nella stessa scala di _evaluate_board
+_LIFE_VALUE = 10.0
+_LETHAL_VALUE = 40.0      # l'ultima Vita: perderla significa perdere la partita
+_WALL_VALUE = 1.0
+_NEW_HORDE_VALUE = 3.0    # Orda che si forma riposizionando (attivata subito dopo)
+
+# Carte in mano all'avversario che cambiano il suo attacco del prossimo turno
+_THREAT_BUILDINGS = {"ariete": ("att", 1), "catapulta": ("git", 1)}
+_THREAT_SPELLS = {"ardolancio", "guerremoto"}
+
+
+def _hit_value(damage: int, durabilities: List[int], lives: int, strip: int = 0) -> float:
+    """Perdita (in punti di valutazione) di un Bastione che subisce `damage`
+    Danni, dopo che `strip` Muri sono stati scartati da effetti (Ardolancio,
+    Guerremoto prodigio). Rispecchia apply_damage_to_bastion: i Muri
+    assorbono secondo la loro durabilità, se non bastano si perde UNA Vita."""
+    stripped = min(strip, len(durabilities))
+    value = stripped * _WALL_VALUE
+    if damage <= 0:
+        return value
+    remaining = damage
+    for d in durabilities[stripped:]:
+        if remaining <= 0:
+            break
+        remaining -= d
+        value += _WALL_VALUE
+    if remaining > 0 and lives > 0:
+        value += _LETHAL_VALUE if lives == 1 else _LIFE_VALUE
+    return value
+
+
+def _fossato_threshold(player: Player) -> int:
+    """GIT minima per poter attaccare questo giocatore (0 = nessun Fossato)."""
+    threshold = 0
+    for b in player.field.village.buildings:
+        if b.base_card_id == "fossato":
+            threshold = max(threshold, 3 if b.completed else 1)
+    return threshold
+
+
+def _side_defense(warriors: List[WarriorInstance], bastion, bonus: Dict[str, int]) -> Tuple[int, int, List[int]]:
+    """(DIF, GIT, durabilità dei Muri) di un Bastione con i Guerrieri dati:
+    stesso calcolo di defender_stats, ma su una disposizione ipotetica."""
+    durabilities = [w.durability for w in bastion.walls]
+    if not warriors:
+        return bastion.dif_bonus, 0, durabilities
+    dif = max(w.effective_dif() for w in warriors) + bastion.dif_bonus + bonus["dif"]
+    git = max(w.effective_git() for w in warriors) + bonus["git"]
+    return dif, git, durabilities
+
+
+def _player_defense(player: Player) -> List[Tuple[int, int, List[int]]]:
+    bonus = battle_building_bonus(player)
+    return [
+        _side_defense(player.field.bastion_left.warriors, player.field.bastion_left, bonus),
+        _side_defense(player.field.bastion_right.warriors, player.field.bastion_right, bonus),
+    ]
+
+
+def _next_turn_mana(state: GameState, player: Player) -> int:
+    if player.skip_mana_next_turn:
+        return 0
+    idx = next(i for i, p in enumerate(state.players) if p.id == player.id)
+    # state.turn avanza quando tocca di nuovo a chi apre il round
+    turn = state.turn + (1 if idx == state.first_player_index else 0)
+    return state.mana_for_turn(turn)
+
+
+class _ThreatModel:
+    """Stima quanto l'avversario può farmi perdere nel SUO prossimo turno.
+
+    Conta le carte come un giocatore esperto: la composizione del mazzo è
+    nota, quindi le carte che il bot non vede (mazzo, mano avversaria, Muri e
+    Vite coperti dell'avversario) formano un unico insieme da cui la mano
+    avversaria è estratta a caso. Il bot NON guarda la mano vera: ne campiona
+    SAMPLES possibili con la dimensione pubblica della mano, e per ognuna
+    calcola il miglior attacco disponibile all'avversario col Mana del suo
+    prossimo turno (Guerrieri o Evoluzioni da schierare, Ariete/Catapulta,
+    Ardolancio/Guerremoto per scartare Muri prima della Battaglia), sapendo
+    che potrà riposizionare in Avanscoperta tutti i Guerrieri che ha in campo.
+    La perdita attesa è la media, sui campioni, del suo attacco migliore
+    contro il mio Bastione più conveniente."""
+
+    SAMPLES = 100
+
+    def __init__(self, state: GameState, player_id: str):
+        opponent = _opponent(state, player_id)
+        hidden_walls = [w.instance_id for b in (opponent.field.bastion_left, opponent.field.bastion_right) for w in b.walls]
+        unseen = list(state.deck) + list(opponent.hand) + hidden_walls + list(opponent.life_cards)
+        bases = [get_base_card_id(iid) for iid in unseen]
+        k = min(len(opponent.hand), len(bases))
+        rng = random.Random()
+        hands: Counter = Counter()
+        for _ in range(self.SAMPLES):
+            hand = [b for b in rng.sample(bases, k) if self._relevant(b)]
+            hands[tuple(sorted(hand))] += 1
+        self.hands = list(hands.items())
+        self.mana = _next_turn_mana(state, opponent)
+        self._cache: Dict[tuple, tuple] = {}
+
+    @staticmethod
+    def _relevant(base_id: str) -> bool:
+        if base_id in _THREAT_BUILDINGS or base_id in _THREAT_SPELLS:
+            return True
+        try:
+            return isinstance(get_card(base_id), WarriorCard)
+        except KeyError:
+            return False
+
+    def _options(self, opponent: Player) -> list:
+        """Ritorna (attacchi, campioni): `attacchi` è la lista degli attacchi
+        possibili distinti (ATT, GIT, Muri scartati), `campioni` associa a
+        ogni mano campionata (con il suo peso) le posizioni dei suoi attacchi
+        non dominati. ATT = -1: nessun Guerriero, nessuna Battaglia."""
+        field = opponent.all_warriors()
+        key = (
+            tuple((w.base_card_id, w.effective_att(), w.effective_git()) for w in field),
+            tuple((b.base_card_id, b.completed) for b in opponent.field.village.buildings),
+            tuple(sorted(opponent.mages_by_school().items())),
+        )
+        cached = self._cache.get(key)
+        if cached is not None:
+            return cached
+
+        field_att = max((w.effective_att() for w in field), default=-1)
+        field_git = max((w.effective_git() for w in field), default=-1)
+        on_field = {w.base_card_id for w in field}
+        bonus = battle_building_bonus(opponent)
+        schools = opponent.mages_by_school()
+        n_mages = sum(schools.values())
+        anatema = schools.get("anatema", 0)
+
+        # Molte mani campionate hanno gli stessi attacchi possibili: ogni
+        # attacco distinto compare una volta sola in `index`, e i campioni
+        # vi fanno riferimento per posizione (expected_loss lo valuta 1 volta).
+        index: Dict[tuple, int] = {}
+        result = []
+        for hand, weight in self.hands:
+            # (costo Mana, ATT, GIT, +ATT, +GIT, Muri scartati)
+            items = []
+            for base_id in hand:
+                card = get_card(base_id)
+                if isinstance(card, WarriorCard):
+                    if card.cost > self.mana:
+                        continue
+                    if card.subtype == "hero" and card.evolves_from not in on_field:
+                        continue
+                    items.append((card.cost, card.att, card.git, 0, 0, 0))
+                elif base_id in _THREAT_BUILDINGS:
+                    if card.cost <= self.mana:
+                        stat, amount = _THREAT_BUILDINGS[base_id]
+                        items.append((card.cost, -1, -1, amount if stat == "att" else 0, amount if stat == "git" else 0, 0))
+                elif base_id == "ardolancio" and n_mages >= card.cost:
+                    items.append((0, -1, -1, 0, 0, 4 if anatema >= card.cost else 2))
+                elif base_id == "guerremoto" and anatema >= card.cost:
+                    items.append((0, -1, -1, 0, 0, 2))
+
+            options = set()
+            for r in (0, 1, 2):
+                for combo in combinations(items, r):
+                    if sum(i[0] for i in combo) > self.mana:
+                        continue
+                    att = max([field_att] + [i[1] for i in combo])
+                    git = max([field_git] + [i[2] for i in combo])
+                    strip = sum(i[5] for i in combo)
+                    if att < 0 and git < 0:
+                        options.add((-1, -1, strip))
+                        continue
+                    att += bonus["att"] + sum(i[3] for i in combo)
+                    git += bonus["git"] + sum(i[4] for i in combo)
+                    options.add((att, git, strip))
+            pareto = [
+                o for o in options
+                if not any(p != o and p[0] >= o[0] and p[1] >= o[1] and p[2] >= o[2] for p in options)
+            ]
+            result.append((tuple(index.setdefault(o, len(index)) for o in pareto), weight))
+
+        cached = (list(index), result)
+        self._cache[key] = cached
+        return cached
+
+    def expected_loss(self, player: Player, opponent: Player,
+                      defense: Optional[List[Tuple[int, int, List[int]]]] = None) -> float:
+        """Perdita attesa di `player` al prossimo turno di `opponent`, con la
+        difesa data (di default quella attuale del campo)."""
+        if defense is None:
+            defense = _player_defense(player)
+        fossato = _fossato_threshold(player)
+        lives = player.lives
+        options, samples = self._options(opponent)
+        losses = []
+        for att, git, strip in options:
+            can_battle = att >= 0 and git >= fossato
+            worst = 0.0
+            for dif, dgit, durabilities in defense:
+                damage = max(att - dif, 0) + max(git - dgit, 0) if can_battle else 0
+                worst = max(worst, _hit_value(damage, durabilities, lives, strip))
+            losses.append(worst)
+        total = sum(max(losses[i] for i in idxs) * weight for idxs, weight in samples if idxs)
+        return total / self.SAMPLES
+
+
+def _attack_value(state: GameState, player: Player, opponent: Player, vanguard: List[WarriorInstance]) -> float:
+    """Perdita che la Battaglia di questo turno infliggerebbe all'avversario
+    con questa Avanscoperta, sul suo Bastione più conveniente."""
+    if state.battles_remaining <= 0 or not vanguard or opponent.turns_completed < 1:
+        return 0.0
+    bonus = battle_building_bonus(player)
+    att = max(w.effective_att() for w in vanguard) + bonus["att"]
+    git = max(w.effective_git() for w in vanguard) + bonus["git"]
+    if git < _fossato_threshold(opponent):
+        return 0.0
+    best = 0.0
+    for side in ("left", "right"):
+        dif, dgit = defender_stats(opponent, side)
+        _, _, damage = calculate_damage(att, git, dif, dgit)
+        walls = opponent.field.bastion_left.walls if side == "left" else opponent.field.bastion_right.walls
+        best = max(best, _hit_value(damage, [w.durability for w in walls], opponent.lives))
+    return best
+
+
+def _optimize_reposition(state: GameState, player_id: str, threat: _ThreatModel) -> None:
+    """Riposizionamento di 'hard': cerca la disposizione dei Guerrieri tra
+    Avanscoperta e Bastioni che massimizza (danno inflitto in questa
+    Battaglia) − (perdita attesa al prossimo turno avversario) + (Orde nuove
+    formate). Il riposizionamento è gratuito e la disposizione resta tale
+    fino al mio prossimo turno, quindi la stessa scelta decide sia l'attacco
+    di ora sia la difesa di dopo. Ricerca locale: sposta un Guerriero o
+    un'intera Specie alla volta finché migliora. I Guerrieri di un'Orda già
+    attiva non si toccano (spostarli la romperebbe, perdendone l'effetto)."""
+    player = state.get_player(player_id)
+    opponent = _opponent(state, player_id)
+    regions = {
+        "vanguard": player.field.vanguard,
+        "bastion_left": player.field.bastion_left.warriors,
+        "bastion_right": player.field.bastion_right.warriors,
+    }
+    warriors = {w.instance_id: w for lst in regions.values() for w in lst}
+    if not warriors:
+        return
+    current = {w.instance_id: zone for zone, lst in regions.items() for w in lst}
+    species = {iid: get_card(w.base_card_id).species for iid, w in warriors.items()}
+    active = set(player.hordes_activated_this_turn)
+    free = [iid for iid, zone in current.items() if f"{zone}:{species[iid]}" not in active]
+    if not free:
+        return
+
+    bonus = battle_building_bonus(player)
+    memo: Dict[tuple, float] = {}
+
+    def evaluate(assign: Dict[str, str]) -> float:
+        key = tuple(assign[iid] for iid in current)
+        if key not in memo:
+            memo[key] = _evaluate_layout(assign)
+        return memo[key]
+
+    def _evaluate_layout(assign: Dict[str, str]) -> float:
+        groups = {zone: [] for zone in regions}
+        for iid, zone in assign.items():
+            groups[zone].append(warriors[iid])
+        defense = [
+            _side_defense(groups["bastion_left"], player.field.bastion_left, bonus),
+            _side_defense(groups["bastion_right"], player.field.bastion_right, bonus),
+        ]
+        value = _attack_value(state, player, opponent, groups["vanguard"])
+        value -= threat.expected_loss(player, opponent, defense)
+        for zone, lst in groups.items():
+            per_species = Counter(species[w.instance_id] for w in lst)
+            value += sum(_NEW_HORDE_VALUE for sp, n in per_species.items() if n >= 3 and f"{zone}:{sp}" not in active)
+        return value
+
+    def moves(assign: Dict[str, str]):
+        for iid in free:
+            for zone in regions:
+                if zone != assign[iid]:
+                    yield {**assign, iid: zone}
+        for sp in {species[iid] for iid in free}:
+            for zone in regions:
+                moved = {iid: zone for iid in free if species[iid] == sp and assign[iid] != zone}
+                if len(moved) > 1:
+                    yield {**assign, **moved}
+
+    all_vanguard = {**current, **{iid: "vanguard" for iid in free}}
+    best, best_value = current, evaluate(current)
+    for start in (current, all_vanguard):
+        assign, value = start, evaluate(start)
+        for _ in range(12):
+            improved = False
+            for cand in moves(assign):
+                v = evaluate(cand)
+                if v > value + 1e-9:
+                    assign, value, improved = cand, v, True
+            if not improved:
+                break
+        if value > best_value + 1e-9:
+            best, best_value = assign, value
+
+    for iid, zone in best.items():
+        if zone != current[iid]:
+            try:
+                reposition_warrior(state, player_id, iid, zone)
+            except ActionError:
+                pass
+
+
+# ---------------------------------------------------------------------------
 # Riposizionamento: solo per consolidare Orde
 # ---------------------------------------------------------------------------
 
@@ -616,7 +1023,11 @@ def _reposition_for_hordes(state: GameState, player_id: str) -> None:
 # Battaglia: attacca sempre il Bastione con danno atteso più alto
 # ---------------------------------------------------------------------------
 
-def _bot_battle(state: GameState, player_id: str) -> None:
+def _bot_battle(state: GameState, player_id: str, smart: bool = False) -> None:
+    """Con `smart` ('hard') il bersaglio è quello che fa perdere di più
+    all'avversario (una Vita vale più di qualche Muro), non quello con il
+    Danno più alto: 3 Danni su un Bastione senza Muri tolgono una Vita,
+    5 Danni su un Bastione con 6 Muri no."""
     player = state.get_player(player_id)
     if state.battles_remaining <= 0 or not player.field.vanguard:
         return
@@ -630,6 +1041,9 @@ def _bot_battle(state: GameState, player_id: str) -> None:
         defender = state.players[t_idx]
         def_dif, def_git = defender_stats(defender, t_side)
         _, _, total = calculate_damage(att_att, att_git, def_dif, def_git)
+        if smart:
+            walls = defender.field.bastion_left.walls if t_side == "left" else defender.field.bastion_right.walls
+            total = _hit_value(total, [w.durability for w in walls], defender.lives) + total * 0.01
         if total > best_dmg:
             best_dmg, best_target = total, (t_idx, t_side)
 

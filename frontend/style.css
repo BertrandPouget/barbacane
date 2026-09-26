@@ -1535,6 +1535,45 @@ input:focus {
 @keyframes toast-in  { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes toast-out { from { opacity: 1; } to { opacity: 0; } }
 
+/* ==================== BANNER CAMBIO TURNO ==================== */
+/* Come #turn-banner del client mobile: pillola oro per il proprio turno,
+   versione sobria (.subtle) per il turno degli altri. */
+
+#turn-banner {
+  position: fixed;
+  top: 34vh;
+  left: 0; right: 0;
+  z-index: 290;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+#turn-banner.hidden { display: none; }
+#turn-banner span {
+  font-size: 1.5rem;
+  font-weight: bold;
+  padding: 0.9rem 2.2rem;
+  border-radius: 10px;
+  color: var(--bg-dark);
+  background: var(--gold);
+  border: 2px solid var(--border-gold);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
+  animation: turn-banner-pop 1.9s ease-out forwards;
+}
+#turn-banner.subtle span {
+  font-size: 1.2rem;
+  color: var(--text);
+  background: var(--bg-medium);
+  border: 1px solid var(--border-gold);
+}
+@keyframes turn-banner-pop {
+  0%   { opacity: 0; transform: scale(0.7) translateY(14px); }
+  14%  { opacity: 1; transform: scale(1.03); }
+  22%  { transform: scale(1); }
+  82%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(0.96) translateY(-10px); }
+}
+
 /* ==================== FINE PARTITA ==================== */
 
 #screen-gameover.active {
@@ -2213,11 +2252,9 @@ input:focus {
 .difficulty-easy:hover   { border-color: var(--green-light); }
 .difficulty-normal:hover { border-color: var(--gold); }
 .difficulty-hard:hover   { border-color: var(--red-light); }
-.difficulty-expert:hover { border-color: #b388e0; }
 .difficulty-easy   .difficulty-card-title { color: var(--green-light); }
 .difficulty-normal .difficulty-card-title { color: var(--gold-light); }
 .difficulty-hard   .difficulty-card-title { color: var(--red-light); }
-.difficulty-expert .difficulty-card-title { color: #b388e0; }
 
 /* ---------------------------------------------------------------------------
    Tutorial — occhio di bue (spotlight.js) e pannello dei passi.

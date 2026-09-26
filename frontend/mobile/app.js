@@ -781,10 +781,10 @@ const Mob = (() => {
     // Banner al cambio turno
     if (prevTurnPlayer !== state.current_player_id && !state.winner_id) {
       if (state.current_player_id === myPlayerId) {
-        TurnBanner.show('È il tuo turno!');
+        TurnBanner.show('Il tuo turno');
         haptic(40);
       } else {
-        TurnBanner.show(`Turno di ${playerName(state.current_player_id)}`, true);
+        TurnBanner.show(`Il turno di ${playerName(state.current_player_id)}`, true);
       }
     }
 
