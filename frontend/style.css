@@ -255,7 +255,11 @@ body::before {
    subito sopra la descrizione: essendo le descrizioni alte uguali
    (min-height), nei due pannelli le figure partono dalla stessa linea. Nella coppia Reinhold (a cui nel PNG è stato
    tolto il martello, che lo teneva lontano da Araminta) sta a sinistra,
-   davanti: i capelli di Araminta passano dietro di lui. La
+   davanti: i capelli di Araminta passano dietro di lui. Ad Araminta nel PNG
+   è stato tolto il braccio alzato con la fiamma. Ogni illustrazione è
+   centrata sul busto, cioè sul punto medio dei pixel della riga più bassa
+   della figura (per la coppia, della riga più bassa del gruppo): il
+   translateX è quello scarto, in % della larghezza. La
    trasparenza è sul gruppo, non sulle singole immagini: dove le figure si
    sovrappongono quella dietro non traspare attraverso quella davanti. */
 .home-mode-art {
@@ -269,10 +273,10 @@ body::before {
 }
 
 .home-mode-art img { display: block; flex: 0 0 auto; }
-.art-pair { display: flex; align-items: flex-end; }
-.art-patrizio { height: 148px; }
+.art-pair { display: flex; align-items: flex-end; transform: translateX(-5.5%); }
+.art-patrizio { height: 148px; transform: translateX(-10.4%); }
 .art-reinhold { height: 166px; margin-right: -136px; position: relative; z-index: 1; }
-.art-araminta { height: 162px; }
+.art-araminta { height: 146px; }
 
 /* Tutorial e Catalogo Carte: uno sopra l'altro, larghi quanto la riga dei
    due pannelli (2 × 324px + 2rem di spazio), come su mobile. */
