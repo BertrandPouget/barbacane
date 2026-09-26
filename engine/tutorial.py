@@ -71,9 +71,10 @@ class TutorialStep:
     def to_dict(self) -> dict:
         mobile_ids: List[str] = []
         for hid in self.highlight:
-            mid = _MOBILE_HIGHLIGHT_MAP.get(hid)
-            if mid and mid not in mobile_ids:
-                mobile_ids.append(mid)
+            mids = _MOBILE_HIGHLIGHT_MAP.get(hid) or []
+            for mid in [mids] if isinstance(mids, str) else mids:
+                if mid not in mobile_ids:
+                    mobile_ids.append(mid)
         return {
             "id": self.step_id,
             "title": self.title,
@@ -87,8 +88,9 @@ class TutorialStep:
 
 # Il frontend mobile usa ID DOM diversi (layout a tasselli invece che regioni
 # fisse): questa mappa deriva automaticamente gli highlight mobile da quelli
-# desktop, così ogni TutorialStep si scrive una volta sola.
-_MOBILE_HIGHLIGHT_MAP: Dict[str, str] = {
+# desktop, così ogni TutorialStep si scrive una volta sola. Un ID desktop può
+# corrispondere a più ID mobile (una lista): lo Spotlight li evidenzia tutti.
+_MOBILE_HIGHLIGHT_MAP: Dict[str, Union[str, List[str]]] = {
     ">hand-cards": ">hand",
     "hdr-deck": "tb-deck",
     "my-life-deck": "st-lives",
@@ -96,7 +98,8 @@ _MOBILE_HIGHLIGHT_MAP: Dict[str, str] = {
     "my-bastion-left": "tw-left",
     "my-bastion-right": "tw-right",
     "my-village": "tw-village",
-    "my-stats": "statusbar",
+    # Solo Mana e Azioni: nella statusbar mobile ci sono anche Vite ed Effetti.
+    "my-stats": ["st-mana", "st-actions"],
     "action-panel": "dock",
     "banner-btn-wall": "dock-wall",
     "banner-btn-play": ">hand",
