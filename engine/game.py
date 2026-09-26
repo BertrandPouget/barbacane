@@ -26,7 +26,7 @@ from engine.models import (
 from engine.cards import CARD_REGISTRY, get_card, WarriorCard, SpellCard, BuildingCard
 from engine.deck import build_deck, draw_cards, get_base_card_id
 from engine.effects import apply_effect
-from engine.battle import resolve_battle, get_valid_attack_targets
+from engine.battle import resolve_battle, get_valid_attack_targets, battle_building_bonus
 from engine.actions import (
     ActionError,
     play_warrior,
@@ -672,6 +672,9 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
     """
     players_view = []
     for p in state.players:
+        # In fase di Battaglia i Guerrieri mostrano già il bonus delle Costruzioni
+        # (Ariete, Catapulta, Saracinesca), come nel calcolo del Danno.
+        bb = battle_building_bonus(p) if state.phase == "battaglia" else None
         p_view = {
             "id": p.id,
             "name": p.name,
@@ -695,14 +698,14 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
             "hand_count": len(p.hand),
             "hand": p.hand if p.id == viewer_player_id else None,
             "field": {
-                "vanguard": [_warrior_view(w, p, viewer_player_id) for w in p.field.vanguard],
+                "vanguard": [_warrior_view(w, p, viewer_player_id, bb) for w in p.field.vanguard],
                 "bastion_left": {
                     "wall_count": len(p.field.bastion_left.walls),
                     "walls": (
                         [w.instance_id for w in p.field.bastion_left.walls]
                         if p.id == viewer_player_id else None
                     ),
-                    "warriors": [_warrior_view(w, p, viewer_player_id) for w in p.field.bastion_left.warriors],
+                    "warriors": [_warrior_view(w, p, viewer_player_id, bb) for w in p.field.bastion_left.warriors],
                 },
                 "bastion_right": {
                     "wall_count": len(p.field.bastion_right.walls),
@@ -710,7 +713,7 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
                         [w.instance_id for w in p.field.bastion_right.walls]
                         if p.id == viewer_player_id else None
                     ),
-                    "warriors": [_warrior_view(w, p, viewer_player_id) for w in p.field.bastion_right.warriors],
+                    "warriors": [_warrior_view(w, p, viewer_player_id, bb) for w in p.field.bastion_right.warriors],
                 },
                 "village": {
                     "buildings": [_building_view(b, p if p.id == viewer_player_id else None) for b in p.field.village.buildings],
@@ -837,15 +840,21 @@ def _available_hordes(player: Player) -> list:
     return result
 
 
-def _warrior_view(w: WarriorInstance, player: Optional[Player] = None, viewer_player_id: Optional[str] = None) -> dict:
+def _warrior_view(
+    w: WarriorInstance,
+    player: Optional[Player] = None,
+    viewer_player_id: Optional[str] = None,
+    battle_bonus: Optional[Dict[str, int]] = None,
+) -> dict:
     card = get_card(w.base_card_id)
+    bb = battle_bonus or {}
     return {
         "instance_id": w.instance_id,
         "base_card_id": w.base_card_id,
         "name": card.name if isinstance(card, WarriorCard) else w.base_card_id,
-        "att": w.effective_att(),
-        "git": w.effective_git(),
-        "dif": w.effective_dif(),
+        "att": w.effective_att() + bb.get("att", 0),
+        "git": w.effective_git() + bb.get("git", 0),
+        "dif": w.effective_dif() + bb.get("dif", 0),
         "species": card.species if isinstance(card, WarriorCard) else None,
         "subtype": card.subtype if isinstance(card, WarriorCard) else None,
         "horde_active": w.horde_active,

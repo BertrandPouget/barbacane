@@ -1254,6 +1254,8 @@ const App = (() => {
 
   function _canActivateArena(buildingInstanceId) {
     if (!currentState || currentState.current_player_id !== myPlayerId) return false;
+    // Solo prima della Battaglia (fasi Azioni e Schieramento)
+    if (!['action', 'schieramento'].includes(currentState.phase)) return false;
     const player = currentState.players.find(p => p.id === myPlayerId);
     if (!player) return false;
     const building = player.field.village.buildings.find(b => b.instance_id === buildingInstanceId);

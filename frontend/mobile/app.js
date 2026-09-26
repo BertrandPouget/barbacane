@@ -2083,6 +2083,8 @@ const Mob = (() => {
   function canActivateArena(buildingIid) {
     const my = me();
     if (!my || !isMyTurn()) return false;
+    // Solo prima della Battaglia (fasi Azioni e Schieramento)
+    if (!['action', 'schieramento'].includes(currentState.phase)) return false;
     const b = (my.field.village.buildings || []).find(x => x.instance_id === buildingIid);
     if (!b || b.arena_available === false) return false;
     const mine = getAllWarriors(my);

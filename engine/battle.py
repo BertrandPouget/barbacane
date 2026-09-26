@@ -15,7 +15,7 @@ Fossato (REGOLE CORRETTE):
 
 from __future__ import annotations
 import random
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from engine.models import (
     Bastion,
@@ -23,7 +23,6 @@ from engine.models import (
     Player,
     WarriorInstance,
 )
-from engine.cards import get_card, BuildingCard
 
 
 class ActionError(Exception):
@@ -167,6 +166,23 @@ def _effective_dif(w: WarriorInstance) -> int:
     return w.effective_dif()
 
 
+_BATTLE_BUILDING_STAT = {"ariete": "att", "catapulta": "git", "saracinesca": "dif"}
+
+
+def battle_building_bonus(player: Player) -> Dict[str, int]:
+    """
+    Bonus che le Costruzioni del giocatore danno a ciascuno dei suoi Guerrieri
+    in Battaglia: Ariete (+ATT), Catapulta (+GIT), Saracinesca (+DIF); +1 base,
+    +2 completa. Non entra in effective_*(): vale solo durante la Battaglia.
+    """
+    bonus = {"att": 0, "git": 0, "dif": 0}
+    for b_inst in player.field.village.buildings:
+        stat = _BATTLE_BUILDING_STAT.get(b_inst.base_card_id)
+        if stat:
+            bonus[stat] += 2 if b_inst.completed else 1
+    return bonus
+
+
 def attacker_stats(attacker: Player) -> Tuple[int, int]:
     """
     Ritorna (max_ATT, max_GIT) tra tutti i Guerrieri in Avanscoperta,
@@ -178,21 +194,10 @@ def attacker_stats(attacker: Player) -> Tuple[int, int]:
     if not warriors:
         return max_att, max_git
 
-    # Bonus da costruzioni: Ariete (+ATT), Catapulta (+GIT). Valgono per ogni
-    # Guerriero in Battaglia, quindi si sommano una volta al massimo; senza
-    # Guerrieri non c'è nessuno a cui darli.
-    att_bonus = 0
-    git_bonus = 0
-    for b_inst in attacker.field.village.buildings:
-        card = get_card(b_inst.base_card_id)
-        if not isinstance(card, BuildingCard):
-            continue
-        if b_inst.base_card_id == "ariete":
-            att_bonus += 2 if b_inst.completed else 1
-        elif b_inst.base_card_id == "catapulta":
-            git_bonus += 2 if b_inst.completed else 1
-
-    return max_att + att_bonus, max_git + git_bonus
+    # Il bonus vale per ogni Guerriero, quindi si somma una volta al massimo;
+    # senza Guerrieri non c'è nessuno a cui darlo.
+    bonus = battle_building_bonus(attacker)
+    return max_att + bonus["att"], max_git + bonus["git"]
 
 
 def defender_stats(defender: Player, bastion_side: str) -> Tuple[int, int]:
@@ -212,20 +217,11 @@ def defender_stats(defender: Player, bastion_side: str) -> Tuple[int, int]:
     # Bonus temporaneo sul bastione (da Saracinesca, Equipotenza, ecc.)
     max_dif += bastion.dif_bonus
 
-    # Saracinesca (+DIF), Catapulta (+GIT): come in attacco valgono per ogni
-    # Guerriero in Battaglia, quindi un Bastione vuoto non ne beneficia.
+    # Come in attacco, un Bastione vuoto non beneficia del bonus.
     if not warriors:
         return max_dif, max_git
-    for b_inst in defender.field.village.buildings:
-        card = get_card(b_inst.base_card_id)
-        if not isinstance(card, BuildingCard):
-            continue
-        if b_inst.base_card_id == "saracinesca":
-            max_dif += 2 if b_inst.completed else 1
-        elif b_inst.base_card_id == "catapulta":
-            max_git += 2 if b_inst.completed else 1
-
-    return max_dif, max_git
+    bonus = battle_building_bonus(defender)
+    return max_dif + bonus["dif"], max_git + bonus["git"]
 
 
 # ---------------------------------------------------------------------------

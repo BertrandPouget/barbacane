@@ -868,6 +868,8 @@ def arena_activate(
     Non consuma Azione. Usabile una sola volta per turno per Arena.
     """
     player = _require_current_player(state, player_id)
+    if state.phase not in ("action", "schieramento"):
+        raise ActionError("L'Arena si può usare solo prima della Battaglia.")
 
     arena = next(
         (b for b in player.field.village.buildings

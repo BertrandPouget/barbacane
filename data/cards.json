@@ -833,7 +833,7 @@
       "cost": 2,
       "cost_type": "mana",
       "completion_cost": 2,
-      "base_effect": "Una volta per turno, puoi scartare un tuo Guerriero e uno con una Caratteristica più bassa.",
+      "base_effect": "Una volta per turno, prima della Battaglia, puoi scartare un tuo Guerriero e uno con una Caratteristica più bassa.",
       "complete_effect": "& Se hai scartato un Eroe avversario, scarta anche la sua Recluta e le carte assegnate.",
       "complete_is_additive": true,
       "effect_id": "arena_effect",
