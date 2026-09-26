@@ -63,7 +63,7 @@ const Mob = (() => {
   // ---------------------------------------------------------------------------
 
   async function init() {
-    Sparks.init({ sizeFactor: 0.42 });
+    Sparks.init({ sizeFactor: 0.42, density: 2.5 });
     BgMusic.init();
     await loadCardDefs();
     bindLobbyUI();

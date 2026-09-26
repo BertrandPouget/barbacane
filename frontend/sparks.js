@@ -30,6 +30,7 @@ const Sparks = (() => {
 
   let canvas, ctx, w, h;
   let sizeFactor = 1;   // < 1 sui client con schermo piccolo (vedi init)
+  let density = 1;      // > 1 fa nascere più brandelli (vedi init)
   let chunkMask = null;
   let sprites = [];
   let particles = [];
@@ -45,10 +46,13 @@ const Sparks = (() => {
 
   // options.sizeFactor rimpicciolisce i brandelli: sullo schermo del telefono
   // le stesse dimensioni del desktop occupano troppa larghezza.
+  // options.density moltiplica rate e tetto di particelle: brandelli più
+  // piccoli, a parità di numero, sembrerebbero troppo radi.
   function init(options = {}) {
     canvas = document.getElementById('sparks-canvas');
     if (!canvas) return;
     if (options.sizeFactor) sizeFactor = options.sizeFactor;
+    if (options.density) density = options.density;
     ctx = canvas.getContext('2d');
     buildSprites();
     resize();
@@ -168,14 +172,14 @@ const Sparks = (() => {
 
   function spawnParticle() {
     const cfg = CONFIG[intensity];
-    if (particles.length >= cfg.maxParticles) return;
+    if (particles.length >= cfg.maxParticles * density) return;
     particles.push(makeParticle(cfg));
   }
 
   // All'avvio il campo è vuoto: pre-distribuiamo qualche brandello già in volo.
   function prime() {
     const cfg = CONFIG[intensity];
-    const n = Math.floor(cfg.maxParticles * 0.5);
+    const n = Math.floor(cfg.maxParticles * density * 0.5);
     for (let i = 0; i < n; i++) {
       const p = makeParticle(cfg);
       p.y = Math.random() * h;
@@ -193,8 +197,9 @@ const Sparks = (() => {
 
     const cfg = CONFIG[intensity];
     spawnAccumulator += dt;
-    while (spawnAccumulator > cfg.spawnIntervalMs) {
-      spawnAccumulator -= cfg.spawnIntervalMs;
+    const interval = cfg.spawnIntervalMs / density;
+    while (spawnAccumulator > interval) {
+      spawnAccumulator -= interval;
       spawnParticle();
     }
 
