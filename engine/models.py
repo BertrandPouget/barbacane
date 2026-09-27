@@ -5,7 +5,7 @@ Rappresentano carte, istanze, giocatori e stato di gioco.
 
 from __future__ import annotations
 from typing import Dict, List, Optional, Any
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -362,8 +362,19 @@ class GameState(BaseModel):
     pending_interactions: List[Dict[str, Any]] = Field(default_factory=list)  # queue of building interactions awaiting player choice
     turn_timer: int = 0  # secondi per turno; 0 = disattivato (default)
     tutorial: Optional[Dict[str, Any]] = None  # {"tutorial_id": str, "step_index": int, "completed": bool}
-    bot_player_id: Optional[str] = None  # id del giocatore controllato dal Bot, se partita di pratica
-    bot_difficulty: str = "normal"  # "easy" | "normal" | "hard"
+    bot_player_ids: List[str] = Field(default_factory=list)  # giocatori controllati dai Bot (partita di pratica)
+    bot_difficulty: str = "normal"  # "easy" | "normal" | "hard", uguale per tutti i Bot
+
+    @model_validator(mode="before")
+    @classmethod
+    def _legacy_single_bot(cls, data: Any) -> Any:
+        # Partite di pratica salvate quando esisteva un solo Bot (campo bot_player_id)
+        if isinstance(data, dict) and data.get("bot_player_id") and not data.get("bot_player_ids"):
+            data = {**data, "bot_player_ids": [data["bot_player_id"]]}
+        return data
+
+    def is_bot(self, player_id: str) -> bool:
+        return player_id in self.bot_player_ids
 
     @property
     def current_player(self) -> Player:

@@ -103,30 +103,33 @@ def create_game(player_names: List[str], game_id: Optional[str] = None) -> GameS
     return state
 
 
-def create_practice_game(player_name: str, difficulty: str = "normal", game_id: Optional[str] = None) -> GameState:
+def create_practice_game(player_name: str, difficulty: str = "normal", game_id: Optional[str] = None,
+                         num_bots: int = 1) -> GameState:
     """
-    Crea una partita di pratica in solitaria contro un Bot (regole e mazzo
-    reali, non scriptati). Il giocatore umano parte sempre per primo, per
-    un'esperienza più diretta subito dopo i tutorial.
+    Crea una partita di pratica in solitaria contro 1–3 Bot (regole e mazzo
+    reali, non scriptati), tutti della stessa difficoltà. Il giocatore umano
+    parte sempre per primo, per un'esperienza più diretta subito dopo i tutorial.
     """
     if difficulty not in ("easy", "normal", "hard"):
         difficulty = "normal"
+    num_bots = max(1, min(3, num_bots))
     if game_id is None:
         game_id = f"vs-{uuid.uuid4().hex[:8]}"
 
-    state = create_game([player_name or "Tu", "Bot"], game_id=game_id)
+    bot_names = ["Bot"] if num_bots == 1 else [f"Bot {i + 1}" for i in range(num_bots)]
+    state = create_game([player_name or "Tu", *bot_names], game_id=game_id)
 
     if state.current_player_index != 0:
-        # create_game ha scelto a caso il Bot come primo giocatore: annulla il
+        # create_game ha scelto a caso un Bot come primo giocatore: annulla il
         # suo inizio turno e rifallo per il giocatore umano.
-        bot = state.players[1]
+        bot = state.current_player
         bot.mana_remaining = 0
         bot.actions_remaining = 2
         state.current_player_index = 0
         _begin_turn(state)
     state.first_player_index = 0
     state.turn_timer = 0
-    state.bot_player_id = state.players[1].id
+    state.bot_player_ids = [p.id for p in state.players[1:]]
     state.bot_difficulty = difficulty
     return state
 
@@ -744,8 +747,8 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
         "search_deck": search_deck,
         "pending_interactions": state.pending_interactions,
         "tutorial": _tutorial_view(state),
-        "bot_player_id": state.bot_player_id,
-        "bot_difficulty": state.bot_difficulty if state.bot_player_id else None,
+        "bot_player_ids": list(state.bot_player_ids),
+        "bot_difficulty": state.bot_difficulty if state.bot_player_ids else None,
     }
 
 

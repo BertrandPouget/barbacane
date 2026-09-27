@@ -268,18 +268,33 @@ const Mob = (() => {
     $('btn-mode-multi').addEventListener('click', () => { haptic(); Screens.show('multi'); });
     $('multi-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
     $('bot-diff-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
+    document.querySelectorAll('.bot-count-btn').forEach(btn => {
+      btn.addEventListener('click', () => { haptic(); selectBotCount(parseInt(btn.dataset.bots, 10)); });
+    });
     document.querySelectorAll('.difficulty-card').forEach(card => {
       card.addEventListener('click', () => { haptic(); startPracticeGame(card.dataset.difficulty); });
     });
   }
 
   // ---------------------------------------------------------------------------
-  // Partita di pratica contro un Bot (partita reale, non scriptata)
+  // Partita di pratica contro 1–3 Bot (partita reale, non scriptata)
   // ---------------------------------------------------------------------------
+
+  let practiceBotCount = 1;
+
+  function selectBotCount(n) {
+    practiceBotCount = n;
+    document.querySelectorAll('.bot-count-btn').forEach(btn => {
+      const on = parseInt(btn.dataset.bots, 10) === n;
+      btn.classList.toggle('selected', on);
+      btn.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+    document.querySelector('.bot-count-hint').textContent = `Partita da ${n + 1} giocatori`;
+  }
 
   async function startPracticeGame(difficulty) {
     try {
-      const res = await api('/practice/start', { player_name: 'Tu', difficulty });
+      const res = await api('/practice/start', { player_name: 'Tu', difficulty, num_bots: practiceBotCount });
       sessionToken = res.session_token;
       myPlayerId = res.player_id;
       gameId = res.game_id;

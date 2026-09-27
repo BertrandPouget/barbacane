@@ -245,11 +245,14 @@ async def api_start_tutorial(req: TutorialStartRequest):
 class PracticeStartRequest(BaseModel):
     player_name: str = "Tu"
     difficulty: str = "normal"  # "easy" | "normal" | "hard"
+    num_bots: int = 1  # 1–3: partita da 2 a 4 giocatori
 
 
 @router.post("/practice/start")
 async def api_start_practice(req: PracticeStartRequest):
-    state = create_practice_game(req.player_name, req.difficulty)
+    if not 1 <= req.num_bots <= 3:
+        raise HTTPException(400, "I Bot possono essere da 1 a 3.")
+    state = create_practice_game(req.player_name, req.difficulty, num_bots=req.num_bots)
 
     session_token = generate_session_token()
     # La riga del giocatore ha una FK su games(game_id): la partita va salvata
@@ -546,13 +549,13 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
         if tut_result:
             result["tutorial"] = tut_result
 
-    # Partita di pratica contro il Bot: risolvi subito ogni interazione/ricerca
-    # pendente che lo riguarda (es. Magiscudo contro una tua Magia, anche nel
-    # tuo stesso turno). Se ora tocca a lui, il suo turno NON si gioca qui:
+    # Partita di pratica contro i Bot: risolvi subito ogni interazione/ricerca
+    # pendente che li riguarda (es. Magiscudo contro una tua Magia, anche nel
+    # tuo stesso turno). Se ora tocca a un Bot, il suo turno NON si gioca qui:
     # lo avvia _schedule_bot_turn dopo il salvataggio, così il giocatore
     # vede prima il passaggio di turno e poi le mosse del Bot.
-    if state.bot_player_id and not state.winner_id:
-        _auto_resolve_bot_pending(state, state.bot_player_id)
+    if state.bot_player_ids and not state.winner_id:
+        _auto_resolve_bot_pending(state)
 
     return result
 
@@ -578,12 +581,17 @@ _bot_tasks: set = set()
 
 
 def _schedule_bot_turn(state) -> None:
-    """Se in questa partita di pratica tocca al Bot, avvia il suo turno in
-    background (una sola volta per partita). Va chiamata DOPO aver salvato e
-    inviato lo stato: il turno del Bot riparte dallo stato salvato."""
-    if not state.bot_player_id or state.winner_id:
+    """Se in questa partita di pratica tocca a un Bot, avvia il suo turno in
+    background (un solo turno alla volta per partita). Va chiamata DOPO aver
+    salvato e inviato lo stato: il turno del Bot riparte dallo stato salvato.
+    Con più Bot di fila, ognuno avvia il successivo al termine del proprio."""
+    if not state.bot_player_ids or state.winner_id:
         return
-    if state.current_player.id != state.bot_player_id or state.game_id in _bot_turns_running:
+    if not state.is_bot(state.current_player.id) or state.game_id in _bot_turns_running:
+        return
+    # Senza nessun umano connesso i Bot non giocano da soli tra loro: la
+    # partita riprende dal punto in cui era alla riconnessione.
+    if not manager.connected_players(state.game_id):
         return
     _bot_turns_running.add(state.game_id)
     task = asyncio.create_task(_play_bot_turn(state.game_id))
@@ -594,15 +602,15 @@ def _schedule_bot_turn(state) -> None:
 async def _play_bot_turn(game_id: str) -> None:
     loop = asyncio.get_running_loop()
     started = loop.time()
+    state = None
     try:
         state = load_game(game_id)
-        if state is None or state.winner_id or not state.bot_player_id:
+        if state is None or state.winner_id or not state.is_bot(state.current_player.id):
+            state = None
             return
-        if state.current_player.id != state.bot_player_id:
-            return
-        # Il calcolo gira in un thread: 'expert' può impiegare qualche decimo
+        # Il calcolo gira in un thread: 'hard' può impiegare qualche decimo
         # di secondo e non deve bloccare il server per le altre partite.
-        await asyncio.to_thread(_run_bot_turn, state, state.bot_player_id)
+        await asyncio.to_thread(_run_bot_turn, state, state.current_player.id)
         remaining = _BOT_THINK_SECONDS - (loop.time() - started)
         if remaining > 0:
             await asyncio.sleep(remaining)
@@ -618,23 +626,26 @@ async def _play_bot_turn(game_id: str) -> None:
             })
     except Exception as e:
         logger.error("[bot] Errore nel turno del Bot %s: %s", game_id, e)
+        state = None
     finally:
         _bot_turns_running.discard(game_id)
+    if state is not None:
+        _schedule_bot_turn(state)
 
 
 def _run_bot_turn(state, bot_id: str) -> None:
     """Gioca l'intero turno del Bot (partita di pratica), risolvendo anche
-    eventuali interazioni pendenti che genera."""
+    eventuali interazioni pendenti che genera, sue o degli altri Bot."""
     guard = 0
     while state.current_player.id == bot_id and not state.winner_id and guard < 20:
         guard += 1
         run_bot_turn(state, state.bot_difficulty)
-        _auto_resolve_bot_pending(state, bot_id)
+        _auto_resolve_bot_pending(state)
 
 
-def _auto_resolve_bot_pending(state, bot_id: str) -> None:
+def _auto_resolve_bot_pending(state) -> None:
     """Risolve automaticamente qualsiasi pending_search o pending_interactions
-    che riguardi il Bot, con scelte semplici di default, così una partita di
+    che riguardi un Bot, con scelte semplici di default, così una partita di
     pratica non resta mai bloccata in attesa di un input che il Bot non può dare."""
     from engine.cards import get_card, WarriorCard
 
@@ -642,11 +653,14 @@ def _auto_resolve_bot_pending(state, bot_id: str) -> None:
     while guard < 20:
         guard += 1
 
-        if state.pending_search and state.pending_search.get("player_id") == bot_id:
-            _resolve_search_action(state, bot_id, None)
+        search_owner = state.pending_search.get("player_id") if state.pending_search else None
+        if search_owner and state.is_bot(search_owner):
+            _resolve_search_action(state, search_owner, None)
             continue
 
-        if state.pending_interactions and state.pending_interactions[0].get("player_id") == bot_id:
+        pending_owner = state.pending_interactions[0].get("player_id") if state.pending_interactions else None
+        if pending_owner and state.is_bot(pending_owner):
+            bot_id = pending_owner
             pending = state.pending_interactions[0]
             ptype = pending.get("type")
             player = state.get_player(bot_id)

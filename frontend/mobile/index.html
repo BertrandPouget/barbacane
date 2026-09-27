@@ -46,7 +46,7 @@
     <button id="btn-mode-single" class="home-mode">
       <span class="home-mode-title">Giocatore Singolo</span>
       <span class="home-mode-art"><img src="/assets/home/patrizio.png" alt="" class="art-patrizio" /></span>
-      <span class="home-mode-desc">Una partita completa contro il computer, con quattro livelli di difficoltà.</span>
+      <span class="home-mode-desc">Una partita completa contro il computer, con tre livelli di difficoltà.</span>
     </button>
     <button id="btn-mode-multi" class="home-mode">
       <span class="home-mode-title">Multigiocatore</span>
@@ -121,6 +121,15 @@
     <span class="cat-title">Giocatore singolo</span>
   </header>
   <div id="bot-diff-scroll">
+    <div class="bot-count-row">
+      <span class="bot-count-label">Avversari</span>
+      <div class="bot-count-options" role="radiogroup" aria-label="Numero di Bot avversari">
+        <button class="bot-count-btn selected" data-bots="1" role="radio" aria-checked="true">1</button>
+        <button class="bot-count-btn" data-bots="2" role="radio" aria-checked="false">2</button>
+        <button class="bot-count-btn" data-bots="3" role="radio" aria-checked="false">3</button>
+      </div>
+      <span class="bot-count-hint">Partita da 2 giocatori</span>
+    </div>
     <button class="difficulty-card difficulty-easy" data-difficulty="easy">
       <div class="difficulty-card-title">🟢 Facile</div>
       <div class="difficulty-card-desc">Valuta le carte una alla volta e non sceglie sempre la mossa migliore. Ottimo per i primi passi dopo i tutorial.</div>
@@ -131,7 +140,7 @@
     </button>
     <button class="difficulty-card difficulty-hard" data-difficulty="hard">
       <div class="difficulty-card-title">🔴 Difficile</div>
-      <div class="difficulty-card-desc">Simula l'intero turno, stima le mosse possibili dell'avversario e bilancia attacco e difesa dei Bastioni.</div>
+      <div class="difficulty-card-desc">Simula l'intero turno, stima le mosse possibili degli avversari e bilancia attacco e difesa dei Bastioni.</div>
     </button>
   </div>
 </section>

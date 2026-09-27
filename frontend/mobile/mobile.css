@@ -1893,6 +1893,39 @@ input {
   gap: 10px;
 }
 
+.bot-count-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 2px 2px 4px;
+}
+.bot-count-label {
+  color: var(--card-cream);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  font-size: 0.8rem;
+}
+.bot-count-options {
+  display: inline-flex;
+  border: 1px solid var(--border-gold);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.bot-count-btn {
+  min-width: 44px;
+  min-height: 40px;
+  background: var(--bg-medium);
+  color: var(--text);
+  border-right: 1px solid var(--border-gold);
+  font-size: 1rem;
+  font-weight: 700;
+}
+.bot-count-btn:last-child { border-right: none; }
+.bot-count-btn.selected { background: var(--gold); color: var(--bg-dark); }
+.bot-count-hint { color: var(--text-dim); font-style: italic; font-size: 0.78rem; }
+
 .difficulty-card {
   display: block;
   width: 100%;

@@ -29,6 +29,12 @@ Tre difficoltà:
             Riposizionamento (_optimize_reposition) bilancia quindi attacco
             di questo turno e difesa del prossimo, invece di ammassare tutto
             in Avanscoperta.
+
+Partite da 3–4 giocatori: ogni Bastione è esposto solo al vicino vivo da
+quel lato (vedi battle.adjacent_bastions), quindi la minaccia è stimata per
+vicino e per lato, la Battaglia considera solo i Bastioni adiacenti e le
+Magie scelgono come bersaglio l'avversario più vicino all'eliminazione. Con
+un solo avversario tutto si riduce al comportamento 1 contro 1.
 """
 
 from __future__ import annotations
@@ -52,6 +58,7 @@ from engine.actions import (
     reposition_warrior,
 )
 from engine.battle import (
+    adjacent_bastions,
     get_valid_attack_targets,
     attacker_stats,
     defender_stats,
@@ -241,23 +248,23 @@ def _evaluate_outcome(sim: GameState, player_id: str, difficulty: str,
         threat = _ThreatModel(sim, player_id)
 
     turn_sim = _sim_copy(sim)
-    opponent = _opponent(turn_sim, player_id)
-    lives_before = opponent.lives
-    walls_before = len(opponent.field.bastion_left.walls) + len(opponent.field.bastion_right.walls)
+    before = {o.id: (o.lives, _total_walls(o)) for o in _opponents(turn_sim, player_id)}
 
     _optimize_reposition(turn_sim, player_id, threat)
     _bot_try_horde(turn_sim, turn_sim.get_player(player_id))
     _bot_battle(turn_sim, player_id, smart=True)
 
-    opponent = turn_sim.get_player(opponent.id)
-    if not opponent.is_alive:
+    if not _opponents(turn_sim, player_id):
         return 1000.0
-    lives_lost = lives_before - opponent.lives
-    walls_lost = walls_before - (len(opponent.field.bastion_left.walls) + len(opponent.field.bastion_right.walls))
 
     value = _evaluate_board(turn_sim, player_id)
-    value += lives_lost * _LIFE_VALUE + max(0, walls_lost) * _WALL_VALUE
-    value -= threat.expected_loss(turn_sim.get_player(player_id), opponent)
+    for oid, (lives_before, walls_before) in before.items():
+        opponent = turn_sim.get_player(oid)
+        if not opponent.is_alive:
+            value += _ELIMINATION_VALUE
+        value += (lives_before - opponent.lives) * _LIFE_VALUE
+        value += max(0, walls_before - _total_walls(opponent)) * _WALL_VALUE
+    value -= threat.expected_loss(turn_sim, turn_sim.get_player(player_id))
     return value
 
 
@@ -281,7 +288,7 @@ def _generate_candidates(state: GameState, player_id: str, difficulty: str = "ea
     via via più grossi, Orde, Evoluzioni) rispetto a 'easy', che pesa quasi
     solo l'efficienza statistiche/costo."""
     player = state.get_player(player_id)
-    opponent = _opponent(state, player_id)
+    spell_targets = _spell_target_order(state, player)
     planner = difficulty in ("normal", "hard")
     candidates: List[Tuple[float, ActionSpec]] = []
 
@@ -328,18 +335,22 @@ def _generate_candidates(state: GameState, player_id: str, difficulty: str = "ea
             if card.effect_id in _SPELL_EFFECT_EXCLUDE:
                 continue
             mages_count = len(player.mages_in_field())
-            if mages_count >= card.cost:
-                score = _score_spell(card, player)
-                kwargs = _default_spell_kwargs(player, opponent)
-                candidates.append((score, ("play_spell", iid, kwargs)))
-                if difficulty == "hard":
-                    # Il Bastione bersaglio "più debole per DIF" non è sempre
-                    # il migliore (es. Ardolancio conviene dove ci sono meno
-                    # Muri): la simulazione prova anche l'altro.
-                    other = "right" if kwargs["target_bastion_side"] == "left" else "left"
-                    candidates.append((score * 0.99, ("play_spell", iid, {
-                        **kwargs, "target_bastion_side": other, "dest_bastion_side": other,
-                    })))
+            if mages_count >= card.cost and spell_targets:
+                base_score = _score_spell(card, player)
+                # 'easy'/'normal' puntano solo l'avversario prioritario; 'hard'
+                # lascia che la simulazione valuti anche gli altri.
+                for rank, target in enumerate(spell_targets if difficulty == "hard" else spell_targets[:1]):
+                    score = base_score * (1 - 0.02 * rank)
+                    kwargs = _default_spell_kwargs(player, target)
+                    candidates.append((score, ("play_spell", iid, kwargs)))
+                    if difficulty == "hard":
+                        # Il Bastione bersaglio "più debole per DIF" non è sempre
+                        # il migliore (es. Ardolancio conviene dove ci sono meno
+                        # Muri): la simulazione prova anche l'altro.
+                        other = "right" if kwargs["target_bastion_side"] == "left" else "left"
+                        candidates.append((score * 0.99, ("play_spell", iid, {
+                            **kwargs, "target_bastion_side": other, "dest_bastion_side": other,
+                        })))
 
     # Evolvi: Recluta già in campo + il suo Eroe in mano
     for iid in player.hand:
@@ -619,6 +630,18 @@ def _weaker_bastion_side(player: Player) -> str:
 # Magie: bundle di kwargs "ragionevoli" per il targeting più comune
 # ---------------------------------------------------------------------------
 
+def _spell_target_order(state: GameState, player: Player) -> List[Player]:
+    """Avversari vivi in ordine di priorità come bersaglio delle Magie: prima
+    chi è più vicino all'eliminazione (meno Vite, poi meno Muri), a parità
+    un vicino, che il Bot può anche attaccare in Battaglia."""
+    idx = next(i for i, p in enumerate(state.players) if p.id == player.id)
+    neighbors = {state.players[i].id for i, _ in adjacent_bastions(idx, state.players).values()}
+    return sorted(
+        _opponents(state, player.id),
+        key=lambda o: (o.lives, _total_walls(o), o.id not in neighbors),
+    )
+
+
 def _default_spell_kwargs(player: Player, opponent: Player) -> dict:
     weak_side = _weaker_enemy_bastion_side(opponent)
     kwargs: dict = {
@@ -675,6 +698,7 @@ def _weaker_enemy_bastion_side(opponent: Player) -> str:
 # Valori nella stessa scala di _evaluate_board
 _LIFE_VALUE = 10.0
 _LETHAL_VALUE = 40.0      # l'ultima Vita: perderla significa perdere la partita
+_ELIMINATION_VALUE = 20.0  # eliminare un avversario quando ne restano altri (3–4 giocatori)
 _WALL_VALUE = 1.0
 _NEW_HORDE_VALUE = 3.0    # Orda che si forma riposizionando (attivata subito dopo)
 
@@ -732,44 +756,99 @@ def _player_defense(player: Player) -> List[Tuple[int, int, List[int]]]:
 
 
 def _next_turn_mana(state: GameState, player: Player) -> int:
+    """Mana di `player` al suo prossimo turno, visto dal turno corrente."""
     if player.skip_mana_next_turn:
         return 0
-    idx = next(i for i, p in enumerate(state.players) if p.id == player.id)
-    # state.turn avanza quando tocca di nuovo a chi apre il round
-    turn = state.turn + (1 if idx == state.first_player_index else 0)
+    n = len(state.players)
+    target = next(i for i, p in enumerate(state.players) if p.id == player.id)
+    # state.turn avanza quando tocca di nuovo a chi apre il round: conta se
+    # tra il giocatore corrente e `player` si passa da chi apre il round.
+    turn, j = state.turn, state.current_player_index
+    while j != target:
+        j = (j + 1) % n
+        if j == state.first_player_index:
+            turn += 1
     return state.mana_for_turn(turn)
 
 
 class _ThreatModel:
-    """Stima quanto l'avversario può farmi perdere nel SUO prossimo turno.
+    """Stima quanto i vicini possono farmi perdere nei loro prossimi turni.
+
+    Ogni mio Bastione è esposto solo al vicino vivo da quel lato; con un solo
+    avversario, lui minaccia entrambi. La minaccia di ogni vicino è stimata
+    da un _OpponentThreat, creato alla prima richiesta, e le perdite dei due
+    lati si sommano (i vicini giocano entrambi prima del mio prossimo turno).
+
+    Le carte che il bot non vede (mazzo, mani, Muri e Vite coperti di tutti
+    gli avversari) formano un unico insieme da cui è campionata la mano di
+    ciascun avversario."""
+
+    def __init__(self, state: GameState, player_id: str):
+        self._state = state
+        unseen = list(state.deck)
+        for other in state.players:
+            if other.id == player_id:
+                continue
+            unseen += other.hand + other.life_cards
+            unseen += [w.instance_id for b in (other.field.bastion_left, other.field.bastion_right) for w in b.walls]
+        self._unseen = [get_base_card_id(iid) for iid in unseen]
+        self._models: Dict[str, _OpponentThreat] = {}
+
+    def _model(self, opponent_id: str) -> "_OpponentThreat":
+        model = self._models.get(opponent_id)
+        if model is None:
+            opponent = self._state.get_player(opponent_id)
+            model = _OpponentThreat(self._unseen, len(opponent.hand), _next_turn_mana(self._state, opponent))
+            self._models[opponent_id] = model
+        return model
+
+    def expected_loss(self, state: GameState, player: Player,
+                      defense: Optional[List[Tuple[int, int, List[int]]]] = None) -> float:
+        """Perdita attesa di `player` ai prossimi turni dei suoi vicini in
+        `state`, con la difesa data (di default quella attuale del campo)."""
+        if defense is None:
+            defense = _player_defense(player)
+        idx = next(i for i, p in enumerate(state.players) if p.id == player.id)
+        adj = adjacent_bastions(idx, state.players)
+        # Il vicino di sinistra minaccia il mio Bastione sinistro (defense[0]),
+        # quello di destra il destro (defense[1]).
+        sides_by_opponent: Dict[int, List[int]] = {}
+        sides_by_opponent.setdefault(adj["left_attacks"][0], []).append(0)
+        sides_by_opponent.setdefault(adj["right_attacks"][0], []).append(1)
+        total = 0.0
+        for opp_idx, sides in sides_by_opponent.items():
+            opponent = state.players[opp_idx]
+            if opp_idx == idx or not opponent.is_alive:
+                continue
+            total += self._model(opponent.id).expected_loss(player, opponent, [defense[s] for s in sides])
+        return total
+
+
+class _OpponentThreat:
+    """Stima quanto UN avversario può farmi perdere nel SUO prossimo turno.
 
     Conta le carte come un giocatore esperto: la composizione del mazzo è
-    nota, quindi le carte che il bot non vede (mazzo, mano avversaria, Muri e
-    Vite coperti dell'avversario) formano un unico insieme da cui la mano
-    avversaria è estratta a caso. Il bot NON guarda la mano vera: ne campiona
-    SAMPLES possibili con la dimensione pubblica della mano, e per ognuna
-    calcola il miglior attacco disponibile all'avversario col Mana del suo
-    prossimo turno (Guerrieri o Evoluzioni da schierare, Ariete/Catapulta,
+    nota, quindi le carte che il bot non vede formano un unico insieme da cui
+    la mano avversaria è estratta a caso. Il bot NON guarda la mano vera: ne
+    campiona SAMPLES possibili con la dimensione pubblica della mano, e per
+    ognuna calcola il miglior attacco disponibile all'avversario col Mana del
+    suo prossimo turno (Guerrieri o Evoluzioni da schierare, Ariete/Catapulta,
     Ardolancio/Guerremoto per scartare Muri prima della Battaglia), sapendo
     che potrà riposizionare in Avanscoperta tutti i Guerrieri che ha in campo.
     La perdita attesa è la media, sui campioni, del suo attacco migliore
-    contro il mio Bastione più conveniente."""
+    contro il più conveniente dei miei Bastioni esposti a lui."""
 
     SAMPLES = 100
 
-    def __init__(self, state: GameState, player_id: str):
-        opponent = _opponent(state, player_id)
-        hidden_walls = [w.instance_id for b in (opponent.field.bastion_left, opponent.field.bastion_right) for w in b.walls]
-        unseen = list(state.deck) + list(opponent.hand) + hidden_walls + list(opponent.life_cards)
-        bases = [get_base_card_id(iid) for iid in unseen]
-        k = min(len(opponent.hand), len(bases))
+    def __init__(self, unseen_bases: List[str], hand_size: int, mana: int):
+        k = min(hand_size, len(unseen_bases))
         rng = random.Random()
         hands: Counter = Counter()
         for _ in range(self.SAMPLES):
-            hand = [b for b in rng.sample(bases, k) if self._relevant(b)]
+            hand = [b for b in rng.sample(unseen_bases, k) if self._relevant(b)]
             hands[tuple(sorted(hand))] += 1
         self.hands = list(hands.items())
-        self.mana = _next_turn_mana(state, opponent)
+        self.mana = mana
         self._cache: Dict[tuple, tuple] = {}
 
     @staticmethod
@@ -854,11 +933,9 @@ class _ThreatModel:
         return cached
 
     def expected_loss(self, player: Player, opponent: Player,
-                      defense: Optional[List[Tuple[int, int, List[int]]]] = None) -> float:
-        """Perdita attesa di `player` al prossimo turno di `opponent`, con la
-        difesa data (di default quella attuale del campo)."""
-        if defense is None:
-            defense = _player_defense(player)
+                      defense: List[Tuple[int, int, List[int]]]) -> float:
+        """Perdita attesa di `player` al prossimo turno di `opponent`, sui
+        Bastioni esposti a lui (`defense`)."""
         fossato = _fossato_threshold(player)
         lives = player.lives
         options, samples = self._options(opponent)
@@ -874,18 +951,32 @@ class _ThreatModel:
         return total / self.SAMPLES
 
 
-def _attack_value(state: GameState, player: Player, opponent: Player, vanguard: List[WarriorInstance]) -> float:
-    """Perdita che la Battaglia di questo turno infliggerebbe all'avversario
-    con questa Avanscoperta, sul suo Bastione più conveniente."""
-    if state.battles_remaining <= 0 or not vanguard or opponent.turns_completed < 1:
+def _battle_targets(state: GameState, player: Player) -> List[Tuple[Player, str]]:
+    """Bastioni avversari attaccabili in Battaglia da `player`, a prescindere
+    dall'Avanscoperta attuale (serve a valutare disposizioni ipotetiche):
+    quelli adiacenti, o tutti con Guerremoto. Fossato escluso, dipende dalla GIT."""
+    guerremoto = any(e.get("type") == "guerremoto" and e.get("any_target") for e in player.active_effects)
+    if guerremoto:
+        pairs = [(p, side) for p in state.players if p.id != player.id for side in ("left", "right")]
+    else:
+        idx = next(i for i, p in enumerate(state.players) if p.id == player.id)
+        pairs = [(state.players[i], side) for i, side in adjacent_bastions(idx, state.players).values()]
+    return [(p, side) for p, side in pairs
+            if p.id != player.id and p.is_alive and p.turns_completed >= 1]
+
+
+def _attack_value(state: GameState, player: Player, vanguard: List[WarriorInstance]) -> float:
+    """Perdita che la Battaglia di questo turno infliggerebbe con questa
+    Avanscoperta, sul Bastione attaccabile più conveniente."""
+    if state.battles_remaining <= 0 or not vanguard:
         return 0.0
     bonus = battle_building_bonus(player)
     att = max(w.effective_att() for w in vanguard) + bonus["att"]
     git = max(w.effective_git() for w in vanguard) + bonus["git"]
-    if git < _fossato_threshold(opponent):
-        return 0.0
     best = 0.0
-    for side in ("left", "right"):
+    for opponent, side in _battle_targets(state, player):
+        if git < _fossato_threshold(opponent):
+            continue
         dif, dgit = defender_stats(opponent, side)
         _, _, damage = calculate_damage(att, git, dif, dgit)
         walls = opponent.field.bastion_left.walls if side == "left" else opponent.field.bastion_right.walls
@@ -903,7 +994,6 @@ def _optimize_reposition(state: GameState, player_id: str, threat: _ThreatModel)
     un'intera Specie alla volta finché migliora. I Guerrieri di un'Orda già
     attiva non si toccano (spostarli la romperebbe, perdendone l'effetto)."""
     player = state.get_player(player_id)
-    opponent = _opponent(state, player_id)
     regions = {
         "vanguard": player.field.vanguard,
         "bastion_left": player.field.bastion_left.warriors,
@@ -936,8 +1026,8 @@ def _optimize_reposition(state: GameState, player_id: str, threat: _ThreatModel)
             _side_defense(groups["bastion_left"], player.field.bastion_left, bonus),
             _side_defense(groups["bastion_right"], player.field.bastion_right, bonus),
         ]
-        value = _attack_value(state, player, opponent, groups["vanguard"])
-        value -= threat.expected_loss(player, opponent, defense)
+        value = _attack_value(state, player, groups["vanguard"])
+        value -= threat.expected_loss(state, player, defense)
         for zone, lst in groups.items():
             per_species = Counter(species[w.instance_id] for w in lst)
             value += sum(_NEW_HORDE_VALUE for sp, n in per_species.items() if n >= 3 and f"{zone}:{sp}" not in active)
@@ -1054,5 +1144,9 @@ def _bot_battle(state: GameState, player_id: str, smart: bool = False) -> None:
             pass
 
 
-def _opponent(state: GameState, player_id: str) -> Player:
-    return next(p for p in state.players if p.id != player_id)
+def _opponents(state: GameState, player_id: str) -> List[Player]:
+    return [p for p in state.players if p.id != player_id and p.is_alive]
+
+
+def _total_walls(player: Player) -> int:
+    return len(player.field.bastion_left.walls) + len(player.field.bastion_right.walls)

@@ -2231,6 +2231,43 @@ input:focus {
   width: 100%;
 }
 
+.bot-count-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+}
+.bot-count-label {
+  color: var(--card-cream);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-size: 0.85rem;
+}
+.bot-count-options {
+  display: inline-flex;
+  border: 1px solid var(--border-gold);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.bot-count-btn {
+  min-width: 2.8rem;
+  padding: 0.45rem 0.9rem;
+  background: var(--bg-medium);
+  color: var(--text);
+  border: none;
+  border-right: 1px solid var(--border-gold);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.bot-count-btn:last-child { border-right: none; }
+.bot-count-btn:hover { color: var(--gold-light); }
+.bot-count-btn.selected { background: var(--gold); color: var(--bg-dark, #171009); }
+.bot-count-hint { color: var(--text-dim); font-style: italic; font-size: 0.85rem; }
+
 .difficulty-card {
   display: block;
   text-align: left;
