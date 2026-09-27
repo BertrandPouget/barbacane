@@ -55,7 +55,7 @@ const Renderer = (() => {
 
     if (n === 2) {
       const opp = state.players.find(p => p.id !== myPlayerId);
-      topArea.appendChild(renderTopOpponent(opp, state, 'both'));
+      topArea.appendChild(renderTopOpponent(opp, state));
       leftStrip.classList.add('hidden');
       rightStrip.classList.add('hidden');
 
@@ -74,7 +74,7 @@ const Renderer = (() => {
       const rn     = state.players[(myIndex + 1) % 4]; // vicino destro
       const across = state.players[(myIndex + 2) % 4]; // di fronte
       const ln     = state.players[(myIndex + 3) % 4]; // vicino sinistro
-      topArea.appendChild(renderTopOpponent(across, state, 'across'));
+      topArea.appendChild(renderTopOpponent(across, state));
       leftStrip.classList.remove('hidden');
       rightStrip.classList.remove('hidden');
       leftStrip.appendChild(renderSideStrip(ln, state, 'left'));
@@ -85,13 +85,9 @@ const Renderer = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Campo avversario in cima (top-opponents) — specchiato
-  //
-  // role:
-  //   'both'          → 2p: entrambi i bastioni sono attack-target
-  //   'left-neighbor' → 3p mobile: B.D. (sx nel display) è adj al mio B.S.
-  //   'right-neighbor'→ 3p mobile: B.S. (dx nel display) è adj al mio B.D.
-  //   'across'        → 4p: nessun bastione adj; campo completo visibile ma non attaccabile
+  // Campo avversario in cima (top-opponents) — specchiato.
+  // I Bastioni attaccabili dipendono dai vicini VIVI: in 4p il giocatore di
+  // fronte diventa adiacente se un vicino laterale è eliminato.
   // ---------------------------------------------------------------------------
 
   function _guerremotoActive(state) {
@@ -99,7 +95,32 @@ const Renderer = (() => {
     return !!myPlayer && (myPlayer.active_effects || []).some(e => e.type === 'guerremoto' && e.any_target);
   }
 
-  function renderTopOpponent(player, state, role) {
+  // Vicini vivi più prossimi a sinistra e a destra: gli eliminati vengono saltati.
+  function _aliveNeighbors(state, myId) {
+    const ps = state.players;
+    const n = ps.length;
+    const i = ps.findIndex(p => p.id === myId);
+    const step = d => {
+      let j = i;
+      for (let k = 0; k < n - 1; k++) {
+        j = (j + d + n) % n;
+        if ((ps[j].lives ?? 0) > 0) return ps[j];
+      }
+      return null;
+    };
+    return { left: step(-1), right: step(1) };
+  }
+
+  // Chiavi "playerId:side" dei Bastioni avversari attaccabili dal mio campo.
+  function _adjacentKeys(state) {
+    const { left, right } = _aliveNeighbors(state, _myPlayerId);
+    const keys = new Set();
+    if (right && right.id !== _myPlayerId) keys.add(`${right.id}:left`);
+    if (left && left.id !== _myPlayerId) keys.add(`${left.id}:right`);
+    return keys;
+  }
+
+  function renderTopOpponent(player, state) {
     const isActive = player.id === state.current_player_id;
     const div = el('div', { className: `opponent-field${isActive ? ' active-player' : ''}`,
       dataset: { playerId: player.id } });
@@ -117,11 +138,11 @@ const Renderer = (() => {
     div.appendChild(infoRow);
 
     // Bastioni SPECCHIATI: B.D. a sinistra, B.S. a destra
-    // isAdj: across → nessuno; both → tutti; left-neighbor → solo sx; right-neighbor → solo dx
     // Con Guerremoto attivo (any_target) tutti i Bastioni diventano bersagli validi.
     const guerremotoActive = _guerremotoActive(state);
-    const leftAdj  = guerremotoActive || role === 'both' || role === 'left-neighbor';
-    const rightAdj = guerremotoActive || role === 'both' || role === 'right-neighbor';
+    const adjKeys  = _adjacentKeys(state);
+    const leftAdj  = guerremotoActive || adjKeys.has(`${player.id}:right`);
+    const rightAdj = guerremotoActive || adjKeys.has(`${player.id}:left`);
 
     const row = el('div', { className: 'opp-regions-row' });
     row.appendChild(renderOppBastionCell(player.field.bastion_right, player.id, 'right', leftAdj));
@@ -191,12 +212,16 @@ const Renderer = (() => {
     const nonAdj_side   = mySide === 'left' ? 'left'  : 'right';
     const adjBastion    = mySide === 'left' ? player.field.bastion_right : player.field.bastion_left;
     const nonAdjBastion = mySide === 'left' ? player.field.bastion_left  : player.field.bastion_right;
-    const adjLabel    = mySide === 'left' ? 'Bastione D. (Possibile Bersaglio)' : 'Bastione S. (Possibile Bersaglio)';
-    // Con Guerremoto attivo (any_target) anche il Bastione non adiacente è un bersaglio valido.
+    // Il Bastione "vicino" è bersaglio solo se il giocatore è davvero un vicino vivo;
+    // quello lontano lo diventa con Guerremoto o se il cerchio si è stretto (es. 3p → 2 vivi).
     const guerremotoActive = _guerremotoActive(state);
-    const nonAdjLabel = guerremotoActive
-      ? (mySide === 'left' ? 'Bastione S. (Possibile Bersaglio)' : 'Bastione D. (Possibile Bersaglio)')
-      : (mySide === 'left' ? 'Bastione S.' : 'Bastione D.');
+    const adjKeys      = _adjacentKeys(state);
+    const adjTarget    = guerremotoActive || adjKeys.has(`${player.id}:${isAdj_side}`);
+    const nonAdjTarget = guerremotoActive || adjKeys.has(`${player.id}:${nonAdj_side}`);
+    const adjName      = mySide === 'left' ? 'Bastione D.' : 'Bastione S.';
+    const nonAdjName   = mySide === 'left' ? 'Bastione S.' : 'Bastione D.';
+    const adjLabel     = adjTarget    ? `${adjName} (Possibile Bersaglio)`    : adjName;
+    const nonAdjLabel  = nonAdjTarget ? `${nonAdjName} (Possibile Bersaglio)` : nonAdjName;
     const wrapper = el('div', { className: 'strip-player' +
       (player.id === state.current_player_id ? ' active-player-content' : '') });
 
@@ -226,9 +251,9 @@ const Renderer = (() => {
       wrapper.appendChild(vill);
     }
 
-    // Bastione NON adiacente (dimmer, in alto; diventa attack-target con Guerremoto attivo)
-    const nonAdj = el('div', { className: `strip-section nonadj${guerremotoActive ? ' attack-target' : ''}`,
-      dataset: guerremotoActive ? { targetPlayerId: player.id, targetSide: nonAdj_side } : {} });
+    // Bastione NON adiacente (dimmer, in alto)
+    const nonAdj = el('div', { className: `strip-section nonadj${nonAdjTarget ? ' attack-target' : ''}`,
+      dataset: nonAdjTarget ? { targetPlayerId: player.id, targetSide: nonAdj_side } : {} });
     nonAdj.appendChild(el('div', { className: 'strip-section-label' }, [nonAdjLabel]));
     nonAdj.appendChild(el('div', { className: 'opp-wall-count' }, [`🧱 ${nonAdjBastion.wall_count}`]));
     if (nonAdjBastion.warriors && nonAdjBastion.warriors.length > 0) {
@@ -248,9 +273,9 @@ const Renderer = (() => {
     }
     wrapper.appendChild(vg);
 
-    // Bastione ADIACENTE (in fondo, attack-target, margin-top:auto)
-    const adj = el('div', { className: 'strip-section adj attack-target',
-      dataset: { targetPlayerId: player.id, targetSide: isAdj_side } });
+    // Bastione ADIACENTE (in fondo, margin-top:auto)
+    const adj = el('div', { className: `strip-section adj${adjTarget ? ' attack-target' : ''}`,
+      dataset: adjTarget ? { targetPlayerId: player.id, targetSide: isAdj_side } : {} });
     adj.appendChild(el('div', { className: 'strip-section-label' }, [adjLabel]));
     adj.appendChild(el('div', { className: 'opp-wall-count' }, [`🧱 ${adjBastion.wall_count}`]));
     if (adjBastion.warriors && adjBastion.warriors.length > 0) {
@@ -289,14 +314,11 @@ const Renderer = (() => {
     document.getElementById('my-actions').textContent = `Azioni: ${player.actions_remaining ?? 0}`;
 
     // Etichette bastioni con nome del vicino che li minaccia
-    const n = state.players.length;
-    const myIndex = state.players.findIndex(p => p.id === myPlayerId);
-    const leftNeighbor  = state.players[(myIndex - 1 + n) % n];
-    const rightNeighbor = state.players[(myIndex + 1) % n];
+    const { left: leftNeighbor, right: rightNeighbor } = _aliveNeighbors(state, myPlayerId);
     document.getElementById('my-bastion-left').dataset.label  = 'Bastione Sinistro';
-    document.getElementById('my-bastion-left').dataset.sub    = `Esposto a ${leftNeighbor.name}`;
+    document.getElementById('my-bastion-left').dataset.sub    = leftNeighbor ? `Esposto a ${leftNeighbor.name}` : '';
     document.getElementById('my-bastion-right').dataset.label = 'Bastione Destro';
-    document.getElementById('my-bastion-right').dataset.sub   = `Esposto a ${rightNeighbor.name}`;
+    document.getElementById('my-bastion-right').dataset.sub   = rightNeighbor ? `Esposto a ${rightNeighbor.name}` : '';
 
     // Regioni
     renderRegion('my-vanguard', player.field.vanguard, 'warrior', true);

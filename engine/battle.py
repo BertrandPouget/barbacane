@@ -34,14 +34,14 @@ class ActionError(Exception):
 # Adiacenza
 # ---------------------------------------------------------------------------
 
-def adjacent_bastions(attacker_index: int, num_players: int) -> dict:
+def adjacent_bastions(attacker_index: int, players: List[Player]) -> dict:
     """
     Ritorna un dizionario con gli indici dei bastioni adiacenti.
 
     Il Bastione destro del giocatore X è adiacente al Bastione sinistro del
-    giocatore X+1 (seduto alla sua destra).
-    Il Bastione sinistro del giocatore X è adiacente al Bastione destro del
-    giocatore X-1 (seduto alla sua sinistra).
+    primo giocatore vivo alla sua destra; il Bastione sinistro al Bastione
+    destro del primo giocatore vivo alla sua sinistra. Gli eliminati vengono
+    saltati: il cerchio si stringe.
 
     Ritorna:
     {
@@ -49,8 +49,18 @@ def adjacent_bastions(attacker_index: int, num_players: int) -> dict:
         "left_attacks":  (defender_index, "right"),  # il mio sinistro attacca il destro del vicino di sinistra
     }
     """
-    right = (attacker_index + 1) % num_players
-    left = (attacker_index - 1) % num_players
+    n = len(players)
+
+    def _next_alive(step: int) -> int:
+        idx = attacker_index
+        for _ in range(n - 1):
+            idx = (idx + step) % n
+            if players[idx].is_alive:
+                return idx
+        return attacker_index
+
+    right = _next_alive(1)
+    left = _next_alive(-1)
     return {
         "right_attacks": (right, "left"),
         "left_attacks": (left, "right"),
@@ -73,7 +83,7 @@ def get_valid_attack_targets(state: GameState) -> List[Tuple[int, str]]:
     if not attacker.field.vanguard:
         return []
 
-    adj = adjacent_bastions(attacker_index, len(state.players))
+    adj = adjacent_bastions(attacker_index, state.players)
 
     # Controlla se Guerremoto è attivo (può attaccare qualsiasi bastione)
     guerremoto_active = any(

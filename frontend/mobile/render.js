@@ -201,14 +201,27 @@ const Render = (() => {
     ]);
   }
 
+  // Vicini vivi più prossimi a sinistra e a destra: gli eliminati vengono saltati.
+  function aliveNeighbors(state, myId) {
+    const ps = state.players;
+    const n = ps.length;
+    const i = ps.findIndex(p => p.id === myId);
+    const step = d => {
+      let j = i;
+      for (let k = 0; k < n - 1; k++) {
+        j = (j + d + n) % n;
+        if ((ps[j].lives ?? 0) > 0) return ps[j];
+      }
+      return null;
+    };
+    return { left: step(-1), right: step(1) };
+  }
+
   function opponents(state, myId) {
     const rail = $('opp-rail');
     rail.innerHTML = '';
-    const n = state.players.length;
-    const myIndex = state.players.findIndex(pp => pp.id === myId);
-    const leftNb = state.players[(myIndex - 1 + n) % n];
-    const rightNb = state.players[(myIndex + 1) % n];
-    const me = state.players[myIndex];
+    const { left: leftNb, right: rightNb } = aliveNeighbors(state, myId);
+    const me = state.players.find(pp => pp.id === myId);
     const guerremoto = !!me && (me.active_effects || []).some(e => e.type === 'guerremoto' && e.any_target);
 
     state.players.forEach(p => {
@@ -216,12 +229,12 @@ const Render = (() => {
       const isTurn = p.id === state.current_player_id;
       const dead = (p.lives ?? 0) <= 0;
       const fxCount = (p.active_effects || []).length;
-      // Bastione destro di X è adiacente al Bastione sinistro di X+1:
+      // Bastione destro di X è adiacente al Bastione sinistro del primo vivo alla sua destra:
       // se p è il mio vicino di destra posso colpire il suo Bastione S.,
       // se p è il mio vicino di sinistra posso colpire il suo Bastione D.
       // Con Guerremoto attivo (any_target) tutti i Bastioni sono bersagli validi.
-      const canHitLeft = guerremoto || p.id === rightNb.id;
-      const canHitRight = guerremoto || p.id === leftNb.id;
+      const canHitLeft = guerremoto || (!dead && !!rightNb && p.id === rightNb.id);
+      const canHitRight = guerremoto || (!dead && !!leftNb && p.id === leftNb.id);
 
       const chip = el('button', {
         className: `opp-chip${isTurn ? ' turn' : ''}${dead ? ' dead' : ''}`,
@@ -275,10 +288,7 @@ const Render = (() => {
       : villageSummary(buildings));
 
     // Bastioni + nome del vicino che li minaccia
-    const n = state.players.length;
-    const myIndex = state.players.findIndex(p => p.id === myId);
-    const leftNb = state.players[(myIndex - 1 + n) % n];
-    const rightNb = state.players[(myIndex + 1) % n];
+    const { left: leftNb, right: rightNb } = aliveNeighbors(state, myId);
     $('tw-left-threat').textContent = leftNb && leftNb.id !== myId ? `Esposto a ${leftNb.name}` : '';
     $('tw-right-threat').textContent = rightNb && rightNb.id !== myId ? `Esposto a ${rightNb.name}` : '';
 

@@ -253,7 +253,7 @@ Una carta già in campo non si tocca liberamente: non esiste né lo scarto liber
 
 ### Adiacenza Bastioni
 
-I giocatori siedono in circolo. Il Bastione destro del giocatore X è adiacente al Bastione sinistro del giocatore X+1.
+I giocatori siedono in circolo. Il Bastione destro del giocatore X è adiacente al Bastione sinistro del primo giocatore **vivo** alla sua destra: gli eliminati vengono saltati e il cerchio si stringe (`battle.py` → `adjacent_bastions`; lato client la stessa logica è in `renderer.js`, `mobile/render.js`, `mobile/app.js`).
 
 ---
 

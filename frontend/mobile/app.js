@@ -2159,8 +2159,17 @@ const Mob = (() => {
     if (guerremoto) {
       players.forEach((p, i) => { push(i, 'left'); push(i, 'right'); });
     } else {
-      push((myIdx + 1) % n, 'left');   // il mio B.D. attacca il B.S. del vicino di destra
-      push((myIdx - 1 + n) % n, 'right'); // il mio B.S. attacca il B.D. del vicino di sinistra
+      // Vicini vivi più prossimi: gli eliminati vengono saltati (il cerchio si stringe).
+      const nextAlive = d => {
+        let j = myIdx;
+        for (let k = 0; k < n - 1; k++) {
+          j = (j + d + n) % n;
+          if ((players[j].lives ?? 0) > 0) return j;
+        }
+        return -1;
+      };
+      push(nextAlive(1), 'left');   // il mio B.D. attacca il B.S. del vicino di destra
+      push(nextAlive(-1), 'right'); // il mio B.S. attacca il B.D. del vicino di sinistra
     }
     return targets;
   }
