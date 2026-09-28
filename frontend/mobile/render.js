@@ -224,8 +224,6 @@ const Render = (() => {
     const me = state.players.find(pp => pp.id === myId);
     const guerremoto = !!me && (me.active_effects || []).some(e => e.type === 'guerremoto' && e.any_target);
 
-    const botIds = new Set(state.bot_player_ids || []);
-
     // Ordine: vicino a cui espongo il Bastione S., vicino a cui espongo il
     // Bastione D., poi gli altri (di fronte) in ordine di posto, eliminati in fondo.
     const ps = state.players;
@@ -254,10 +252,7 @@ const Render = (() => {
         dataset: { playerId: p.id },
       }, [
         el('span', { className: 'opp-top' }, [
-          el('span', { className: 'opp-name' }, [
-            botIds.has(p.id) ? el('span', { className: 'opp-bot', title: 'Bot' }, ['🤖']) : null,
-            p.name,
-          ]),
+          el('span', { className: 'opp-name' }, [p.name]),
           el('span', { className: 'opp-lives' }, [_livesStr(p.lives ?? 0)]),
         ]),
         el('span', { className: 'opp-sub' }, [

@@ -2327,7 +2327,7 @@ const Mob = (() => {
     if (buildings.length === 0) body.push(el('div', { className: 'sheet-note' }, ['Nessuna Costruzione.']));
 
     Sheet.open({
-      title: (currentState.bot_player_ids || []).includes(p.id) ? `🤖 ${p.name}` : p.name,
+      title: p.name,
       subtitle: `❤︎ ${p.lives} Vite · 🃏 ${p.hand_count} carte in mano` +
         (p.id === currentState.current_player_id ? ' · sta giocando' : ''),
       body,
