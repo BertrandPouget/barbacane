@@ -167,7 +167,17 @@
       <button class="btn btn-small" onclick="copyLobbyCode()">Copia</button>
     </div>
     <div id="waiting-players" class="player-list"></div>
-    <p class="waiting-hint">Condividi il codice con i tuoi amici. Servono almeno 2 giocatori.</p>
+    <div id="waiting-bot-controls" class="waiting-bot-controls" style="display:none">
+      <button id="btn-add-bot" class="btn btn-secondary btn-small">+ Aggiungi Bot</button>
+      <label class="waiting-bot-diff">Difficoltà Bot
+        <select id="waiting-bot-difficulty">
+          <option value="easy">Facile</option>
+          <option value="normal">Normale</option>
+          <option value="hard">Difficile</option>
+        </select>
+      </label>
+    </div>
+    <p class="waiting-hint">Condividi il codice con i tuoi amici o aggiungi dei Bot. Servono almeno 2 giocatori.</p>
     <button id="btn-start" class="btn btn-primary" style="display:none">Avvia Partita</button>
     <div id="waiting-status" class="status-msg"></div>
   </div>

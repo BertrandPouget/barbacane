@@ -443,6 +443,37 @@ input:focus {
   border-radius: 50%;
   background: var(--green-light);
 }
+.player-list-item .dot.bot { background: var(--blue-light); }
+.player-list-item .seat { color: var(--text-dim); font-size: 0.8rem; min-width: 1.2em; }
+.player-list-item .name { flex: 1; }
+.player-list-item .tag { color: var(--text-dim); font-size: 0.75rem; font-style: italic; }
+.player-list-item .seat-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  width: 1.7rem; height: 1.7rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.player-list-item .seat-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+.player-list-item .seat-btn:disabled { opacity: 0.3; cursor: default; }
+
+.waiting-bot-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 300px;
+}
+.waiting-bot-diff { display: flex; align-items: center; gap: 0.5rem; color: var(--text-dim); font-size: 0.85rem; }
+.waiting-bot-diff select {
+  background: var(--bg-medium);
+  color: var(--text);
+  border: 1px solid var(--border-gold);
+  border-radius: 4px;
+  padding: 0.25rem 0.4rem;
+}
 
 .waiting-hint { color: var(--text); font-style: italic; font-size: 0.9rem; text-align: center; }
 .status-msg { color: var(--text-dim); font-size: 0.85rem; min-height: 1.2rem; text-align: center; }
@@ -610,8 +641,13 @@ input:focus {
   background: rgba(50, 22, 4, 0.72);
   border: 1px solid rgba(122, 68, 24, 0.35);
   border-radius: 6px;
-  overflow: hidden;
+  /* Con molti Guerrieri il contenuto supera l'altezza: scorre in verticale */
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
+.strip-player > * { flex-shrink: 0; }
 
 .strip-header {
   padding-bottom: 5px;

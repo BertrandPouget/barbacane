@@ -166,7 +166,15 @@
         <span class="code-copy">copia</span>
       </button>
       <div id="wait-players" class="wait-players"></div>
-      <p class="wait-hint">Condividi il codice con i tuoi amici.<br>Servono almeno 2 giocatori.</p>
+      <div id="wait-bots" class="wait-bots" hidden>
+        <button id="btn-add-bot" class="cta">+ Aggiungi Bot</button>
+        <div class="wait-diff" role="radiogroup" aria-label="Difficoltà Bot">
+          <button class="wait-diff-btn" data-diff="easy">Facile</button>
+          <button class="wait-diff-btn" data-diff="normal">Normale</button>
+          <button class="wait-diff-btn" data-diff="hard">Difficile</button>
+        </div>
+      </div>
+      <p class="wait-hint">Condividi il codice con i tuoi amici o aggiungi dei Bot.<br>Servono almeno 2 giocatori.</p>
       <button id="btn-start" class="cta cta-gold" hidden>Avvia partita</button>
       <div id="wait-status" class="wait-status"></div>
     </div>

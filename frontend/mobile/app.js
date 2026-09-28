@@ -230,6 +230,10 @@ const Mob = (() => {
     $('btn-create').addEventListener('click', onCreateLobby);
     $('btn-join').addEventListener('click', onJoinLobby);
     $('btn-start').addEventListener('click', onStartGame);
+    $('btn-add-bot').addEventListener('click', () => { haptic(); editLobby('/lobby/add_bot'); });
+    document.querySelectorAll('.wait-diff-btn').forEach(btn => {
+      btn.addEventListener('click', () => { haptic(); editLobby('/lobby/bot_difficulty', { difficulty: btn.dataset.diff }); });
+    });
     $('in-join-code').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
     $('wait-code').addEventListener('click', copyLobbyCode);
 
@@ -629,22 +633,73 @@ const Mob = (() => {
   function showWaitingRoom(lobby) {
     lobbyCode = lobby.lobby_code;
     $('wait-code-text').textContent = lobby.lobby_code;
-    updateWaitingPlayers(lobby.players);
+    updateWaitingRoom(lobby);
     $('btn-start').hidden = !isCreator;
+    $('wait-bots').hidden = !isCreator;
     $('wait-status').textContent = '';
     Screens.show('wait');
     startLobbyPolling();
   }
 
+  let waitingPlayers = [];
+
+  function updateWaitingRoom(lobby) {
+    waitingPlayers = lobby.players || [];
+    updateWaitingPlayers(waitingPlayers);
+    $('btn-start').disabled = !lobby.can_start;
+    $('btn-add-bot').disabled = waitingPlayers.length >= 4;
+    document.querySelectorAll('.wait-diff-btn').forEach(btn => {
+      btn.classList.toggle('on', btn.dataset.diff === (lobby.bot_difficulty || 'normal'));
+    });
+  }
+
+  // Ordine dei posti al tavolo: i Bastioni confinano con quelli dei vicini,
+  // quindi il creatore può riordinare i giocatori (e rimuovere i Bot).
   function updateWaitingPlayers(players) {
     const list = $('wait-players');
     list.innerHTML = '';
-    (players || []).forEach(p => {
-      list.appendChild(el('div', { className: 'wait-player' }, [
-        el('span', { className: 'dot' }),
-        el('span', {}, [p.name]),
-      ]));
+    players.forEach((p, i) => {
+      const tag = p.is_bot ? 'Bot' : (p.player_id === myPlayerId ? 'tu' : '');
+      const children = [
+        el('span', { className: 'wait-seat' }, [`${i + 1}.`]),
+        el('span', { className: p.is_bot ? 'dot bot' : 'dot' }),
+        el('span', { className: 'wait-name' }, [p.name]),
+        tag ? el('span', { className: 'wait-tag' }, [tag]) : null,
+      ];
+      if (isCreator) {
+        const seatBtn = (label, ariaLabel, disabled, onClick) => el('button', {
+          className: 'wait-seat-btn', 'aria-label': ariaLabel,
+          disabled: disabled ? '' : null,
+          onclick: () => { haptic(); onClick(); },
+        }, [label]);
+        children.push(
+          seatBtn('▲', 'Sposta su', i === 0, () => moveWaitingPlayer(i, -1)),
+          seatBtn('▼', 'Sposta giù', i === players.length - 1, () => moveWaitingPlayer(i, 1)),
+        );
+        if (p.is_bot) {
+          children.push(seatBtn('✕', 'Rimuovi Bot', false,
+            () => editLobby('/lobby/remove_bot', { bot_id: p.player_id })));
+        }
+      }
+      list.appendChild(el('div', { className: 'wait-player' }, children));
     });
+  }
+
+  function moveWaitingPlayer(index, delta) {
+    const order = waitingPlayers.map(p => p.player_id);
+    const j = index + delta;
+    if (j < 0 || j >= order.length) return;
+    [order[index], order[j]] = [order[j], order[index]];
+    editLobby('/lobby/reorder', { order });
+  }
+
+  async function editLobby(path, params = {}) {
+    try {
+      const lobby = await api(path, { lobby_code: lobbyCode, session_token: sessionToken, ...params });
+      updateWaitingRoom(lobby);
+    } catch (e) {
+      Toast.show(e.message, 'error');
+    }
   }
 
   function startLobbyPolling() {
@@ -652,8 +707,7 @@ const Mob = (() => {
     lobbyPollTimer = setInterval(async () => {
       try {
         const lobby = await apiFetch(`/lobby/${lobbyCode}`);
-        updateWaitingPlayers(lobby.players);
-        $('btn-start').disabled = !lobby.can_start;
+        updateWaitingRoom(lobby);
         if (lobby.game_id && !gameId) {
           stopLobbyPolling();
           gameId = lobby.game_id;

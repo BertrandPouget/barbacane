@@ -158,6 +158,9 @@ const App = (() => {
     document.getElementById('btn-create').addEventListener('click', onCreateLobby);
     document.getElementById('btn-join').addEventListener('click', onJoinLobby);
     document.getElementById('btn-start').addEventListener('click', onStartGame);
+    document.getElementById('btn-add-bot').addEventListener('click', () => editLobby('/lobby/add_bot'));
+    document.getElementById('waiting-bot-difficulty').addEventListener('change', (e) =>
+      editLobby('/lobby/bot_difficulty', { difficulty: e.target.value }));
     document.getElementById('btn-end-turn').addEventListener('click', onEndTurn);
     document.getElementById('btn-battle').addEventListener('click', onBattleClick);
     document.getElementById('btn-horde').addEventListener('click', onHordeClick);
@@ -589,21 +592,73 @@ const App = (() => {
   function showWaitingRoom(lobby) {
     lobbyCode = lobby.lobby_code;
     document.getElementById('lobby-code-text').textContent = lobby.lobby_code;
-    updateWaitingPlayers(lobby.players);
+    updateWaitingRoom(lobby);
     document.getElementById('btn-start').style.display = isCreator ? 'block' : 'none';
+    document.getElementById('waiting-bot-controls').style.display = isCreator ? 'flex' : 'none';
     document.getElementById('waiting-status').textContent = '';
     Renderer.showScreen('waiting');
   }
 
+  let waitingPlayers = [];
+
+  function updateWaitingRoom(lobby) {
+    waitingPlayers = lobby.players;
+    updateWaitingPlayers(lobby.players);
+    document.getElementById('btn-start').disabled = !lobby.can_start;
+    document.getElementById('btn-add-bot').disabled = lobby.players.length >= 4;
+    const diff = document.getElementById('waiting-bot-difficulty');
+    if (document.activeElement !== diff) diff.value = lobby.bot_difficulty || 'normal';
+  }
+
+  // Ordine dei posti al tavolo: i Bastioni confinano con quelli dei vicini,
+  // quindi il creatore può riordinare i giocatori (e rimuovere i Bot).
   function updateWaitingPlayers(players) {
     const list = document.getElementById('waiting-players');
     list.innerHTML = '';
-    players.forEach(p => {
+    players.forEach((p, i) => {
       const item = document.createElement('div');
       item.className = 'player-list-item';
-      item.innerHTML = `<span class="dot"></span><span>${p.name}</span>`;
+      const tag = p.is_bot ? 'Bot' : (p.player_id === myPlayerId ? 'tu' : '');
+      item.innerHTML = `<span class="seat">${i + 1}.</span>`
+        + `<span class="dot${p.is_bot ? ' bot' : ''}"></span>`
+        + `<span class="name"></span>`
+        + (tag ? `<span class="tag">${tag}</span>` : '');
+      item.querySelector('.name').textContent = p.name;
+      if (isCreator) {
+        const btn = (label, title, disabled, onClick) => {
+          const b = document.createElement('button');
+          b.className = 'seat-btn';
+          b.textContent = label;
+          b.title = title;
+          b.disabled = disabled;
+          b.addEventListener('click', onClick);
+          item.appendChild(b);
+        };
+        btn('▲', 'Sposta su', i === 0, () => moveWaitingPlayer(i, -1));
+        btn('▼', 'Sposta giù', i === players.length - 1, () => moveWaitingPlayer(i, 1));
+        if (p.is_bot) {
+          btn('✕', 'Rimuovi Bot', false, () => editLobby('/lobby/remove_bot', { bot_id: p.player_id }));
+        }
+      }
       list.appendChild(item);
     });
+  }
+
+  function moveWaitingPlayer(index, delta) {
+    const order = waitingPlayers.map(p => p.player_id);
+    const j = index + delta;
+    if (j < 0 || j >= order.length) return;
+    [order[index], order[j]] = [order[j], order[index]];
+    editLobby('/lobby/reorder', { order });
+  }
+
+  async function editLobby(path, params = {}) {
+    try {
+      const lobby = await api(path, { lobby_code: lobbyCode, session_token: sessionToken, ...params });
+      updateWaitingRoom(lobby);
+    } catch (e) {
+      Renderer.toast(e.message, 'error');
+    }
   }
 
   async function onStartGame() {
@@ -631,8 +686,7 @@ const App = (() => {
     lobbyPollTimer = setInterval(async () => {
       try {
         const lobby = await apiFetch(`/lobby/${lobbyCode}`);
-        updateWaitingPlayers(lobby.players);
-        document.getElementById('btn-start').disabled = !lobby.can_start;
+        updateWaitingRoom(lobby);
         if (lobby.game_id && !gameId) {
           stopLobbyPolling();
           gameId = lobby.game_id;

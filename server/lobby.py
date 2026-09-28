@@ -17,10 +17,11 @@ _lobbies: Dict[str, "LobbyInfo"] = {}
 
 
 class LobbyPlayer:
-    def __init__(self, player_id: str, name: str, session_token: str):
+    def __init__(self, player_id: str, name: str, session_token: Optional[str], is_bot: bool = False):
         self.player_id = player_id
         self.name = name
-        self.session_token = session_token
+        self.session_token = session_token  # None per i Bot
+        self.is_bot = is_bot
         self.ready = False
 
     def to_dict(self) -> dict:
@@ -28,6 +29,7 @@ class LobbyPlayer:
             "player_id": self.player_id,
             "name": self.name,
             "ready": self.ready,
+            "is_bot": self.is_bot,
         }
 
 
@@ -36,8 +38,9 @@ class LobbyInfo:
         self.lobby_code = lobby_code
         self.creator_id = creator_id
         self.turn_timer = turn_timer  # secondi; 0 = disattivato
-        self.players: List[LobbyPlayer] = []
+        self.players: List[LobbyPlayer] = []  # in ordine di posto al tavolo
         self.game_id: Optional[str] = None
+        self.bot_difficulty = "normal"  # uguale per tutti i Bot della lobby
 
     def to_dict(self) -> dict:
         return {
@@ -47,6 +50,7 @@ class LobbyInfo:
             "players": [p.to_dict() for p in self.players],
             "game_id": self.game_id,
             "can_start": self.can_start(),
+            "bot_difficulty": self.bot_difficulty,
         }
 
     def can_start(self) -> bool:
@@ -57,6 +61,15 @@ class LobbyInfo:
 
     def get_player_by_token(self, token: str) -> Optional[LobbyPlayer]:
         return next((p for p in self.players if p.session_token == token), None)
+
+    def next_player_id(self) -> str:
+        """Primo id "player_N" libero: con i Bot rimossi, len(players) + 1
+        potrebbe già essere in uso."""
+        used = {p.player_id for p in self.players}
+        n = 1
+        while f"player_{n}" in used:
+            n += 1
+        return f"player_{n}"
 
 
 def generate_lobby_code() -> str:
@@ -109,10 +122,15 @@ def join_lobby(lobby_code: str, player_name: str) -> dict:
     if lobby.game_id is not None:
         raise ValueError("La partita è già iniziata.")
 
-    player_id = f"player_{len(lobby.players) + 1}"
+    player_id = lobby.next_player_id()
     session_token = generate_session_token()
     player = LobbyPlayer(player_id=player_id, name=player_name, session_token=session_token)
     lobby.players.append(player)
+
+    # Un Bot con lo stesso nome del nuovo arrivato viene ribattezzato
+    for bot in lobby.players:
+        if bot.is_bot and _same_name(bot.name, player_name):
+            bot.name = _pick_bot_name(lobby, exclude=bot)
 
     return {
         "lobby_code": lobby_code,
@@ -124,6 +142,82 @@ def join_lobby(lobby_code: str, player_name: str) -> dict:
 
 def get_lobby(lobby_code: str) -> Optional[LobbyInfo]:
     return _lobbies.get(lobby_code)
+
+
+# ---------------------------------------------------------------------------
+# Bot e ordine dei posti (solo il creatore, prima dell'avvio)
+# ---------------------------------------------------------------------------
+
+BOT_DIFFICULTIES = ("easy", "normal", "hard")
+
+
+def _same_name(a: str, b: str) -> bool:
+    return a.strip().casefold() == b.strip().casefold()
+
+
+def _recruit_names() -> List[str]:
+    from engine import cards
+    if not cards.CARD_REGISTRY:
+        cards.load_cards()
+    return [c.name for c in cards.CARD_REGISTRY.values()
+            if c.type == "warrior" and getattr(c, "subtype", None) == "recruit"]
+
+
+def _pick_bot_name(lobby: LobbyInfo, exclude: Optional[LobbyPlayer] = None) -> str:
+    """Nome casuale tra le Reclute, diverso da quello di ogni altro giocatore
+    della lobby (umano o Bot)."""
+    taken = [p.name for p in lobby.players if p is not exclude]
+    free = [n for n in _recruit_names() if not any(_same_name(n, t) for t in taken)]
+    return random.choice(free) if free else f"Bot {len(lobby.players)}"
+
+
+def _lobby_for_creator(lobby_code: str, requester_id: str) -> LobbyInfo:
+    lobby = _lobbies.get(lobby_code)
+    if lobby is None:
+        raise ValueError(f"Lobby {lobby_code} non trovata.")
+    if requester_id != lobby.creator_id:
+        raise PermissionError("Solo il creatore della lobby può farlo.")
+    if lobby.game_id is not None:
+        raise ValueError("La partita è già iniziata.")
+    return lobby
+
+
+def add_bot(lobby_code: str, requester_id: str) -> LobbyInfo:
+    lobby = _lobby_for_creator(lobby_code, requester_id)
+    if len(lobby.players) >= 4:
+        raise ValueError("Lobby piena (massimo 4 giocatori).")
+    bot = LobbyPlayer(player_id=lobby.next_player_id(), name=_pick_bot_name(lobby),
+                      session_token=None, is_bot=True)
+    lobby.players.append(bot)
+    return lobby
+
+
+def remove_bot(lobby_code: str, requester_id: str, bot_id: str) -> LobbyInfo:
+    lobby = _lobby_for_creator(lobby_code, requester_id)
+    bot = lobby.get_player(bot_id)
+    if bot is None or not bot.is_bot:
+        raise ValueError("Bot non trovato.")
+    lobby.players.remove(bot)
+    return lobby
+
+
+def reorder_players(lobby_code: str, requester_id: str, order: List[str]) -> LobbyInfo:
+    """Riordina i posti al tavolo: `order` è la lista completa dei player_id."""
+    lobby = _lobby_for_creator(lobby_code, requester_id)
+    by_id = {p.player_id: p for p in lobby.players}
+    if len(order) != len(by_id) or set(order) != set(by_id):
+        # Qualcuno è entrato/uscito nel frattempo: il client ricarica la lista
+        raise ValueError("La lista dei giocatori è cambiata, riprova.")
+    lobby.players = [by_id[pid] for pid in order]
+    return lobby
+
+
+def set_bot_difficulty(lobby_code: str, requester_id: str, difficulty: str) -> LobbyInfo:
+    lobby = _lobby_for_creator(lobby_code, requester_id)
+    if difficulty not in BOT_DIFFICULTIES:
+        raise ValueError("Difficoltà non valida.")
+    lobby.bot_difficulty = difficulty
+    return lobby
 
 
 def start_game(lobby_code: str, requester_id: str) -> "GameState":
@@ -151,6 +245,9 @@ def start_game(lobby_code: str, requester_id: str) -> "GameState":
     # Allinea i player_id dello stato con quelli della lobby
     for i, lp in enumerate(lobby.players):
         state.players[i].id = lp.player_id
+    state.bot_player_ids = [lp.player_id for lp in lobby.players if lp.is_bot]
+    if state.bot_player_ids:
+        state.bot_difficulty = lobby.bot_difficulty
 
     lobby.game_id = game_id
     return state

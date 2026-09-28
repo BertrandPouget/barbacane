@@ -336,6 +336,8 @@ Questo garantisce che la carta resti in mano e l'azione non venga consumata se l
 
 **Creazione Lobby**: giocatore crea → server genera codice (`BARB-7X3K`) → altri si uniscono → creatore avvia → server genera stato iniziale.
 
+**Bot in lobby**: in sala d'attesa il creatore può aggiungere/rimuovere Bot (`/lobby/add_bot`, `/lobby/remove_bot`), sceglierne la difficoltà (`/lobby/bot_difficulty`, unica per tutti) e riordinare i posti al tavolo (`/lobby/reorder`, lista completa dei `player_id`): l'ordine della lobby è l'ordine di `state.players`, quindi l'adiacenza dei Bastioni. Il nome del Bot è una Recluta casuale diversa (case-insensitive) da quelli già in lobby; se entra un umano con lo stesso nome di un Bot, il Bot viene ribattezzato. All'avvio i Bot finiscono in `state.bot_player_ids` e i loro turni girano come nella pratica (`_schedule_bot_turn`); i Bot non hanno riga nella tabella `players`.
+
 **Gestione Turno**: server invia stato via WebSocket → giocatore attivo invia azioni → server valida, aggiorna, salva, notifica tutti.
 
 **Visibilità**:

@@ -538,6 +538,35 @@ input {
   border-radius: 50%;
   background: var(--ok);
 }
+.wait-player .dot.bot { background: var(--info); }
+.wait-seat { color: var(--text-faint); font-size: 0.85rem; min-width: 1.3em; text-align: left; }
+.wait-name { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wait-tag { color: var(--text-dim); font-size: 0.75rem; font-style: italic; }
+.wait-seat-btn {
+  width: 36px; height: 36px;
+  flex: none;
+  border-radius: var(--r-sm);
+  background: var(--bg-light);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+.wait-seat-btn:disabled { opacity: 0.3; }
+.wait-player:has(.wait-seat-btn) { padding: 6px 8px 6px 15px; gap: 8px; }
+
+.wait-bots { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.wait-bots[hidden] { display: none; }
+.wait-diff { display: flex; gap: 6px; }
+.wait-diff-btn {
+  flex: 1;
+  padding: 9px 4px;
+  border-radius: var(--r-sm);
+  background: var(--bg-medium);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+.wait-diff-btn.on { border-color: var(--gold); color: var(--gold); font-weight: 700; }
 .wait-hint { color: var(--text); font-size: 0.9rem; line-height: 1.5; font-style: italic; }
 .wait-status { color: var(--text-dim); font-size: 0.85rem; min-height: 1.2em; }
 #btn-start { width: 100%; }

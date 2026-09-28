@@ -5,7 +5,7 @@ Endpoint REST e WebSocket di Barbacane.
 from __future__ import annotations
 import asyncio
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,10 @@ from server.lobby import (
     join_lobby,
     get_lobby,
     start_game,
+    add_bot,
+    remove_bot,
+    reorder_players,
+    set_bot_difficulty,
     authenticate_player,
     generate_session_token,
 )
@@ -86,6 +90,7 @@ async def _on_turn_expire(game_id: str, player_id: str) -> None:
 
         if not state.winner_id:
             await _start_turn_timer(game_id, state)
+        _schedule_bot_turn(state)
     except Exception as e:
         logger.error("[timer] Errore nel forzare fine turno %s: %s", game_id, e)
 
@@ -126,6 +131,15 @@ class StartGameRequest(BaseModel):
     session_token: str
 
 
+class LobbyEditRequest(BaseModel):
+    """Modifica della sala d'attesa da parte del creatore."""
+    lobby_code: str
+    session_token: str
+    bot_id: Optional[str] = None       # remove_bot
+    order: List[str] = []              # reorder: tutti i player_id nel nuovo ordine
+    difficulty: Optional[str] = None   # bot_difficulty
+
+
 class GameActionRequest(BaseModel):
     game_id: str
     session_token: str
@@ -160,6 +174,36 @@ async def api_get_lobby(lobby_code: str):
     return lobby.to_dict()
 
 
+def _edit_lobby(req: LobbyEditRequest, edit) -> dict:
+    auth = authenticate_player(req.session_token)
+    if auth is None:
+        raise HTTPException(401, "Token non valido")
+    try:
+        return edit(auth[1]).to_dict()
+    except (ValueError, PermissionError) as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/lobby/add_bot")
+async def api_lobby_add_bot(req: LobbyEditRequest):
+    return _edit_lobby(req, lambda pid: add_bot(req.lobby_code, pid))
+
+
+@router.post("/lobby/remove_bot")
+async def api_lobby_remove_bot(req: LobbyEditRequest):
+    return _edit_lobby(req, lambda pid: remove_bot(req.lobby_code, pid, req.bot_id or ""))
+
+
+@router.post("/lobby/reorder")
+async def api_lobby_reorder(req: LobbyEditRequest):
+    return _edit_lobby(req, lambda pid: reorder_players(req.lobby_code, pid, req.order))
+
+
+@router.post("/lobby/bot_difficulty")
+async def api_lobby_bot_difficulty(req: LobbyEditRequest):
+    return _edit_lobby(req, lambda pid: set_bot_difficulty(req.lobby_code, pid, req.difficulty or ""))
+
+
 @router.post("/lobby/start")
 async def api_start_game(req: StartGameRequest):
     auth = authenticate_player(req.session_token)
@@ -180,7 +224,8 @@ async def api_start_game(req: StartGameRequest):
     lobby = get_lobby(req.lobby_code)
     if lobby:
         for lp in lobby.players:
-            save_player(state.game_id, lp.player_id, lp.name, lp.session_token)
+            if not lp.is_bot:
+                save_player(state.game_id, lp.player_id, lp.name, lp.session_token)
 
     # Invia a ogni giocatore connesso la propria vista personalizzata
     for pid in manager.connected_players(state.game_id):
@@ -624,6 +669,8 @@ async def _play_bot_turn(game_id: str) -> None:
                 "result": {},
                 "state": public_state(state, pid),
             })
+        # Multigiocatore con timer: riparte per chi gioca dopo il Bot
+        await _start_turn_timer(game_id, state)
     except Exception as e:
         logger.error("[bot] Errore nel turno del Bot %s: %s", game_id, e)
         state = None

@@ -481,8 +481,13 @@ def trono_effect(
             # L'effetto Orda diventa sempre attivo: si attiva subito (come una
             # normale attivazione manuale) e verrà ri-attivato automaticamente
             # a ogni inizio turno del giocatore (vedi _trigger_building_start).
+            # Gli effetti vanno taggati con trono_warrior come in _trigger_building_start,
+            # altrimenti _clear_trono_horde_effects non li rimuove e il bonus si raddoppia.
             target_w.horde_active = True
+            effects_count_before = len(player.active_effects)
             horde_result = apply_effect(card.horde_effect_id, state, player, warrior_iid=target_warrior_iid)
+            for eff in player.active_effects[effects_count_before:]:
+                eff["trono_warrior"] = target_warrior_iid
             result["horde_always_active"] = card.horde_effect_id
             result["horde_effect_result"] = horde_result
 
