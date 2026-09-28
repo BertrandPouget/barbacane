@@ -240,12 +240,12 @@ def start_game(lobby_code: str, requester_id: str) -> "GameState":
 
     player_names = [p.name for p in lobby.players]
     game_id = str(uuid.uuid4())[:8]
-    state = create_game(player_names, game_id=game_id)
+    # Gli id della lobby vanno passati subito: la distribuzione iniziale e il
+    # primo inizio turno scrivono già nel log usando gli id dei giocatori.
+    state = create_game(player_names, game_id=game_id,
+                        player_ids=[lp.player_id for lp in lobby.players])
     state.turn_timer = lobby.turn_timer
 
-    # Allinea i player_id dello stato con quelli della lobby
-    for i, lp in enumerate(lobby.players):
-        state.players[i].id = lp.player_id
     state.bot_player_ids = [lp.player_id for lp in lobby.players if lp.is_bot]
     if state.bot_player_ids:
         state.bot_difficulty = lobby.bot_difficulty

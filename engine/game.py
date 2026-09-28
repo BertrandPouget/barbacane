@@ -45,22 +45,29 @@ from engine.effects import _apply_scrigno_bonus
 # Inizializzazione partita
 # ---------------------------------------------------------------------------
 
-def create_game(player_names: List[str], game_id: Optional[str] = None) -> GameState:
+def create_game(player_names: List[str], game_id: Optional[str] = None,
+                player_ids: Optional[List[str]] = None) -> GameState:
     """
     Crea e inizializza una nuova partita.
     - Mescola il mazzo
     - Distribuisce 5 carte a ogni giocatore
     - Sceglie casualmente il primo giocatore
+    `player_ids` (opzionale) fissa gli id dei giocatori prima della distribuzione,
+    così il log delle pescate iniziali usa gli id definitivi (es. quelli della lobby).
     """
     if not 2 <= len(player_names) <= 4:
         raise ValueError("Barbacane richiede da 2 a 4 giocatori.")
+    if player_ids is None:
+        player_ids = [f"player_{i+1}" for i in range(len(player_names))]
+    if len(player_ids) != len(player_names):
+        raise ValueError("player_ids e player_names devono avere la stessa lunghezza.")
 
     if game_id is None:
         game_id = str(uuid.uuid4())[:8]
 
     players = [
         Player(
-            id=f"player_{i+1}",
+            id=player_ids[i],
             name=name,
             mana=0,
             mana_remaining=0,

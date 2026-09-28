@@ -56,6 +56,7 @@ from engine.actions import (
     add_wall,
     evolve_warrior,
     reposition_warrior,
+    eracle_destroy,
 )
 from engine.battle import (
     adjacent_bastions,
@@ -1139,9 +1140,41 @@ def _bot_battle(state: GameState, player_id: str, smart: bool = False) -> None:
 
     if best_target:
         try:
-            do_battle(state, player_id, best_target[0], best_target[1])
+            result = do_battle(state, player_id, best_target[0], best_target[1])
         except ActionError:
-            pass
+            return
+        if result.get("eracle_destroy_triggered") and not state.winner_id:
+            _bot_eracle_destroy(state, player_id, result)
+
+
+# Costruzioni avversarie da distruggere con l'Orda di Eracle, dalla più
+# pericolosa per il Bot: prima i bonus di Battaglia e le difese, poi l'economia.
+_ERACLE_PRIORITY = (
+    "catapulta", "ariete", "fossato", "saracinesca", "trono", "fucina",
+    "estrattore", "scrigno", "obelisco", "biblioteca", "arena", "granaio",
+    "sorgiva", "cardo", "decumano",
+)
+
+
+def _bot_eracle_destroy(state: GameState, player_id: str, battle_result: dict) -> None:
+    """Il Bot sfrutta l'Orda di Eracle: senza questa scelta la battaglia
+    segnala i bersagli ma nessuna Costruzione viene mai distrutta."""
+    targets = battle_result.get("eracle_targets") or []
+    if not targets:
+        return
+    defender = state.get_player(battle_result["defender_id"])
+    completed = {b.instance_id for b in defender.field.village.buildings if b.completed}
+
+    def rank(t: dict) -> Tuple[int, int]:
+        base = t["base_card_id"]
+        prio = _ERACLE_PRIORITY.index(base) if base in _ERACLE_PRIORITY else len(_ERACLE_PRIORITY)
+        return (0 if t["instance_id"] in completed else 1, prio)
+
+    choice = min(targets, key=rank)
+    try:
+        eracle_destroy(state, player_id, choice["instance_id"], defender.id)
+    except ActionError:
+        pass
 
 
 def _opponents(state: GameState, player_id: str) -> List[Player]:
