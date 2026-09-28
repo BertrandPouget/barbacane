@@ -156,10 +156,11 @@ def _same_name(a: str, b: str) -> bool:
 
 
 def _recruit_names() -> List[str]:
+    """Nomi dei Bot: ogni Recluta col prefisso "Mecha-" (es. Mecha-Araminta)."""
     from engine import cards
     if not cards.CARD_REGISTRY:
         cards.load_cards()
-    return [c.name for c in cards.CARD_REGISTRY.values()
+    return [f"Mecha-{c.name}" for c in cards.CARD_REGISTRY.values()
             if c.type == "warrior" and getattr(c, "subtype", None) == "recruit"]
 
 

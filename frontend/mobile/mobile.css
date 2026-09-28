@@ -731,6 +731,7 @@ input {
   text-overflow: ellipsis;
   flex: 1;
 }
+.opp-bot { margin-right: 4px; font-size: 0.8rem; }
 .opp-lives { font-size: 0.68rem; letter-spacing: 1px; color: var(--red-light); white-space: nowrap; }
 .opp-sub {
   display: flex;
