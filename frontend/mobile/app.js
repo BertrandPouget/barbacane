@@ -2833,7 +2833,8 @@ const Mob = (() => {
     const winner = state.players.find(p => p.id === state.winner_id);
     const iWon = state.winner_id === myPlayerId;
     $('over-title').textContent = iWon ? 'Vittoria!' : 'Fine partita';
-    $('over-winner').textContent = winner ? `${winner.name} conquista il Barbacane` : 'Nessun vincitore';
+    $('over-winner').textContent = iWon ? 'Hai conquistato il Barbacane'
+      : winner ? `${winner.name} conquista il Barbacane` : 'Nessun vincitore';
     $('over-scores').innerHTML = state.players
       .map(p => `${p.name}: ${'❤︎'.repeat(Math.max(0, p.lives))}${'✕'.repeat(Math.max(0, 3 - p.lives))}`)
       .join('<br>');

@@ -878,7 +878,8 @@ const Renderer = (() => {
     showScreen('gameover');
     const winner = state.players.find(p => p.id === state.winner_id);
     document.getElementById('gameover-winner').textContent =
-      winner ? `Vincitore: ${winner.name} 🏆` : 'Nessun vincitore';
+      state.winner_id && state.winner_id === _myPlayerId ? 'Hai conquistato il Barbacane'
+        : winner ? `Vincitore: ${winner.name} 🏆` : 'Nessun vincitore';
     document.getElementById('gameover-scores').innerHTML =
       state.players.map(p => `${p.name}: ${livesText(p.lives)} Vite`).join('<br>');
   }

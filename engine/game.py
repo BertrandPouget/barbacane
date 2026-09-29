@@ -123,7 +123,15 @@ def create_practice_game(player_name: str, difficulty: str = "normal", game_id: 
     if game_id is None:
         game_id = f"vs-{uuid.uuid4().hex[:8]}"
 
-    bot_names = ["Bot"] if num_bots == 1 else [f"Bot {i + 1}" for i in range(num_bots)]
+    # Nomi dei Bot: Reclute casuali col prefisso "Mecha-" (es. Mecha-Araminta),
+    # come nelle lobby multiplayer.
+    recruits = [f"Mecha-{c.name}" for c in CARD_REGISTRY.values()
+                if c.type == "warrior" and getattr(c, "subtype", None) == "recruit"
+                and f"Mecha-{c.name}".casefold() != (player_name or "").strip().casefold()]
+    if len(recruits) >= num_bots:
+        bot_names = random.sample(recruits, num_bots)
+    else:
+        bot_names = [f"Bot {i + 1}" for i in range(num_bots)]
     state = create_game([player_name or "Tu", *bot_names], game_id=game_id)
 
     if state.current_player_index != 0:
