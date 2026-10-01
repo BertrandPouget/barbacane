@@ -1,0 +1,16 @@
+{
+  "decks": [
+    {
+      "id": "base",
+      "name": "Barbacane",
+      "file": "cards.json",
+      "tagline": "Il mazzo originale: Umani, Elfi, Nani e Maghe, tutti di sangue Goblin."
+    },
+    {
+      "id": "oltretomba",
+      "name": "Oltretomba",
+      "file": "cards_oltretomba.json",
+      "tagline": "La pila degli scarti era l'Oltretomba. Ed era piena."
+    }
+  ]
+}

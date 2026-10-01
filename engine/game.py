@@ -23,10 +23,23 @@ from engine.models import (
     WarriorInstance,
     BuildingInstance,
 )
-from engine.cards import CARD_REGISTRY, get_card, WarriorCard, SpellCard, BuildingCard
-from engine.deck import build_deck, draw_cards, get_base_card_id
+from engine.cards import CARD_REGISTRY, DEFAULT_DECK, get_card, WarriorCard, SpellCard, BuildingCard
+from engine.deck import (
+    build_deck,
+    draw_cards,
+    get_base_card_id,
+    card_matches_condition,
+    search_source_cards,
+    advance_search_queue,
+)
 from engine.effects import apply_effect
-from engine.battle import resolve_battle, get_valid_attack_targets, battle_building_bonus
+from engine.battle import (
+    resolve_battle,
+    get_valid_attack_targets,
+    battle_building_bonus,
+    attack_block_reason,
+)
+from engine import oltretomba
 from engine.actions import (
     ActionError,
     play_warrior,
@@ -46,10 +59,10 @@ from engine.effects import _apply_scrigno_bonus
 # ---------------------------------------------------------------------------
 
 def create_game(player_names: List[str], game_id: Optional[str] = None,
-                player_ids: Optional[List[str]] = None) -> GameState:
+                player_ids: Optional[List[str]] = None, deck_id: str = DEFAULT_DECK) -> GameState:
     """
     Crea e inizializza una nuova partita.
-    - Mescola il mazzo
+    - Mescola il mazzo `deck_id` (data/decks.json: "base" o un'espansione)
     - Distribuisce 5 carte a ogni giocatore
     - Sceglie casualmente il primo giocatore
     `player_ids` (opzionale) fissa gli id dei giocatori prima della distribuzione,
@@ -76,7 +89,7 @@ def create_game(player_names: List[str], game_id: Optional[str] = None,
         for i, name in enumerate(player_names)
     ]
 
-    deck = build_deck()
+    deck = build_deck(deck_id)
     first_player = random.randint(0, len(players) - 1)
 
     state = GameState(
@@ -87,6 +100,7 @@ def create_game(player_names: List[str], game_id: Optional[str] = None,
         phase="action",
         players=players,
         deck=deck,
+        deck_id=deck_id,
         battles_remaining=1,
     )
 
@@ -98,7 +112,7 @@ def create_game(player_names: List[str], game_id: Optional[str] = None,
 
     # Distribuisce 6 carte in mano a ogni giocatore
     # Se un giocatore si chiama "Test", le prime carte pescate sono quelle di test_cards.json
-    _test_cards = _load_test_card_ids()
+    _test_cards = _load_test_card_ids(deck_id)
     for player in players:
         if player.name in ("Test", "Test2") and _test_cards:
             _move_to_front(state.deck, _test_cards)
@@ -111,7 +125,7 @@ def create_game(player_names: List[str], game_id: Optional[str] = None,
 
 
 def create_practice_game(player_name: str, difficulty: str = "normal", game_id: Optional[str] = None,
-                         num_bots: int = 1) -> GameState:
+                         num_bots: int = 1, deck_id: str = DEFAULT_DECK) -> GameState:
     """
     Crea una partita di pratica in solitaria contro 1–3 Bot (regole e mazzo
     reali, non scriptati), tutti della stessa difficoltà. Il giocatore umano
@@ -124,7 +138,7 @@ def create_practice_game(player_name: str, difficulty: str = "normal", game_id: 
         game_id = f"vs-{uuid.uuid4().hex[:8]}"
 
     bot_names = ["Bot"] if num_bots == 1 else [f"Bot {i + 1}" for i in range(num_bots)]
-    state = create_game([player_name or "Tu", *bot_names], game_id=game_id)
+    state = create_game([player_name or "Tu", *bot_names], game_id=game_id, deck_id=deck_id)
 
     if state.current_player_index != 0:
         # create_game ha scelto a caso un Bot come primo giocatore: annulla il
@@ -196,6 +210,10 @@ def _begin_turn(state: GameState) -> None:
 
     # Effetti differiti dal turno precedente (investimento prodigio, divinazione)
     _process_deferred_effects(state, player)
+
+    # Oltretomba: Ossario, Mausoleo, Campana, Clessidra, Orde di Gennaro/Mephisto/Enea,
+    # scadenza di Malocchio, Sanguisuga, Ectoplasma e Fantasmagoria
+    oltretomba.on_turn_start(state, player)
 
     # Orda di Giulio già attiva: cerca Giulio II e aggiungilo alla mano
     _trigger_giulio_horde_start(state, player)
@@ -450,17 +468,26 @@ def end_turn(state: GameState) -> GameState:
     if has_cardo_complete and has_decumano and not cardo_move_pending and not cardo_move_done:
         state.pending_interactions.append({"type": "cardo_move", "player_id": player.id})
         return state
+    # Traghetto (Oltretomba): stesso spostamento del Cardo, stessa interazione
+    if oltretomba.offer_end_turn_move(state, player):
+        return state
 
     # Fase finale: effetti costruzioni a fine turno
     granaio_bonus = _trigger_building_end(state, player)
+    # Oltretomba: Orda di Celestino (mano massima), Clessidra (Azioni non usate)
+    dlc_hand_bonus = oltretomba.on_turn_end(state, player)
 
     # Pesca fino al limite (6 + bonus Granai)
     from engine.deck import draw_to_hand_limit
-    draw_to_hand_limit(state, player.id, limit=6 + granaio_bonus)
+    draw_to_hand_limit(state, player.id, limit=6 + granaio_bonus + dlc_hand_bonus)
 
-    # Pulisci effetti scaduti a fine turno e interazioni pendenti
+    # Pulisci effetti scaduti a fine turno e interazioni pendenti. Uno scarto
+    # imposto agli avversari (Malcomune, Baraonda) ancora senza risposta non va
+    # perso: accade se il turno finisce senza passare dal dispatcher (Bot, timer).
     _clear_turn_expired_effects(player)
+    _settle_forced_discards(state)
     state.pending_interactions.clear()
+    _drop_searches_of(state, player.id)
 
     # Registra che il giocatore ha completato un turno
     player.turns_completed += 1
@@ -493,6 +520,106 @@ def end_turn(state: GameState) -> GameState:
     _begin_turn(state)
 
     return state
+
+
+def _settle_forced_discards(state: GameState) -> None:
+    """Risolve con la scelta più prudente (il Guerriero più debole) gli scarti
+    imposti agli avversari da Malcomune o Baraonda rimasti senza risposta."""
+    from engine.effects import _discard_warrior_from_player
+    for pending in [i for i in state.pending_interactions if i.get("type") == "malcomune_discard"]:
+        victim = state.get_player(pending.get("player_id"))
+        choices = forced_discard_choices(victim, pending) if victim else []
+        if choices:
+            weakest = min(choices, key=lambda w: w.effective_att() + w.effective_git() + w.effective_dif())
+            _discard_warrior_from_player(state, victim, weakest.instance_id)
+
+
+def forced_discard_choices(player: Player, pending: dict) -> List[WarriorInstance]:
+    """Guerrieri tra cui `player` sceglie per un'interazione malcomune_discard:
+    quelli della Specie indicata (Malcomune) o, senza Specie, quelli che una
+    Magia avversaria può scartare (Baraonda)."""
+    species = pending.get("species")
+    if species is None:
+        return oltretomba.baraonda_choices(player)
+    return [w for w in player.all_warriors()
+            if isinstance(get_card(w.base_card_id), WarriorCard) and get_card(w.base_card_id).species == species]
+
+
+def _drop_searches_of(state: GameState, player_id: str) -> None:
+    """Annulla le ricerche rimaste in sospeso di un giocatore (fine turno forzata, abbandono)."""
+    state.search_queue = [s for s in state.search_queue if s.get("player_id") != player_id]
+    ps = state.pending_search
+    if ps and ps.get("player_id") == player_id:
+        oltretomba.cancel_search(state, ps)
+        if ps.get("source", "deck") == "deck":
+            random.shuffle(state.deck)
+        advance_search_queue(state)
+
+
+def resolve_search(state: GameState, player_id: str, chosen_iid: Optional[str]) -> dict:
+    """
+    Risolve la ricerca in attesa (state.pending_search) con la carta scelta dal
+    giocatore, o la annulla se chosen_iid è vuoto. Le carte si scelgono dal mazzo
+    (cercare), dagli scarti (riesumare) o tra quelle scoperte in cima al mazzo
+    (Lumicino), secondo pending_search["source"]. Poi passa alla ricerca
+    successiva in coda (state.search_queue), se ce n'è una.
+    """
+    ps = state.pending_search
+    if not ps:
+        raise ActionError("Nessuna ricerca in corso.")
+    if ps["player_id"] != player_id:
+        raise ActionError("Non è la tua ricerca.")
+    source = ps.get("source", "deck")
+
+    if not chosen_iid:
+        oltretomba.cancel_search(state, ps)
+        if source == "deck":
+            random.shuffle(state.deck)
+        advance_search_queue(state)
+        return {"cancelled": True}
+
+    if chosen_iid not in search_source_cards(state, ps):
+        raise ActionError("La carta scelta non è disponibile.")
+    if not card_matches_condition(chosen_iid, ps["condition"]):
+        raise ActionError("La carta scelta non soddisfa la condizione di ricerca.")
+
+    # La carta lascia la sua pila. Dopo aver cercato nel mazzo lo si mescola;
+    # gli scarti no, e nemmeno il mazzo sotto le carte scoperte da Lumicino.
+    if source == "discard":
+        state.discard_pile.remove(chosen_iid)
+    else:
+        state.deck.remove(chosen_iid)
+        if source == "deck":
+            random.shuffle(state.deck)
+
+    player = state.get_player(player_id)
+    context = ps["context"]
+    result: dict = {"resolved_search": chosen_iid, "context": context}
+    follow_up = None
+
+    if context == "cercapersone_base":
+        player.hand.append(chosen_iid)
+        result["added_to_hand"] = chosen_iid
+
+    elif context == "cercapersone_prodigio":
+        player.hand.append(chosen_iid)
+        player.ethereal_card = chosen_iid
+        result["added_to_hand"] = chosen_iid
+        result["ethereal"] = chosen_iid
+
+    elif context == "giulio_horde":
+        player.hand.append(chosen_iid)
+        result["added_to_hand"] = chosen_iid
+
+    elif context in oltretomba.SEARCH_CONTEXTS:
+        follow_up = oltretomba.resolve_search(state, player, ps, chosen_iid, result)
+
+    state.add_log(player_id, "search", card=chosen_iid, source=source)
+    if follow_up:
+        state.pending_search = follow_up
+    else:
+        advance_search_queue(state)
+    return result
 
 
 def abandon_game(state: GameState, player_id: str) -> dict:
@@ -540,9 +667,7 @@ def abandon_game(state: GameState, player_id: str) -> dict:
     player.pending_velocemento_prodigy = False
 
     # Interazioni in sospeso di chi abbandona non hanno più senso
-    if state.pending_search and state.pending_search.get("player_id") == player_id:
-        random.shuffle(state.deck)
-        state.pending_search = None
+    _drop_searches_of(state, player_id)
     state.pending_interactions = [
         i for i in state.pending_interactions if i.get("player_id") != player_id
     ]
@@ -616,7 +741,10 @@ def do_battle(
     valid_targets = get_valid_attack_targets(state)
     target_key = (defender_player_index, defender_bastion_side)
     if target_key not in valid_targets:
-        raise ActionError(f"Bersaglio non valido: giocatore {defender_player_index} bastione {defender_bastion_side}.")
+        reason = None
+        if 0 <= defender_player_index < len(state.players) and defender_player_index != state.current_player_index:
+            reason = attack_block_reason(state, defender_player_index, defender_bastion_side)
+        raise ActionError(reason or f"Bersaglio non valido: giocatore {defender_player_index} bastione {defender_bastion_side}.")
 
     # Applica bonus ATT da effetti "next_battle"
     _apply_battle_bonuses(player)
@@ -699,6 +827,8 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
                 if e.get("type") in {
                     "spell_immune", "guerremoto", "investimento_deferred",
                     "divinazione_incantesimo", "divinazione_all_mage", "equipotenza_own",
+                    # Oltretomba: chi attacca deve sapere dei Bastioni intoccabili e dell'obolo
+                    "catalessi", "caronte_obolo",
                 }
             ],
             "spell_immune": any(e.get("type") == "spell_immune" for e in p.active_effects),
@@ -734,19 +864,23 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
 
     ps = state.pending_search
     search_deck = (
-        _search_deck_view(state, ps["condition"])
+        _search_deck_view(state, ps)
         if ps and ps.get("player_id") == viewer_player_id
         else None
     )
 
     return {
         "game_id": state.game_id,
+        "deck_id": state.deck_id,
         "turn": state.turn,
         "current_player_id": state.current_player.id,
         "phase": state.phase,
         "players": players_view,
         "deck_count": len(state.deck),
         "discard_count": len(state.discard_pile),
+        # La pila degli scarti è a faccia in su: la carta in cima è pubblica
+        # (Ossario e Pietrombale la trasformano in Muro)
+        "discard_top": get_base_card_id(state.discard_pile[-1]) if state.discard_pile else None,
         "winner_id": state.winner_id,
         "battles_remaining": state.battles_remaining,
         "recent_events": list(state.recent_events),
@@ -759,13 +893,17 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
     }
 
 
-def _load_test_card_ids() -> list:
-    """Carica la lista di base_card_id da data/test_cards.json, o [] se assente/invalido."""
+def _load_test_card_ids(deck_id: str = DEFAULT_DECK) -> list:
+    """Carica la lista di base_card_id da data/test_cards.json, o [] se assente/invalido.
+    Il file è una lista (valida per ogni mazzo: le carte assenti dal mazzo vengono
+    ignorate) oppure un oggetto {deck_id: [base_card_id, ...]}."""
     import json, os
     path = os.path.join(os.path.dirname(__file__), "..", "data", "test_cards.json")
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
+        if isinstance(data, dict):
+            data = data.get(deck_id, [])
         return data if isinstance(data, list) else []
     except (FileNotFoundError, json.JSONDecodeError):
         return []
@@ -783,25 +921,16 @@ def _move_to_front(deck: list, base_card_ids: list) -> None:
                 break
 
 
-def _search_deck_view(state: GameState, condition: dict) -> list:
-    """Ritorna le carte del mazzo con flag 'matches', ordinate: matching prima."""
-    from engine.deck import get_base_card_id
-    from engine.cards import CARD_REGISTRY, WarriorCard
-
-    ctype = condition.get("type")
-    cvalue = condition.get("value")
+def _search_deck_view(state: GameState, search: dict) -> list:
+    """Ritorna le carte tra cui si cerca (mazzo, scarti o cima del mazzo, vedi
+    search_source_cards) con flag 'matches', ordinate: matching prima."""
     result = []
-    for iid in state.deck:
+    for iid in search_source_cards(state, search):
         base_id = get_base_card_id(iid)
         card = CARD_REGISTRY.get(base_id)
         if card is None:
             continue
-        if ctype == "subtype":
-            matches = isinstance(card, WarriorCard) and card.subtype == cvalue
-        elif ctype == "base_card_id":
-            matches = base_id == cvalue
-        else:
-            matches = False
+        matches = card_matches_condition(iid, search["condition"])
         result.append({
             "instance_id": iid,
             "base_card_id": base_id,
@@ -875,6 +1004,8 @@ def _warrior_view(
             [_assigned_card_view(iid, player, viewer_player_id) for iid in w.assigned_cards]
             if player is not None else []
         ),
+        # Oltretomba: spell_protected (Reliquiario) / discard_protected (Orda di Achille)
+        **(oltretomba.warrior_flags(player, w) if player is not None else {}),
     }
 
 
@@ -935,6 +1066,8 @@ def _building_view(b: BuildingInstance, player=None) -> dict:
             e.get("type") == "arena_used" and e.get("building_instance_id") == b.instance_id
             for e in player.active_effects
         )
+    if isinstance(card, BuildingCard) and card.activation and player is not None:
+        result["activation_available"] = oltretomba.activation_available(player, b)
     return result
 
 

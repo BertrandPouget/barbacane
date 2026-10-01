@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, computed_field, model_validator
 class WarriorCard(BaseModel):
     id: str
     name: str
+    deck: str = "base"  # mazzo di appartenenza (data/decks.json), impostato da load_cards
     type: str = "warrior"
     subtype: str  # "recruit" | "hero"
     species: str  # "elfo" | "nano" | "maga" | "umano"
@@ -34,6 +35,7 @@ class WarriorCard(BaseModel):
 class SpellCard(BaseModel):
     id: str
     name: str
+    deck: str = "base"
     type: str = "spell"
     subtype: str  # "anatema" | "sortilegio" | "incantesimo"
     school: str
@@ -43,12 +45,18 @@ class SpellCard(BaseModel):
     prodigy_effect: str
     prodigy_is_additive: bool
     effect_id: str
+    # Bersagli da scegliere prima del lancio, in ordine (es. ["enemy_warrior", "own_warrior"],
+    # oppure {"type": "enemy_warrior", "max_dif": 2}). Il client costruisce da qui la UI di
+    # targeting senza codice dedicato alla carta; None = UI dedicata (carte del mazzo base).
+    targeting: Optional[List[Any]] = None
+    prodigy_targeting: Optional[List[Any]] = None  # se diverso quando il Prodigio è attivo
     copies: int
 
 
 class BuildingCard(BaseModel):
     id: str
     name: str
+    deck: str = "base"
     type: str = "building"
     cost: int
     cost_type: str = "mana"
@@ -58,6 +66,10 @@ class BuildingCard(BaseModel):
     complete_is_additive: bool = False
     effect_id: str
     auto_complete: bool = False  # Cardo, Decumano
+    targeting: Optional[List[Any]] = None  # bersagli da scegliere al piazzamento (es. Reliquiario)
+    # Costruzione attivabile una volta per turno prima della Battaglia (es. Pira):
+    # {"label": str, "targeting": [...]}. L'Arena del mazzo base ha una UI dedicata.
+    activation: Optional[Dict[str, Any]] = None
     copies: int
 
 
@@ -80,21 +92,24 @@ class WarriorInstance(BaseModel):
     assigned_cards: List[str] = Field(default_factory=list)  # instance_ids (es. Trono)
     horde_active: bool = False  # questa carta è quella "segnalata" nell'Orda
     temp_modifiers: Dict[str, int] = Field(default_factory=dict)  # {"att": +2, "dif": +1, ...}
+    # Modificatori a scadenza delle Magie Oltretomba (Malocchio, Sanguisuga, Ectoplasma):
+    # tenuti separati da temp_modifiers perché possono essere negativi, mentre la
+    # disattivazione delle Orde azzera temp_modifiers a 0 quando toglie un bonus.
+    stat_mods: Dict[str, int] = Field(default_factory=dict)
+
+    def _effective(self, stat: str) -> int:
+        from engine.cards import CARD_REGISTRY
+        base = getattr(CARD_REGISTRY[self.base_card_id], stat)
+        return max(0, base + self.temp_modifiers.get(stat, 0) + self.stat_mods.get(stat, 0))
 
     def effective_att(self) -> int:
-        from engine.cards import CARD_REGISTRY
-        base = CARD_REGISTRY[self.base_card_id].att
-        return base + self.temp_modifiers.get("att", 0)
+        return self._effective("att")
 
     def effective_git(self) -> int:
-        from engine.cards import CARD_REGISTRY
-        base = CARD_REGISTRY[self.base_card_id].git
-        return base + self.temp_modifiers.get("git", 0)
+        return self._effective("git")
 
     def effective_dif(self) -> int:
-        from engine.cards import CARD_REGISTRY
-        base = CARD_REGISTRY[self.base_card_id].dif
-        return base + self.temp_modifiers.get("dif", 0)
+        return self._effective("dif")
 
 
 class BuildingInstance(BaseModel):
@@ -257,6 +272,11 @@ class Player(BaseModel):
         to_remove = []
         for eff in self.active_effects:
             if eff.get("type") == "horde_stat_bonus":
+                # Solo i bonus di QUESTA Orda: nella stessa Regione può esserci
+                # un'Orda di un'altra Specie con i propri bonus (es. Umani ed Elfi
+                # in Avanscoperta), che non va toccata.
+                if eff.get("from_horde_key") != horde_key:
+                    continue
                 w_iid = eff.get("warrior_iid")
                 if self.has_active_trono(w_iid):
                     continue
@@ -358,7 +378,11 @@ class GameState(BaseModel):
     battle_done_this_turn: bool = False
     battles_remaining: int = 1  # default 1 per turno, può aumentare
     recent_events: List[Dict[str, Any]] = Field(default_factory=list)  # D10 rolls, cleared each action
+    deck_id: str = "base"  # mazzo della partita (data/decks.json)
     pending_search: Optional[Dict[str, Any]] = None  # set when a cerca effect awaits player choice
+    # Ricerche in coda quando una è già in attesa (es. Necromanteion dopo una Magia che
+    # riesuma): diventano pending_search, una alla volta, man mano che si risolvono.
+    search_queue: List[Dict[str, Any]] = Field(default_factory=list)
     pending_interactions: List[Dict[str, Any]] = Field(default_factory=list)  # queue of building interactions awaiting player choice
     turn_timer: int = 0  # secondi per turno; 0 = disattivato (default)
     tutorial: Optional[Dict[str, Any]] = None  # {"tutorial_id": str, "step_index": int, "completed": bool}

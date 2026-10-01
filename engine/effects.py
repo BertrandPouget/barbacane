@@ -106,9 +106,13 @@ def _discard_warrior_from_player(state: GameState, player: Player, warrior_iid: 
         player.field.bastion_left.warriors,
         player.field.bastion_right.warriors,
     ]
+    from engine import oltretomba
     for region_name, region in zip(region_names, regions):
         for w in region:
             if w.instance_id == warrior_iid:
+                # Oltretomba: gli effetti che reagiscono allo scarto vanno letti
+                # prima che il Guerriero esca dalla sua eventuale Orda
+                dlc_ctx = oltretomba.discard_context(player, w)
                 region.remove(w)
                 player.deactivate_broken_horde(w, region_name)
                 if w.evolved_from:
@@ -124,6 +128,7 @@ def _discard_warrior_from_player(state: GameState, player: Player, warrior_iid: 
                 else:
                     _discard_assigned_cards(state, player, w.assigned_cards)
                 state.discard_pile.append(w.instance_id)
+                oltretomba.on_warrior_discarded(state, player, w, dlc_ctx)
                 return True
     return False
 
@@ -1730,3 +1735,10 @@ def eracle_horde(state: GameState, player: Player, **kwargs) -> dict:
         "player_id": player.id, "eracle_destroy_on_win": True, "min_damage": 3,
     })
     return {"eracle_destroy_on_win": True, "min_damage": 3}
+
+
+# ---------------------------------------------------------------------------
+# Espansioni: i loro effetti si registrano nello stesso EFFECT_REGISTRY
+# ---------------------------------------------------------------------------
+
+from engine import oltretomba  # noqa: E402,F401  (registra gli effetti del mazzo Oltretomba)

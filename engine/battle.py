@@ -23,6 +23,7 @@ from engine.models import (
     Player,
     WarriorInstance,
 )
+from engine import oltretomba
 
 
 class ActionError(Exception):
@@ -82,6 +83,9 @@ def get_valid_attack_targets(state: GameState) -> List[Tuple[int, str]]:
     # Senza guerrieri in Avanscoperta non si può attaccare
     if not attacker.field.vanguard:
         return []
+    # Dormiveglia (Oltretomba): questo turno niente Battaglia
+    if oltretomba.battle_forbidden(attacker):
+        return []
 
     adj = adjacent_bastions(attacker_index, state.players)
 
@@ -91,8 +95,16 @@ def get_valid_attack_targets(state: GameState) -> List[Tuple[int, str]]:
         for e in attacker.active_effects
     )
 
-    # Calcola GIT attaccante (usato per verifica Fossato)
-    _, att_git = attacker_stats(attacker)
+    # Calcola ATT e GIT attaccante (usati per Fossato e, nell'Oltretomba, Cancello)
+    att_att, att_git = attacker_stats(attacker)
+
+    def blocked(defender: Player, side: str) -> bool:
+        # Fossato (con l'eventuale raddoppio GIT dell'Orda di Decimo); Oltretomba:
+        # Spauracchio riduce ATT/GIT, Cancello, Catalessi e l'obolo di Caronte bloccano
+        att_vs, git_vs = oltretomba.attack_vs(attacker, defender, att_att,
+                                              attacker_git_vs(attacker, defender, att_git))
+        return (_fossato_blocks(defender, side, git_vs)
+                or oltretomba.attack_block_reason(state, attacker, defender, side, att_vs) is not None)
 
     if guerremoto_active:
         # Può attaccare qualsiasi bastione di qualsiasi avversario vivo
@@ -102,9 +114,8 @@ def get_valid_attack_targets(state: GameState) -> List[Tuple[int, str]]:
                 continue
             if p.turns_completed < 1:
                 continue
-            git_vs = attacker_git_vs(attacker, p, att_git)
             for side in ["left", "right"]:
-                if not _fossato_blocks(p, side, git_vs):
+                if not blocked(p, side):
                     targets.append((i, side))
         return targets
 
@@ -117,11 +128,20 @@ def get_valid_attack_targets(state: GameState) -> List[Tuple[int, str]]:
             continue
         if defender.turns_completed < 1:
             continue
-        # Verifica Fossato (con l'eventuale raddoppio GIT dell'Orda di Decimo)
-        if _fossato_blocks(defender, side, attacker_git_vs(attacker, defender, att_git)):
+        if blocked(defender, side):
             continue
         targets.append((defender_index, side))
     return targets
+
+
+def attack_block_reason(state: GameState, defender_index: int, side: str) -> Optional[str]:
+    """Spiegazione leggibile del perché il giocatore corrente non può attaccare quel
+    Bastione per un effetto dell'Oltretomba (None se il motivo è un altro)."""
+    attacker = state.current_player
+    defender = state.players[defender_index]
+    att_att, att_git = attacker_stats(attacker)
+    att_vs, _ = oltretomba.attack_vs(attacker, defender, att_att, att_git)
+    return oltretomba.attack_block_reason(state, attacker, defender, side, att_vs)
 
 
 def attacker_git_vs(attacker: Player, defender: Player, attacker_git: int) -> int:
@@ -190,6 +210,9 @@ def battle_building_bonus(player: Player) -> Dict[str, int]:
         stat = _BATTLE_BUILDING_STAT.get(b_inst.base_card_id)
         if stat:
             bonus[stat] += 2 if b_inst.completed else 1
+    # Oltretomba: Carrofunebre e Fuocofatuo
+    for stat, value in oltretomba.battle_bonus(player).items():
+        bonus[stat] += value
     return bonus
 
 
@@ -278,6 +301,7 @@ def apply_damage_to_bastion(
 
     walls_destroyed = 0
     life_lost = 0
+    life_card = None
 
     if total_damage <= 0:
         return {"walls_destroyed": 0, "life_lost": 0}
@@ -299,11 +323,15 @@ def apply_damage_to_bastion(
 
     # Se rimangono danni dopo aver esaurito i muri → perde 1 Vita (scarta la prima carta-vita)
     if remaining > 0 and defender.life_cards:
-        lost_card = defender.life_cards.pop(0)
-        state.discard_pile.append(lost_card)
+        # Cenotafio (Oltretomba): al posto dell'ultima Vita si scarta la Costruzione
+        if len(defender.life_cards) == 1 and oltretomba.cenotafio_saves(state, defender):
+            return {"walls_destroyed": walls_destroyed, "life_lost": 0, "cenotafio": True}
+        life_card = defender.life_cards.pop(0)
+        state.discard_pile.append(life_card)
         life_lost = 1
 
-    return {"walls_destroyed": walls_destroyed, "life_lost": life_lost}
+    # life_card: la carta-Vita persa, ora in cima agli scarti (Orda di Orlok)
+    return {"walls_destroyed": walls_destroyed, "life_lost": life_lost, "life_card": life_card}
 
 
 def resolve_battle(
@@ -332,10 +360,17 @@ def resolve_battle(
 
     # Orda di Decimo: se il difensore ha un Fossato, la GIT raddoppia
     att_git = attacker_git_vs(attacker, defender, att_git)
+    # Spauracchio (Oltretomba): chi attacca questo difensore perde ATT/GIT
+    att_att, att_git = oltretomba.attack_vs(attacker, defender, att_att, att_git)
 
     # Verifica Fossato: blocca l'attacco se il GIT è insufficiente
     if _fossato_blocks(defender, defender_bastion_side, att_git):
         raise ActionError("Il Fossato blocca attacchi con GIT insufficiente")
+    # Oltretomba: Cancello, Catalessi, Dormiveglia, obolo di Caronte
+    block = oltretomba.attack_block_reason(state, attacker, defender, defender_bastion_side, att_att)
+    if block:
+        raise ActionError(block)
+    oltretomba.pay_battle_toll(state, attacker, defender)
 
     # Statistiche difensore
     def_dif, def_git = defender_stats(defender, defender_bastion_side)
@@ -366,11 +401,15 @@ def resolve_battle(
 
     walls_destroyed = 0
     life_lost = 0
+    battle_result: dict = {}
 
     if total_dmg > 0:
         battle_result = apply_damage_to_bastion(state, defender, defender_bastion_side, total_dmg)
         walls_destroyed = battle_result["walls_destroyed"]
         life_lost = battle_result["life_lost"]
+
+    # Orda di Orlok (Oltretomba): la Vita persa può passare all'attaccante
+    oltretomba.after_battle(state, attacker, defender, battle_result)
 
     # Eracle horde: if damage >= 3 and effect is active, offer building destruction
     eracle_destroy_triggered = False

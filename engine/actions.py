@@ -34,6 +34,7 @@ from engine.effects import (
     _reassign_buildings,
     _unassign_building,
 )
+from engine import oltretomba
 import random as _random
 
 
@@ -152,7 +153,10 @@ def evolve_warrior(
     Costo: il costo dell'Eroe in Mana. Consuma 1 Azione.
     """
     player = _require_current_player(state, player_id)
-    _require_actions(player)
+    # Laboratorio completo (Oltretomba): evolvere non consuma Azioni
+    free_evolve = oltretomba.evolve_is_free(player)
+    if not free_evolve:
+        _require_actions(player)
     _require_in_hand(player, hero_instance_id)
 
     hero_base_id = get_base_card_id(hero_instance_id)
@@ -189,7 +193,8 @@ def evolve_warrior(
 
     player.mana_remaining -= cost
     player.hand.remove(hero_instance_id)
-    player.actions_remaining -= 1
+    if not free_evolve:
+        player.actions_remaining -= 1
 
     # Crea l'Eroe ereditando le proprietà della Recluta
     hero_inst = WarriorInstance(
@@ -198,6 +203,7 @@ def evolve_warrior(
         evolved_from=recruit_instance_id,
         assigned_cards=list(recruit.assigned_cards),
         temp_modifiers=dict(recruit.temp_modifiers),
+        stat_mods=dict(recruit.stat_mods),
         horde_active=recruit.horde_active,
     )
 
@@ -217,9 +223,13 @@ def evolve_warrior(
 
     # La Recluta rimane "sotto" l'Eroe — tracciata da evolved_from, non negli scarti né in campo
 
+    # Laboratorio (Oltretomba): pesca una carta per ogni evoluzione
+    oltretomba.after_evolve(state, player)
+
     state.add_log(player_id, "evolve_warrior",
                   recruit=recruit_instance_id, hero=hero_instance_id, region=recruit_region)
-    return {"recruit": recruit_instance_id, "hero": hero_instance_id, "region": recruit_region}
+    return {"recruit": recruit_instance_id, "hero": hero_instance_id, "region": recruit_region,
+            "free_evolve": free_evolve}
 
 
 def _warrior_regions(player: Player):
@@ -297,6 +307,9 @@ def _apply_spell_post_effects(
             "base_card_id": base_id,
         })
 
+    # Oltretomba: Orde di Ligeia e Morella, Necromanteion
+    oltretomba.after_spell(state, player, base_id, instance_id)
+
 
 def play_spell(
     state: GameState,
@@ -346,11 +359,15 @@ def play_spell(
                 player.active_effects.remove(free_effect)
         else:
             discount = player.spell_cost_reductions.get(school, 0)
+            # Orda di Lenore (Oltretomba): Anatemi a costo 2 o più scontati di 1 Maga
+            discount += oltretomba.spell_discount(player, card)
             cost_to_pay = max(0, cost - discount)
             if mages_count < cost_to_pay:
                 raise ActionError(f"Maghe insufficienti: {mages_count} disponibili, {cost_to_pay} richieste.")
 
-    # Verifica Prodigio (basato sulle Maghe in campo, indipendentemente dall'eterea)
+    # Verifica Prodigio (basato sulle Maghe in campo, indipendentemente dall'eterea).
+    # Il numero di Maghe per il Prodigio è quello stampato sulla carta, indipendente
+    # da eventuali riduzioni di costo (regolamento, voce Prodigio).
     prodigy = False
     if mages_count > 0:
         mages_by_school = player.mages_by_school()
@@ -359,7 +376,7 @@ def play_spell(
             e.get("type") == "madeleine_prodigy_any_school"
             for e in player.active_effects
         )
-        effective_cost = cost if is_ethereal else cost_to_pay
+        effective_cost = cost
         if madeleine_active and school == "incantesimo":
             prodigy = (mages_count >= effective_cost) and (effective_cost > 0 or free_effect or is_ethereal)
         else:
@@ -448,6 +465,12 @@ def play_spell(
             raise ActionError("Muro non trovato nel Bastione indicato.")
         if not any(w.instance_id == warrior_iid for w in player.all_warriors()):
             raise ActionError("Guerriero non trovato in campo.")
+
+    # Pre-validazione delle Magie Oltretomba: bersagli (campo "targeting" della
+    # carta) e condizioni come "negli scarti deve esserci una Costruzione"
+    dlc_error = oltretomba.spell_error(state, player, card, prodigy, kwargs)
+    if dlc_error:
+        raise ActionError(dlc_error)
 
     # Rimuovi dalla mano e consuma azione
     player.hand.remove(instance_id)

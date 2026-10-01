@@ -52,15 +52,88 @@ def get_base_card_id(instance_id: str) -> str:
     return parts[0]
 
 
-def build_deck() -> List[str]:
+def build_deck(deck_id: str = "base") -> List[str]:
     """
-    Costruisce e mescola il mazzo di 200 carte.
+    Costruisce e mescola il mazzo di 200 carte del mazzo `deck_id` (data/decks.json).
     Ritorna una lista di instance_ids (l'inizio della lista è la cima del mazzo).
     """
+    from engine.cards import deck_card_ids
+    in_deck = set(deck_card_ids(deck_id))
     reg = get_instance_registry()
-    deck = list(reg.keys())
+    deck = [iid for iid, card in reg.items() if card.id in in_deck]
     random.shuffle(deck)
     return deck
+
+
+def card_matches_condition(instance_id: str, condition: dict) -> bool:
+    """
+    True se la carta soddisfa la condizione di una ricerca (state.pending_search):
+    - {"type": "subtype", "value": "recruit"}        Guerriero del sottotipo dato
+    - {"type": "base_card_id", "value": "giulio_ii"}  una carta precisa
+    - {"type": "card_type", "value": "spell"}         Guerriero / Magia / Costruzione
+    - {"type": "any"}                                 qualsiasi carta
+    Opzionali: "exclude_base_ids" e "exclude_iids" (es. Crisantemo non riesuma sé stesso).
+    """
+    from engine.cards import CARD_REGISTRY
+    base_id = get_base_card_id(instance_id)
+    card = CARD_REGISTRY.get(base_id)
+    if card is None:
+        return False
+    if base_id in condition.get("exclude_base_ids", ()) or instance_id in condition.get("exclude_iids", ()):
+        return False
+    ctype = condition.get("type")
+    cvalue = condition.get("value")
+    if ctype == "subtype":
+        return card.type == "warrior" and card.subtype == cvalue
+    if ctype == "base_card_id":
+        return base_id == cvalue
+    if ctype == "card_type":
+        return card.type == cvalue
+    return ctype == "any"
+
+
+def search_source_cards(state: GameState, search: dict) -> List[str]:
+    """
+    Carte tra cui si sceglie in una ricerca, secondo `search["source"]`:
+    - "deck" (default): tutto il mazzo (cercare)
+    - "discard": la pila degli scarti, dalla cima (riesumare, espansione Oltretomba)
+    - "deck_top": solo le carte scoperte in cima al mazzo, elencate in search["cards"]
+    """
+    source = search.get("source", "deck")
+    if source == "discard":
+        return list(reversed(state.discard_pile))
+    if source == "deck_top":
+        return [iid for iid in search.get("cards", []) if iid in state.deck]
+    return list(state.deck)
+
+
+def search_has_candidates(state: GameState, search: dict) -> bool:
+    return any(card_matches_condition(iid, search["condition"]) for iid in search_source_cards(state, search))
+
+
+def queue_search(state: GameState, search: dict) -> bool:
+    """
+    Mette in attesa una ricerca (state.pending_search) o, se ce n'è già una, la
+    accoda in state.search_queue. Se nessuna carta soddisfa la condizione non
+    accoda nulla e ritorna False.
+    """
+    if not search_has_candidates(state, search):
+        return False
+    if state.pending_search is None:
+        state.pending_search = search
+    else:
+        state.search_queue.append(search)
+    return True
+
+
+def advance_search_queue(state: GameState) -> None:
+    """Dopo una ricerca risolta: passa alla prossima in coda ancora possibile."""
+    state.pending_search = None
+    while state.search_queue:
+        search = state.search_queue.pop(0)
+        if search_has_candidates(state, search):
+            state.pending_search = search
+            return
 
 
 def draw_cards(state: GameState, player_id: str, count: int) -> List[str]:
