@@ -702,7 +702,15 @@ def _auto_resolve_bot_pending(state) -> None:
 
         search_owner = state.pending_search.get("player_id") if state.pending_search else None
         if search_owner and state.is_bot(search_owner):
-            _resolve_search_action(state, search_owner, None)
+            # Prende la prima carta che soddisfa la ricerca (es. Giulio II per
+            # l'Orda di Giulio); annulla solo se nel mazzo non ce n'è nessuna.
+            from engine.game import _search_deck_view
+            match = next(
+                (c["instance_id"] for c in _search_deck_view(state, state.pending_search["condition"])
+                 if c["matches"]),
+                None,
+            )
+            _resolve_search_action(state, search_owner, match)
             continue
 
         pending_owner = state.pending_interactions[0].get("player_id") if state.pending_interactions else None
