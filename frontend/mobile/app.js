@@ -782,11 +782,20 @@ const Mob = (() => {
     });
     WS.on('error', (msg) => {
       Toast.show(msg.message || 'Errore', 'error');
+      // Blocco dovuto a un'interazione in attesa: riapre gli sheet pendenti
+      // nell'ordine giusto (prima la ricerca, poi Biblioteca & co.)
       if (msg.message && msg.message.includes('Biblioteca') && currentState) {
-        const myPending = (currentState.pending_interactions || []).find(i => i.player_id === myPlayerId);
-        if (myPending) showBibliotecaSheet(myPending);
+        _openPendingSheets(currentState);
       }
     });
+  }
+
+  // La mia interazione in attesa, solo se è la prima della coda: il server
+  // risolve pending_interactions in ordine (es. Malcomune con due avversari),
+  // quindi una mia interazione più indietro va solo attesa.
+  function _myPendingInteraction(state) {
+    const first = state && state.pending_interactions && state.pending_interactions[0];
+    return first && first.player_id === myPlayerId ? first : null;
   }
 
   function playerName(pid) {
@@ -921,7 +930,7 @@ const Mob = (() => {
 
   function _openPendingSheets(state) {
     const me = state.players.find(p => p.id === myPlayerId);
-    const myPending = (state.pending_interactions || []).find(i => i.player_id === myPlayerId);
+    const myPending = _myPendingInteraction(state);
 
     if (state.pending_search && state.pending_search.player_id === myPlayerId && state.search_deck) {
       showSearchSheet(state.search_deck, state.pending_search);
@@ -1095,7 +1104,7 @@ const Mob = (() => {
     const hint = (text) => el('div', { className: 'dock-hint' }, [text]);
 
     // Interazioni pendenti che mi riguardano → un solo bottone che riapre lo sheet
-    const myPending = (currentState.pending_interactions || []).find(i => i.player_id === myPlayerId);
+    const myPending = _myPendingInteraction(currentState);
     const searchMine = currentState.pending_search && currentState.pending_search.player_id === myPlayerId;
     const veloMine = my && my.pending_velocemento_buildings && my.pending_velocemento_buildings.length > 0;
     if (myPending || searchMine || veloMine) {

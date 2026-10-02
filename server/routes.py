@@ -437,7 +437,10 @@ def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
     if state.pending_search and action != "resolve_search":
         raise ActionError("C'è una ricerca in attesa di risoluzione.")
 
-    if state.pending_interactions:
+    # Una ricerca in sospeso ha la precedenza sulle interazioni (es. Orda di Giulio
+    # e Biblioteca insieme a inizio turno): resolve_search non va bloccato da queste,
+    # altrimenti le due si bloccano a vicenda.
+    if state.pending_interactions and not (state.pending_search and action == "resolve_search"):
         _pending_type = state.pending_interactions[0].get("type", "")
         _allowed = {
             "biblioteca_discard": "resolve_biblioteca",

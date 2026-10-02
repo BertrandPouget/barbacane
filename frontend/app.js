@@ -745,11 +745,22 @@ const App = (() => {
     WS.on('error', (msg) => {
       Renderer.toast(msg.message || 'Errore', 'error');
       // Se il blocco è dovuto a un'interazione Biblioteca in attesa, mostra il modale
+      // (una ricerca in sospeso ha la precedenza: in quel caso si riapre quella)
       if (msg.message && msg.message.includes('Biblioteca') && currentState) {
-        const myPending = currentState.pending_interactions && currentState.pending_interactions.find(i => i.player_id === myPlayerId);
-        if (myPending) _showBibliotecaModal(myPending, currentState);
+        const mySearch = currentState.pending_search && currentState.pending_search.player_id === myPlayerId && currentState.search_deck;
+        const myPending = _myPendingInteraction(currentState);
+        if (mySearch) _showSearchModal(currentState.search_deck, currentState.pending_search);
+        else if (myPending) _showBibliotecaModal(myPending, currentState);
       }
     });
+  }
+
+  // La mia interazione in attesa, solo se è la prima della coda: il server
+  // risolve pending_interactions in ordine (es. Malcomune con due avversari),
+  // quindi una mia interazione più indietro va solo attesa.
+  function _myPendingInteraction(state) {
+    const first = state && state.pending_interactions && state.pending_interactions[0];
+    return first && first.player_id === myPlayerId ? first : null;
   }
 
   function onStateUpdate(state, action, result) {
@@ -898,7 +909,7 @@ const App = (() => {
 
     // Chiudi eventuale modale aperta e aggiorna la UI azioni
     // (non chiudere se c'è una ricerca o interazione biblioteca in attesa per questo giocatore)
-    const myPendingInteraction = state.pending_interactions && state.pending_interactions.find(i => i.player_id === myPlayerId);
+    const myPendingInteraction = _myPendingInteraction(state);
     const myPlayer = state.players && state.players.find(p => p.id === myPlayerId);
     const myPendingVelocemento = myPlayer && myPlayer.pending_velocemento_buildings && myPlayer.pending_velocemento_buildings.length > 0;
     if (!(state.pending_search && state.pending_search.player_id === myPlayerId) && !myPendingInteraction && !myPendingVelocemento) {
@@ -906,13 +917,16 @@ const App = (() => {
     }
     _refreshActionUI();
 
-    // Mostra il modale di ricerca se siamo noi a dover scegliere
-    if (state.pending_search && state.pending_search.player_id === myPlayerId && state.search_deck) {
+    // Mostra il modale di ricerca se siamo noi a dover scegliere. La ricerca ha la
+    // precedenza sulle interazioni (il server le accetta solo dopo): quelle si
+    // mostrano allo state_update successivo alla risoluzione della ricerca.
+    const mySearch = state.pending_search && state.pending_search.player_id === myPlayerId && state.search_deck;
+    if (mySearch) {
       _showSearchModal(state.search_deck, state.pending_search);
     }
 
     // Mostra il modale di interazione in attesa (Biblioteca, Cardo, Agilpesca, Magiscudo, Malcomune)
-    if (myPendingInteraction) {
+    if (myPendingInteraction && !mySearch) {
       if (myPendingInteraction.type === 'cardo_move') {
         _showCardoMoveModal(state);
       } else if (myPendingInteraction.type === 'agilpesca_discard') {
@@ -952,7 +966,7 @@ const App = (() => {
     Renderer.render(state, myPlayerId);
     _refreshActionUI();
     // Mostra modali in attesa (es. riconnessione)
-    const myPending = state.pending_interactions && state.pending_interactions.find(i => i.player_id === myPlayerId);
+    const myPending = _myPendingInteraction(state);
     if (myPending) {
       if (myPending.type === 'cardo_move') _showCardoMoveModal(state);
       else if (myPending.type === 'agilpesca_discard') _showAgilpescaDiscardModal(state);
@@ -1036,8 +1050,7 @@ const App = (() => {
     }
 
     // Interazioni in attesa (Biblioteca, Cardo, Magiscudo): mostrano solo il modale, bloccano tutto
-    const myPendingInteraction = currentState.pending_interactions &&
-      currentState.pending_interactions.find(i => i.player_id === myPlayerId);
+    const myPendingInteraction = _myPendingInteraction(currentState);
     if (myPendingInteraction) {
       if (myPendingInteraction.type === 'cardo_move') {
         document.getElementById('action-hint').textContent = '🛞 Cardo: scegli un Guerriero da spostare prima di pescare.';
