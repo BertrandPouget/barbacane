@@ -1485,6 +1485,66 @@ input:focus {
 
 #modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; }
 
+/* Selettore di Guerrieri (Renderer.showWarriorPicker): sezioni per giocatore,
+   sottosezioni per Regione. Stessa palette e nastri della grafica delle carte. */
+.wpick-subtitle { font-size: 0.8rem; color: var(--text-dim); font-style: italic; margin-bottom: 0.6rem; }
+.wpick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+.wpick-player { display: flex; flex-direction: column; gap: 0.45rem; }
+.wpick-player-head {
+  color: var(--card-cream);
+  font-weight: bold;
+  font-size: 0.95rem;
+}
+.wpick-zone { display: flex; flex-direction: column; gap: 0.3rem; padding-left: 0.5rem; }
+.wpick-zone-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--gold);
+  font-style: italic;
+}
+.wpick-zone-icon { font-style: normal; }
+.wpick-tag {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 0.68rem;
+  color: var(--card-ink);
+  background: var(--card-gold);
+  border-radius: 3px;
+  padding: 0.05rem 0.45rem;
+  letter-spacing: 0.03em;
+}
+.wpick-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.6rem;
+  background: var(--bg-light);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.wpick-row:hover { border-color: var(--gold); background: var(--bg-dark); }
+.wpick-row.selected { border-color: var(--gold-light); background: var(--bg-dark); }
+.wpick-row.selected .wpick-name { color: var(--gold-light); }
+.wpick-row.disabled { opacity: 0.45; cursor: default; }
+.wpick-row.disabled:hover { border-color: var(--border); background: var(--bg-light); }
+.wpick-row .wpick-tag { margin-left: 0; }
+.wpick-row-icon { color: var(--gold); }
+.wpick-name { font-weight: bold; font-size: 0.88rem; }
+.wpick-stats { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; margin-left: auto; }
+.wpick-note { flex-basis: 100%; font-size: 0.74rem; color: var(--card-cream); font-style: italic; margin-top: 0.15rem; }
+
 /* Ricerca nel mazzo */
 .search-summary {
   font-size: 0.85rem;

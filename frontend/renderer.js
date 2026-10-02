@@ -861,6 +861,336 @@ const Renderer = (() => {
   }
 
   // ---------------------------------------------------------------------------
+  // Selettori: una modale comune divisa in gruppi (giocatore, oppure
+  // "Selezionabili" / "Resto del mazzo") e sottosezioni (Regione, tipo di carta).
+  // Tutte le scelte di Guerrieri, Bastioni, Costruzioni e carte passano di qui,
+  // così hanno lo stesso aspetto. Parità con pickGrouped & co. del client mobile.
+  // ---------------------------------------------------------------------------
+
+  // Simboli monocromi come nella scelta della Regione quando si gioca un Guerriero
+  // (︎ forza la resa testuale anche dove il carattere diventerebbe un'emoji)
+  const ICON_VANGUARD = '⚔︎';
+  const ICON_BASTION  = '🛡︎';
+
+  const PICKER_ZONES = [
+    { key: 'vanguard',      icon: ICON_VANGUARD, label: 'Avanscoperta' },
+    { key: 'bastion_left',  icon: ICON_BASTION,  label: 'Bastione Sinistro', side: 'left' },
+    { key: 'bastion_right', icon: ICON_BASTION,  label: 'Bastione Destro',   side: 'right' },
+  ];
+  const TARGET_TAG = 'Possibile Bersaglio';
+
+  function _zoneWarriors(player, zoneKey) {
+    return zoneKey === 'vanguard'
+      ? (player.field.vanguard || [])
+      : (player.field[zoneKey].warriors || []);
+  }
+
+  function _bastion(player, side) {
+    return side === 'left' ? player.field.bastion_left : player.field.bastion_right;
+  }
+
+  // Giocatori vivi in ordine di posto, partendo da me.
+  function _playersFromMe(state) {
+    const ps = state.players;
+    const i = Math.max(0, ps.findIndex(p => p.id === _myPlayerId));
+    return [...ps.slice(i), ...ps.slice(0, i)].filter(p => (p.lives ?? 0) > 0);
+  }
+
+  // true se il Bastione `side` di `player` è un mio possibile bersaglio in Battaglia
+  function _isTarget(state, player, side) {
+    if (player.id === _myPlayerId) return false;
+    return _guerremotoActive(state) || _adjacentKeys(state).has(`${player.id}:${side}`);
+  }
+
+  function _playerHead(player) {
+    return player.id === _myPlayerId ? 'Tu' : player.name;
+  }
+
+  function _plural(n, one, many) { return `${n} ${n === 1 ? one : many}`; }
+
+  /**
+   * Modale di scelta a gruppi.
+   * opts: {
+   *   title, subtitle,
+   *   groups: [{ head?, zones: [{ icon?, label?, tag?, rows: [row] }] }],
+   *     row: { icon?, name, meta?, note?, tag?, value, disabled? }
+   *   onPick(value),
+   *   cancelLabel (default 'Annulla'; null = nessun bottone), onCancel,
+   *   empty: messaggio (toast) se non c'è nessuna riga selezionabile
+   * }
+   * Selezione + Conferma, oppure doppio clic. Ritorna false se non c'è niente da scegliere.
+   */
+  function showPicker(opts) {
+    const groups = (opts.groups || []).map(g => ({
+      ...g, zones: (g.zones || []).filter(z => z.rows && z.rows.length > 0),
+    })).filter(g => g.zones.length > 0);
+    const selectable = groups.some(g => g.zones.some(z => z.rows.some(r => !r.disabled)));
+    if (!selectable) {
+      if (opts.empty) toast(opts.empty, 'error');
+      return false;
+    }
+
+    const overlay    = document.getElementById('modal-overlay');
+    const confirmBtn = document.getElementById('modal-confirm');
+    const cancelBtn  = document.getElementById('modal-cancel');
+    const list = el('div', { className: 'wpick' });
+    let selected;
+    let hasSelection = false;
+
+    groups.forEach(g => {
+      const section = el('div', { className: 'wpick-player' });
+      if (g.head) section.appendChild(el('div', { className: 'wpick-player-head' }, [g.head]));
+      g.zones.forEach(z => {
+        const zone = el('div', { className: 'wpick-zone' });
+        if (z.label) {
+          const head = el('div', { className: 'wpick-zone-head' });
+          if (z.icon) head.appendChild(el('span', { className: 'wpick-zone-icon' }, [z.icon]));
+          head.appendChild(el('span', { className: 'wpick-zone-name' }, [z.label]));
+          if (z.tag) head.appendChild(el('span', { className: 'wpick-tag' }, [z.tag]));
+          zone.appendChild(head);
+        }
+        z.rows.forEach(r => {
+          const row = el('div', { className: `wpick-row${r.disabled ? ' disabled' : ''}` });
+          if (r.icon) row.appendChild(el('span', { className: 'wpick-row-icon' }, [r.icon]));
+          row.appendChild(el('span', { className: 'wpick-name' }, [r.name]));
+          if (r.tag) row.appendChild(el('span', { className: 'wpick-tag' }, [r.tag]));
+          if (r.meta) row.appendChild(el('span', { className: 'wpick-stats' }, [r.meta]));
+          if (r.note) row.appendChild(el('span', { className: 'wpick-note' }, [r.note]));
+          if (!r.disabled) {
+            row.addEventListener('click', () => {
+              list.querySelectorAll('.wpick-row').forEach(x => x.classList.remove('selected'));
+              row.classList.add('selected');
+              selected = r.value;
+              hasSelection = true;
+            });
+            row.addEventListener('dblclick', () => { overlay.classList.add('hidden'); opts.onPick(r.value); });
+          }
+          zone.appendChild(row);
+        });
+        section.appendChild(zone);
+      });
+      list.appendChild(section);
+    });
+
+    document.getElementById('modal-title').textContent = opts.title;
+    const body = document.getElementById('modal-body');
+    body.innerHTML = '';
+    if (opts.subtitle) body.appendChild(el('p', { className: 'wpick-subtitle' }, [opts.subtitle]));
+    body.appendChild(list);
+    overlay.classList.remove('hidden');
+
+    confirmBtn.classList.remove('hidden');
+    confirmBtn.textContent = 'Conferma';
+    confirmBtn.onclick = () => {
+      if (!hasSelection) { toast('Scegli prima un\'opzione', 'error'); return; }
+      overlay.classList.add('hidden');
+      opts.onPick(selected);
+    };
+    if (opts.cancelLabel === null) {
+      cancelBtn.classList.add('hidden');
+    } else {
+      cancelBtn.classList.remove('hidden');
+      cancelBtn.textContent = opts.cancelLabel || 'Annulla';
+      cancelBtn.onclick = () => {
+        overlay.classList.add('hidden');
+        opts.onCancel && opts.onCancel();
+      };
+    }
+    return true;
+  }
+
+  // Opzioni comuni ai selettori specializzati, passate così come sono a showPicker
+  function _passthrough(opts) {
+    const { title, subtitle, cancelLabel, onCancel, empty } = opts;
+    return { title, subtitle, cancelLabel, onCancel, empty };
+  }
+
+  /**
+   * Guerrieri, divisi per giocatore e per Regione.
+   * opts: { players (default: tutti i vivi, io per primo), filter(w, p, zoneKey),
+   *         note(w, p, zoneKey), onPick(w, p, zoneKey), + opzioni di showPicker }
+   */
+  function showWarriorPicker(state, opts) {
+    const players = opts.players || _playersFromMe(state);
+    const onlyMe = players.length === 1 && players[0].id === _myPlayerId;
+    const groups = players.map(p => ({
+      head: onlyMe ? null : _playerHead(p),
+      zones: PICKER_ZONES.map(z => ({
+        icon: z.icon,
+        label: z.label,
+        tag: z.side && _isTarget(state, p, z.side) ? TARGET_TAG : null,
+        rows: _zoneWarriors(p, z.key)
+          .filter(w => !opts.filter || opts.filter(w, p, z.key))
+          .map(w => ({
+            name: w.name || w.base_card_id,
+            meta: `ATT ${w.att} · GIT ${w.git} · DIF ${w.dif}`,
+            note: opts.note ? opts.note(w, p, z.key) : null,
+            value: { w, p, zoneKey: z.key },
+          })),
+      })),
+    }));
+    return showPicker({
+      ..._passthrough(opts),
+      groups,
+      onPick: (v) => opts.onPick(v.w, v.p, v.zoneKey),
+    });
+  }
+
+  /**
+   * Bastioni, divisi per giocatore.
+   * opts: { players, filter(p, side), note(p, side), onPick(p, side), + opzioni di showPicker }
+   */
+  function showBastionPicker(state, opts) {
+    const players = opts.players || _playersFromMe(state);
+    const onlyMe = players.length === 1 && players[0].id === _myPlayerId;
+    const groups = players.map(p => ({
+      head: onlyMe ? null : _playerHead(p),
+      zones: [{
+        rows: ['left', 'right']
+          .filter(side => !opts.filter || opts.filter(p, side))
+          .map(side => {
+            const b = _bastion(p, side);
+            return {
+              icon: ICON_BASTION,
+              name: `Bastione ${side === 'left' ? 'Sinistro' : 'Destro'}`,
+              tag: _isTarget(state, p, side) ? TARGET_TAG : null,
+              meta: `${_plural(b.wall_count ?? 0, 'Muro', 'Muri')} · ${_plural((b.warriors || []).length, 'Guerriero', 'Guerrieri')}`,
+              note: opts.note ? opts.note(p, side) : null,
+              value: { p, side },
+            };
+          }),
+      }],
+    }));
+    return showPicker({
+      ..._passthrough(opts),
+      groups,
+      onPick: (v) => opts.onPick(v.p, v.side),
+    });
+  }
+
+  /**
+   * Giocatori (es. Bastioncontrario base): una riga per giocatore con i Muri dei due Bastioni.
+   * opts: { players, onPick(p), + opzioni di showPicker }
+   */
+  function showPlayerPicker(state, opts) {
+    const players = opts.players || _playersFromMe(state);
+    return showPicker({
+      ..._passthrough(opts),
+      groups: [{ zones: [{ rows: players.map(p => ({
+        name: _playerHead(p),
+        meta: `Sinistro ${p.field.bastion_left.wall_count ?? 0} · Destro ${p.field.bastion_right.wall_count ?? 0} Muri`,
+        value: p,
+      })) }] }],
+      onPick: (p) => opts.onPick(p),
+    });
+  }
+
+  /**
+   * Costruzioni nel Villaggio, divise per giocatore.
+   * opts: { players, filter(b, p), meta(b, p), note(b, p), onPick(b, p), + opzioni di showPicker }
+   */
+  function showBuildingPicker(state, opts) {
+    const players = opts.players || _playersFromMe(state);
+    const onlyMe = players.length === 1 && players[0].id === _myPlayerId;
+    const groups = players.map(p => ({
+      head: onlyMe ? null : _playerHead(p),
+      zones: [{
+        label: 'Villaggio',
+        rows: (p.field.village.buildings || [])
+          .filter(b => !opts.filter || opts.filter(b, p))
+          .map(b => {
+            const def = App.getCardDef ? App.getCardDef(b.instance_id) : null;
+            return {
+              name: def ? def.name : b.base_card_id,
+              meta: opts.meta ? opts.meta(b, p) : (b.completed ? 'Completa' : 'Base'),
+              note: opts.note ? opts.note(b, p) : null,
+              value: { b, p },
+            };
+          }),
+      }],
+    }));
+    return showPicker({
+      ..._passthrough(opts),
+      groups,
+      onPick: (v) => opts.onPick(v.b, v.p),
+    });
+  }
+
+  /**
+   * Regione di destinazione di un proprio Guerriero (gioco dalla mano, riposizionamento, Cardo).
+   * opts: { exclude: zoneKey da non proporre, note(zoneKey), onPick(zoneKey), + opzioni di showPicker }
+   */
+  function showRegionPicker(opts) {
+    return showPicker({
+      ..._passthrough(opts),
+      groups: [{ zones: [{ rows: PICKER_ZONES.filter(z => z.key !== opts.exclude).map(z => ({
+        icon: z.icon,
+        name: z.label,
+        note: opts.note ? opts.note(z.key) : null,
+        value: z.key,
+      })) }] }],
+      onPick: (zoneKey) => opts.onPick(zoneKey),
+    });
+  }
+
+  const CARD_TYPES = [
+    { type: 'warrior',  label: 'Guerrieri' },
+    { type: 'spell',    label: 'Magie' },
+    { type: 'building', label: 'Costruzioni' },
+  ];
+
+  function _cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+
+  // Riga descrittiva di una carta (tipo, Specie/Scuola, costo), senza emoji
+  function cardMeta(def) {
+    if (!def) return '';
+    if (def.type === 'warrior') return `${def.subtype === 'hero' ? 'Eroe' : 'Recluta'} · ${_cap(def.species)}`;
+    if (def.type === 'spell') return `${_cap(def.school)} · ${_plural(def.cost, 'Maga', 'Maghe')}`;
+    return `${def.cost} Mana`;
+  }
+
+  /**
+   * Carte (mano o mazzo), divise per tipo.
+   * opts: {
+   *   groups: [{ head?, cards: [instance_id], disabled? }]   (oppure cards: [...] per un solo gruppo)
+   *   dedupe: raggruppa le copie della stessa carta in una riga "×N" (si sceglie la prima),
+   *   note(def, iid), onPick(iid), + opzioni di showPicker
+   * }
+   */
+  function showCardPicker(opts) {
+    const srcGroups = opts.groups || [{ cards: opts.cards || [] }];
+    const groups = srcGroups.map(g => {
+      const entries = [];
+      const byBase = new Map();
+      g.cards.forEach(iid => {
+        const def = App.getCardDef ? App.getCardDef(iid) : null;
+        const key = def ? def.id : iid;
+        if (opts.dedupe && byBase.has(key)) { byBase.get(key).count++; return; }
+        const entry = { iid, def, count: 1 };
+        entries.push(entry);
+        if (opts.dedupe) byBase.set(key, entry);
+      });
+      return {
+        head: g.head || null,
+        zones: CARD_TYPES.map(t => ({
+          label: t.label,
+          rows: entries
+            .filter(e => (e.def ? e.def.type : 'building') === t.type)
+            .sort((a, b) => (a.def ? a.def.name : '').localeCompare(b.def ? b.def.name : ''))
+            .map(e => ({
+              name: `${e.def ? e.def.name : e.iid}${e.count > 1 ? ` ×${e.count}` : ''}`,
+              meta: cardMeta(e.def),
+              note: opts.note ? opts.note(e.def, e.iid) : null,
+              disabled: !!g.disabled,
+              value: e.iid,
+            })),
+        })),
+      };
+    });
+    return showPicker({ ..._passthrough(opts), groups, onPick: (iid) => opts.onPick(iid) });
+  }
+
+  // ---------------------------------------------------------------------------
   // Toast
   // ---------------------------------------------------------------------------
 
@@ -986,6 +1316,14 @@ const Renderer = (() => {
     showScreen,
     showModal,
     showChoiceModal,
+    showPicker,
+    showWarriorPicker,
+    showBastionPicker,
+    showPlayerPicker,
+    showBuildingPicker,
+    showRegionPicker,
+    showCardPicker,
+    cardMeta,
     showCardDetail,
     closeCardDetail,
     toast,

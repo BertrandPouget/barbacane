@@ -889,19 +889,20 @@ const Mob = (() => {
       if (action === 'battle' && result.eracle_destroy_triggered &&
           result.eracle_targets && result.eracle_targets.length > 0 &&
           state.current_player_id === myPlayerId) {
-        Sheet.choice(
-          '⚡ Eracle',
-          result.eracle_targets.map(b => ({
-            icon: '🏗️',
-            label: cardName(b.base_card_id || (getCardDef(b.instance_id) || {}).id) || b.instance_id,
-            value: b.instance_id,
-          })),
-          (buildingIId) => sendAction('eracle_destroy', {
-            building_instance_id: buildingIId,
+        const defender = state.players.find(p => p.id === result.defender_id);
+        const targetIds = new Set(result.eracle_targets.map(b => b.instance_id));
+        pickBuilding({
+          title: 'Orda di Eracle — distruggi una Costruzione',
+          subtitle: 'Hai inflitto almeno 3 Danni: scegli una Costruzione del difensore',
+          players: defender ? [defender] : [],
+          filter: (b) => targetIds.has(b.instance_id),
+          locked: true,
+          cancelLabel: null,
+          onPick: (b) => sendAction('eracle_destroy', {
+            building_instance_id: b.instance_id,
             target_player_id: result.defender_id,
           }),
-          { subtitle: 'Distruggi una Costruzione avversaria', locked: true, cancelLabel: null },
-        );
+        });
         _logRecentEvents(state);
         refreshDock();
         return;
@@ -1230,12 +1231,12 @@ const Mob = (() => {
     if (def.type === 'warrior') {
       if (def.subtype === 'hero') showHeroPlayOptions(iid, def);
       else {
-        Sheet.choice(`Gioca ${def.name}`, [
-          { icon: '⚔️', label: 'Avanscoperta', sub: 'Prima linea: attacca e difende in battaglia', value: 'vanguard' },
-          { icon: '🏰', label: 'Bastione Sinistro', value: 'bastion_left' },
-          { icon: '🏰', label: 'Bastione Destro', value: 'bastion_right' },
-        ], (region) => sendAction('play_warrior', { instance_id: iid, region }),
-        { subtitle: 'Scegli dove schierarlo' });
+        pickRegion({
+          title: `Gioca ${def.name}`,
+          subtitle: 'Scegli dove schierarlo',
+          note: (z) => z === 'vanguard' ? 'Attacca in Battaglia' : 'Difende questo Bastione',
+          onPick: (region) => sendAction('play_warrior', { instance_id: iid, region }),
+        });
       }
     } else if (def.type === 'spell') {
       showSpellOptions(iid, def);
@@ -1261,43 +1262,25 @@ const Mob = (() => {
       Toast.show('Non hai nessun Guerriero in campo a cui assegnare il Trono.', 'error');
       return;
     }
-    Sheet.choice(`Costruisci ${def.name}`, warriors.map(w => ({
-      icon: '🗡️',
-      label: w.name || w.base_card_id,
-      sub: `🗡️${w.att} 🏹${w.git} 🛡️${w.dif}`,
-      value: w.instance_id,
-    })), (warriorIid) => sendAction('play_building', { instance_id: iid, target_warrior_iid: warriorIid }),
-    { subtitle: 'Scegli il Guerriero a cui assegnare il Trono' });
+    pickWarrior({
+      title: `Costruisci ${def.name}`,
+      subtitle: "Scegli il Guerriero a cui assegnarlo: completato, ne rende sempre attivo l'effetto Orda",
+      players: [my],
+      note: (w) => { const d = getCardDef(w.instance_id); return d && d.horde_effect ? null : 'Nessun effetto Orda'; },
+      onPick: (w) => sendAction('play_building', { instance_id: iid, target_warrior_iid: w.instance_id }),
+    });
   }
 
   function showHeroPlayOptions(iid, def) {
     const my = me();
-    const regionLabels = { vanguard: 'Avanscoperta', bastion_left: 'Bastione Sin.', bastion_right: 'Bastione Des.' };
-    const compat = [];
-    ['vanguard', 'bastion_left', 'bastion_right'].forEach(reg => {
-      const warriors = reg === 'vanguard'
-        ? my.field.vanguard
-        : (reg === 'bastion_left' ? my.field.bastion_left.warriors : my.field.bastion_right.warriors);
-      (warriors || []).forEach(w => {
-        const wDef = getCardDef(w.instance_id);
-        if (wDef && wDef.evolves_into === def.id) {
-          compat.push({
-            icon: '⬆️',
-            label: `Evolvi ${wDef.name}`,
-            sub: regionLabels[reg],
-            value: w.instance_id,
-          });
-        }
-      });
+    pickWarrior({
+      title: `Evolvi in ${def.name}`,
+      subtitle: 'La Recluta diventa Eroe e ne eredita le carte assegnate',
+      players: [my],
+      filter: (w) => { const d = getCardDef(w.instance_id); return !!d && d.evolves_into === def.id; },
+      empty: `Nessuna Recluta compatibile in campo per evolvere ${def.name}.`,
+      onPick: (w) => sendAction('evolve', { recruit_instance_id: w.instance_id, hero_instance_id: iid }),
     });
-
-    if (compat.length === 0) {
-      Toast.show(`Nessuna Recluta compatibile in campo per evolvere ${def.name}.`, 'error');
-      return;
-    }
-    Sheet.choice(`Evolvi in ${def.name}`, compat,
-      (recruitIId) => sendAction('evolve', { recruit_instance_id: recruitIId, hero_instance_id: iid }),
-      { subtitle: 'La Recluta diventa Eroe e ne eredita le carte assegnate' });
   }
 
   // -- Magie ------------------------------------------------------------------
@@ -1335,117 +1318,63 @@ const Mob = (() => {
 
     if (def.id === 'plasmattone' || def.id === 'plasmarmo') {
       const my = me();
-      const bastionOptions = ['left', 'right']
-        .filter(s => ((s === 'left' ? my.field.bastion_left : my.field.bastion_right).wall_count ?? 0) > 0)
-        .map(s => ({
-          icon: '🏰',
-          label: `Bastione ${s === 'left' ? 'Sinistro' : 'Destro'}`,
-          sub: `${(s === 'left' ? my.field.bastion_left : my.field.bastion_right).wall_count} muri`,
-          value: s,
-        }));
-      if (bastionOptions.length === 0) { Toast.show('Nessun Muro nei tuoi Bastioni.', 'error'); return; }
-
       const needPicker = def.id === 'plasmarmo' || (def.id === 'plasmattone' && prodigy);
-      Sheet.choice(`${def.name} — scegli un Bastione`, bastionOptions, (side) => {
-        if (needPicker) {
-          const walls = (side === 'left' ? my.field.bastion_left : my.field.bastion_right).walls || [];
-          showSpellWallPicker(walls, side, iid, 0);
-        } else {
-          sendAction('play_spell', { instance_id: iid, bastion_side: side });
-        }
+      pickBastion({
+        title: `${def.name} — scegli un tuo Bastione`,
+        players: [my],
+        filter: (p, side) => (bastionOf(p, side).wall_count ?? 0) > 0,
+        empty: 'Nessun Muro nei tuoi Bastioni.',
+        onPick: (p, side) => {
+          if (needPicker) {
+            showSpellWallPicker(bastionOf(my, side).walls || [], side, iid, 0);
+          } else {
+            sendAction('play_spell', { instance_id: iid, bastion_side: side });
+          }
+        },
       });
       return;
     }
 
     if (def.id === 'arrampicarta') {
       const my = me();
-      const bastionOptions = ['left', 'right']
-        .filter(s => ((s === 'left' ? my.field.bastion_left : my.field.bastion_right).wall_count ?? 0) > 0)
-        .map(s => ({
-          icon: '🏰',
-          label: `Bastione ${s === 'left' ? 'Sinistro' : 'Destro'}`,
-          sub: `${(s === 'left' ? my.field.bastion_left : my.field.bastion_right).wall_count} muri`,
-          value: s,
-        }));
-      if (bastionOptions.length === 0) { Toast.show('Nessun Muro nei tuoi Bastioni.', 'error'); return; }
       if (getAllWarriors(my).length === 0) { Toast.show('Non hai nessun Guerriero in campo a cui assegnare un Muro.', 'error'); return; }
-      Sheet.choice(`${def.name} — scegli un Bastione`, bastionOptions, (side) => {
-        const walls = (side === 'left' ? my.field.bastion_left : my.field.bastion_right).walls || [];
-        showArrampicartaWallPicker(walls, side, iid, 0);
+      pickBastion({
+        title: `${def.name} — scegli un tuo Bastione`,
+        subtitle: 'Poi scegli il Muro e il Guerriero a cui assegnarlo',
+        players: [my],
+        filter: (p, side) => (bastionOf(p, side).wall_count ?? 0) > 0,
+        empty: 'Nessun Muro nei tuoi Bastioni.',
+        onPick: (p, side) => showArrampicartaWallPicker(bastionOf(my, side).walls || [], side, iid, 0),
       });
       return;
     }
 
     if (def.id === 'cambiamente') {
-      const options = [];
-      opponents.forEach(p => {
-        const zones = [
-          { warriors: p.field.vanguard, label: 'Avanscoperta' },
-          { warriors: p.field.bastion_left.warriors, label: 'Bastione Sin.' },
-          { warriors: p.field.bastion_right.warriors, label: 'Bastione Des.' },
-        ];
-        zones.forEach(({ warriors, label }) => {
-          (warriors || []).forEach(w => {
-            options.push({
-              icon: '🗡️',
-              label: w.name || w.base_card_id,
-              sub: `${p.name} — ${label} · 🗡️${w.att} 🏹${w.git} 🛡️${w.dif}`,
-              value: `${p.id}:${w.instance_id}`,
-            });
-          });
-        });
-      });
-      if (options.length === 0) { Toast.show('Nessun Guerriero avversario disponibile.', 'error'); return; }
-      Sheet.choice(`${def.name} — scegli un Guerriero`, options, (choice) => {
-        const [targetPlayerId, targetWarriorIid] = choice.split(':');
-        sendAction('play_spell', { instance_id: iid, target_player_id: targetPlayerId, target_warrior_iid: targetWarriorIid });
+      pickWarrior({
+        title: `${def.name} — scegli un Guerriero`,
+        players: opponents,
+        empty: 'Nessun Guerriero avversario disponibile.',
+        onPick: (w, p) => sendAction('play_spell', { instance_id: iid, target_player_id: p.id, target_warrior_iid: w.instance_id }),
       });
       return;
     }
 
     if (def.id === 'equipotenza') {
-      const my = me();
-      const zoneLabels = { vanguard: 'Avanscoperta', bastion_left: 'Bastione Sin.', bastion_right: 'Bastione Des.' };
-      const ownOptions = [];
-      ['vanguard', 'bastion_left', 'bastion_right'].forEach(reg => {
-        const warriors = reg === 'vanguard'
-          ? my.field.vanguard
-          : (reg === 'bastion_left' ? my.field.bastion_left.warriors : my.field.bastion_right.warriors);
-        (warriors || []).forEach(w => {
-          ownOptions.push({ icon: '🗡️', label: w.name || w.base_card_id, sub: zoneLabels[reg], value: w.instance_id });
-        });
-      });
-      if (ownOptions.length === 0) { Toast.show('Non hai nessun Guerriero in campo.', 'error'); return; }
-      Sheet.choice(
-        `${def.name} — scegli un tuo Guerriero`,
-        ownOptions,
-        (ownIid) => {
-          if (!prodigy) { sendAction('play_spell', { instance_id: iid, own_warrior_iid: ownIid }); return; }
-          const allOptions = [];
-          currentState.players.filter(p => p.lives > 0).forEach(p => {
-            ['vanguard', 'bastion_left', 'bastion_right'].forEach(reg => {
-              const warriors = reg === 'vanguard'
-                ? p.field.vanguard
-                : (reg === 'bastion_left' ? p.field.bastion_left.warriors : p.field.bastion_right.warriors);
-              (warriors || []).forEach(w => {
-                allOptions.push({
-                  icon: '🗡️',
-                  label: w.name || w.base_card_id,
-                  sub: `${p.id === myPlayerId ? 'Tu' : p.name} — ${zoneLabels[reg]}`,
-                  value: w.instance_id,
-                });
-              });
-            });
+      pickWarrior({
+        title: `${def.name} — scegli un tuo Guerriero`,
+        subtitle: 'ATT e DIF diventano pari al valore maggiore dei due',
+        players: [me()],
+        empty: 'Non hai nessun Guerriero in campo.',
+        onPick: (ownW) => {
+          if (!prodigy) { sendAction('play_spell', { instance_id: iid, own_warrior_iid: ownW.instance_id }); return; }
+          const shown = pickWarrior({
+            title: `${def.name} — scegli un Guerriero qualsiasi`,
+            subtitle: 'Prodigio: ATT e DIF diventano pari al valore minore dei due',
+            onPick: (w) => sendAction('play_spell', { instance_id: iid, own_warrior_iid: ownW.instance_id, enemy_warrior_iid: w.instance_id }),
           });
-          if (allOptions.length === 0) { sendAction('play_spell', { instance_id: iid, own_warrior_iid: ownIid }); return; }
-          Sheet.choice(
-            `${def.name} — scegli un Guerriero (ATT/DIF al valore minore)`,
-            allOptions,
-            (enemyIid) => sendAction('play_spell', { instance_id: iid, own_warrior_iid: ownIid, enemy_warrior_iid: enemyIid }),
-          );
+          if (!shown) sendAction('play_spell', { instance_id: iid, own_warrior_iid: ownW.instance_id });
         },
-        { subtitle: 'ATT e DIF diventano pari al valore maggiore dei due' },
-      );
+      });
       return;
     }
 
@@ -1456,25 +1385,15 @@ const Mob = (() => {
     if (def.id === 'regicidio') { showRegicidioOptions(iid, def, prodigy); return; }
 
     if (def.id === 'malcomune') {
-      const my = me();
-      const zones = [
-        { warriors: my.field.vanguard, label: 'Avanscoperta' },
-        { warriors: my.field.bastion_left.warriors, label: 'Bastione Sin.' },
-        { warriors: my.field.bastion_right.warriors, label: 'Bastione Des.' },
-      ];
-      const options = [];
-      zones.forEach(({ warriors, label }) => {
-        (warriors || []).forEach(w => {
-          options.push({ icon: '🗡️', label: w.name || w.base_card_id, sub: label, value: w.instance_id });
-        });
+      pickWarrior({
+        title: `${def.name} — scegli un tuo Guerriero`,
+        subtitle: (prodigy ? 'Prodigio: il tuo Guerriero resta in campo' : 'Il Guerriero scelto verrà scartato')
+          + '. Ogni avversario ne scarta uno della stessa Specie',
+        players: [me()],
+        note: (w) => { const d = getCardDef(w.instance_id); return d && d.species ? `Specie: ${capitalize(d.species)}` : null; },
+        empty: 'Non hai nessun Guerriero in campo.',
+        onPick: (w) => sendAction('play_spell', { instance_id: iid, own_warrior_iid: w.instance_id }),
       });
-      if (options.length === 0) { Toast.show('Non hai nessun Guerriero in campo.', 'error'); return; }
-      Sheet.choice(
-        `${def.name} — scegli un tuo Guerriero`,
-        options,
-        (chosenIid) => sendAction('play_spell', { instance_id: iid, own_warrior_iid: chosenIid }),
-        { subtitle: prodigy ? 'Prodigio: il tuo Guerriero resta in campo' : 'Il Guerriero scelto verrà scartato' },
-      );
       return;
     }
 
@@ -1489,156 +1408,109 @@ const Mob = (() => {
       return;
     }
 
-    const options = [];
-    opponents.forEach(p => {
-      options.push({
-        icon: '🎯', label: `${p.name} — Bastione Sin.`,
-        sub: `🧱 ${p.field.bastion_left.wall_count ?? 0} muri`, value: `${p.id}:left`,
-      });
-      options.push({
-        icon: '🎯', label: `${p.name} — Bastione Des.`,
-        sub: `🧱 ${p.field.bastion_right.wall_count ?? 0} muri`, value: `${p.id}:right`,
-      });
-    });
-    Sheet.choice(`${def.name} — scegli bersaglio`, options, (choice) => {
-      const [targetId, side] = choice.split(':');
-      sendAction('play_spell', { instance_id: iid, target_player_id: targetId, target_bastion_side: side });
+    pickBastion({
+      title: `${def.name} — scegli il Bastione bersaglio`,
+      players: opponents,
+      onPick: (p, side) => sendAction('play_spell', { instance_id: iid, target_player_id: p.id, target_bastion_side: side }),
     });
   }
 
   function showCuordipietraOptions(iid, def, prodigy) {
     const opponents = currentState.players.filter(p => p.id !== myPlayerId && p.lives > 0);
-    const options = [];
-    opponents.forEach(p => {
-      const zones = [
-        { warriors: p.field.vanguard, label: 'Avanscoperta' },
-        { warriors: p.field.bastion_left.warriors, label: 'Bastione Sin.' },
-        { warriors: p.field.bastion_right.warriors, label: 'Bastione Des.' },
-      ];
-      zones.forEach(({ warriors, label }) => {
-        (warriors || []).forEach(w => {
-          if (!prodigy && w.subtype !== 'recruit') return;
-          options.push({
-            icon: '🗡️',
-            label: w.name || w.base_card_id,
-            sub: `${p.name} — ${label} · 🗡️${w.att} 🏹${w.git} 🛡️${w.dif}`,
-            value: `${p.id}:${w.instance_id}`,
-          });
+    pickWarrior({
+      title: `${def.name} — scegli un Guerriero`,
+      subtitle: prodigy ? '' : 'Solo Reclute (con il Prodigio anche gli Eroi)',
+      players: opponents,
+      filter: (w) => prodigy || w.subtype === 'recruit',
+      empty: prodigy ? 'Nessun Guerriero avversario disponibile.' : 'Nessuna Recluta avversaria disponibile.',
+      onPick: (w, p) => {
+        const targetPlayerId = p.id;
+        const targetWarriorIid = w.instance_id;
+        // Base: il Guerriero diventa Muro in un Bastione del suo proprietario; Prodigio: in uno tuo
+        pickBastion({
+          title: `${def.name} — dove diventa Muro ${w.name}?`,
+          players: [prodigy ? me() : p],
+          onPick: (bp, destSide) => sendAction('play_spell', {
+            instance_id: iid,
+            target_player_id: targetPlayerId,
+            target_warrior_iid: targetWarriorIid,
+            dest_bastion_side: destSide,
+          }),
         });
-      });
-    });
-    if (options.length === 0) {
-      Toast.show(prodigy ? 'Nessun Guerriero avversario disponibile.' : 'Nessuna Recluta avversaria disponibile.', 'error');
-      return;
-    }
-    Sheet.choice(`${def.name} — scegli un Guerriero`, options, (choice) => {
-      const [targetPlayerId, targetWarriorIid] = choice.split(':');
-      const target = currentState.players.find(p => p.id === targetPlayerId);
-      const sideOptions = prodigy
-        ? [
-            { icon: '🏰', label: 'Muri — Bastione Sin. mio', value: 'left' },
-            { icon: '🏰', label: 'Muri — Bastione Des. mio', value: 'right' },
-          ]
-        : [
-            { icon: '🏰', label: `Muri — Bastione Sin. di ${target ? target.name : ''}`, value: 'left' },
-            { icon: '🏰', label: `Muri — Bastione Des. di ${target ? target.name : ''}`, value: 'right' },
-          ];
-      Sheet.choice(`${def.name} — scegli il Bastione a cui aggiungere il Muro`, sideOptions, (destSide) => {
-        sendAction('play_spell', {
-          instance_id: iid,
-          target_player_id: targetPlayerId,
-          target_warrior_iid: targetWarriorIid,
-          dest_bastion_side: destSide,
-        });
-      });
+      },
     });
   }
 
   function showBastioncontrarioOptions(iid, def, prodigy) {
-    const alive = currentState.players.filter(p => p.lives > 0);
     if (!prodigy) {
-      Sheet.choice(`${def.name} — scegli un giocatore`, alive.map(p => ({
-        icon: '⇄',
-        label: p.id === myPlayerId ? 'I miei Muri' : `I Muri di ${p.name}`,
-        value: p.id,
-      })), (playerId) => sendAction('play_spell', { instance_id: iid, player1_id: playerId }),
-      { subtitle: 'I suoi due Bastioni si scambiano i Muri' });
+      pickPlayer({
+        title: `${def.name} — scegli un giocatore`,
+        subtitle: 'I suoi due Bastioni si scambiano i Muri',
+        onPick: (p) => sendAction('play_spell', { instance_id: iid, player1_id: p.id }),
+      });
       return;
     }
-    const bastionOptions = [];
-    alive.forEach(p => {
-      ['left', 'right'].forEach(side => {
-        bastionOptions.push({
-          icon: '🏰',
-          label: `${p.id === myPlayerId ? 'Mio' : p.name} — Bastione ${side === 'left' ? 'Sin.' : 'Des.'}`,
-          value: `${p.id}:${side}`,
+    pickBastion({
+      title: `${def.name} — primo Bastione`,
+      subtitle: 'Prodigio: due Bastioni qualsiasi si scambiano i Muri',
+      onPick: (p1, s1) => {
+        const sideName = s1 === 'left' ? 'Sinistro' : 'Destro';
+        pickBastion({
+          title: `${def.name} — secondo Bastione`,
+          subtitle: p1.id === myPlayerId
+            ? `Scambierà i Muri con il tuo Bastione ${sideName}`
+            : `Scambierà i Muri con il Bastione ${sideName} di ${p1.name}`,
+          filter: (p2, s2) => !(p2.id === p1.id && s2 === s1),
+          onPick: (p2, s2) => sendAction('play_spell', { instance_id: iid, player1_id: p1.id, side1: s1, player2_id: p2.id, side2: s2 }),
         });
-      });
-    });
-    Sheet.choice(`${def.name} — primo Bastione`, bastionOptions, (c1) => {
-      const [p1, s1] = c1.split(':');
-      Sheet.choice(`${def.name} — secondo Bastione`, bastionOptions.filter(o => o.value !== c1), (c2) => {
-        const [p2, s2] = c2.split(':');
-        sendAction('play_spell', { instance_id: iid, player1_id: p1, side1: s1, player2_id: p2, side2: s2 });
-      });
+      },
     });
   }
 
   function showRegicidioOptions(iid, def, prodigy) {
-    const options = [];
-    currentState.players.forEach(p => {
-      (p.field.village.buildings || []).forEach(b => {
-        if (b.base_card_id !== 'trono') return;
-        let sub = p.id === myPlayerId ? 'Tuo' : p.name;
-        if (b.assigned_warrior) {
-          const warrior = [...(p.field.vanguard || []), ...(p.field.bastion_left.warriors || []), ...(p.field.bastion_right.warriors || [])]
-            .find(w => w.instance_id === b.assigned_warrior);
-          sub += warrior ? ` · su ${warrior.name || warrior.base_card_id}` : '';
-        } else {
-          sub += ' · non assegnato';
-        }
-        options.push({
-          icon: '👑',
-          label: `Trono${b.completed ? ' (completo)' : ''}`,
-          sub,
-          value: `${p.id}:${b.instance_id}`,
-        });
-      });
+    pickBuilding({
+      title: `${def.name} — scegli un Trono`,
+      subtitle: prodigy ? 'Prodigio: verrà scartato anche il Guerriero a cui è assegnato' : '',
+      filter: (b) => b.base_card_id === 'trono',
+      note: (b, p) => {
+        if (!b.assigned_warrior) return 'Non assegnato';
+        const warrior = getAllWarriors(p).find(w => w.instance_id === b.assigned_warrior);
+        return `Assegnato a ${warrior ? (warrior.name || warrior.base_card_id) : 'un Guerriero'}`;
+      },
+      empty: 'Non ci sono Troni in campo.',
+      onPick: (b, p) => sendAction('play_spell', { instance_id: iid, target_player_id: p.id, target_trono_iid: b.instance_id }),
     });
-    if (options.length === 0) { Toast.show('Non ci sono Troni in campo.', 'error'); return; }
-    Sheet.choice(`${def.name} — scegli un Trono`, options, (choice) => {
-      const [targetId, tronoIid] = choice.split(':');
-      sendAction('play_spell', { instance_id: iid, target_player_id: targetId, target_trono_iid: tronoIid });
-    }, prodigy ? { subtitle: 'Prodigio: verrà scartato anche il Guerriero a cui era assegnato' } : undefined);
   }
 
   function showTelecinesiOptions(iid, def, prodigy) {
     const my = me();
     const alive = currentState.players.filter(p => p.lives > 0);
-    const wallCount = (p, side) => (side === 'left' ? p.field.bastion_left : p.field.bastion_right).wall_count ?? 0;
+    const wallCount = (p, side) => bastionOf(p, side).wall_count ?? 0;
 
     function pickCount(maxWalls, onCount) {
-      const max = Math.min(3, maxWalls);
-      const opts = [];
-      for (let i = 1; i <= max; i++) opts.push({ icon: '🧱', label: `${i} ${i > 1 ? 'Muri' : 'Muro'}`, value: String(i) });
-      Sheet.choice('Telecinesi — quanti Muri?', opts, v => onCount(parseInt(v)));
+      const rows = [];
+      for (let i = 1; i <= Math.min(3, maxWalls); i++) rows.push({ name: `${i} ${i > 1 ? 'Muri' : 'Muro'}`, value: i });
+      pickGrouped({
+        title: 'Telecinesi — quanti Muri?',
+        subtitle: 'I Muri spostati sono scelti a caso',
+        groups: [{ zones: [{ rows }] }],
+        onPick: (n) => onCount(n),
+      });
     }
 
     if (!prodigy) {
-      const srcOptions = ['left', 'right']
-        .filter(s => wallCount(my, s) > 0)
-        .map(s => ({
-          icon: '🏰',
-          label: `Bastione ${s === 'left' ? 'Sinistro' : 'Destro'}`,
-          sub: `${wallCount(my, s)} muri`,
-          value: s,
-        }));
-      if (srcOptions.length === 0) { Toast.show('Nessun Muro nei tuoi Bastioni.', 'error'); return; }
-      Sheet.choice('Telecinesi — bastione di partenza', srcOptions, (srcSide) => {
-        const destSide = srcSide === 'left' ? 'right' : 'left';
-        pickCount(wallCount(my, srcSide), (count) => {
-          sendAction('play_spell', { instance_id: iid, source_side: srcSide, dest_side: destSide, count });
-        });
+      pickBastion({
+        title: 'Telecinesi — Bastione di partenza',
+        subtitle: "I Muri si spostano nell'altro tuo Bastione",
+        players: [my],
+        filter: (p, side) => wallCount(p, side) > 0,
+        empty: 'Nessun Muro nei tuoi Bastioni.',
+        onPick: (p, srcSide) => {
+          const destSide = srcSide === 'left' ? 'right' : 'left';
+          pickCount(wallCount(my, srcSide), (count) => {
+            sendAction('play_spell', { instance_id: iid, source_side: srcSide, dest_side: destSide, count });
+          });
+        },
       });
       return;
     }
@@ -1649,40 +1521,30 @@ const Mob = (() => {
       const adj = [`${playerId}:${side === 'left' ? 'right' : 'left'}`];
       if (side === 'right') adj.push(`${alive[(idx + 1) % n].id}:left`);
       else adj.push(`${alive[(idx - 1 + n) % n].id}:right`);
-      return adj;
+      return new Set(adj);
     }
-    const label = (p, side) =>
-      `${p.id === myPlayerId ? 'Mio' : p.name} — Bastione ${side === 'left' ? 'Sin.' : 'Des.'}`;
 
-    const srcOptions = [];
-    alive.forEach(p => {
-      ['left', 'right'].forEach(side => {
-        if (wallCount(p, side) > 0) {
-          srcOptions.push({ icon: '🏰', label: label(p, side), sub: `${wallCount(p, side)} muri`, value: `${p.id}:${side}` });
-        }
-      });
-    });
-    if (srcOptions.length === 0) { Toast.show('Nessun Muro disponibile.', 'error'); return; }
-
-    Sheet.choice('Telecinesi — bastione di partenza', srcOptions, (srcChoice) => {
-      const [srcPid, srcSide] = srcChoice.split(':');
-      const dstOptions = adjacentKeys(srcPid, srcSide).map(key => {
-        const [pid, side] = key.split(':');
-        const p = alive.find(pp => pp.id === pid);
-        return { icon: '🏰', label: label(p, side), sub: `${wallCount(p, side)} muri`, value: key };
-      });
-      Sheet.choice('Telecinesi — bastione di arrivo', dstOptions, (dstChoice) => {
-        const [dstPid, dstSide] = dstChoice.split(':');
-        const src = alive.find(p => p.id === srcPid);
-        pickCount(wallCount(src, srcSide), (count) => {
-          sendAction('play_spell', {
-            instance_id: iid,
-            source_player_id: srcPid, source_side: srcSide,
-            dest_player_id: dstPid, dest_side: dstSide,
-            count,
-          });
+    pickBastion({
+      title: 'Telecinesi — Bastione di partenza',
+      subtitle: 'Prodigio: da un Bastione qualsiasi a uno adiacente',
+      filter: (p, side) => wallCount(p, side) > 0,
+      empty: 'Nessun Muro disponibile.',
+      onPick: (src, srcSide) => {
+        const adj = adjacentKeys(src.id, srcSide);
+        pickBastion({
+          title: 'Telecinesi — Bastione di arrivo',
+          subtitle: 'Solo i Bastioni adiacenti a quello di partenza',
+          filter: (p, side) => adj.has(`${p.id}:${side}`),
+          onPick: (dst, dstSide) => pickCount(wallCount(src, srcSide), (count) => {
+            sendAction('play_spell', {
+              instance_id: iid,
+              source_player_id: src.id, source_side: srcSide,
+              dest_player_id: dst.id, dest_side: dstSide,
+              count,
+            });
+          }),
         });
-      });
+      },
     });
   }
 
@@ -1735,29 +1597,15 @@ const Mob = (() => {
   }
 
   function showArrampicartaWarriorPicker(spellIid, wallSide, wallIid) {
-    const my = me();
-    const zoneLabels = { vanguard: 'Avanscoperta', bastion_left: 'Bastione Sin.', bastion_right: 'Bastione Des.' };
-    const options = [];
-    ['vanguard', 'bastion_left', 'bastion_right'].forEach(reg => {
-      const warriors = reg === 'vanguard'
-        ? my.field.vanguard
-        : (reg === 'bastion_left' ? my.field.bastion_left.warriors : my.field.bastion_right.warriors);
-      (warriors || []).forEach(w => {
-        options.push({
-          icon: '🗡️',
-          label: w.name || w.base_card_id,
-          sub: `${zoneLabels[reg]} · 🗡️${w.att} 🏹${w.git} 🛡️${w.dif}`,
-          value: w.instance_id,
-        });
-      });
-    });
-    Sheet.choice('Arrampicarta — assegna il Muro a un Guerriero', options, (warriorIid) => {
-      sendAction('play_spell', {
+    pickWarrior({
+      title: 'Arrampicarta — assegna il Muro a un Guerriero',
+      players: [me()],
+      onPick: (w) => sendAction('play_spell', {
         instance_id: spellIid,
         bastion_side: wallSide,
         wall_instance_id: wallIid,
-        warrior_iid: warriorIid,
-      });
+        warrior_iid: w.instance_id,
+      }),
     });
   }
 
@@ -1873,20 +1721,24 @@ const Mob = (() => {
     const my = me();
     const buildings = (my.field.village.buildings || []).filter(b => !b.completed);
     if (buildings.length === 0) return;
-    Sheet.choice('Completa una Costruzione', buildings.map(b => {
-      const def = getCardDef(b.instance_id);
-      const baseCost = def ? def.completion_cost : null;
-      const discount = reinholdDiscountFor(b.base_card_id);
-      const eff = baseCost !== null ? Math.max(0, baseCost - discount) : '?';
-      const isEth = my.ethereal_complete === b.instance_id;
-      return {
-        icon: '🏗️',
-        label: def ? def.name : b.base_card_id,
-        sub: isEth ? 'Gratis (Velocemento)' : `${discount > 0 ? `${baseCost}→` : ''}${eff} Mana`,
-        value: b.instance_id,
-        className: isEth ? 'gold' : '',
-      };
-    }), (instanceId) => sendAction('complete_building', { building_instance_id: instanceId }));
+    pickBuilding({
+      title: 'Completa una Costruzione',
+      players: [my],
+      filter: (b) => !b.completed,
+      meta: (b) => {
+        if (my.ethereal_complete === b.instance_id) return 'Gratis (Velocemento)';
+        const def = getCardDef(b.instance_id);
+        const baseCost = def ? def.completion_cost : null;
+        const discount = reinholdDiscountFor(b.base_card_id);
+        const eff = baseCost !== null ? Math.max(0, baseCost - discount) : '?';
+        return `${discount > 0 ? `${baseCost}→` : ''}${eff} Mana`;
+      },
+      note: (b) => {
+        const def = getCardDef(b.instance_id);
+        return def && def.complete_effect ? def.complete_effect.replace(/^&\s*/, '') : null;
+      },
+      onPick: (b) => sendAction('complete_building', { building_instance_id: b.instance_id }),
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -2016,11 +1868,11 @@ const Mob = (() => {
       disabled: !canMove,
       onClick: () => {
         Sheet.close(true);
-        Sheet.choice(`Sposta ${w.name || ''}`, [
-          { icon: '⚔️', label: 'Avanscoperta', value: 'vanguard', disabled: zone === 'vanguard' },
-          { icon: '🏰', label: 'Bastione Sinistro', value: 'bastion_left', disabled: zone === 'bastion_left' },
-          { icon: '🏰', label: 'Bastione Destro', value: 'bastion_right', disabled: zone === 'bastion_right' },
-        ], (dest) => sendAction('reposition', { warrior_instance_id: iid, destination: dest }));
+        pickRegion({
+          title: `Sposta ${w.name || ''}`,
+          exclude: zone,
+          onPick: (dest) => sendAction('reposition', { warrior_instance_id: iid, destination: dest }),
+        });
       },
     });
     footer.push({ label: 'Chiudi', onClick: () => Sheet.close() });
@@ -2156,6 +2008,322 @@ const Mob = (() => {
     });
   }
 
+  // -- Selettori ------------------------------------------------------------------
+  // Uno sheet comune diviso in gruppi (giocatore, oppure "Selezionabili" /
+  // "Resto del mazzo") e sottosezioni (Regione, tipo di carta). Tutte le scelte di
+  // Guerrieri, Bastioni, Costruzioni e carte passano di qui, così hanno lo stesso
+  // aspetto. Parità con Renderer.showPicker & co. del client desktop.
+
+  // Simboli monocromi di Regione, come sul desktop (⚔ e 🛡). Sono SVG e non
+  // caratteri perché sui telefoni ︎ non basta: senza un glifo testuale nei
+  // font di sistema (🛡 su iOS) il carattere torna un'emoji a colori.
+  // Usano currentColor, quindi prendono il colore del testo che li contiene.
+  const REGION_SVG = {
+    vanguard: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '<path d="M4 4l11 11M20 4L9 15"/><path d="M12.5 17.5l5-5M6.5 12.5l5 5"/><path d="M16 16l4 4M8 16l-4 4"/></svg>',
+    bastion: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">'
+      + '<path d="M12 2.5l8 3v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10v-6z"/></svg>',
+  };
+  const ICON_VANGUARD = 'svg:vanguard';
+  const ICON_BASTION  = 'svg:bastion';
+
+  // Nodo per un'icona dei selettori: 'svg:<nome>' → SVG di REGION_SVG, altrimenti testo
+  function iconNode(icon) {
+    if (typeof icon === 'string' && icon.startsWith('svg:')) {
+      const span = el('span', { className: 'region-svg' });
+      span.innerHTML = REGION_SVG[icon.slice(4)] || '';
+      return span;
+    }
+    return icon;
+  }
+
+  const PICKER_ZONES = [
+    { key: 'vanguard',      icon: ICON_VANGUARD, label: 'Avanscoperta' },
+    { key: 'bastion_left',  icon: ICON_BASTION,  label: 'Bastione Sinistro', side: 'left' },
+    { key: 'bastion_right', icon: ICON_BASTION,  label: 'Bastione Destro',   side: 'right' },
+  ];
+  const TARGET_TAG = 'Possibile Bersaglio';
+
+  function zoneWarriors(p, zoneKey) {
+    return zoneKey === 'vanguard' ? (p.field.vanguard || []) : (p.field[zoneKey].warriors || []);
+  }
+
+  function bastionOf(p, side) {
+    return side === 'left' ? p.field.bastion_left : p.field.bastion_right;
+  }
+
+  // Giocatori vivi in ordine di posto, partendo da me.
+  function playersFromMe() {
+    const ps = currentState.players;
+    const i = Math.max(0, ps.findIndex(p => p.id === myPlayerId));
+    return [...ps.slice(i), ...ps.slice(0, i)].filter(p => (p.lives ?? 0) > 0);
+  }
+
+  // Chiavi "playerId:side" dei Bastioni avversari che posso attaccare
+  function targetKeys() {
+    return new Set(myAttackTargets().map(t => `${t.player.id}:${t.side}`));
+  }
+
+  const playerHead = (p) => (p.id === myPlayerId ? 'Tu' : p.name);
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+  /**
+   * Sheet di scelta a gruppi. Il tap su una riga sceglie subito.
+   * opts: {
+   *   title, subtitle,
+   *   groups: [{ head?, zones: [{ icon?, label?, tag?, rows: [row] }] }],
+   *     row: { icon?, name, meta?, note?, tag?, value, disabled? }
+   *   onPick(value),
+   *   locked, cancelLabel (default 'Annulla'; null = nessun bottone), onCancel,
+   *   empty: messaggio (toast) se non c'è nessuna riga selezionabile
+   * }
+   * Ritorna false se non c'è niente da scegliere.
+   */
+  function pickGrouped(opts) {
+    const groups = (opts.groups || []).map(g => ({
+      ...g, zones: (g.zones || []).filter(z => z.rows && z.rows.length > 0),
+    })).filter(g => g.zones.length > 0);
+    const selectable = groups.some(g => g.zones.some(z => z.rows.some(r => !r.disabled)));
+    if (!selectable) {
+      if (opts.empty) Toast.show(opts.empty, 'error');
+      return false;
+    }
+
+    const body = groups.map(g => el('div', { className: 'wpick-player' }, [
+      g.head ? el('div', { className: 'wpick-player-head' }, [g.head]) : null,
+      ...g.zones.map(z => el('div', { className: 'wpick-zone' }, [
+        z.label ? el('div', { className: 'wpick-zone-head' }, [
+          z.icon ? el('span', { className: 'wpick-zone-icon' }, [iconNode(z.icon)]) : null,
+          el('span', { className: 'wpick-zone-name' }, [z.label]),
+          z.tag ? el('span', { className: 'wpick-tag' }, [z.tag]) : null,
+        ]) : null,
+        ...z.rows.map(r => {
+          const row = el(r.disabled ? 'div' : 'button', { className: `wpick-row${r.disabled ? ' disabled' : ''}` }, [
+            r.icon ? el('span', { className: 'wpick-row-icon' }, [iconNode(r.icon)]) : null,
+            el('span', { className: 'wpick-main' }, [
+              el('span', { className: 'wpick-name' }, [r.name]),
+              r.tag ? el('span', { className: 'wpick-tag' }, [r.tag]) : null,
+              r.meta ? el('span', { className: 'wpick-stats' }, [r.meta]) : null,
+              r.note ? el('span', { className: 'wpick-note' }, [r.note]) : null,
+            ]),
+            r.disabled ? null : el('span', { className: 'opt-chevron' }, ['›']),
+          ]);
+          if (!r.disabled) {
+            row.addEventListener('click', () => {
+              haptic();
+              Sheet.close(true);
+              opts.onPick(r.value);
+            });
+          }
+          return row;
+        }),
+      ])),
+    ]));
+
+    const footer = [];
+    if (opts.cancelLabel !== null && (!opts.locked || opts.cancelLabel)) {
+      footer.push({
+        label: opts.cancelLabel || 'Annulla',
+        onClick: () => { Sheet.close(true); opts.onCancel && opts.onCancel(); },
+      });
+    }
+    Sheet.open({
+      title: opts.title,
+      subtitle: opts.subtitle || '',
+      body,
+      footer,
+      locked: opts.locked,
+      onClose: opts.onCancel,
+    });
+    return true;
+  }
+
+  // Opzioni comuni ai selettori specializzati, passate così come sono a pickGrouped
+  function passthrough(opts) {
+    const { title, subtitle, locked, cancelLabel, onCancel, empty } = opts;
+    return { title, subtitle, locked, cancelLabel, onCancel, empty };
+  }
+
+  /**
+   * Guerrieri, divisi per giocatore e per Regione.
+   * opts: { players (default: tutti i vivi, io per primo), filter(w, p, zoneKey),
+   *         note(w, p, zoneKey), onPick(w, p, zoneKey), + opzioni di pickGrouped }
+   */
+  function pickWarrior(opts) {
+    const players = opts.players || playersFromMe();
+    const onlyMe = players.length === 1 && players[0].id === myPlayerId;
+    const targets = targetKeys();
+    return pickGrouped({
+      ...passthrough(opts),
+      groups: players.map(p => ({
+        head: onlyMe ? null : playerHead(p),
+        zones: PICKER_ZONES.map(z => ({
+          icon: z.icon,
+          label: z.label,
+          tag: z.side && targets.has(`${p.id}:${z.side}`) ? TARGET_TAG : null,
+          rows: zoneWarriors(p, z.key)
+            .filter(w => !opts.filter || opts.filter(w, p, z.key))
+            .map(w => ({
+              name: w.name || w.base_card_id,
+              meta: `ATT ${w.att} · GIT ${w.git} · DIF ${w.dif}`,
+              note: opts.note ? opts.note(w, p, z.key) : null,
+              value: { w, p, zoneKey: z.key },
+            })),
+        })),
+      })),
+      onPick: (v) => opts.onPick(v.w, v.p, v.zoneKey),
+    });
+  }
+
+  /**
+   * Bastioni, divisi per giocatore.
+   * opts: { players, filter(p, side), meta(p, side), note(p, side), onPick(p, side), + opzioni di pickGrouped }
+   */
+  function pickBastion(opts) {
+    const players = opts.players || playersFromMe();
+    const onlyMe = players.length === 1 && players[0].id === myPlayerId;
+    const targets = targetKeys();
+    return pickGrouped({
+      ...passthrough(opts),
+      groups: players.map(p => ({
+        head: onlyMe ? null : playerHead(p),
+        zones: [{
+          rows: ['left', 'right']
+            .filter(side => !opts.filter || opts.filter(p, side))
+            .map(side => {
+              const b = bastionOf(p, side);
+              return {
+                icon: ICON_BASTION,
+                name: `Bastione ${side === 'left' ? 'Sinistro' : 'Destro'}`,
+                tag: targets.has(`${p.id}:${side}`) ? TARGET_TAG : null,
+                meta: opts.meta ? opts.meta(p, side)
+                  : `${plural(b.wall_count ?? 0, 'Muro', 'Muri')} · ${plural((b.warriors || []).length, 'Guerriero', 'Guerrieri')}`,
+                note: opts.note ? opts.note(p, side) : null,
+                value: { p, side },
+              };
+            }),
+        }],
+      })),
+      onPick: (v) => opts.onPick(v.p, v.side),
+    });
+  }
+
+  /** Giocatori (es. Bastioncontrario base): una riga per giocatore con i Muri dei due Bastioni. */
+  function pickPlayer(opts) {
+    const players = opts.players || playersFromMe();
+    return pickGrouped({
+      ...passthrough(opts),
+      groups: [{ zones: [{ rows: players.map(p => ({
+        name: playerHead(p),
+        meta: `Sinistro ${p.field.bastion_left.wall_count ?? 0} · Destro ${p.field.bastion_right.wall_count ?? 0} Muri`,
+        value: p,
+      })) }] }],
+      onPick: (p) => opts.onPick(p),
+    });
+  }
+
+  /**
+   * Costruzioni nel Villaggio, divise per giocatore.
+   * opts: { players, filter(b, p), meta(b, p), note(b, p), onPick(b, p), + opzioni di pickGrouped }
+   */
+  function pickBuilding(opts) {
+    const players = opts.players || playersFromMe();
+    const onlyMe = players.length === 1 && players[0].id === myPlayerId;
+    return pickGrouped({
+      ...passthrough(opts),
+      groups: players.map(p => ({
+        head: onlyMe ? null : playerHead(p),
+        zones: [{
+          label: 'Villaggio',
+          rows: (p.field.village.buildings || [])
+            .filter(b => !opts.filter || opts.filter(b, p))
+            .map(b => {
+              const def = getCardDef(b.instance_id);
+              return {
+                name: def ? def.name : b.base_card_id,
+                meta: opts.meta ? opts.meta(b, p) : (b.completed ? 'Completa' : 'Base'),
+                note: opts.note ? opts.note(b, p) : null,
+                value: { b, p },
+              };
+            }),
+        }],
+      })),
+      onPick: (v) => opts.onPick(v.b, v.p),
+    });
+  }
+
+  /** Regione di destinazione di un proprio Guerriero (gioco dalla mano, riposizionamento, Cardo). */
+  function pickRegion(opts) {
+    return pickGrouped({
+      ...passthrough(opts),
+      groups: [{ zones: [{ rows: PICKER_ZONES.filter(z => z.key !== opts.exclude).map(z => ({
+        icon: z.icon,
+        name: z.label,
+        note: opts.note ? opts.note(z.key) : null,
+        value: z.key,
+      })) }] }],
+      onPick: (zoneKey) => opts.onPick(zoneKey),
+    });
+  }
+
+  const CARD_TYPES = [
+    { type: 'warrior',  label: 'Guerrieri' },
+    { type: 'spell',    label: 'Magie' },
+    { type: 'building', label: 'Costruzioni' },
+  ];
+
+  // Riga descrittiva di una carta (tipo, Specie/Scuola, costo), senza emoji
+  function cardMeta(def) {
+    if (!def) return '';
+    if (def.type === 'warrior') return `${def.subtype === 'hero' ? 'Eroe' : 'Recluta'} · ${capitalize(def.species)}`;
+    if (def.type === 'spell') return `${capitalize(def.school)} · ${plural(def.cost, 'Maga', 'Maghe')}`;
+    return `${def.cost} Mana`;
+  }
+
+  /**
+   * Carte (mano o mazzo), divise per tipo.
+   * opts: {
+   *   groups: [{ head?, cards: [instance_id], disabled? }]   (oppure cards: [...] per un solo gruppo)
+   *   dedupe: raggruppa le copie della stessa carta in una riga "×N" (si sceglie la prima),
+   *   note(def, iid), onPick(iid), + opzioni di pickGrouped
+   * }
+   */
+  function pickCard(opts) {
+    const srcGroups = opts.groups || [{ cards: opts.cards || [] }];
+    return pickGrouped({
+      ...passthrough(opts),
+      groups: srcGroups.map(g => {
+        const entries = [];
+        const byBase = new Map();
+        g.cards.forEach(iid => {
+          const def = getCardDef(iid);
+          const key = def ? def.id : iid;
+          if (opts.dedupe && byBase.has(key)) { byBase.get(key).count++; return; }
+          const entry = { iid, def, count: 1 };
+          entries.push(entry);
+          if (opts.dedupe) byBase.set(key, entry);
+        });
+        return {
+          head: g.head || null,
+          zones: CARD_TYPES.map(t => ({
+            label: t.label,
+            rows: entries
+              .filter(e => (e.def ? e.def.type : 'building') === t.type)
+              .sort((a, b) => (a.def ? a.def.name : '').localeCompare(b.def ? b.def.name : ''))
+              .map(e => ({
+                name: `${e.def ? e.def.name : e.iid}${e.count > 1 ? ` ×${e.count}` : ''}`,
+                meta: cardMeta(e.def),
+                note: opts.note ? opts.note(e.def, e.iid) : null,
+                disabled: !!g.disabled,
+                value: e.iid,
+              })),
+          })),
+        };
+      }),
+      onPick: (iid) => opts.onPick(iid),
+    });
+  }
+
   // -- Arena -------------------------------------------------------------------
 
   function canActivateArena(buildingIid) {
@@ -2174,41 +2342,34 @@ const Mob = (() => {
 
   function showArenaFlow(buildingIid) {
     const my = me();
-    const mine = getAllWarriors(my);
     const enemies = currentState.players.filter(p => p.id !== myPlayerId && p.lives > 0);
+    const beats = (own, ew) => own.att > ew.att || own.git > ew.git || own.dif > ew.dif;
+    const hasTarget = (own) => enemies.some(en => getAllWarriors(en).some(ew => beats(own, ew)));
 
-    Sheet.choice('Arena — il tuo campione', mine.map(w => ({
-      icon: '🗡️',
-      label: w.name || w.base_card_id,
-      sub: `🗡️${w.att} 🏹${w.git} 🛡️${w.dif} — verrà scartato`,
-      value: w.instance_id,
-    })), (ownIid) => {
-      const ownW = mine.find(w => w.instance_id === ownIid);
-      if (!ownW) return;
-      const targets = [];
-      enemies.forEach(p => {
-        getAllWarriors(p).forEach(ew => {
-          if (ownW.att > ew.att || ownW.git > ew.git || ownW.dif > ew.dif) {
-            targets.push({
-              icon: '💀',
-              label: ew.name || ew.base_card_id,
-              sub: `${p.name} · 🗡️${ew.att} 🏹${ew.git} 🛡️${ew.dif}`,
-              value: `${p.id}:${ew.instance_id}`,
-            });
-          }
+    pickWarrior({
+      title: 'Arena — scegli il tuo campione',
+      subtitle: 'Verrà scartato insieme al Guerriero avversario che sconfigge',
+      players: [my],
+      filter: (w) => hasTarget(w),
+      empty: 'Nessun tuo Guerriero ha un bersaglio valido.',
+      onPick: (ownW) => {
+        pickWarrior({
+          title: `Arena — chi sconfigge ${ownW.name}?`,
+          subtitle: `Il tuo campione: ATT ${ownW.att} · GIT ${ownW.git} · DIF ${ownW.dif}. Basta una Caratteristica più bassa`,
+          players: enemies,
+          filter: (ew) => beats(ownW, ew),
+          note: (ew) => 'Più debole in ' + ['att', 'git', 'dif']
+            .filter(k => ew[k] < ownW[k]).map(k => k.toUpperCase()).join(', '),
+          empty: 'Nessun bersaglio valido per questo Guerriero.',
+          onPick: (ew, p) => sendAction('arena_activate', {
+            building_instance_id: buildingIid,
+            own_warrior_iid: ownW.instance_id,
+            target_warrior_iid: ew.instance_id,
+            target_player_id: p.id,
+          }),
         });
-      });
-      if (targets.length === 0) { Toast.show('Nessun bersaglio valido per questo guerriero', 'error'); return; }
-      Sheet.choice('Arena — chi viene sconfitto?', targets, (choice) => {
-        const colon = choice.indexOf(':');
-        sendAction('arena_activate', {
-          building_instance_id: buildingIid,
-          own_warrior_iid: ownIid,
-          target_warrior_iid: choice.substring(colon + 1),
-          target_player_id: choice.substring(0, colon),
-        });
-      }, { subtitle: 'Entrambi i Guerrieri vengono scartati' });
-    }, { subtitle: 'Sacrifica un tuo Guerriero per eliminarne uno più debole' });
+      },
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -2540,27 +2701,29 @@ const Mob = (() => {
     const hordes = my.available_hordes || [];
     if (hordes.length === 0) { Toast.show('Nessuna Orda disponibile', 'error'); return; }
 
-    const zoneNames = { vanguard: 'Avanscoperta', bastion_left: 'Bastione Sin.', bastion_right: 'Bastione Des.' };
-    // Le carte già attive per il proprio gruppo non vanno riproposte; le altre carte
-    // dello stesso gruppo permettono di cambiare l'effetto Orda attivo.
-    const options = [];
-    hordes.forEach(h => {
-      h.warriors.forEach(w => {
-        if (w.active) return;
-        options.push({
-          icon: '⚡',
-          label: w.name,
-          sub: `${capitalize(h.species)} · ${zoneNames[h.zone] || h.zone} — ${w.horde_effect}`,
-          value: `${w.base_card_id}|${w.instance_id}|${h.zone}`,
-        });
-      });
+    // Un gruppo per Orda (Regione + Specie). Le carte già attive per il proprio
+    // gruppo non vanno riproposte; le altre carte dello stesso gruppo permettono
+    // di cambiare l'effetto Orda attivo.
+    const zoneOf = (key) => PICKER_ZONES.find(z => z.key === key) || { label: key };
+    pickGrouped({
+      title: 'Attiva un effetto Orda',
+      subtitle: "Un'Orda resta attiva finché non si divide o scegli un altro effetto",
+      groups: [{
+        zones: hordes.map(h => ({
+          icon: zoneOf(h.zone).icon,
+          label: `${zoneOf(h.zone).label} — ${capitalize(h.species)}`,
+          rows: h.warriors.filter(w => !w.active).map(w => ({
+            name: w.name,
+            note: w.horde_effect,
+            value: { w, zone: h.zone },
+          })),
+        })),
+      }],
+      empty: 'Nessuna Orda disponibile',
+      onPick: ({ w, zone }) => sendAction('horde', {
+        horde_card_id: w.base_card_id, warrior_instance_id: w.instance_id, zone,
+      }),
     });
-    if (options.length === 0) { Toast.show('Nessuna Orda disponibile', 'error'); return; }
-
-    Sheet.choice('⚡ Attiva un effetto Orda', options, (choice) => {
-      const [hordeCardId, warriorIid, zone] = choice.split('|');
-      sendAction('horde', { horde_card_id: hordeCardId, warrior_instance_id: warriorIid, zone });
-    }, { subtitle: 'Un\'Orda resta attiva finché non si divide o scegli un altro effetto' });
   }
 
   // ---------------------------------------------------------------------------
@@ -2582,25 +2745,26 @@ const Mob = (() => {
     const attAtt = Math.max(0, ...my.field.vanguard.map(w => w.att));
     const attGit = Math.max(0, ...my.field.vanguard.map(w => w.git));
 
-    const options = targets.map(t => {
-      const bastion = t.side === 'left' ? t.player.field.bastion_left : t.player.field.bastion_right;
-      const defs = bastion.warriors || [];
-      const defDif = defs.length ? Math.max(...defs.map(w => w.dif)) : 0;
-      const defGit = defs.length ? Math.max(...defs.map(w => w.git)) : 0;
-      const est = Math.max(attAtt - defDif, 0) + Math.max(attGit - defGit, 0);
-      return {
-        icon: '🎯',
-        label: `${t.player.name} — Bastione ${t.side === 'left' ? 'Sin.' : 'Des.'}`,
-        sub: `🧱 ${bastion.wall_count ?? 0} muri · ${defs.length} difensori · danno stimato ${est}`,
-        value: `${t.playerIndex}:${t.side}`,
-      };
+    // Indice del giocatore nello stato, richiesto dall'azione battle
+    const indexOf = new Map(targets.map(t => [`${t.player.id}:${t.side}`, t.playerIndex]));
+    const players = playersFromMe().filter(p => targets.some(t => t.player.id === p.id));
+    pickBastion({
+      title: 'Battaglia — scegli il Bastione da attaccare',
+      subtitle: `I tuoi attaccanti: ATT ${attAtt} · GIT ${attGit}`,
+      players,
+      filter: (p, side) => indexOf.has(`${p.id}:${side}`),
+      note: (p, side) => {
+        const defs = bastionOf(p, side).warriors || [];
+        const defDif = defs.length ? Math.max(...defs.map(w => w.dif)) : 0;
+        const defGit = defs.length ? Math.max(...defs.map(w => w.git)) : 0;
+        const est = Math.max(attAtt - defDif, 0) + Math.max(attGit - defGit, 0);
+        return `Danno stimato: ${est}`;
+      },
+      onPick: (p, side) => {
+        haptic(30);
+        sendAction('battle', { defender_player_index: indexOf.get(`${p.id}:${side}`), defender_bastion_side: side });
+      },
     });
-
-    Sheet.choice('⚔️ Scegli il bersaglio', options, (choice) => {
-      const [idx, side] = choice.split(':');
-      haptic(30);
-      sendAction('battle', { defender_player_index: parseInt(idx), defender_bastion_side: side });
-    }, { subtitle: `I tuoi attaccanti: 🗡️ ${attAtt} · 🏹 ${attGit}` });
   }
 
   // ---------------------------------------------------------------------------
@@ -2609,64 +2773,46 @@ const Mob = (() => {
 
   function showSearchSheet(deckView, pendingSearch) {
     const titles = {
-      cercapersone_base: 'Cercapersone',
-      cercapersone_prodigio: 'Cercapersone ✨',
-      giulio_horde: 'Orda di Giulio',
+      cercapersone_base: 'Cercapersone — scegli una Recluta',
+      cercapersone_prodigio: 'Cercapersone — scegli una Recluta',
+      giulio_horde: 'Orda di Giulio — cerca Giulio II',
     };
     const subs = {
-      cercapersone_base: 'Scegli una Recluta da aggiungere alla mano',
-      cercapersone_prodigio: 'Scegli una Recluta: diventerà Eterea',
-      giulio_horde: 'Cerca Giulio II nel mazzo',
+      cercapersone_base: 'La Recluta scelta va nella tua mano.',
+      cercapersone_prodigio: 'Prodigio: la Recluta scelta va nella tua mano e diventa Eterea.',
+      giulio_horde: 'Giulio II va nella tua mano.',
     };
-    const matches = deckView.filter(c => c.matches);
-    const body = [];
-    body.push(el('div', { className: 'sheet-note' },
-      [`${matches.length} carte selezionabili su ${deckView.length} nel mazzo.`]));
-
-    const CHUNK = 60;
-    const list = el('div');
-    body.push(list);
-
-    function renderChunk(from) {
-      deckView.slice(from, from + CHUNK).forEach(card => {
-        const typeLabel = card.type === 'warrior' ? (card.subtype === 'recruit' ? 'Recluta' : 'Eroe')
-          : card.type === 'spell' ? 'Magia' : 'Costruzione';
-        const row = el('button', { className: `deck-row${card.matches ? ' match' : ''}` }, [
-          el('span', { className: 'dr-name' }, [card.name]),
-          el('span', { className: 'dr-type' }, [typeLabel]),
-        ]);
-        row.disabled = !card.matches;
-        if (card.matches) {
-          row.addEventListener('click', () => {
-            haptic();
-            Sheet.close(true);
-            sendAction('resolve_search', { chosen_iid: card.instance_id });
-          });
-        }
-        list.appendChild(row);
-      });
-      if (from + CHUNK < deckView.length) {
-        const more = el('button', { className: 'opt-row' }, [
-          el('span', { className: 'opt-main' }, [
-            el('span', { className: 'opt-label' }, [`Mostra altre ${Math.min(CHUNK, deckView.length - from - CHUNK)} carte…`]),
-          ]),
-        ]);
-        more.addEventListener('click', () => { more.remove(); renderChunk(from + CHUNK); });
-        list.appendChild(more);
-      }
-    }
-    renderChunk(0);
-
-    Sheet.open({
-      title: `🔍 ${titles[pendingSearch.context] || 'Cerca nel mazzo'}`,
-      subtitle: subs[pendingSearch.context] || '',
-      body,
-      footer: [{
-        label: 'Esci senza prendere',
-        onClick: () => { Sheet.close(true); sendAction('resolve_search', {}); },
-      }],
+    // Le copie della stessa carta sono raggruppate in una riga "×N": l'ordine del
+    // mazzo non viene mostrato.
+    const matches = deckView.filter(c => c.matches).map(c => c.instance_id);
+    const others = deckView.filter(c => !c.matches).map(c => c.instance_id);
+    const title = titles[pendingSearch.context] || 'Cerca nel mazzo';
+    const shown = pickCard({
+      title,
+      subtitle: `${subs[pendingSearch.context] || ''} ${matches.length} carte selezionabili su ${deckView.length} nel mazzo.`.trim(),
+      groups: [
+        { head: 'Selezionabili', cards: matches },
+        { head: 'Resto del mazzo', cards: others, disabled: true },
+      ],
+      dedupe: true,
       locked: true,
+      cancelLabel: 'Esci senza prendere',
+      onCancel: () => sendAction('resolve_search', {}),
+      onPick: (iid) => sendAction('resolve_search', { chosen_iid: iid }),
     });
+    // Nessuna carta adatta nel mazzo: si può solo uscire
+    if (!shown) {
+      Sheet.open({
+        title,
+        body: [el('div', { className: 'sheet-note' }, ["Nel mazzo non c'è nessuna carta adatta."])],
+        footer: [{
+          label: 'Continua',
+          className: 'mbtn-gold',
+          onClick: () => { Sheet.close(true); sendAction('resolve_search', {}); },
+        }],
+        locked: true,
+      });
+    }
   }
 
   function showBibliotecaSheet(interaction) {
@@ -2676,43 +2822,54 @@ const Mob = (() => {
 
     if (hand.length === 0) { sendAction('resolve_biblioteca', {}); return; }
 
-    const options = hand.map(iid => {
-      const def = getCardDef(iid);
-      return { icon: '🃏', label: def ? def.name : iid, value: iid };
-    });
-
     if (isWall) {
-      Sheet.choice('📚 Biblioteca', options, (chosenIid) => {
-        Sheet.choice('Su quale Bastione?', [
-          { icon: '🏰', label: 'Bastione Sinistro', value: 'left' },
-          { icon: '🏰', label: 'Bastione Destro', value: 'right' },
-        ], (side) => {
-          sendAction('resolve_biblioteca', { wall_card_iid: chosenIid, wall_bastion_side: side });
-        }, { locked: true, cancelLabel: null });
-      }, { subtitle: 'Scegli una carta da aggiungere come Muro', locked: true, cancelLabel: null });
+      pickCard({
+        title: 'Biblioteca — scegli una carta',
+        subtitle: 'La carta scelta diventa un Muro in un tuo Bastione',
+        cards: hand,
+        locked: true,
+        cancelLabel: null,
+        onPick: (chosenIid) => pickBastion({
+          title: 'Biblioteca — in quale Bastione?',
+          players: [my],
+          locked: true,
+          cancelLabel: null,
+          onPick: (p, side) => sendAction('resolve_biblioteca', { wall_card_iid: chosenIid, wall_bastion_side: side }),
+        }),
+      });
     } else {
-      Sheet.choice('📚 Biblioteca', options, (chosenIid) => {
-        sendAction('resolve_biblioteca', { discard_iid: chosenIid });
-      }, { subtitle: 'Scegli una carta da scartare', locked: true, cancelLabel: null });
+      pickCard({
+        title: 'Biblioteca — scegli una carta da scartare',
+        cards: hand,
+        locked: true,
+        cancelLabel: null,
+        onPick: (chosenIid) => sendAction('resolve_biblioteca', { discard_iid: chosenIid }),
+      });
     }
   }
 
   function showVelocementoSheet(buildingIids) {
-    Sheet.choice('✨ Velocemento', buildingIids.map(iid => {
-      const def = getCardDef(iid);
-      return { icon: '🏗️', label: def ? def.name : iid, sub: def ? `${def.base_effect || ''}` : '', value: iid };
-    }), (iid) => sendAction('resolve_velocemento', { building_instance_id: iid }),
-    { subtitle: 'Scegli la Costruzione da rendere Eterea', locked: true, cancelLabel: null });
+    pickCard({
+      title: 'Velocemento — scegli una Costruzione',
+      subtitle: 'La Costruzione scelta diventa Eterea',
+      cards: buildingIids,
+      note: (def) => def ? def.base_effect : null,
+      locked: true,
+      cancelLabel: null,
+      onPick: (iid) => sendAction('resolve_velocemento', { building_instance_id: iid }),
+    });
   }
 
   function showAgilpescaSheet() {
     const my = me();
     const hand = (my && my.hand) || [];
-    Sheet.choice('🎣 Agilpesca', hand.map(iid => {
-      const def = getCardDef(iid);
-      return { icon: '🃏', label: def ? def.name : iid, value: iid };
-    }), (iid) => sendAction('resolve_agilpesca', { discard_iid: iid }),
-    { subtitle: 'Scegli una carta da scartare', locked: true, cancelLabel: null });
+    pickCard({
+      title: 'Agilpesca — scegli una carta da scartare',
+      cards: hand,
+      locked: true,
+      cancelLabel: null,
+      onPick: (iid) => sendAction('resolve_agilpesca', { discard_iid: iid }),
+    });
   }
 
   // Orda di Evelyn: la Magia appena giocata va rigiocata, con nuovi bersagli.
@@ -2780,53 +2937,37 @@ const Mob = (() => {
   }
 
   function showMalcomuneSheet(pending) {
-    const my = me();
-    const caster = playerName(pending.caster_id);
-    const zones = [
-      { warriors: my.field.vanguard, label: 'Avanscoperta' },
-      { warriors: my.field.bastion_left.warriors, label: 'Bastione Sin.' },
-      { warriors: my.field.bastion_right.warriors, label: 'Bastione Des.' },
-    ];
-    const options = [];
-    zones.forEach(({ warriors, label }) => {
-      (warriors || []).forEach(w => {
-        const wDef = getCardDef(w.instance_id);
-        if (wDef && wDef.species === pending.species) {
-          options.push({ icon: '💀', label: wDef.name, sub: label, value: w.instance_id });
-        }
-      });
+    const shown = pickWarrior({
+      title: 'Malcomune — scegli il Guerriero da scartare',
+      subtitle: `${playerName(pending.caster_id)} ti costringe a scartare un Guerriero ${capitalize(pending.species)}`,
+      players: [me()],
+      filter: (w) => { const d = getCardDef(w.instance_id); return !!d && d.species === pending.species; },
+      locked: true,
+      cancelLabel: null,
+      onPick: (w) => sendAction('resolve_malcomune', { warrior_iid: w.instance_id }),
     });
-    if (options.length === 0) { sendAction('resolve_malcomune', {}); return; }
-    Sheet.choice('☠️ Malcomune', options,
-      (iid) => sendAction('resolve_malcomune', { warrior_iid: iid }),
-      { subtitle: `${caster} ti costringe a scartare un Guerriero ${capitalize(pending.species)}`, locked: true, cancelLabel: null });
+    if (!shown) sendAction('resolve_malcomune', {});
   }
 
   function showCardoSheet() {
-    const my = me();
-    const zoneLabels = { vanguard: '⚔️ Avanscoperta', bastion_left: '🏰 Bastione Sin.', bastion_right: '🏰 Bastione Des.' };
-    const options = [];
-    Object.entries(zoneLabels).forEach(([zoneKey, zoneLabel]) => {
-      const zone = my.field[zoneKey];
-      const warriors = zone ? (zone.warriors || zone) : [];
-      (warriors || []).forEach(w => {
-        options.push({ icon: '🛞', label: w.name || w.base_card_id, sub: zoneLabel, value: w.instance_id });
-      });
-    });
-
-    Sheet.choice('🛞 Cardo — sposta un Guerriero', options, (warriorIid) => {
-      Sheet.choice('🛞 Cardo — destinazione', [
-        { icon: '⚔️', label: 'Avanscoperta', value: 'vanguard' },
-        { icon: '🏰', label: 'Bastione Sinistro', value: 'bastion_left' },
-        { icon: '🏰', label: 'Bastione Destro', value: 'bastion_right' },
-      ], (dest) => sendAction('resolve_cardo_move', { warrior_iid: warriorIid, destination: dest }),
-      { locked: true, cancelLabel: null });
-    }, {
+    const shown = pickWarrior({
+      title: 'Cardo — sposta un Guerriero',
       subtitle: 'Facoltativo: puoi anche saltare',
+      players: [me()],
       locked: true,
       cancelLabel: 'Salta',
       onCancel: () => sendAction('resolve_cardo_move', {}),
+      onPick: (w, p, zoneKey) => {
+        pickRegion({
+          title: `Cardo — dove sposti ${w.name}?`,
+          exclude: zoneKey,
+          locked: true,
+          cancelLabel: null,
+          onPick: (dest) => sendAction('resolve_cardo_move', { warrior_iid: w.instance_id, destination: dest }),
+        });
+      },
     });
+    if (!shown) sendAction('resolve_cardo_move', {});
   }
 
   // ---------------------------------------------------------------------------

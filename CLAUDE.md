@@ -138,7 +138,7 @@ assets/                 rules.md, logo, sfondo, musica, immagini home
 **Checklist quando si aggiunge o cambia una carta:**
 1. `data/cards.json` (testo, costi, statistiche, copie).
 2. Effetto in `engine/effects.py` (+ pre-validazione in `actions.py`, + logica passiva o trigger in `game.py`/`battle.py` se serve).
-3. Targeting/interazione in **entrambi** i client (`frontend/app.js` e `frontend/mobile/app.js`; spesso c'è un ramo dedicato per `base_id`).
+3. Targeting/interazione in **entrambi** i client (`frontend/app.js` e `frontend/mobile/app.js`; spesso c'è un ramo dedicato per `base_id`). Ogni scelta passa dai **selettori comuni**, mai da liste fatte a mano: desktop `Renderer.showWarriorPicker / showBastionPicker / showBuildingPicker / showCardPicker / showPlayerPicker / showRegionPicker` (base: `Renderer.showPicker`), mobile `pickWarrior / pickBastion / pickBuilding / pickCard / pickPlayer / pickRegion` (base: `pickGrouped`). Dividono per giocatore e Regione (o tipo di carta), mettono "Possibile Bersaglio" sui Bastioni adiacenti e usano i simboli di Regione del client (desktop ⚔ 🛡 monocromi, mobile ⚔️ 🏰); stesse opzioni nei due client (`players`, `filter`, `note`, `onPick`, `cancelLabel`, `empty`).
 4. Bot: candidati e kwargs in `bot.py` (`_default_spell_kwargs`, `_card_value`, `_SPELL_EFFECT_EXCLUDE`) e, se c'è un nuovo pending, `_auto_resolve_bot_pending` in `routes.py`.
 5. Tutorial: controllare se la carta compare negli script di `tutorial.py`.
 6. Grafica: illustrazione in `card_factory/images/<id>.png`, poi `python card_factory/2_generate_cards.py <id>` → `card_factory/output/<id>.png` (committato, il frontend lo serve da lì).

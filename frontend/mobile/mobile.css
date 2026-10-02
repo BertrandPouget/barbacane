@@ -1449,6 +1449,62 @@ input {
 .opt-row.gold .opt-label { color: var(--gold); }
 .opt-row.has-assigned { border-color: var(--orange); }
 
+/* Selettore di Guerrieri (pickWarrior): sezioni per giocatore, sottosezioni per
+   Regione. Parità con .wpick-* di style.css (desktop). */
+.wpick-player { margin-bottom: 14px; }
+.wpick-player-head {
+  color: var(--card-cream);
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+}
+.wpick-zone { padding-left: 6px; margin-bottom: 6px; }
+.wpick-zone-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  color: var(--gold);
+  font-style: italic;
+  margin: 4px 0 6px;
+}
+.wpick-zone-icon { font-style: normal; }
+.wpick-tag {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 0.68rem;
+  color: var(--card-ink);
+  background: var(--card-gold);
+  border-radius: 3px;
+  padding: 1px 7px;
+  letter-spacing: 0.03em;
+}
+.wpick-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-light);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  text-align: left;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+}
+.wpick-row:active { border-color: var(--gold); background: var(--bg-dark); }
+.wpick-row.disabled { opacity: 0.45; }
+.wpick-row.disabled:active { border-color: var(--border); background: var(--bg-light); }
+.wpick-row-icon { flex: 0 0 auto; font-size: 1.1rem; color: var(--gold); display: inline-flex; }
+.region-svg { display: inline-flex; align-items: center; }
+.region-svg svg { display: block; }
+.wpick-main .wpick-tag { margin-left: 0; }
+.wpick-main { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; }
+.wpick-name { font-weight: 700; font-size: 0.9rem; }
+.wpick-stats { font-size: 0.74rem; color: var(--text-dim); margin-left: auto; white-space: nowrap; }
+.wpick-note { flex-basis: 100%; font-size: 0.72rem; color: var(--card-cream); font-style: italic; margin-top: 2px; }
+
 .sheet-note {
   font-size: 0.8rem;
   color: var(--text-dim);
