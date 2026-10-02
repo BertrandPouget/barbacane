@@ -122,7 +122,7 @@ class _RevalidatingStatic(StaticFiles):
         return response
 
 
-# Espone /data/ al frontend (cards.json, rules_config.json)
+# Espone /data/ al frontend (cards.json)
 app.mount("/data", _RevalidatingStatic(directory=_DATA_DIR), name="data")
 
 # Espone /assets/ al frontend (logo.png, ecc.)

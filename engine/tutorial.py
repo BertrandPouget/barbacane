@@ -256,7 +256,7 @@ TUTORIAL_ANATOMIA_CARTA = TutorialDef(
     steps=[
         # --- Recluta ---
         TutorialStep(
-            "intro", "Benvenuto a Barbacane!",
+            "intro", "Benvenuto su Barbacane!",
             "Prima di giocare impariamo a leggere le carte. Esistono tre tipi di carte: Guerrieri, Magie e "
             "Costruzioni, e il colore della cornice li distingue a colpo d'occhio: rossa per i Guerrieri, blu per "
             "le Magie, verde per le Costruzioni. Iniziamo da un Guerriero: Patrizio.",
