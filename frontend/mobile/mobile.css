@@ -50,6 +50,12 @@
 
   /* Dimensioni carte — più larghe del breakpoint mobile del desktop:
      il nome deve restare leggibile su due righe invece di troncare. */
+  /* Colori dei giocatori nella cronaca e nel riepilogo, per posto al tavolo */
+  --seat-0: #fbc402;
+  --seat-1: #7fb8e8;
+  --seat-2: #8fd49b;
+  --seat-3: #ec9a8c;
+
   --card-w: 74px;
   --card-h: 108px;
   --card-w-sm: 66px;
@@ -434,6 +440,25 @@ input {
   flex-direction: column;
   gap: 10px;
 }
+
+/* Partita in corso salvata nel browser */
+.home-resume {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 12px 14px;
+  border-radius: var(--r-lg);
+  background: linear-gradient(180deg, rgba(251, 196, 2, 0.18), rgba(251, 196, 2, 0.06));
+  border: 1px solid var(--gold);
+  font-family: inherit;
+}
+.home-resume[hidden] { display: none; }
+.home-resume-title { color: var(--gold); font-size: 1.05rem; font-weight: 700; }
+.home-resume-sub { color: var(--text-dim); font-size: 0.8rem; }
+
+/* Sala d'attesa: invito con link */
+.share-invite { width: 100%; margin-top: 10px; }
 
 /* ═══════════════════════ MULTIGIOCATORE ═══════════════════════ */
 
@@ -1663,7 +1688,25 @@ input {
   border-bottom: 1px solid var(--border);
   color: var(--text-dim);
 }
-.log-row:first-child { color: var(--text); }
+.log-group { padding: 4px 0 8px; }
+.log-turn {
+  padding: 8px 4px 2px;
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.log-turn .chr-player { text-transform: none; letter-spacing: 0; font-size: 0.84rem; }
+.log-row.log-action, .log-row.log-system { color: var(--text); }
+.log-row.log-battle { color: var(--text); border-left: 2px solid var(--red-light); padding-left: 8px; }
+.log-row.log-system { border-left: 2px solid var(--gold); padding-left: 8px; }
+
+/* Nomi e carte nei testi della cronaca (chronicle.js) */
+.chr-player { font-weight: 700; color: var(--seat-0); }
+.chr-player.chr-seat-1 { color: var(--seat-1); }
+.chr-player.chr-seat-2 { color: var(--seat-2); }
+.chr-player.chr-seat-3 { color: var(--seat-3); }
+.chr-card { color: var(--card-cream); font-style: italic; }
 .log-empty { color: var(--text-faint); font-style: italic; font-size: 0.84rem; padding: 12px 4px; }
 
 /* ═══════════════════════ TOAST + BANNER ═══════════════════════ */
@@ -1751,13 +1794,23 @@ input {
 #over-title { font-size: 2rem; color: var(--gold); }
 #over-winner { color: var(--text); font-size: 1.12rem; }
 #over-scores {
-  border-radius: var(--r-md);
-  padding: 15px 24px;
-  font-size: 0.92rem;
-  line-height: 2;
   width: 100%;
-  color: var(--text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
 }
+/* Riepilogo: una scheda per giocatore, in ordine di classifica */
+.over-row { border-radius: var(--r-md); padding: 10px 12px; }
+.over-row.winner { border-color: var(--gold); }
+.over-row-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.over-place { color: var(--gold); font-weight: 700; }
+.over-you { color: var(--text-faint); font-size: 0.8rem; }
+.over-outcome { margin-left: auto; color: var(--text-dim); font-size: 0.78rem; }
+.over-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 0.76rem; color: var(--text-dim); }
+.over-stat b { color: var(--text); }
+.over-note { color: var(--gold-light); font-size: 0.9rem; }
+.over-note[hidden] { display: none; }
 #scr-over .cta { width: 100%; }
 
 #confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }

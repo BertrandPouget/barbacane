@@ -40,6 +40,13 @@ const App = (() => {
   let lastTurnPlayer = null;   // per il banner di cambio turno
   let turnBannerTimer = null;
 
+  // Cronaca: id dell'ultima voce già mostrata (le successive sono "nuove")
+  let chronicleSeenId = 0;
+  // Rivincita proposta da un altro giocatore (messaggio WS rematch_offer)
+  let rematchOffer = null;
+  // Codice lobby arrivato con un link d'invito (?join=BARB-XXXX)
+  let pendingJoinCode = null;
+
   // True dopo la prima registrazione degli handler WS.on: connectGameWS()
   // viene richiamata a ogni nuova partita/tutorial, ma gli handler vanno
   // registrati una sola volta per tutta la vita della pagina (altrimenti si
@@ -62,10 +69,51 @@ const App = (() => {
   async function init() {
     Sparks.init();
     BgMusic.init();
+    pendingJoinCode = Invite.takeFromURL();
     await loadCardDefs();
     bindLobbyUI();
     bindSplashUI();
+    ['create-name', 'join-name'].forEach(id => { document.getElementById(id).value = PlayerName.get(); });
+    // Pagina ricaricata durante una partita: si torna subito al tavolo
+    if (await resumeGame(SavedGame.load(false))) return;
     Renderer.showScreen('splash');
+    refreshResumeButton();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Partita salvata nel browser (session.js)
+  // ---------------------------------------------------------------------------
+
+  function rememberGame(state) {
+    if (isTutorial || !gameId || !sessionToken) return;
+    SavedGame.save({ gameId, token: sessionToken, playerId: myPlayerId, lobbyCode, mode: state.mode });
+  }
+
+  /** Rientra nella partita salvata, se è ancora in corso. */
+  async function resumeGame(saved) {
+    const state = await SavedGame.check(saved);
+    if (!state) return false;
+    sessionToken = saved.token;
+    myPlayerId = saved.playerId || state.players.find(p => p.hand !== null && p.hand !== undefined).id;
+    gameId = saved.gameId;
+    lobbyCode = saved.lobbyCode || null;
+    isCreator = false;
+    isTutorial = false;
+    enterGame(state);
+    return true;
+  }
+
+  /** Mostra in home il pulsante "Riprendi la partita" se ce n'è una in corso. */
+  async function refreshResumeButton() {
+    const btn = document.getElementById('btn-resume');
+    const saved = SavedGame.load(true);
+    const state = saved ? await SavedGame.check(saved) : null;
+    btn.classList.toggle('hidden', !state);
+    if (!state) return;
+    const others = state.players.filter(p => p.id !== saved.playerId).map(p => p.name);
+    const kind = state.mode === 'practice' ? 'Giocatore singolo' : 'Multigiocatore';
+    document.getElementById('btn-resume-sub').textContent =
+      `${kind} · turno ${state.turn} · contro ${others.join(', ')}`;
   }
 
   // La splash mostra solo il logo: cliccandolo (primo gesto utente, sblocca
@@ -99,6 +147,7 @@ const App = (() => {
       splash.classList.remove('splash-flying', 'splash-exit');
       if (splashLogo) splashLogo.style.transform = '';
       Renderer.showScreen('lobby');
+      if (pendingJoinCode) openJoinFromInvite();
     };
 
     const from = splashLogo ? splashLogo.getBoundingClientRect() : null;
@@ -143,6 +192,17 @@ const App = (() => {
     } catch (e) {
       console.error('Impossibile caricare cards.json', e);
     }
+  }
+
+  // Link d'invito: si apre "Unisciti" con il codice già inserito
+  function openJoinFromInvite() {
+    const code = pendingJoinCode;
+    pendingJoinCode = null;
+    Renderer.showScreen('multiplayer');
+    document.getElementById('join-code').value = code;
+    const name = document.getElementById('join-name');
+    (name.value ? document.getElementById('btn-join') : name).focus();
+    Renderer.toast(`Invito alla lobby ${code}: scegli il tuo nome ed entra`, 'info');
   }
 
   function getCardDef(instanceId) {
@@ -190,6 +250,25 @@ const App = (() => {
 
     document.getElementById('join-code').addEventListener('input', e => {
       e.target.value = e.target.value.toUpperCase();
+    });
+
+    // Cronaca della partita
+    document.getElementById('btn-chronicle').addEventListener('click', toggleChronicle);
+    document.getElementById('battle-log').addEventListener('click', () => openChronicle());
+    document.getElementById('chronicle-close').addEventListener('click', () => Renderer.closeChroniclePanel());
+    document.getElementById('btn-gameover-chronicle').addEventListener('click', () => openChronicle(true));
+    document.getElementById('chronicle-body').addEventListener('click', (e) => {
+      const card = e.target.closest('.chr-card');
+      if (card && card.dataset.card) showCardInfo(card.dataset.card);
+    });
+
+    // Fine partita e home
+    document.getElementById('btn-rematch').addEventListener('click', onRematchClick);
+    document.getElementById('btn-resume').addEventListener('click', async () => {
+      if (!(await resumeGame(SavedGame.load(true)))) {
+        Renderer.toast('La partita non è più disponibile', 'error');
+        refreshResumeButton();
+      }
     });
 
     // Catalogo carte
@@ -252,7 +331,7 @@ const App = (() => {
 
   async function startPracticeGame(difficulty) {
     try {
-      const res = await api('/practice/start', { player_name: 'Tu', difficulty, num_bots: practiceBotCount });
+      const res = await api('/practice/start', { player_name: PlayerName.get() || 'Giocatore', difficulty, num_bots: practiceBotCount });
       sessionToken = res.session_token;
       myPlayerId = res.player_id;
       gameId = res.game_id;
@@ -303,7 +382,7 @@ const App = (() => {
         const full = await apiFetch(`/tutorials/${tutorialId}`);
         tutorialStepsCache[tutorialId] = full.steps || [];
       }
-      const res = await api('/tutorial/start', { tutorial_id: tutorialId, player_name: 'Tu' });
+      const res = await api('/tutorial/start', { tutorial_id: tutorialId, player_name: PlayerName.get() || 'Giocatore' });
       sessionToken = res.session_token;
       myPlayerId = res.player_id;
       gameId = res.game_id;
@@ -556,6 +635,7 @@ const App = (() => {
     const rawTimer = parseInt(document.getElementById('create-timer').value, 10);
     const timer = Number.isFinite(rawTimer) && rawTimer > 0 ? rawTimer : 0;
     if (!name) { Renderer.toast('Inserisci il tuo nome', 'error'); return; }
+    PlayerName.set(name);
     try {
       const res = await api('/lobby/create', { player_name: name, turn_timer: timer });
       sessionToken = res.session_token;
@@ -575,6 +655,7 @@ const App = (() => {
     const code = document.getElementById('join-code').value.trim().toUpperCase();
     if (!name) { Renderer.toast('Inserisci il tuo nome', 'error'); return; }
     if (!code) { Renderer.toast('Inserisci il codice lobby', 'error'); return; }
+    PlayerName.set(name);
     try {
       const res = await api('/lobby/join', { lobby_code: code, player_name: name });
       sessionToken = res.session_token;
@@ -731,16 +812,16 @@ const App = (() => {
       startLocalTimer(timerSecondsLeft);
     });
     WS.on('player_connected', (msg) => {
-      const name = currentState
-        ? ((currentState.players.find(p => p.id === msg.player_id) || {}).name || msg.player_id)
-        : msg.player_id;
-      Renderer.updateBattleLog(`${name} si è connesso`);
+      if (msg.player_id === myPlayerId || !currentState) return;
+      Renderer.toast(`${_playerName(msg.player_id)} è di nuovo al tavolo`, 'info');
     });
     WS.on('player_disconnected', (msg) => {
-      const name = currentState
-        ? ((currentState.players.find(p => p.id === msg.player_id) || {}).name || msg.player_id)
-        : msg.player_id;
-      Renderer.updateBattleLog(`${name} si è disconnesso`);
+      if (msg.player_id === myPlayerId || !currentState || currentState.winner_id) return;
+      Renderer.toast(`${_playerName(msg.player_id)} si è disconnesso`, '');
+    });
+    WS.on('rematch_offer', (msg) => {
+      rematchOffer = msg;
+      if (currentState && currentState.winner_id) updateRematchUI(currentState);
     });
     WS.on('error', (msg) => {
       Renderer.toast(msg.message || 'Errore', 'error');
@@ -788,18 +869,6 @@ const App = (() => {
         }
       }
 
-      // Log battaglia
-      if (action === 'battle') {
-        const attName = (state.players.find(p => p.id === result.attacker_id) || {}).name || result.attacker_id;
-        const defName = (state.players.find(p => p.id === result.defender_id) || {}).name || result.defender_id;
-        const bastionSide = result.defender_bastion === 'left' ? 'Sinistro' : 'Destro';
-        const log = `⚔ ${attName} → ${defName} [Bastione ${bastionSide}]: `
-          + `${result.total_damage} Danni, ${result.walls_destroyed} Muri, ${result.life_lost} Vita`
-          + (result.walls_discarded_guerremoto ? ` (+${result.walls_discarded_guerremoto} Muri scartati da Guerremoto)` : '');
-        Renderer.updateBattleLog(log);
-      }
-
-
       // Eracle: distruggi una costruzione avversaria
       if (action === 'battle' && result.eracle_destroy_triggered && result.eracle_targets && result.eracle_targets.length > 0
           && state.current_player_id === myPlayerId) {
@@ -815,98 +884,24 @@ const App = (() => {
             target_player_id: result.defender_id,
           }),
         });
+        _renderChronicle(state);
         return; // non chiudere il modale; la UI si aggiornerà dopo eracle_destroy
       }
 
     }
 
-    // Log eventi recenti — tutti i tipi
-    if (state.recent_events && state.recent_events.length > 0) {
-      state.recent_events.forEach(ev => {
-        const pName = (state.players.find(p => p.id === ev.player_id) || {}).name || ev.player_id;
-        const cardName = ev.card ? ev.card.charAt(0).toUpperCase() + ev.card.slice(1) : '';
-        let msg = null;
-
-        if (ev.type === 'd10') {
-          if (ev.card === 'estrattore') {
-            msg = `${pName} — Estrattore: D10=${ev.roll} — ${ev.triggered ? `+${ev.mana_gained} Mana` : 'nessun mana'}`;
-          } else if (ev.card === 'granaio') {
-            msg = `${pName} — Granaio: D10=${ev.roll} — ${ev.triggered ? 'carta pescata' : 'nessuna carta'}`;
-          } else if (ev.card === 'obelisco') {
-            msg = `${pName} — Obelisco: D10=${ev.roll} (soglia ${ev.threshold}) — ${ev.returned ? 'Magia in mano' : 'Magia scartata'}`;
-          } else if (ev.card === 'fucina') {
-            msg = `${pName} — Fucina: D10=${ev.roll} — ${ev.extra_action ? 'azione extra' : 'nessuna azione extra'}`;
-          }
-        } else if (ev.type === 'mana') {
-          msg = `${pName} — ${cardName}: +${ev.mana_gained} Mana`;
-        } else if (ev.type === 'damage') {
-          const defName = (state.players.find(p => p.id === ev.target_player_id) || {}).name || ev.target_player_id;
-          const side = ev.target_bastion_side === 'left' ? 'Sin.' : 'Des.';
-          msg = `${pName} — ${cardName}: ${ev.damage} Danni a ${defName} [${side}]`;
-        } else if (ev.type === 'draw') {
-          const n = ev.cards_drawn ? ev.cards_drawn.length : 0;
-          msg = `${pName} — ${cardName}: ${n} carta${n !== 1 ? ' pescate' : ' pescata'}`;
-        } else if (ev.type === 'life_gained') {
-          msg = `${pName} — ${cardName}: +${ev.lives_gained || 0} Vita`;
-        } else if (ev.type === 'warrior_discarded') {
-          msg = `${pName} — ${cardName}: guerriero scartato`;
-        } else if (ev.type === 'warrior_moved') {
-          msg = `${pName} — ${cardName}: guerriero spostato`;
-        } else if (ev.type === 'warrior_to_wall') {
-          msg = `${pName} — ${cardName}: guerriero trasformato in Muro`;
-        } else if (ev.type === 'wall_moved') {
-          const n = ev.moved_walls ? ev.moved_walls.length : 0;
-          msg = `${pName} — ${cardName}: ${n} ${n !== 1 ? 'Muri spostati' : 'Muro spostato'}`;
-        } else if (ev.type === 'wall_taken') {
-          msg = `${pName} — ${cardName}: Muro in mano`;
-        } else if (ev.type === 'search') {
-          msg = `${pName} — ${cardName}: ricerca nel mazzo`;
-        } else if (ev.type === 'ethereal') {
-          msg = `${pName} — ${cardName}: carta eterea`;
-        } else if (ev.type === 'discard') {
-          msg = `${pName} — ${cardName}: scartato`;
-        } else if (ev.type === 'horde') {
-          if (ev.card === 'patrizio') msg = `${pName} — Orda Patrizio: +2 GIT`;
-          else if (ev.card === 'orfeo') msg = `${pName} — Orda Orfeo: +1 ATT +1 DIF`;
-          else if (ev.card === 'polemarco') msg = `${pName} — Orda Polemarco: +${ev.att_bonus} ATT`;
-          else if (ev.card === 'reinhold') msg = `${pName} — Orda Reinhold: sconto Sorgive -2`;
-          else if (ev.card === 'araminta') msg = `${pName} — Orda Araminta: Anatemi tornano in mano`;
-          else if (ev.card === 'evelyn') msg = `${pName} — Orda Evelyn: Sortilegi raddoppiati`;
-          else if (ev.card === 'faust') msg = `${pName} — Orda Faust: Biblioteche avversarie bloccate`;
-          else if (ev.card === 'giulio') msg = `${pName} — Orda Giulio: ricerca nel mazzo`;
-          else if (ev.card === 'madeleine') msg = `${pName} — Orda Madeleine: Prodigi liberi da Scuola`;
-          else if (ev.card === 'decimo') msg = `${pName} — Orda Decimo: anti-Fossato`;
-          else if (ev.card === 'joseph') msg = `${pName} — Orda Joseph: ${(ev.enemy_troni_discarded || []).length ? 'Troni avversari scartati' : 'Troni avversari bloccati'}`;
-          else if (ev.card === 'eracle') msg = `${pName} — Orda Eracle: distruggi Costruzione se ≥3 Danni`;
-          else msg = `${pName} — Orda ${cardName}`;
-        } else if (ev.type === 'abandon') {
-          msg = `${pName} ha abbandonato la partita`;
-          Renderer.toast(msg, 'error');
-        } else if (ev.type === 'magiscudo_blocked') {
-          const blockedName = (state.players.find(p => p.id === ev.blocked_player) || {}).name || ev.blocked_player;
-          const cardLabel = ev.card ? ev.card.charAt(0).toUpperCase() + ev.card.slice(1) : 'Magia';
-          msg = `${pName} — ${cardLabel} annullata: ${blockedName} è protetto da Magiscudo`;
-        } else if (ev.type === 'effect') {
-          if (ev.card === 'magiscudo') msg = `${pName} — Magiscudo: immune alle Magie`;
-          else if (ev.card === 'guerremoto') msg = `${pName} — Guerremoto: attacco a qualsiasi Bastione${ev.discard_walls ? `, scarta fino a ${ev.discard_walls} Muri prima dei Danni` : ''}`;
-          else if (ev.card === 'divinazione') msg = `${pName} — Divinazione: Mana extra al prossimo turno`;
-          else if (ev.card === 'dazipazzi') msg = `${pName} — Dazipazzi: ${ev.reset_buildings ? ev.reset_buildings.length : 0} costruzioni ripristinate`;
-          else if (ev.card === 'fucina') msg = `${pName} — Fucina: ${ev.extra_action ? 'azione extra' : 'azione extra (D10)'}`;
-          else if (ev.card === 'cardo') msg = `${pName} — Cardo: spostamento guerriero attivato`;
-          else if (ev.card === 'decumano') msg = `${pName} — Decumano: completamento Cardo gratuito`;
-          else if (ev.card === 'trono') msg = `${pName} — Trono: assegnato a guerriero`;
-          else if (ev.card === 'biblioteca') msg = `${pName} — Biblioteca: carta pescata`;
-          else if (ev.card === 'equipotenza') msg = `${pName} — Equipotenza: statistiche equiparate`;
-          else if (ev.card === 'bastioncontrario') msg = `${pName} — Bastioncontrario: Bastioni scambiati`;
-          else msg = `${pName} — ${cardName}`;
+    // Cronaca: le voci nuove arrivano già pronte dal server
+    _renderChronicle(state);
+    if (action === 'leave_game') {
+      (state.recent_events || []).forEach(ev => {
+        if (ev.type === 'abandon' && ev.player_id !== myPlayerId) {
+          Renderer.toast(`${_playerName(ev.player_id)} ha abbandonato la partita`, 'error');
         }
-
-        if (msg) Renderer.updateBattleLog(msg);
       });
     }
 
     if (state.winner_id) {
-      setTimeout(() => Renderer.showGameOver(state), 800);
+      setTimeout(() => showGameOver(state), 800);
     }
 
     // Chiudi eventuale modale aperta e aggiorna la UI azioni
@@ -963,9 +958,13 @@ const App = (() => {
     gameId = gameId || state.game_id;
     currentState = state;
     lastTurnPlayer = state.current_player_id;
+    rematchOffer = null;
     connectGameWS();
     Renderer.showScreen('game');
     Renderer.render(state, myPlayerId);
+    chronicleSeenId = Chronicle.lastId(state);
+    Renderer.renderChronicle(state, myPlayerId, cardDefs);
+    rememberGame(state);
     _refreshActionUI();
     // Mostra modali in attesa (es. riconnessione)
     const myPending = _myPendingInteraction(state);
@@ -983,6 +982,97 @@ const App = (() => {
     }
     // Tutorial: aggiornata per ultima (vedi nota in onStateUpdate).
     if (isTutorial) updateTutorialUI(state);
+  }
+
+  function _playerName(pid) {
+    const p = currentState && currentState.players.find(x => x.id === pid);
+    return p ? p.name : pid;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cronaca della partita
+  // ---------------------------------------------------------------------------
+
+  function _renderChronicle(state) {
+    const fresh = new Set(Chronicle.newSince(chronicleSeenId, state).map(e => e.id));
+    chronicleSeenId = Chronicle.lastId(state);
+    Renderer.renderChronicle(state, myPlayerId, cardDefs, fresh);
+  }
+
+  function openChronicle(aboveOverlay = false) {
+    if (!currentState) return;
+    Renderer.openChroniclePanel(currentState, myPlayerId, cardDefs, aboveOverlay);
+  }
+
+  function toggleChronicle() {
+    if (Renderer.isChroniclePanelOpen()) Renderer.closeChroniclePanel();
+    else openChronicle();
+  }
+
+  function showCardInfo(baseId) {
+    const def = cardDefs[baseId];
+    if (!def) return;
+    Renderer.showCardDetail(def.name, cardDetailBodyHTML(def, def.id), null, null, null, [], null, def.id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Fine partita e rivincita
+  // ---------------------------------------------------------------------------
+
+  function showGameOver(state) {
+    SavedGame.clear();
+    stopLocalTimer();
+    Renderer.closeChroniclePanel();
+    Renderer.showGameOver(state);
+    updateRematchUI(state);
+  }
+
+  function updateRematchUI(state) {
+    const btn = document.getElementById('btn-rematch');
+    const note = document.getElementById('gameover-rematch-note');
+    const available = state.mode === 'practice' || state.mode === 'lobby';
+    btn.classList.toggle('hidden', !available);
+    btn.disabled = false;
+    const invited = rematchOffer && rematchOffer.player_id !== myPlayerId;
+    btn.textContent = invited ? 'Unisciti alla rivincita' : 'Rivincita';
+    note.classList.toggle('hidden', !invited);
+    if (invited) note.textContent = `${_playerName(rematchOffer.player_id)} propone la rivincita.`;
+    else if (state.mode === 'lobby') {
+      note.textContent = 'La rivincita apre una nuova sala d\'attesa con gli stessi posti: gli altri giocatori riceveranno l\'invito.';
+      note.classList.remove('hidden');
+    }
+  }
+
+  async function onRematchClick() {
+    const btn = document.getElementById('btn-rematch');
+    btn.disabled = true;
+    try {
+      const res = await api('/game/rematch', { game_id: gameId, session_token: sessionToken });
+      // Si lascia la partita finita: da qui in poi conta solo la nuova
+      WS.disconnect();
+      _clearPendingUI();
+      Renderer.closeChroniclePanel();
+      rematchOffer = null;
+      sessionToken = res.session_token;
+      myPlayerId = res.player_id;
+      isTutorial = false;
+      if (res.mode === 'practice') {
+        gameId = res.game_id;
+        lobbyCode = null;
+        isCreator = false;
+        enterGame(res.state);
+      } else {
+        gameId = null;
+        currentState = null;
+        lobbyCode = res.lobby_code;
+        isCreator = !!res.is_creator;
+        showWaitingRoom(res.lobby);
+        connectWS();
+      }
+    } catch (e) {
+      btn.disabled = false;
+      Renderer.toast(e.message, 'error');
+    }
   }
 
   function _showTurnBanner(state) {
@@ -2533,6 +2623,9 @@ const App = (() => {
     stopLobbyPolling();
     stopLocalTimer();
     _clearPendingUI();
+    Renderer.closeChroniclePanel();
+    SavedGame.clear();
+    rematchOffer = null;
     leavingGame = false;
     selectedCard = null;
     actionMode = null;
@@ -2547,6 +2640,7 @@ const App = (() => {
     hideCardAnatomy();
     document.getElementById('btn-abandon').classList.remove('hidden');
     Renderer.showScreen('lobby');
+    refreshResumeButton();
   }
 
   function copyLobbyCode() {
@@ -2950,6 +3044,7 @@ const App = (() => {
 
   return {
     init,
+    returnToLobby,
     getCardDef,
     onCardClick,
     sendAction,
@@ -2959,19 +3054,26 @@ const App = (() => {
   };
 })();
 
-function returnToLobby() { location.reload(); }
+function returnToLobby() { App.returnToLobby(); }
 function copyLobbyCode() {
-  const text = document.getElementById('lobby-code-text').textContent.trim();
+  _copyText(document.getElementById('lobby-code-text').textContent.trim(), 'Codice copiato!');
+}
+function copyInviteLink() {
+  _copyText(Invite.link(document.getElementById('lobby-code-text').textContent.trim()),
+            'Link d\'invito copiato: mandalo ai tuoi amici!');
+}
+
+function _copyText(text, done) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text)
-      .then(() => Renderer.toast('Codice copiato!', 'success'))
-      .catch(() => _copyFallback(text));
+      .then(() => Renderer.toast(done, 'success'))
+      .catch(() => _copyFallback(text, done));
   } else {
-    _copyFallback(text);
+    _copyFallback(text, done);
   }
 }
 
-function _copyFallback(text) {
+function _copyFallback(text, done) {
   const ta = document.createElement('textarea');
   ta.value = text;
   ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
@@ -2979,9 +3081,9 @@ function _copyFallback(text) {
   ta.select();
   try {
     document.execCommand('copy');
-    Renderer.toast('Codice copiato!', 'success');
+    Renderer.toast(done, 'success');
   } catch (_) {
-    Renderer.toast(`Codice: ${text}`, '');
+    Renderer.toast(text, '');
   }
   document.body.removeChild(ta);
 }

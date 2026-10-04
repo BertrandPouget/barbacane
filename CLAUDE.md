@@ -53,10 +53,13 @@ engine/
                         abandon_game, public_state, bot casuale (random_bot_turn), simulate_game
   bot.py                IA euristica dei Bot (easy/normal/hard), entry point run_bot_turn
   tutorial.py           6 tutorial scriptati (TutorialDef/TutorialStep), validazione e avanzamento step
+  chronicle.py          Cronaca della partita: da log + recent_events a frasi italiane (con testo privato
+                        per chi può vedere le carte coperte) e statistiche del riepilogo finale
 server/
   routes.py             REST + WebSocket, _dispatch_action, timer turno, scheduling turni Bot,
                         handler resolve_* delle interazioni pendenti
-  lobby.py              Lobby IN MEMORIA (_lobbies), Bot in lobby, nomi Mecha-, start_game, auth token
+  lobby.py              Lobby IN MEMORIA (_lobbies), Bot in lobby, nomi Mecha-, start_game, auth token,
+                        rivincita multigiocatore (rematch, _rematches)
   ws_manager.py         Connessioni per partita, send/broadcast, timer turno
 db/storage.py           Postgres (se DATABASE_URL) o SQLite; save/load game, players, cleanup_games
 frontend/               Client desktop
@@ -68,6 +71,8 @@ frontend/               Client desktop
   ws.js                 Client WebSocket (condiviso con mobile)
   spotlight.js          "Occhio di bue" dei tutorial (condiviso)
   sparks.js, audio.js   Scintille e musica (condivisi)
+  chronicle.js          Formattazione della cronaca e classifica di fine partita (condiviso)
+  session.js            Partita salvata nel browser (SavedGame), link d'invito (Invite), nome ricordato (condiviso)
   mobile/               Client mobile: app.js (modulo Mob), render.js, ui.js (sheet, toast), mobile.css
 card_factory/           Pipeline grafica carte (vedi suo README): cards.json + illustrazioni → output/<id>.png,
                         servite al frontend come /card_images/<id>.png (retro.png = dorso)
@@ -87,8 +92,9 @@ assets/                 rules.md, logo, sfondo, musica, immagini home
    - verifica la fase richiesta (`_PHASE_REQUIRED`);
    - chiama l'handler; dopo un'azione che consuma Azione controlla la Fucina (`check_fucina_after_action`);
    - dopo `battle`/`eracle_destroy`, se non restano battaglie, chiama `end_turn` automaticamente (non nei tutorial);
-   - nei tutorial avanza lo step; con Bot in partita risolve subito le loro interazioni pendenti (`_auto_resolve_bot_pending`).
-3. Salva (`save_game`), invia a ogni connesso il proprio `public_state(state, pid)` con `type: "state_update"`, riavvia il timer se il turno è cambiato, poi `_schedule_bot_turn(state)`.
+   - nei tutorial avanza lo step; con Bot in partita risolve subito le loro interazioni pendenti (`_auto_resolve_bot_pending`);
+   - infine `chronicle.sync(state)` racconta nella cronaca ciò che l'azione ha prodotto.
+3. Salva (`save_game`), invia a ogni connesso il proprio `public_state(state, pid)` con `type: "state_update"` (`_broadcast_state`), riavvia il timer se il turno è cambiato, poi `_schedule_bot_turn(state)`.
 4. Gli errori di regola sono `ActionError` → messaggio `{type: "error"}` solo a chi ha agito.
 
 **Fasi del turno** (`state.phase`): `"action"` → `"schieramento"` (riposizionamento + Orde) → `"battaglia"`, avanzate dal client con l'azione `next_phase`; `"end"` a partita finita.
@@ -107,7 +113,10 @@ assets/                 rules.md, logo, sfondo, musica, immagini home
 
 - **Multigiocatore** (`server/lobby.py`): codice tipo `BARB-7X3K`. Le lobby vivono **solo in memoria** (`_lobbies`): un riavvio del server perde le sale d'attesa, non le partite già avviate (che sono nel DB). Il creatore può aggiungere/rimuovere Bot, sceglierne la difficoltà (unica) e riordinare i posti (`/lobby/add_bot|remove_bot|bot_difficulty|reorder`); l'ordine della lobby = ordine di `state.players` = adiacenza. Nomi Bot: "Mecha-" + Recluta casuale, unici case-insensitive; un umano omonimo fa ribattezzare il Bot. I Bot non hanno riga in `players`.
 - **Giocatore Singolo** (`POST /practice/start`, `create_practice_game`): 1–3 Bot, umano sempre primo, game_id `vs-…`, timer disattivato.
-- **Bot**: `state.bot_player_ids` + `state.bot_difficulty`. I turni girano in background (`_schedule_bot_turn` → `_play_bot_turn` in thread, durata minima `_BOT_THINK_SECONDS`), uno alla volta per partita, e **solo se almeno un umano è connesso**. La strategia è in `engine/bot.py` (docstring in testa spiega le tre difficoltà; `hard` simula fino a fine turno e stima la minaccia avversaria). Un turno da 3–4 s è accettabile: non sacrificare la forza per la velocità. Magie che il Bot non sa usare: `_SPELL_EFFECT_EXCLUDE`.
+- **Bot**: `state.bot_player_ids` + `state.bot_difficulty`. I turni girano in background (`_schedule_bot_turn` → `_play_bot_turn` in thread), uno alla volta per partita, e **solo se almeno un umano è connesso**. Il turno è calcolato tutto insieme (`run_bot_turn(..., on_step)` fotografa lo stato dopo ogni mossa), lo stato finale viene salvato subito e poi il tavolo riceve le fotografie una alla volta (`action: "bot_step"`, pausa `_BOT_STEP_SECONDS`, prima mossa dopo `_BOT_THINK_SECONDS`), infine lo stato vero (`bot_turn`). Il racconto si interrompe se nel frattempo il tavolo riceve uno stato più recente (`_game_versions`). La strategia è in `engine/bot.py` (docstring in testa spiega le tre difficoltà; `hard` simula fino a fine turno e stima la minaccia avversaria). Un turno da 3–4 s è accettabile: non sacrificare la forza per la velocità; `hard` ha comunque un tetto di riflessione per la fase Azioni (`HARD_THINK_SECONDS`), oltre il quale gioca la mossa migliore trovata. Magie che il Bot non sa usare: `_SPELL_EFFECT_EXCLUDE`.
+- **Cronaca** (`engine/chronicle.py`): `sync()` trasforma le nuove voci di `state.log` (cursore `chronicle_cursor`) e gli eventi non ancora raccontati (marcati `_told`) in voci di `state.chronicle`, con segnaposto `{p:player_id}` e `{c:base_card_id}` che i client rendono con `frontend/chronicle.js`. Le informazioni coperte (carte pescate, Muri, carte scartate dalla mano) vanno in `private_text` per il solo proprietario; `view()` invia a ciascuno la propria versione. Una carta nuova che produce eventi o voci di log merita una frase in `_tell_log`/`_tell_event`. Aggiorna anche `match_stats` ed `eliminations`, usati dal riepilogo di fine partita.
+- **Fine partita**: riepilogo (classifica + statistiche) e **Rivincita** (`POST /game/rematch`): in Giocatore Singolo crea una nuova partita contro gli stessi Bot; in multigiocatore il primo che la chiede crea una nuova sala d'attesa con timer, Bot e posti della partita precedente (`seat_hint`), gli altri ricevono `{type: "rematch_offer"}` via WebSocket e con la stessa chiamata ci entrano. `state.mode` ("lobby" | "practice" | "tutorial", vedi `game_mode()` per le partite vecchie) dice quale delle due.
+- **Ripresa e inviti** (`frontend/session.js`): la partita in corso è salvata in `localStorage` (pulsante «Riprendi la partita» in home) e in `sessionStorage` (ricaricando la pagina si torna subito al tavolo). Il link d'invito è `/?join=BARB-XXXX` (passa anche al redirect mobile).
 - **Tutorial** (`engine/tutorial.py`, `GET /tutorials`, `POST /tutorial/start`): partita contro un "Manichino" che non gioca; ogni step `info` (avanza con `tutorial_next`) o `action` (richiede un'azione precisa, con `match`). Si torna indietro solo verso step `info` tramite snapshot. Gli step usano `highlight` per lo spotlight (con `_MOBILE_HIGHLIGHT_MAP` per i selettori mobile) e `card_focus` con rettangoli in percentuale sull'immagine della carta: se cambia il layout di `card.html`, quei rettangoli vanno ritarati.
 - **Modalità Test**: nome `Test` o `Test2` → le carte di `data/test_cards.json` in cima al mazzo prima della pescata iniziale, e a ogni inizio turno 10 Mana e 5 Azioni.
 

@@ -364,6 +364,15 @@ class GameState(BaseModel):
     tutorial: Optional[Dict[str, Any]] = None  # {"tutorial_id": str, "step_index": int, "completed": bool}
     bot_player_ids: List[str] = Field(default_factory=list)  # giocatori controllati dai Bot (partita di pratica)
     bot_difficulty: str = "normal"  # "easy" | "normal" | "hard", uguale per tutti i Bot
+    mode: Optional[str] = None  # "lobby" | "practice" | "tutorial" (None: partite salvate prima del campo)
+
+    # Cronaca della partita (engine/chronicle.py): frasi già pronte per i client,
+    # costruite da `log` e `recent_events`. `chronicle_cursor` è la prima voce di
+    # `log` non ancora raccontata (-1: cronaca mai avviata, es. partite vecchie).
+    chronicle: List[Dict[str, Any]] = Field(default_factory=list)
+    chronicle_cursor: int = -1
+    match_stats: Dict[str, Dict[str, int]] = Field(default_factory=dict)  # player_id -> contatori
+    eliminations: List[Dict[str, Any]] = Field(default_factory=list)      # [{player_id, turn, abandoned}]
 
     @model_validator(mode="before")
     @classmethod

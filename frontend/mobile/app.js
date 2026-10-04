@@ -56,7 +56,12 @@ const Mob = (() => {
   let tutorialStepsCache = {};   // tutorial_id -> [step, ...] (con testo/highlight)
   let tutorialCompletedShown = false;
 
-  const SESSION_KEY = 'barb_m_session';
+  // Cronaca: id dell'ultima voce già mostrata (le successive sono "nuove")
+  let chronicleSeenId = 0;
+  // Rivincita proposta da un altro giocatore (messaggio WS rematch_offer)
+  let rematchOffer = null;
+  // Codice lobby arrivato con un link d'invito (?join=BARB-XXXX)
+  let pendingJoinCode = null;
 
   // ---------------------------------------------------------------------------
   // Init
@@ -65,12 +70,17 @@ const Mob = (() => {
   async function init() {
     Sparks.init({ sizeFactor: 0.42, density: 2.5 });
     BgMusic.init();
+    pendingJoinCode = Invite.takeFromURL();
     await loadCardDefs();
     bindLobbyUI();
     bindGameChrome();
     bindSplashUI();
+    ['in-create-name', 'in-join-name'].forEach(id => { $(id).value = PlayerName.get(); });
     const resumed = await tryResume();
-    if (!resumed) Screens.show('splash');
+    if (!resumed) {
+      Screens.show('splash');
+      refreshResumeButton();
+    }
   }
 
   // La splash mostra solo il logo: toccandolo (primo gesto utente, sblocca
@@ -104,6 +114,7 @@ const Mob = (() => {
       splash.classList.remove('splash-flying');
       if (splashLogo) splashLogo.style.transform = '';
       Screens.show('lobby');
+      if (pendingJoinCode) openJoinFromInvite();
     };
 
     const from = splashLogo ? splashLogo.getBoundingClientRect() : null;
@@ -160,52 +171,80 @@ const Mob = (() => {
   // ---------------------------------------------------------------------------
 
   function saveSession() {
-    try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-        token: sessionToken, playerId: myPlayerId, lobbyCode, gameId,
-      }));
-    } catch (_) {}
+    if (!gameId || !sessionToken) return;
+    const mode = isTutorial ? 'tutorial' : (currentState && currentState.mode) || null;
+    SavedGame.save({ gameId, token: sessionToken, playerId: myPlayerId, lobbyCode, mode });
   }
 
-  function clearSession() {
-    try { sessionStorage.removeItem(SESSION_KEY); } catch (_) {}
-  }
+  function clearSession() { SavedGame.clear(); }
 
   async function tryResume() {
     // ?resume=GAMEID.TOKEN (utile anche per riaprire una partita da link)
     const qs = new URLSearchParams(location.search);
-    let stored = null;
+    let saved = null;
     if (qs.has('resume')) {
       const raw = qs.get('resume');
       const dot = raw.indexOf('.');
-      if (dot > 0) stored = { gameId: raw.slice(0, dot), token: raw.slice(dot + 1), playerId: null };
+      if (dot > 0) saved = { gameId: raw.slice(0, dot), token: raw.slice(dot + 1), playerId: null };
     }
-    if (!stored) {
-      try { stored = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null'); } catch (_) {}
-    }
-    if (!stored || !stored.token || !stored.gameId) return false;
+    return resumeFrom(saved || SavedGame.load(false));
+  }
 
-    try {
-      const state = await apiFetch(`/game/${stored.gameId}?session_token=${encodeURIComponent(stored.token)}`);
-      if (!state || state.winner_id) { clearSession(); return false; }
-      // Il giocatore "visibile" (mano non oscurata) è il proprietario del token
-      const mine = state.players.find(p => p.hand !== null && p.hand !== undefined);
-      if (!mine) { clearSession(); return false; }
-      sessionToken = stored.token;
-      myPlayerId = stored.playerId || mine.id;
-      gameId = stored.gameId;
-      lobbyCode = stored.lobbyCode || null;
-      saveSession();
-      if (state.tutorial) {
-        isTutorial = true;
-        tutorialCompletedShown = false;
-        await _ensureTutorialStepsCached(state.tutorial.tutorial_id);
+  async function resumeFrom(saved) {
+    const state = await SavedGame.check(saved);
+    if (!state) return false;
+    const mine = state.players.find(p => p.hand !== null && p.hand !== undefined);
+    sessionToken = saved.token;
+    myPlayerId = saved.playerId || mine.id;
+    gameId = saved.gameId;
+    lobbyCode = saved.lobbyCode || null;
+    isTutorial = !!state.tutorial;
+    if (isTutorial) {
+      tutorialCompletedShown = false;
+      await _ensureTutorialStepsCached(state.tutorial.tutorial_id);
+    }
+    enterGame(state);
+    return true;
+  }
+
+  /** Mostra in home il pulsante "Riprendi la partita" se ce n'è una in corso (tutorial esclusi). */
+  async function refreshResumeButton() {
+    const btn = $('btn-resume');
+    const saved = SavedGame.load(true);
+    const state = saved && saved.mode !== 'tutorial' ? await SavedGame.check(saved) : null;
+    btn.hidden = !state || !!state.tutorial;
+    if (btn.hidden) return;
+    const others = state.players.filter(p => p.hand === null || p.hand === undefined).map(p => p.name);
+    const kind = state.mode === 'practice' ? 'Giocatore singolo' : 'Multigiocatore';
+    $('btn-resume-sub').textContent = `${kind} · turno ${state.turn} · contro ${others.join(', ')}`;
+  }
+
+  // Link d'invito: si apre "Unisciti" con il codice già inserito
+  function openJoinFromInvite() {
+    const code = pendingJoinCode;
+    pendingJoinCode = null;
+    Screens.show('multi');
+    $('tab-join').click();
+    $('in-join-code').value = code;
+    Toast.show(`Invito alla lobby ${code}: scegli il tuo nome ed entra`);
+  }
+
+  async function shareInvite() {
+    const code = $('wait-code-text').textContent.trim();
+    const url = Invite.link(code);
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Barbacane', text: `Unisciti alla mia partita di Barbacane (codice ${code})`, url });
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;  // condivisione annullata
       }
-      enterGame(state);
-      return true;
-    } catch (_) {
-      clearSession();
-      return false;
+    }
+    const done = () => Toast.show('Link d\'invito copiato!', 'success');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(done).catch(() => Toast.show(url));
+    } else {
+      Toast.show(url);
     }
   }
 
@@ -236,6 +275,16 @@ const Mob = (() => {
     });
     $('in-join-code').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
     $('wait-code').addEventListener('click', copyLobbyCode);
+    $('btn-share-invite').addEventListener('click', () => { haptic(); shareInvite(); });
+    $('btn-resume').addEventListener('click', async () => {
+      haptic();
+      if (!(await resumeFrom(SavedGame.load(true)))) {
+        Toast.show('La partita non è più disponibile', 'error');
+        refreshResumeButton();
+      }
+    });
+    $('btn-rematch').addEventListener('click', () => { haptic(); onRematchClick(); });
+    $('btn-over-log').addEventListener('click', () => { haptic(); openLogSheet(); });
 
     // Catalogo carte
     $('btn-catalog').addEventListener('click', openCatalog);
@@ -298,7 +347,7 @@ const Mob = (() => {
 
   async function startPracticeGame(difficulty) {
     try {
-      const res = await api('/practice/start', { player_name: 'Tu', difficulty, num_bots: practiceBotCount });
+      const res = await api('/practice/start', { player_name: PlayerName.get() || 'Giocatore', difficulty, num_bots: practiceBotCount });
       sessionToken = res.session_token;
       myPlayerId = res.player_id;
       gameId = res.game_id;
@@ -354,7 +403,7 @@ const Mob = (() => {
   async function startTutorial(tutorialId) {
     try {
       await _ensureTutorialStepsCached(tutorialId);
-      const res = await api('/tutorial/start', { tutorial_id: tutorialId, player_name: 'Tu' });
+      const res = await api('/tutorial/start', { tutorial_id: tutorialId, player_name: PlayerName.get() || 'Giocatore' });
       sessionToken = res.session_token;
       myPlayerId = res.player_id;
       gameId = res.game_id;
@@ -597,6 +646,7 @@ const Mob = (() => {
     const name = $('in-create-name').value.trim();
     const timer = parseInt($('in-create-timer').value) || 0;
     if (!name) { Toast.show('Inserisci il tuo nome', 'error'); return; }
+    PlayerName.set(name);
     try {
       const res = await api('/lobby/create', { player_name: name, turn_timer: timer });
       sessionToken = res.session_token;
@@ -616,6 +666,7 @@ const Mob = (() => {
     const code = $('in-join-code').value.trim().toUpperCase();
     if (!name) { Toast.show('Inserisci il tuo nome', 'error'); return; }
     if (!code) { Toast.show('Inserisci il codice lobby', 'error'); return; }
+    PlayerName.set(name);
     try {
       const res = await api('/lobby/join', { lobby_code: code, player_name: name });
       sessionToken = res.session_token;
@@ -772,13 +823,19 @@ const Mob = (() => {
       startLocalTimer(msg.seconds_left);
     });
     WS.on('player_connected', (msg) => {
-      Render.logPush(`${playerName(msg.player_id)} si è connesso`);
+      if (msg.player_id === myPlayerId || !currentState) return;
+      Toast.show(`${playerName(msg.player_id)} è di nuovo al tavolo`);
     });
     WS.on('player_disconnected', (msg) => {
-      Render.logPush(`${playerName(msg.player_id)} si è disconnesso`);
+      if (msg.player_id === myPlayerId || !currentState || currentState.winner_id) return;
+      Toast.show(`${playerName(msg.player_id)} si è disconnesso`);
     });
     WS.on('disconnected', () => {
-      Render.logPush('Connessione persa, riconnessione…');
+      if (currentState && !currentState.winner_id) Render.ticker('Connessione persa, riconnessione…');
+    });
+    WS.on('rematch_offer', (msg) => {
+      rematchOffer = msg;
+      if (currentState && currentState.winner_id) updateRematchUI(currentState);
     });
     WS.on('error', (msg) => {
       Toast.show(msg.message || 'Errore', 'error');
@@ -812,6 +869,8 @@ const Mob = (() => {
     stopLobbyPolling();
     gameId = gameId || state.game_id;
     currentState = state;
+    rematchOffer = null;
+    chronicleSeenId = Chronicle.lastId(state);
     saveSession();
     connectGameWS();
     Screens.show('game');
@@ -876,15 +935,6 @@ const Mob = (() => {
         }
       }
 
-      if (action === 'battle') {
-        const attName = playerName(result.attacker_id);
-        const defName = playerName(result.defender_id);
-        const side = result.defender_bastion === 'left' ? 'Sinistro' : 'Destro';
-        Render.logPush(`⚔️ ${attName} → ${defName} [Bastione ${side}]: ` +
-          `${result.total_damage} Danni, ${result.walls_destroyed} Muri, ${result.life_lost} Vita` +
-          (result.walls_discarded_guerremoto ? ` (+${result.walls_discarded_guerremoto} Muri scartati da Guerremoto)` : ''));
-      }
-
       // Eracle: distruggi una costruzione avversaria
       if (action === 'battle' && result.eracle_destroy_triggered &&
           result.eracle_targets && result.eracle_targets.length > 0 &&
@@ -903,13 +953,13 @@ const Mob = (() => {
             target_player_id: result.defender_id,
           }),
         });
-        _logRecentEvents(state);
+        _renderChronicle(state, action);
         refreshDock();
         return;
       }
     }
 
-    _logRecentEvents(state);
+    _renderChronicle(state, action);
 
     if (state.winner_id) {
       setTimeout(() => showGameOver(state), 900);
@@ -953,87 +1003,25 @@ const Mob = (() => {
     return false;
   }
 
-  // Descrizione eventi (parità col client desktop)
-  function _logRecentEvents(state) {
-    if (!state.recent_events || state.recent_events.length === 0) return;
-    state.recent_events.forEach(ev => {
-      const msg = _describeEvent(ev, state);
-      if (msg) Render.logPush(msg);
-    });
-  }
+  // ---------------------------------------------------------------------------
+  // Cronaca della partita (testi dal server, formattati da chronicle.js)
+  // ---------------------------------------------------------------------------
 
-  function _describeEvent(ev, state) {
-    const pName = playerName(ev.player_id);
-    const cardLabel = ev.card ? capitalize(ev.card) : '';
-
-    if (ev.type === 'd10') {
-      if (ev.card === 'estrattore') return `${pName} — Estrattore: D10=${ev.roll} — ${ev.triggered ? `+${ev.mana_gained} Mana` : 'nessun mana'}`;
-      if (ev.card === 'granaio') return `${pName} — Granaio: D10=${ev.roll} — ${ev.triggered ? 'carta pescata' : 'nessuna carta'}`;
-      if (ev.card === 'obelisco') return `${pName} — Obelisco: D10=${ev.roll} (soglia ${ev.threshold}) — ${ev.returned ? 'Magia in mano' : 'Magia scartata'}`;
-      if (ev.card === 'fucina') return `${pName} — Fucina: D10=${ev.roll} — ${ev.extra_action ? 'azione extra' : 'nessuna azione extra'}`;
-      return `${pName} — ${cardLabel}: D10=${ev.roll}`;
+  // Il ticker mostra l'ultima voce arrivata; la cronaca completa è nello sheet
+  function _renderChronicle(state, action) {
+    const fresh = Chronicle.newSince(chronicleSeenId, state).filter(e => e.kind !== 'turn');
+    chronicleSeenId = Chronicle.lastId(state);
+    if (fresh.length) {
+      const last = fresh[fresh.length - 1];
+      Render.ticker(Chronicle.toHTML(last.text, state, { cardDefs, myPlayerId }));
     }
-    if (ev.type === 'mana') return `${pName} — ${cardLabel}: +${ev.mana_gained} Mana`;
-    if (ev.type === 'damage') {
-      const defName = playerName(ev.target_player_id);
-      const side = ev.target_bastion_side === 'left' ? 'Sin.' : 'Des.';
-      return `${pName} — ${cardLabel}: ${ev.damage} Danni a ${defName} [${side}]`;
+    if (action === 'leave_game') {
+      (state.recent_events || []).forEach(ev => {
+        if (ev.type === 'abandon' && ev.player_id !== myPlayerId) {
+          Toast.show(`${playerName(ev.player_id)} ha abbandonato la partita`, 'error');
+        }
+      });
     }
-    if (ev.type === 'draw') {
-      const n = ev.cards_drawn ? ev.cards_drawn.length : 0;
-      return `${pName} — ${cardLabel}: ${n} carta${n !== 1 ? ' pescate' : ' pescata'}`;
-    }
-    if (ev.type === 'life_gained') return `${pName} — ${cardLabel}: +${ev.lives_gained || 0} Vita`;
-    if (ev.type === 'warrior_discarded') return `${pName} — ${cardLabel}: guerriero scartato`;
-    if (ev.type === 'warrior_moved') return `${pName} — ${cardLabel}: guerriero spostato`;
-    if (ev.type === 'warrior_to_wall') return `${pName} — ${cardLabel}: guerriero trasformato in Muro`;
-    if (ev.type === 'wall_moved') {
-      const n = ev.moved_walls ? ev.moved_walls.length : 0;
-      return `${pName} — ${cardLabel}: ${n} ${n !== 1 ? 'Muri spostati' : 'Muro spostato'}`;
-    }
-    if (ev.type === 'wall_taken') return `${pName} — ${cardLabel}: Muro in mano`;
-    if (ev.type === 'search') return `${pName} — ${cardLabel}: ricerca nel mazzo`;
-    if (ev.type === 'ethereal') return `${pName} — ${cardLabel}: carta eterea`;
-    if (ev.type === 'discard') return `${pName} — ${cardLabel}: scartato`;
-    if (ev.type === 'horde') {
-      const H = {
-        patrizio: 'Orda Patrizio: +2 GIT',
-        orfeo: 'Orda Orfeo: +1 ATT +1 DIF',
-        polemarco: `Orda Polemarco: +${ev.att_bonus} ATT`,
-        reinhold: 'Orda Reinhold: sconto Sorgive -2',
-        araminta: 'Orda Araminta: Anatemi tornano in mano',
-        evelyn: 'Orda Evelyn: Sortilegi raddoppiati',
-        faust: 'Orda Faust: Biblioteche avversarie bloccate',
-        giulio: 'Orda Giulio: ricerca nel mazzo',
-        madeleine: 'Orda Madeleine: Prodigi liberi da Scuola',
-        decimo: 'Orda Decimo: anti-Fossato',
-        joseph: `Orda Joseph: ${(ev.enemy_troni_discarded || []).length ? 'Troni avversari scartati' : 'Troni avversari bloccati'}`,
-        eracle: 'Orda Eracle: distruggi Costruzione se ≥3 Danni',
-      };
-      return `${pName} — ${H[ev.card] || `Orda ${cardLabel}`}`;
-    }
-    if (ev.type === 'abandon') return `${pName} ha abbandonato la partita`;
-    if (ev.type === 'magiscudo_blocked') {
-      const blockedName = playerName(ev.blocked_player);
-      return `${pName} — ${cardLabel || 'Magia'} annullata: ${blockedName} è protetto da Magiscudo`;
-    }
-    if (ev.type === 'effect') {
-      const E = {
-        magiscudo: 'Magiscudo: immune alle Magie',
-        guerremoto: `Guerremoto: attacco a qualsiasi Bastione${ev.discard_walls ? `, scarta fino a ${ev.discard_walls} Muri prima dei Danni` : ''}`,
-        divinazione: 'Divinazione: Mana extra al prossimo turno',
-        dazipazzi: `Dazipazzi: ${ev.reset_buildings ? ev.reset_buildings.length : 0} costruzioni ripristinate`,
-        fucina: `Fucina: ${ev.extra_action ? 'azione extra' : 'azione extra (D10)'}`,
-        cardo: 'Cardo: spostamento guerriero attivato',
-        decumano: 'Decumano: completamento Cardo gratuito',
-        trono: 'Trono: assegnato a guerriero',
-        biblioteca: 'Biblioteca: carta pescata',
-        equipotenza: 'Equipotenza: statistiche equiparate',
-        bastioncontrario: 'Bastioncontrario: Bastioni scambiati',
-      };
-      return `${pName} — ${E[ev.card] || cardLabel}`;
-    }
-    return null;
   }
 
   // ---------------------------------------------------------------------------
@@ -2680,13 +2668,20 @@ const Mob = (() => {
   }
 
   function openLogSheet() {
-    const entries = Render.logEntries();
-    const body = entries.length === 0
-      ? [el('div', { className: 'log-empty' }, ['Nessun evento registrato finora.'])]
-      : entries.map(e => el('div', { className: 'log-row' }, [e.text]));
+    const state = currentState;
+    const list = Chronicle.entries(state);
+    const opts = { cardDefs, myPlayerId };
+    // Turni dal più recente; dentro ogni turno, le mosse in ordine
+    const html = Chronicle.groupByTurn(list).reverse().map(g => {
+      const head = g.header ? `<div class="log-turn">${Chronicle.toHTML(g.header.text, state, opts)}</div>` : '';
+      const rows = g.items.map(e =>
+        `<div class="log-row log-${e.kind}">${Chronicle.toHTML(e.text, state, opts)}</div>`).join('');
+      return `<div class="log-group">${head}${rows}</div>`;
+    }).join('');
     Sheet.open({
-      title: '📜 Registro eventi',
-      body,
+      title: 'Cronaca della partita',
+      subtitle: list.length && list[0].id > 1 ? 'Le mosse più vecchie non sono più mostrate' : '',
+      body: html || '<div class="log-empty">Ancora nessuna mossa.</div>',
       footer: [{ label: 'Chiudi', onClick: () => Sheet.close() }],
     });
   }
@@ -2985,10 +2980,66 @@ const Mob = (() => {
     $('over-title').textContent = iWon ? 'Vittoria!' : 'Fine partita';
     $('over-winner').textContent = iWon ? 'Hai conquistato il Barbacane'
       : winner ? `${winner.name} conquista il Barbacane` : 'Nessun vincitore';
-    $('over-scores').innerHTML = state.players
-      .map(p => `${p.name}: ${'❤︎'.repeat(Math.max(0, p.lives))}${'✕'.repeat(Math.max(0, 3 - p.lives))}`)
-      .join('<br>');
+
+    // Riepilogo: classifica e statistiche della partita (chronicle.js)
+    const esc = Chronicle.escapeHTML;
+    $('over-scores').innerHTML = Chronicle.standings(state).map(r => {
+      const seat = state.players.indexOf(r.player);
+      const me = r.player.id === myPlayerId;
+      const stats = Chronicle.STAT_COLUMNS
+        .map(c => `<span class="over-stat"><b>${r.stats[c.key] || 0}</b> ${c.label}</span>`).join('');
+      return `<div class="over-row glass${r.player.id === state.winner_id ? ' winner' : ''}">`
+        + `<div class="over-row-head"><span class="over-place">${r.place}°</span>`
+        + `<span class="chr-player chr-seat-${seat}">${esc(r.player.name)}</span>${me ? ' <span class="over-you">(tu)</span>' : ''}`
+        + `<span class="over-outcome">${esc(r.outcome)}</span></div>`
+        + `<div class="over-stats">${stats}</div></div>`;
+    }).join('');
+    updateRematchUI(state);
     haptic(iWon ? 120 : 40);
+  }
+
+  function updateRematchUI(state) {
+    const btn = $('btn-rematch');
+    const note = $('over-rematch-note');
+    btn.hidden = !(state.mode === 'practice' || state.mode === 'lobby');
+    btn.disabled = false;
+    const invited = rematchOffer && rematchOffer.player_id !== myPlayerId;
+    btn.textContent = invited ? 'Unisciti alla rivincita' : 'Rivincita';
+    note.hidden = !invited && state.mode !== 'lobby';
+    note.textContent = invited
+      ? `${playerName(rematchOffer.player_id)} propone la rivincita.`
+      : 'La rivincita apre una nuova sala d\'attesa con gli stessi posti: gli altri riceveranno l\'invito.';
+  }
+
+  async function onRematchClick() {
+    const btn = $('btn-rematch');
+    btn.disabled = true;
+    try {
+      const res = await api('/game/rematch', { game_id: gameId, session_token: sessionToken });
+      // Si lascia la partita finita: da qui in poi conta solo la nuova
+      WS.disconnect();
+      Sheet.close(true);
+      $('confetti').innerHTML = '';
+      rematchOffer = null;
+      sessionToken = res.session_token;
+      myPlayerId = res.player_id;
+      isTutorial = false;
+      if (res.mode === 'practice') {
+        gameId = res.game_id;
+        lobbyCode = null;
+        isCreator = false;
+        enterGame(res.state);
+      } else {
+        gameId = null;
+        currentState = null;
+        lobbyCode = res.lobby_code;
+        isCreator = !!res.is_creator;
+        showWaitingRoom(res.lobby);
+      }
+    } catch (e) {
+      btn.disabled = false;
+      Toast.show(e.message, 'error');
+    }
   }
 
   // ---------------------------------------------------------------------------

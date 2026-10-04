@@ -39,6 +39,7 @@ un solo avversario tutto si riduce al comportamento 1 contro 1.
 
 from __future__ import annotations
 import random
+import time
 from collections import Counter
 from itertools import combinations
 from typing import Dict, List, Optional, Tuple
@@ -90,30 +91,46 @@ ActionSpec = Tuple
 _LEGACY_DIFFICULTY = {"expert": "hard"}
 
 
-def run_bot_turn(state: GameState, difficulty: str = "normal") -> None:
-    """Gioca l'intero turno del giocatore corrente (deve essere il Bot)."""
+# Tempo massimo di riflessione di 'hard' per la fase Azioni di un turno. La
+# ricerca esamina prima i candidati più promettenti, quindi a tempo scaduto
+# gioca la migliore mossa trovata fin lì invece di far aspettare il tavolo
+# (e di occupare la CPU del server, condivisa con le altre partite).
+HARD_THINK_SECONDS = 4.0
+
+
+def run_bot_turn(state: GameState, difficulty: str = "normal", on_step=None) -> None:
+    """Gioca l'intero turno del giocatore corrente (deve essere il Bot).
+    `on_step` (opzionale) viene chiamata dopo ogni mossa sullo stato reale
+    (azione, riposizionamento, Orda, Battaglia), prima della fine del turno:
+    serve a mostrare al tavolo il turno del Bot un passo alla volta."""
+    step = on_step or (lambda: None)
     difficulty = _LEGACY_DIFFICULTY.get(difficulty, difficulty)
     player_id = state.current_player.id
+    deadline = time.monotonic() + HARD_THINK_SECONDS if difficulty == "hard" else None
     threat = _ThreatModel(state, player_id) if difficulty == "hard" else None
-    _play_actions(state, player_id, difficulty, threat)
-    _maybe_fucina_bonus_action(state, player_id, difficulty, threat)
+    _play_actions(state, player_id, difficulty, threat, deadline, step)
+    _maybe_fucina_bonus_action(state, player_id, difficulty, threat, deadline, step)
     if threat is not None:
         _optimize_reposition(state, player_id, threat)
     else:
         _reposition_for_hordes(state, player_id)
+    step()
     _bot_try_horde(state, state.get_player(player_id))
+    step()
     _bot_battle(state, player_id, smart=threat is not None)
+    step()
     end_turn(state)
 
 
 def _maybe_fucina_bonus_action(state: GameState, player_id: str, difficulty: str,
-                               threat: Optional["_ThreatModel"] = None) -> None:
+                               threat: Optional["_ThreatModel"] = None,
+                               deadline: Optional[float] = None, step=None) -> None:
     """Se una Fucina base concede un'Azione extra dopo aver esaurito le due
     normali, giocala anche lei invece di sprecarla."""
     player = state.get_player(player_id)
     result = check_fucina_after_action(state, player)
     if result and player.actions_remaining > 0:
-        _play_actions(state, player_id, difficulty, threat)
+        _play_actions(state, player_id, difficulty, threat, deadline, step)
 
 
 # ---------------------------------------------------------------------------
@@ -121,19 +138,22 @@ def _maybe_fucina_bonus_action(state: GameState, player_id: str, difficulty: str
 # ---------------------------------------------------------------------------
 
 def _play_actions(state: GameState, player_id: str, difficulty: str,
-                  threat: Optional["_ThreatModel"] = None) -> None:
+                  threat: Optional["_ThreatModel"] = None,
+                  deadline: Optional[float] = None, step=None) -> None:
     player = state.get_player(player_id)
     while player.actions_remaining > 0:
         if difficulty == "hard":
             # Anche con una sola Azione rimasta la valutazione a fine turno
             # (minaccia inclusa) è più affidabile del punteggio statico.
-            done = _play_best_pair(state, player_id, difficulty, threat)
+            done = _play_best_pair(state, player_id, difficulty, threat, deadline)
         elif difficulty == "normal" and player.actions_remaining >= 2:
             done = _play_best_pair(state, player_id, difficulty)
         else:
             done = _play_best_single(state, player_id, difficulty)
         if not done:
             break
+        if step:
+            step()
 
 
 def _play_best_single(state: GameState, player_id: str, difficulty: str) -> bool:
@@ -180,13 +200,16 @@ def _beam(candidates: List[Tuple[float, ActionSpec]], width: int, difficulty: st
 
 
 def _play_best_pair(state: GameState, player_id: str, difficulty: str,
-                    threat: Optional["_ThreatModel"] = None) -> bool:
+                    threat: Optional["_ThreatModel"] = None,
+                    deadline: Optional[float] = None) -> bool:
     """Per 'normal'/'hard': tra le migliori azioni possibili ora, sceglie
     quella che porta al MIGLIOR ESITO dopo aver giocato anche la seconda
     azione del turno di conseguenza — non semplicemente la migliore "sul
     momento". Prova ogni combinazione su una copia dello stato, sceglie la
     coppia con la valutazione più alta, poi esegue solo la prima mossa scelta
-    sullo stato reale (la seconda verrà rivalutata al giro successivo)."""
+    sullo stato reale (la seconda verrà rivalutata al giro successivo).
+    Con `deadline` (time.monotonic) la ricerca si ferma a tempo scaduto, dopo
+    aver esaminato almeno un candidato: sono in ordine di promessa."""
     beam_first, beam_second = _BEAM[difficulty]
 
     candidates = _generate_candidates(state, player_id, difficulty)
@@ -199,7 +222,11 @@ def _play_best_pair(state: GameState, player_id: str, difficulty: str,
         # 'hard' può anche non fare nulla: tenere una carta in mano è
         # meglio che sprecarla in una mossa che peggiora la posizione.
         best_value = _evaluate_outcome(state, player_id, difficulty, threat)
+    evaluated = 0
     for _, spec1 in top_first:
+        if deadline is not None and evaluated and time.monotonic() > deadline:
+            break
+        evaluated += 1
         sim = _sim_copy(state)
         try:
             _apply_spec(sim, player_id, spec1)
@@ -214,6 +241,8 @@ def _play_best_pair(state: GameState, player_id: str, difficulty: str,
         if sim.get_player(player_id).actions_remaining > 0:
             second_candidates = _beam(_generate_candidates(sim, player_id, difficulty), beam_second, difficulty)
         for _, spec2 in second_candidates:
+            if deadline is not None and time.monotonic() > deadline:
+                break
             sim2 = _sim_copy(sim)
             try:
                 _apply_spec(sim2, player_id, spec2)

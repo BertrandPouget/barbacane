@@ -651,13 +651,67 @@ const Renderer = (() => {
     timerEl.classList.remove('warning');
   }
 
-  const _battleLogHistory = [];
+  // ---------------------------------------------------------------------------
+  // Cronaca della partita (testi dal server, formattati da chronicle.js)
+  // ---------------------------------------------------------------------------
 
-  function updateBattleLog(text) {
-    _battleLogHistory.push(text);
-    if (_battleLogHistory.length > 3) _battleLogHistory.shift();
-    const el = document.getElementById('battle-log');
-    el.innerHTML = _battleLogHistory.map(t => `<div class="battle-log-entry">${t}</div>`).join('');
+  const CHRONICLE_TICKER_ENTRIES = 3;
+
+  function _chronicleEntryHTML(e, state, opts, fresh, tag = 'div', cls = 'chr-entry') {
+    return `<${tag} class="${cls} chr-${e.kind}${fresh.has(e.id) ? ' fresh' : ''}">`
+      + `${Chronicle.toHTML(e.text, state, opts)}</${tag}>`;
+  }
+
+  /**
+   * Aggiorna le ultime righe della cronaca sopra il campo e, se aperto, il
+   * pannello completo. `fresh`: id delle voci appena arrivate (animate).
+   */
+  function renderChronicle(state, myPlayerId, cardDefs, fresh = new Set()) {
+    const opts = { cardDefs, myPlayerId };
+    const recent = Chronicle.entries(state).filter(e => e.kind !== 'turn').slice(-CHRONICLE_TICKER_ENTRIES);
+    document.getElementById('battle-log').innerHTML = recent
+      .map(e => _chronicleEntryHTML(e, state, opts, fresh, 'div', 'battle-log-entry'))
+      .join('');
+    if (!document.getElementById('chronicle-panel').classList.contains('hidden')) {
+      renderChroniclePanel(state, myPlayerId, cardDefs, fresh);
+    }
+  }
+
+  function renderChroniclePanel(state, myPlayerId, cardDefs, fresh = new Set(), forceBottom = false) {
+    const body = document.getElementById('chronicle-body');
+    const wasAtBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 48;
+    const opts = { cardDefs, myPlayerId, interactive: true };
+    const list = Chronicle.entries(state);
+    const groups = Chronicle.groupByTurn(list);
+    let html = list.length && list[0].id > 1
+      ? '<div class="chr-older">Le mosse più vecchie non sono più mostrate.</div>' : '';
+    html += groups.map(g => {
+      const head = g.header
+        ? `<div class="chr-turn">${Chronicle.toHTML(g.header.text, state, opts)}</div>` : '';
+      return `<section class="chr-group">${head}`
+        + g.items.map(e => _chronicleEntryHTML(e, state, opts, fresh)).join('')
+        + '</section>';
+    }).join('');
+    body.innerHTML = html || '<div class="chr-older">Ancora nessuna mossa.</div>';
+    if (forceBottom || wasAtBottom) body.scrollTop = body.scrollHeight;
+  }
+
+  /** aboveOverlay: il pannello va sopra la schermata di fine partita. */
+  function openChroniclePanel(state, myPlayerId, cardDefs, aboveOverlay = false) {
+    const panel = document.getElementById('chronicle-panel');
+    panel.classList.toggle('above-overlay', aboveOverlay);
+    panel.classList.remove('hidden');
+    document.body.classList.add('chronicle-open');
+    renderChroniclePanel(state, myPlayerId, cardDefs, new Set(), true);
+  }
+
+  function closeChroniclePanel() {
+    document.getElementById('chronicle-panel').classList.add('hidden');
+    document.body.classList.remove('chronicle-open');
+  }
+
+  function isChroniclePanelOpen() {
+    return !document.getElementById('chronicle-panel').classList.contains('hidden');
   }
 
   // ---------------------------------------------------------------------------
@@ -1207,11 +1261,29 @@ const Renderer = (() => {
   function showGameOver(state) {
     showScreen('gameover');
     const winner = state.players.find(p => p.id === state.winner_id);
+    const iWon = state.winner_id && state.winner_id === _myPlayerId;
+    document.getElementById('gameover-title').textContent = iWon ? 'Vittoria!' : 'Fine Partita';
     document.getElementById('gameover-winner').textContent =
-      state.winner_id && state.winner_id === _myPlayerId ? 'Hai conquistato il Barbacane'
-        : winner ? `Vincitore: ${winner.name} 🏆` : 'Nessun vincitore';
+      iWon ? 'Hai conquistato il Barbacane'
+        : winner ? `${winner.name} conquista il Barbacane` : 'Nessun vincitore';
+
+    // Riepilogo: classifica e statistiche della partita (chronicle.js)
+    const esc = Chronicle.escapeHTML;
+    const cols = Chronicle.STAT_COLUMNS;
+    const rows = Chronicle.standings(state).map(r => {
+      const seat = state.players.indexOf(r.player);
+      const me = r.player.id === _myPlayerId;
+      return `<tr class="${r.player.id === state.winner_id ? 'winner' : ''}${me ? ' me' : ''}">`
+        + `<td class="go-place">${r.place}°</td>`
+        + `<td class="go-name"><span class="chr-player chr-seat-${seat}">${esc(r.player.name)}</span>${me ? ' <span class="go-you">(tu)</span>' : ''}`
+        + `<div class="go-outcome">${esc(r.outcome)}</div></td>`
+        + cols.map(c => `<td class="go-num">${r.stats[c.key] || 0}</td>`).join('')
+        + '</tr>';
+    }).join('');
     document.getElementById('gameover-scores').innerHTML =
-      state.players.map(p => `${p.name}: ${livesText(p.lives)} Vite`).join('<br>');
+      `<table class="gameover-table"><thead><tr><th></th><th>Giocatore</th>`
+      + cols.map(c => `<th>${c.label}</th>`).join('')
+      + `</tr></thead><tbody>${rows}</tbody></table>`;
   }
 
   // ---------------------------------------------------------------------------
@@ -1330,7 +1402,10 @@ const Renderer = (() => {
     showGameOver,
     showTimerWarning,
     hideTimer,
-    updateBattleLog,
+    renderChronicle,
+    openChroniclePanel,
+    closeChroniclePanel,
+    isChroniclePanelOpen,
     el,
     livesText,
   };

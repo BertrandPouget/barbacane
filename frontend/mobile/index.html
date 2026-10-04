@@ -41,6 +41,12 @@
       <h1 class="lobby-title">BARBACANE</h1>
     </div>
 
+    <!-- Partita in corso salvata nel browser (session.js): compare solo se è ancora in gioco -->
+    <button id="btn-resume" class="home-resume" hidden>
+      <span class="home-resume-title">Riprendi la partita</span>
+      <span id="btn-resume-sub" class="home-resume-sub"></span>
+    </button>
+
     <!-- Le due modalità di gioco -->
     <div class="home-modes">
     <button id="btn-mode-single" class="home-mode">
@@ -165,6 +171,7 @@
         <span id="wait-code-text">—</span>
         <span class="code-copy">copia</span>
       </button>
+      <button id="btn-share-invite" class="cta share-invite">Invita con un link</button>
       <div id="wait-players" class="wait-players"></div>
       <div id="wait-bots" class="wait-bots" hidden>
         <button id="btn-add-bot" class="cta">+ Aggiungi Bot</button>
@@ -200,7 +207,7 @@
         <svg viewBox="0 0 36 36"><circle class="ring-bg" cx="18" cy="18" r="15.5"/><circle id="timer-ring" class="ring-fg" cx="18" cy="18" r="15.5"/></svg>
         <span id="tb-timer-num">—</span>
       </div>
-      <button id="tb-log" class="tb-btn" aria-label="Registro eventi">📜</button>
+      <button id="tb-log" class="tb-btn" aria-label="Cronaca della partita">📜</button>
       <button id="tb-leave" class="tb-btn tb-leave" aria-label="Abbandona la partita">Esci</button>
     </div>
   </header>
@@ -308,8 +315,11 @@
   <div class="over-wrap">
     <h1 id="over-title">Fine partita</h1>
     <p id="over-winner"></p>
-    <div id="over-scores" class="glass"></div>
-    <button class="cta cta-gold" onclick="location.href='/m'">Torna alla lobby</button>
+    <div id="over-scores"></div>
+    <p id="over-rematch-note" class="over-note" hidden></p>
+    <button id="btn-rematch" class="cta cta-gold" hidden>Rivincita</button>
+    <button id="btn-over-log" class="cta">Rivedi la cronaca</button>
+    <button class="cta" onclick="location.href='/m'">Torna alla home</button>
   </div>
 </section>
 
@@ -333,6 +343,8 @@
 <script src="/audio.js"></script>
 <script src="/ws.js"></script>
 <script src="/spotlight.js"></script>
+<script src="/chronicle.js"></script>
+<script src="/session.js"></script>
 <script src="/mobile/ui.js"></script>
 <script src="/mobile/render.js"></script>
 <script src="/mobile/app.js"></script>

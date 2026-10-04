@@ -39,6 +39,7 @@ from engine.actions import (
     evolve_warrior,
 )
 from engine.effects import _apply_scrigno_bonus
+from engine import chronicle
 
 
 # ---------------------------------------------------------------------------
@@ -107,15 +108,20 @@ def create_game(player_names: List[str], game_id: Optional[str] = None,
     # Assegna il Mana iniziale al primo giocatore
     _begin_turn(state)
 
+    # La cronaca parte da qui: la distribuzione iniziale non va raccontata
+    chronicle.start(state)
+
     return state
 
 
 def create_practice_game(player_name: str, difficulty: str = "normal", game_id: Optional[str] = None,
-                         num_bots: int = 1) -> GameState:
+                         num_bots: int = 1, bot_names: Optional[List[str]] = None) -> GameState:
     """
     Crea una partita di pratica in solitaria contro 1–3 Bot (regole e mazzo
     reali, non scriptati), tutti della stessa difficoltà. Il giocatore umano
     parte sempre per primo, per un'esperienza più diretta subito dopo i tutorial.
+    `bot_names` (opzionale) riusa i nomi dei Bot, es. per la rivincita contro
+    gli stessi avversari.
     """
     if difficulty not in ("easy", "normal", "hard"):
         difficulty = "normal"
@@ -128,7 +134,9 @@ def create_practice_game(player_name: str, difficulty: str = "normal", game_id: 
     recruits = [f"Mecha-{c.name}" for c in CARD_REGISTRY.values()
                 if c.type == "warrior" and getattr(c, "subtype", None) == "recruit"
                 and f"Mecha-{c.name}".casefold() != (player_name or "").strip().casefold()]
-    if len(recruits) >= num_bots:
+    if bot_names and len(bot_names) == num_bots:
+        bot_names = list(bot_names)
+    elif len(recruits) >= num_bots:
         bot_names = random.sample(recruits, num_bots)
     else:
         bot_names = [f"Bot {i + 1}" for i in range(num_bots)]
@@ -146,6 +154,9 @@ def create_practice_game(player_name: str, difficulty: str = "normal", game_id: 
     state.turn_timer = 0
     state.bot_player_ids = [p.id for p in state.players[1:]]
     state.bot_difficulty = difficulty
+    state.mode = "practice"
+    # Il primo turno è stato rifatto per il giocatore umano: la cronaca riparte da lui
+    chronicle.start(state)
     return state
 
 
@@ -764,7 +775,22 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
         "tutorial": _tutorial_view(state),
         "bot_player_ids": list(state.bot_player_ids),
         "bot_difficulty": state.bot_difficulty if state.bot_player_ids else None,
+        "mode": game_mode(state),
+        "chronicle": chronicle.view(state, viewer_player_id),
+        "match_stats": state.match_stats,
+        "eliminations": state.eliminations,
     }
+
+
+def game_mode(state: GameState) -> str:
+    """Tipo di partita, anche per quelle salvate prima del campo `mode`."""
+    if state.mode:
+        return state.mode
+    if state.tutorial:
+        return "tutorial"
+    if state.game_id.startswith("vs-"):
+        return "practice"
+    return "lobby"
 
 
 def _load_test_card_ids() -> list:

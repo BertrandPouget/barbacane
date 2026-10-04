@@ -21,7 +21,9 @@ from engine.game import (
     check_fucina_after_action,
     abandon_game,
     create_practice_game,
+    game_mode,
 )
+from engine import chronicle
 from engine.bot import run_bot_turn
 from engine.actions import (
     ActionError,
@@ -49,6 +51,7 @@ from server.lobby import (
     set_bot_difficulty,
     authenticate_player,
     generate_session_token,
+    rematch,
 )
 from server.ws_manager import manager
 from engine.tutorial import (
@@ -75,24 +78,36 @@ async def _on_turn_expire(game_id: str, player_id: str) -> None:
         return  # turno già passato
 
     try:
+        state.recent_events = []
         end_turn(state)
+        chronicle.sync(state)
         status = "finished" if state.winner_id else "playing"
         save_game(state, status=status)
-
-        connected = list(manager.connected_players(game_id))
-        for pid in connected:
-            await manager.send_to_player(game_id, pid, {
-                "type": "state_update",
-                "action": "end_turn",
-                "result": {"turn_ended": True, "auto": True},
-                "state": public_state(state, pid),
-            })
+        await _broadcast_state(game_id, state, "end_turn", {"turn_ended": True, "auto": True})
 
         if not state.winner_id:
             await _start_turn_timer(game_id, state)
         _schedule_bot_turn(state)
     except Exception as e:
         logger.error("[timer] Errore nel forzare fine turno %s: %s", game_id, e)
+
+
+# Contatore degli aggiornamenti inviati per ogni partita: il racconto passo
+# passo del turno di un Bot si interrompe se nel frattempo il tavolo riceve
+# uno stato più recente (es. un giocatore abbandona), per non riportarlo indietro.
+_game_versions: Dict[str, int] = {}
+
+
+async def _broadcast_state(game_id: str, state, action: Optional[str], result: dict) -> None:
+    """Invia a ogni giocatore connesso la propria vista dello stato."""
+    _game_versions[game_id] = _game_versions.get(game_id, 0) + 1
+    for pid in manager.connected_players(game_id):
+        await manager.send_to_player(game_id, pid, {
+            "type": "state_update",
+            "action": action,
+            "result": result,
+            "state": public_state(state, pid),
+        })
 
 
 async def _start_turn_timer(game_id: str, state) -> None:
@@ -217,7 +232,7 @@ async def api_start_game(req: StartGameRequest):
         raise HTTPException(400, str(e))
 
     # Salva nel DB
-    lobby = get_lobby(req.lobby_code)
+    chronicle.sync(state)
     save_game(state, lobby_code=req.lobby_code, status="playing")
 
     # Salva i giocatori nel DB per la riconnessione
@@ -269,6 +284,7 @@ async def api_start_tutorial(req: TutorialStartRequest):
     except ValueError as e:
         raise HTTPException(400, str(e))
 
+    chronicle.sync(state)
     session_token = generate_session_token()
     # La riga del giocatore ha una FK su games(game_id): la partita va salvata
     # per prima, altrimenti su Postgres (produzione) l'INSERT fallisce.
@@ -299,6 +315,7 @@ async def api_start_practice(req: PracticeStartRequest):
         raise HTTPException(400, "I Bot possono essere da 1 a 3.")
     state = create_practice_game(req.player_name, req.difficulty, num_bots=req.num_bots)
 
+    chronicle.sync(state)
     session_token = generate_session_token()
     # La riga del giocatore ha una FK su games(game_id): la partita va salvata
     # per prima, altrimenti su Postgres (produzione) l'INSERT fallisce.
@@ -311,6 +328,70 @@ async def api_start_practice(req: PracticeStartRequest):
         "session_token": session_token,
         "state": public_state(state, "player_1"),
     }
+
+
+# ---------------------------------------------------------------------------
+# REST: Rivincita
+# ---------------------------------------------------------------------------
+
+class RematchRequest(BaseModel):
+    game_id: str
+    session_token: str
+
+
+@router.post("/game/rematch")
+async def api_rematch(req: RematchRequest):
+    """Rivincita di una partita finita.
+
+    - Giocatore singolo: nuova partita contro gli stessi Bot (stessi nomi e
+      difficoltà), pronta da giocare.
+    - Multigiocatore: nuova sala d'attesa con le stesse impostazioni. Il primo
+      che la chiede la crea, gli altri ricevono l'invito via WebSocket e,
+      accettandolo, ci entrano con questa stessa chiamata.
+    """
+    state = load_game(req.game_id)
+    if state is None:
+        raise HTTPException(404, "La partita non è più disponibile.")
+    auth = authenticate_player(req.session_token)
+    if auth is None:
+        raise HTTPException(401, "Token non valido")
+    _, player_id = auth
+    if not state.winner_id:
+        raise HTTPException(400, "La partita non è ancora finita.")
+
+    mode = game_mode(state)
+    if mode == "practice":
+        me = state.get_player(player_id)
+        bots = [p for p in state.players if state.is_bot(p.id)]
+        new_state = create_practice_game(
+            me.name if me else "Tu", state.bot_difficulty,
+            num_bots=len(bots), bot_names=[b.name for b in bots],
+        )
+        chronicle.sync(new_state)
+        session_token = generate_session_token()
+        save_game(new_state, status="playing")
+        save_player(new_state.game_id, "player_1", new_state.players[0].name, session_token)
+        return {
+            "mode": "practice",
+            "game_id": new_state.game_id,
+            "player_id": "player_1",
+            "session_token": session_token,
+            "state": public_state(new_state, "player_1"),
+        }
+
+    if mode != "lobby":
+        raise HTTPException(400, "Rivincita non disponibile per questa partita.")
+    try:
+        res = rematch(state, player_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if res["created"]:
+        await manager.broadcast(req.game_id, {
+            "type": "rematch_offer",
+            "player_id": player_id,
+            "lobby_code": res["lobby_code"],
+        })
+    return {"mode": "lobby", **res}
 
 
 # ---------------------------------------------------------------------------
@@ -357,13 +438,7 @@ async def api_game_action(req: GameActionRequest):
     # Salva e invia a ogni giocatore la propria vista personalizzata
     status = "finished" if state.winner_id else "playing"
     save_game(state, status=status)
-    for pid in manager.connected_players(req.game_id):
-        await manager.send_to_player(req.game_id, pid, {
-            "type": "state_update",
-            "action": req.action,
-            "result": result,
-            "state": public_state(state, pid),
-        })
+    await _broadcast_state(req.game_id, state, req.action, result)
 
     # Timer: riavvia quando il turno cambia davvero (non se cardo_move è in attesa)
     if result.get("turn_ended") or result.get("auto_end_turn") or state.winner_id:
@@ -390,8 +465,15 @@ _PHASE_REQUIRED = {
 
 
 def _dispatch_action(state, player_id: str, action: str, params: dict) -> dict:
-    """Smista l'azione al handler appropriato."""
+    """Smista l'azione al handler appropriato e ne racconta l'esito nella
+    cronaca della partita."""
     state.recent_events = []
+    result = _dispatch(state, player_id, action, params)
+    chronicle.sync(state)
+    return result
+
+
+def _dispatch(state, player_id: str, action: str, params: dict) -> dict:
 
     # Abbandono: consentito in qualsiasi momento (anche fuori dal proprio turno
     # o con interazioni pendenti), quindi va gestito prima di ogni altro controllo.
@@ -620,10 +702,14 @@ def _tutorial_prev_action(state, player_id: str) -> dict:
     return tutorial_engine.go_back(state)
 
 
-# Durata minima del turno del Bot, pensiero incluso: un Bot che risponde
-# istantaneamente è straniante, e il giocatore deve avere il tempo di vedere
-# il banner del cambio turno prima che arrivino le sue mosse.
-_BOT_THINK_SECONDS = 1.8
+# Il turno di un Bot viene calcolato tutto insieme e poi mostrato al tavolo un
+# passo alla volta (azioni, riposizionamento, Orda, Battaglia), così chi guarda
+# capisce cosa è successo invece di vedere il campo cambiare di colpo.
+# _BOT_THINK_SECONDS: attesa minima prima della prima mossa, pensiero incluso
+# (il giocatore deve avere il tempo di vedere il banner del cambio turno);
+# _BOT_STEP_SECONDS: pausa tra una mossa e la successiva.
+_BOT_THINK_SECONDS = 1.0
+_BOT_STEP_SECONDS = 1.1
 _bot_turns_running: set = set()
 _bot_tasks: set = set()
 
@@ -650,46 +736,70 @@ def _schedule_bot_turn(state) -> None:
 async def _play_bot_turn(game_id: str) -> None:
     loop = asyncio.get_running_loop()
     started = loop.time()
-    state = None
+    played = False
     try:
         state = load_game(game_id)
         if state is None or state.winner_id or not state.is_bot(state.current_player.id):
-            state = None
             return
-        # Il calcolo gira in un thread: 'hard' può impiegare qualche decimo
-        # di secondo e non deve bloccare il server per le altre partite.
-        await asyncio.to_thread(_run_bot_turn, state, state.current_player.id)
+        # Fotografie del tavolo dopo ogni mossa del Bot che arricchisce la cronaca
+        steps = []
+
+        def on_step() -> None:
+            told = len(state.chronicle)
+            chronicle.sync(state)
+            if len(state.chronicle) > told:
+                steps.append(state.model_copy(deep=True))
+
+        # Il calcolo gira in un thread: 'hard' può impiegare qualche secondo
+        # e non deve bloccare il server per le altre partite.
+        await asyncio.to_thread(_run_bot_turn, state, state.current_player.id, on_step)
+        chronicle.sync(state)
+
+        # Lo stato finale si salva subito: il racconto qui sotto invia solo
+        # fotografie intermedie, e chi si riconnette nel frattempo riceve già
+        # lo stato vero.
+        status = "finished" if state.winner_id else "playing"
+        save_game(state, status=status)
+        played = True
+        version = _game_versions.get(game_id, 0)
+
         remaining = _BOT_THINK_SECONDS - (loop.time() - started)
         if remaining > 0:
             await asyncio.sleep(remaining)
+        for snap in steps:
+            if _game_versions.get(game_id, 0) != version:
+                break  # il tavolo ha già ricevuto uno stato più recente
+            for pid in manager.connected_players(game_id):
+                await manager.send_to_player(game_id, pid, {
+                    "type": "state_update",
+                    "action": "bot_step",
+                    "result": {},
+                    "state": public_state(snap, pid),
+                })
+            await asyncio.sleep(_BOT_STEP_SECONDS)
 
-        status = "finished" if state.winner_id else "playing"
-        save_game(state, status=status)
-        for pid in manager.connected_players(game_id):
-            await manager.send_to_player(game_id, pid, {
-                "type": "state_update",
-                "action": "bot_turn",
-                "result": {},
-                "state": public_state(state, pid),
-            })
+        if _game_versions.get(game_id, 0) == version:
+            await _broadcast_state(game_id, state, "bot_turn", {})
         # Multigiocatore con timer: riparte per chi gioca dopo il Bot
         await _start_turn_timer(game_id, state)
     except Exception as e:
         logger.error("[bot] Errore nel turno del Bot %s: %s", game_id, e)
-        state = None
     finally:
         _bot_turns_running.discard(game_id)
-    if state is not None:
-        _schedule_bot_turn(state)
+    if played:
+        # Dallo stato salvato: durante il racconto qualcuno può aver agito
+        latest = load_game(game_id)
+        if latest is not None:
+            _schedule_bot_turn(latest)
 
 
-def _run_bot_turn(state, bot_id: str) -> None:
+def _run_bot_turn(state, bot_id: str, on_step=None) -> None:
     """Gioca l'intero turno del Bot (partita di pratica), risolvendo anche
     eventuali interazioni pendenti che genera, sue o degli altri Bot."""
     guard = 0
     while state.current_player.id == bot_id and not state.winner_id and guard < 20:
         guard += 1
-        run_bot_turn(state, state.bot_difficulty)
+        run_bot_turn(state, state.bot_difficulty, on_step=on_step)
         _auto_resolve_bot_pending(state)
 
 
@@ -1114,13 +1224,7 @@ async def _handle_ws_message(game_id: str, player_id: str, data: dict) -> None:
             status = "finished" if state.winner_id else "playing"
             save_game(state, status=status)
             # Invia a ogni giocatore connesso la propria vista personalizzata
-            for pid in manager.connected_players(game_id):
-                await manager.send_to_player(game_id, pid, {
-                    "type": "state_update",
-                    "action": action,
-                    "result": result,
-                    "state": public_state(state, pid),
-                })
+            await _broadcast_state(game_id, state, action, result)
             # Timer: riavvia quando il turno cambia davvero (non se cardo_move è in attesa)
             if result.get("turn_ended") or result.get("auto_end_turn") or state.winner_id:
                 await _start_turn_timer(game_id, state)

@@ -22,7 +22,8 @@
       try { forced = localStorage.getItem('barbacane-desktop') === '1'; } catch (e) {}
       var coarse = window.matchMedia && matchMedia('(pointer: coarse)').matches;
       var small = Math.min(screen.width, screen.height) < 820;
-      if (coarse && small && !forced) location.replace('/m');
+      // La query (es. ?join=BARB-XXXX di un link d'invito) passa anche al mobile
+      if (coarse && small && !forced) location.replace('/m' + location.search);
     })();
   </script>
   <link rel="stylesheet" href="style.css" />
@@ -50,6 +51,12 @@
            onerror="this.style.display='none'; document.getElementById('lobby-title').classList.add('show')" />
       <h1 class="game-title" id="lobby-title">BARBACANE</h1>
     </div>
+
+    <!-- Partita in corso salvata nel browser (session.js): compare solo se è ancora in gioco -->
+    <button id="btn-resume" class="home-resume hidden">
+      <span class="home-resume-title">Riprendi la partita</span>
+      <span id="btn-resume-sub" class="home-resume-sub"></span>
+    </button>
 
     <!-- Le due modalità di gioco -->
     <div class="home-modes">
@@ -165,6 +172,7 @@
     <div class="lobby-code-display">
       Codice: <span id="lobby-code-text">—</span>
       <button class="btn btn-small" onclick="copyLobbyCode()">Copia</button>
+      <button class="btn btn-small" onclick="copyInviteLink()" title="Chi apre il link trova il codice già inserito">Copia link</button>
     </div>
     <div id="waiting-players" class="player-list"></div>
     <div id="waiting-bot-controls" class="waiting-bot-controls" style="display:none">
@@ -198,6 +206,7 @@
     <div class="header-right">
       <span id="hdr-deck">Mazzo: —</span>
       <div id="turn-timer-display" class="timer hidden"></div>
+      <button id="btn-chronicle" class="btn btn-small btn-chronicle" title="Tutto quello che è successo nella partita">Cronaca</button>
       <button id="btn-abandon" class="btn btn-small btn-abandon">Esci</button>
     </div>
   </div>
@@ -222,7 +231,8 @@
         <div id="table-surface"></div>
 
         <div id="center-bar">
-          <div id="battle-log"></div>
+          <!-- Ultime voci della cronaca: un click apre la cronaca completa -->
+          <div id="battle-log" title="Apri la cronaca della partita"></div>
         </div>
 
         <!-- Barra azioni centrale -->
@@ -395,13 +405,27 @@
 
 </div>
 
+<!-- ===== CRONACA DELLA PARTITA (pannello laterale) ===== -->
+<aside id="chronicle-panel" class="hidden" aria-label="Cronaca della partita">
+  <div class="chronicle-head">
+    <h3>Cronaca della partita</h3>
+    <button id="chronicle-close" class="btn btn-secondary btn-small" aria-label="Chiudi la cronaca">✕</button>
+  </div>
+  <div id="chronicle-body" class="chronicle-body"></div>
+</aside>
+
 <!-- ===== SCHERMATA: FINE PARTITA ===== -->
 <div id="screen-gameover" class="screen">
   <div class="gameover-container">
     <h1 id="gameover-title">Fine Partita</h1>
     <p id="gameover-winner"></p>
     <div id="gameover-scores"></div>
-    <button class="btn btn-primary" onclick="returnToLobby()">Torna alla Lobby</button>
+    <p id="gameover-rematch-note" class="gameover-note hidden"></p>
+    <div class="gameover-actions">
+      <button id="btn-rematch" class="btn btn-primary hidden">Rivincita</button>
+      <button id="btn-gameover-chronicle" class="btn btn-secondary">Rivedi la cronaca</button>
+      <button class="btn btn-secondary" onclick="returnToLobby()">Torna alla home</button>
+    </div>
   </div>
 </div>
 
@@ -409,6 +433,8 @@
 <script src="audio.js"></script>
 <script src="ws.js"></script>
 <script src="spotlight.js"></script>
+<script src="chronicle.js"></script>
+<script src="session.js"></script>
 <script src="renderer.js"></script>
 <script src="app.js"></script>
 </body>

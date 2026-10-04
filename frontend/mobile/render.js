@@ -548,18 +548,15 @@ const Render = (() => {
 
   const _log = [];
 
-  function logPush(text) {
-    _log.unshift({ text, at: new Date() });
-    if (_log.length > 60) _log.pop();
-    const ticker = $('ticker');
-    ticker.textContent = text;
-    ticker.hidden = false;
-    ticker.classList.remove('ticker');
-    void ticker.offsetWidth;
-    ticker.classList.add('ticker');
+  /** Mostra nel ticker l'ultima voce della cronaca (HTML già sicuro, da chronicle.js). */
+  function ticker(html) {
+    const t = $('ticker');
+    t.innerHTML = html;
+    t.hidden = false;
+    t.classList.remove('ticker');
+    void t.offsetWidth;  // forza il replay dell'animazione
+    t.classList.add('ticker');
   }
-
-  function logEntries() { return _log; }
 
   return {
     game,
@@ -579,7 +576,6 @@ const Render = (() => {
     timerStart,
     timer,
     timerHide,
-    logPush,
-    logEntries,
+    ticker,
   };
 })();

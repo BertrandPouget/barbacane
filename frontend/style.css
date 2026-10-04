@@ -31,6 +31,12 @@
   --card-cream: #f4dea0;
   --card-ink:   #171009;   /* fondo su cui sono renderizzati i PNG delle carte */
 
+  /* Colori dei giocatori nella cronaca e nel riepilogo, per posto al tavolo */
+  --seat-0: #fbc402;
+  --seat-1: #7fb8e8;
+  --seat-2: #8fd49b;
+  --seat-3: #ec9a8c;
+
   --card-w: 90px;
   --card-h: 130px;
   --card-w-sm: 70px;
@@ -202,6 +208,26 @@ body::before {
 }
 .lobby-container.reveal .home-modes  { animation: lobby-reveal 0.5s ease both 0.34s; }
 .lobby-container.reveal .home-extras { animation: lobby-reveal 0.5s ease both 0.44s; }
+.lobby-container.reveal .home-resume { animation: lobby-reveal 0.5s ease both 0.28s; }
+
+/* Partita in corso salvata nel browser */
+.home-resume {
+  width: min(100%, calc(2 * 324px + 2rem));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.8rem 1.2rem;
+  background: linear-gradient(180deg, rgba(251, 196, 2, 0.16), rgba(251, 196, 2, 0.06));
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: box-shadow 0.25s ease;
+}
+.home-resume:hover { box-shadow: 0 0 20px rgba(251, 196, 2, 0.28); }
+.home-resume-title { color: var(--gold); font-size: 1.1rem; font-weight: bold; }
+.home-resume-sub { color: var(--text-dim); font-size: 0.85rem; }
 
 /* ==================== HOME ==================== */
 
@@ -417,9 +443,13 @@ input:focus {
   border-radius: 8px;
   padding: 0.7rem 1.5rem;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
-  gap: 1rem;
+  gap: 0.6rem 1rem;
 }
+
+#lobby-code-text { white-space: nowrap; letter-spacing: 0.06em; }
 
 .player-list {
   display: flex;
@@ -518,6 +548,13 @@ input:focus {
   color: #e05050;
 }
 .btn-abandon:hover { background: rgba(176, 48, 48, 0.2); filter: none; }
+
+.btn-chronicle {
+  background: transparent;
+  border: 1px solid var(--border-gold);
+  color: var(--gold-light);
+}
+.btn-chronicle:hover { background: rgba(251, 196, 2, 0.12); filter: none; }
 
 /* ==================== HEADER GIOCO ==================== */
 
@@ -896,6 +933,7 @@ input:focus {
   justify-content: flex-end;
   gap: 1px;
   overflow: hidden;
+  cursor: pointer;
 }
 
 .battle-log-entry {
@@ -903,11 +941,103 @@ input:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.3;
+  color: var(--text);
 }
 
 .battle-log-entry:not(:last-child) {
   opacity: 0.5;
 }
+
+.battle-log-entry.chr-battle { color: #f0b8a0; }
+.battle-log-entry.fresh:last-child { animation: chr-fresh 0.9s ease; }
+
+/* ==================== CRONACA ==================== */
+
+/* Nomi e carte nei testi della cronaca (chronicle.js) */
+.chr-player { font-weight: bold; color: var(--seat-0); }
+.chr-player.chr-seat-1 { color: var(--seat-1); }
+.chr-player.chr-seat-2 { color: var(--seat-2); }
+.chr-player.chr-seat-3 { color: var(--seat-3); }
+.chr-card { color: var(--card-cream); font-style: italic; }
+button.chr-card {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-style: italic;
+  color: var(--card-cream);
+  cursor: pointer;
+  text-decoration: underline dotted rgba(244, 222, 160, 0.5);
+  text-underline-offset: 2px;
+}
+button.chr-card:hover { color: var(--gold-light); }
+
+@keyframes chr-fresh {
+  from { background: rgba(251, 196, 2, 0.28); }
+  to   { background: transparent; }
+}
+
+#chronicle-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(380px, 92vw);
+  z-index: 240;  /* sopra il tavolo e i modali, sotto il dettaglio carta */
+  display: flex;
+  flex-direction: column;
+  background: rgba(32, 14, 2, 0.97);
+  border-left: 1px solid var(--border-gold);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
+  animation: chr-panel-in 0.22s ease;
+}
+/* Aperto dalla fine partita: sopra la sua schermata (z-index 300) */
+#chronicle-panel.above-overlay { z-index: 320; }
+body.chronicle-open #card-detail-overlay { z-index: 330; }
+
+@keyframes chr-panel-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+.chronicle-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 0.9rem;
+  /* Sopra la fine partita il pulsante musica (fisso in alto a destra) cade qui */
+  padding-right: 4.2rem;
+  border-bottom: 1px solid rgba(160, 104, 32, 0.5);
+}
+.chronicle-head h3 { color: var(--gold); font-size: 1.05rem; }
+
+.chronicle-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.4rem 0.9rem 1.2rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.chr-group { padding: 0.35rem 0; border-bottom: 1px solid rgba(106, 48, 16, 0.5); }
+.chr-turn {
+  position: sticky;
+  z-index: 1;
+  top: -0.4rem;
+  padding: 0.3rem 0;
+  background: rgb(32, 14, 2);
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.chr-turn .chr-player { text-transform: none; letter-spacing: 0; font-size: 0.9rem; }
+.chr-entry { padding: 0.18rem 0 0.18rem 0.6rem; border-left: 2px solid transparent; border-radius: 2px; }
+.chr-entry.chr-event { color: var(--text-dim); font-size: 0.85rem; }
+.chr-entry.chr-battle { border-left-color: var(--red-light); }
+.chr-entry.chr-system { border-left-color: var(--gold); color: var(--gold-light); }
+.chr-entry.fresh { animation: chr-fresh 1.2s ease; }
+.chr-older { color: var(--text-dim); font-size: 0.8rem; font-style: italic; padding: 0.4rem 0; }
 
 /* Campo locale */
 #my-field {
@@ -1689,19 +1819,43 @@ input:focus {
   background: var(--bg-medium);
   border: 2px solid var(--border-gold);
   border-radius: 8px;
-  padding: 2.5rem 2rem;
+  padding: 2.2rem 2rem;
   min-width: 320px;
-  max-width: 480px;
+  max-width: min(920px, 94vw);
+  max-height: 92vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.2rem;
+  gap: 1.1rem;
   text-align: center;
 }
 
 #gameover-title { font-size: 2.5rem; color: var(--gold); }
 #gameover-winner { font-size: 1.4rem; }
-#gameover-scores { font-size: 1rem; color: var(--text-dim); }
+#gameover-scores { font-size: 1rem; color: var(--text-dim); max-width: 100%; overflow-x: auto; }
+
+/* Riepilogo: classifica e statistiche */
+.gameover-table { border-collapse: collapse; font-size: 0.9rem; }
+.gameover-table th {
+  color: var(--text-dim);
+  font-weight: normal;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.55rem;
+  border-bottom: 1px solid var(--border-gold);
+}
+.gameover-table td { padding: 0.45rem 0.55rem; border-bottom: 1px solid rgba(106, 48, 16, 0.6); color: var(--text); }
+.gameover-table tr.winner td { background: rgba(251, 196, 2, 0.08); }
+.gameover-table .go-place { color: var(--gold); font-weight: bold; }
+.gameover-table .go-name { text-align: left; white-space: nowrap; }
+.gameover-table .go-you { color: var(--text-dim); font-size: 0.8rem; }
+.gameover-table .go-outcome { color: var(--text-dim); font-size: 0.78rem; }
+.gameover-table .go-num { font-variant-numeric: tabular-nums; }
+
+.gameover-note { color: var(--gold-light); font-size: 0.95rem; max-width: 520px; }
+.gameover-actions { display: flex; gap: 0.7rem; flex-wrap: wrap; justify-content: center; }
 
 /* ==================== UTILITY ==================== */
 

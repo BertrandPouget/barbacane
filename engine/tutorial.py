@@ -1015,6 +1015,7 @@ def create_tutorial_game(tutorial_id: str, player_name: str = "Tu", game_id: Opt
         battles_remaining=1,
         turn_timer=0,
         tutorial={"tutorial_id": tutorial_id, "step_index": 0, "completed": False, "snapshots": {}},
+        mode="tutorial",
     )
     _apply_step_setup(state, tdef, 0)
     _save_snapshot(state, 0)

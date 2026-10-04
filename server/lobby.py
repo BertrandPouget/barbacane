@@ -23,6 +23,7 @@ class LobbyPlayer:
         self.session_token = session_token  # None per i Bot
         self.is_bot = is_bot
         self.ready = False
+        self.seat_hint: Optional[int] = None  # rivincita: posto occupato nella partita precedente
 
     def to_dict(self) -> dict:
         return {
@@ -126,6 +127,7 @@ def join_lobby(lobby_code: str, player_name: str) -> dict:
     session_token = generate_session_token()
     player = LobbyPlayer(player_id=player_id, name=player_name, session_token=session_token)
     lobby.players.append(player)
+    _sort_by_seat_hint(lobby)
 
     # Un Bot con lo stesso nome del nuovo arrivato viene ribattezzato
     for bot in lobby.players:
@@ -249,6 +251,7 @@ def start_game(lobby_code: str, requester_id: str) -> "GameState":
     state.bot_player_ids = [lp.player_id for lp in lobby.players if lp.is_bot]
     if state.bot_player_ids:
         state.bot_difficulty = lobby.bot_difficulty
+    state.mode = "lobby"
 
     lobby.game_id = game_id
     return state
@@ -256,6 +259,70 @@ def start_game(lobby_code: str, requester_id: str) -> "GameState":
 
 def remove_lobby(lobby_code: str) -> None:
     _lobbies.pop(lobby_code, None)
+
+
+# ---------------------------------------------------------------------------
+# Rivincita (partite multigiocatore)
+# ---------------------------------------------------------------------------
+
+# game_id della partita finita -> {"lobby_code": str, "members": {vecchio player_id: dati di accesso}}
+_rematches: Dict[str, dict] = {}
+
+
+def _sort_by_seat_hint(lobby: LobbyInfo) -> None:
+    """In una sala di rivincita i giocatori riprendono i posti della partita
+    precedente, in qualunque ordine rientrino (sort stabile: chi non ha un
+    posto noto resta in fondo)."""
+    if any(p.seat_hint is not None for p in lobby.players):
+        lobby.players.sort(key=lambda p: 99 if p.seat_hint is None else p.seat_hint)
+
+
+def rematch(state: "GameState", requester_id: str) -> dict:
+    """Rivincita di una partita multigiocatore finita.
+
+    Il primo che la chiede crea una nuova sala d'attesa (e ne diventa il
+    creatore) con le stesse impostazioni: timer, difficoltà e nomi dei Bot,
+    posti al tavolo. Gli altri, chiedendola, entrano nella stessa sala.
+    Ritorna i dati di accesso come create_lobby/join_lobby, più `created`.
+    """
+    if not state.winner_id:
+        raise ValueError("La partita non è ancora finita.")
+    me = state.get_player(requester_id)
+    if me is None:
+        raise ValueError("Giocatore non trovato.")
+    seat = {p.id: i for i, p in enumerate(state.players)}
+
+    entry = _rematches.get(state.game_id)
+    lobby = _lobbies.get(entry["lobby_code"]) if entry else None
+    if lobby is not None:
+        known = entry["members"].get(requester_id)
+        if known:
+            return {**known, "lobby": lobby.to_dict(), "created": False}
+        if lobby.game_id is not None:
+            raise ValueError("La rivincita è già cominciata.")
+        joined = join_lobby(lobby.lobby_code, me.name)
+        lobby.get_player(joined["player_id"]).seat_hint = seat[requester_id]
+        _sort_by_seat_hint(lobby)
+        creds = {"lobby_code": lobby.lobby_code, "player_id": joined["player_id"],
+                 "session_token": joined["session_token"], "is_creator": False}
+        entry["members"][requester_id] = creds
+        return {**creds, "lobby": lobby.to_dict(), "created": False}
+
+    created = create_lobby(me.name, state.turn_timer)
+    lobby = _lobbies[created["lobby_code"]]
+    lobby.players[0].seat_hint = seat[requester_id]
+    lobby.bot_difficulty = state.bot_difficulty or "normal"
+    for p in state.players:
+        if state.is_bot(p.id):
+            bot = LobbyPlayer(player_id=lobby.next_player_id(), name=p.name,
+                              session_token=None, is_bot=True)
+            bot.seat_hint = seat[p.id]
+            lobby.players.append(bot)
+    _sort_by_seat_hint(lobby)
+    creds = {"lobby_code": lobby.lobby_code, "player_id": created["player_id"],
+             "session_token": created["session_token"], "is_creator": True}
+    _rematches[state.game_id] = {"lobby_code": lobby.lobby_code, "members": {requester_id: creds}}
+    return {**creds, "lobby": lobby.to_dict(), "created": True}
 
 
 def authenticate_player(session_token: str) -> Optional[tuple]:
