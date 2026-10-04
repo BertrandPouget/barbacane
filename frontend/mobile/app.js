@@ -350,7 +350,7 @@ const Mob = (() => {
 
   async function startPracticeGame(difficulty) {
     try {
-      const res = await api('/practice/start', { player_name: PlayerName.get() || 'Giocatore', difficulty, num_bots: practiceBotCount });
+      const res = await api('/practice/start', { player_name: 'Giocatore', difficulty, num_bots: practiceBotCount });
       sessionToken = res.session_token;
       myPlayerId = res.player_id;
       gameId = res.game_id;
@@ -406,7 +406,7 @@ const Mob = (() => {
   async function startTutorial(tutorialId) {
     try {
       await _ensureTutorialStepsCached(tutorialId);
-      const res = await api('/tutorial/start', { tutorial_id: tutorialId, player_name: PlayerName.get() || 'Giocatore' });
+      const res = await api('/tutorial/start', { tutorial_id: tutorialId, player_name: 'Giocatore' });
       sessionToken = res.session_token;
       myPlayerId = res.player_id;
       gameId = res.game_id;
@@ -1004,9 +1004,11 @@ const Mob = (() => {
 
     // Sheet pendenti (ricerca, biblioteca, ecc.) o chiusura di quelli superati
     const hadPending = _openPendingSheets(state);
-    if (!hadPending && Sheet.isOpen() && prevTurnPlayer !== state.current_player_id) {
-      // il turno è cambiato: qualsiasi sheet contestuale è ormai superato
-      Sheet.close(true);
+    if (!hadPending && Sheet.isOpen()) {
+      // Gli sheet di consultazione (Regioni, carte in campo, avversari, cronaca…)
+      // restano aperti e si aggiornano; quelli di scelta sono superati quando
+      // cambia il turno.
+      if (!Sheet.refresh() && prevTurnPlayer !== state.current_player_id) Sheet.close(true);
     }
 
     refreshDock();
@@ -1247,6 +1249,7 @@ const Mob = (() => {
       onPrev: idx > 0 ? () => openHandCardSheet(hand[idx - 1]) : null,
       onNext: idx >= 0 && idx < hand.length - 1 ? () => openHandCardSheet(hand[idx + 1]) : null,
       footer,
+      refresh: () => { if ((me().hand || []).includes(iid)) openHandCardSheet(iid); },
     });
   }
 
@@ -1644,7 +1647,7 @@ const Mob = (() => {
   }
 
   // Sheet carta con navigazione precedente/successiva
-  function showCardNavSheet({ title, subtitle, def, ctx = {}, pos, onPrev, onNext, footer = [] }) {
+  function showCardNavSheet({ title, subtitle, def, ctx = {}, pos, onPrev, onNext, footer = [], refresh = null }) {
     const body = [Render.cardViewNode(def, ctx)];
     if (onPrev || onNext) {
       const nav = el('div', { className: 'card-nav', style: 'justify-content:center' });
@@ -1659,7 +1662,7 @@ const Mob = (() => {
       nav.append(prevBtn, posEl, nextBtn);
       body.push(nav);
     }
-    Sheet.open({ title, subtitle, body, footer: [...footer, { label: 'Chiudi', onClick: () => Sheet.close() }] });
+    Sheet.open({ title, subtitle, body, footer: [...footer, { label: 'Chiudi', onClick: () => Sheet.close() }], refresh });
   }
 
   // ---------------------------------------------------------------------------
@@ -1823,6 +1826,7 @@ const Mob = (() => {
       subtitle: `${walls.length} Muri · ${warriors.length} Guerrieri`,
       body,
       footer: [{ label: 'Chiudi', onClick: () => Sheet.close() }],
+      refresh: () => openBastionSheet(side),
     });
   }
 
@@ -1838,6 +1842,11 @@ const Mob = (() => {
       onPrev: idx > 0 ? () => showMyWallSheet(walls, side, idx - 1) : null,
       onNext: idx < walls.length - 1 ? () => showMyWallSheet(walls, side, idx + 1) : null,
       footer: [],
+      // Il Muro può essere caduto: si ritrova per instance id nel Bastione attuale
+      refresh: () => {
+        const now = (side === 'left' ? me().field.bastion_left : me().field.bastion_right).walls || [];
+        if (now.includes(iid)) showMyWallSheet(now, side, now.indexOf(iid));
+      },
     });
   }
 
@@ -1907,6 +1916,7 @@ const Mob = (() => {
         (canMove ? '' : ' — spostabile nella fase Schieramento'),
       body: Render.cardViewNode(def, { att: w.att, git: w.git, dif: w.dif, instanceId: iid }),
       footer,
+      refresh: () => openFieldWarriorSheet(iid),
     });
   }
 
@@ -1947,6 +1957,7 @@ const Mob = (() => {
         (canMove && warriors.length > 0 ? ' · tocca un Guerriero per riposizionarlo' : ''),
       body,
       footer: [{ label: 'Chiudi', onClick: () => Sheet.close() }],
+      refresh: openVanguardSheet,
     });
   }
 
@@ -1986,6 +1997,7 @@ const Mob = (() => {
       subtitle: `${buildings.length} Costruzioni`,
       body,
       footer: [{ label: 'Chiudi', onClick: () => Sheet.close() }],
+      refresh: openVillageSheet,
     });
   }
 
@@ -2029,6 +2041,7 @@ const Mob = (() => {
       subtitle: b.completed ? '✓ Completata' : 'Incompleta — effetto Base attivo',
       body: Render.cardViewNode(def, { completed: b.completed, completionCostLabel: costLabel, instanceId: iid }),
       footer,
+      refresh: () => openBuildingSheet(iid),
     });
   }
 
@@ -2479,13 +2492,7 @@ const Mob = (() => {
       body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' },
         [`🧱 Bastione ${name}${tag}`]));
       const row = el('div', { style: 'display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px' });
-      row.appendChild(el('div', {
-        className: 'card card-sm in-field wall-stack',
-        dataset: { type: 'wall' },
-      }, [
-        el('div', { className: 'wall-stack-icon' }, ['🧱']),
-        el('div', { className: 'wall-stack-count' }, [String(bastion.wall_count ?? 0)]),
-      ]));
+      row.appendChild(Render.deckNode('wall', bastion.wall_count ?? 0));
       (bastion.warriors || []).forEach(w => {
         const mini = Render.warriorMini(w);
         mini.addEventListener('click', () => { haptic(); openEnemyCardSheet(w, p); });
@@ -2526,6 +2533,7 @@ const Mob = (() => {
         (p.id === currentState.current_player_id ? ' · sta giocando' : ''),
       body,
       footer: [{ label: 'Chiudi', onClick: () => Sheet.close() }],
+      refresh: () => openOpponentSheet(playerId),
     });
   }
 
@@ -2561,6 +2569,14 @@ const Mob = (() => {
       subtitle: `di ${owner.name}`,
       body: Render.cardViewNode(def, { att: w.att, git: w.git, dif: w.dif }),
       footer,
+      // Il Guerriero si ritrova per instance id nel campo attuale del proprietario
+      refresh: () => {
+        const p = currentState.players.find(pp => pp.id === owner.id);
+        const f = p && p.field;
+        const now = f && [...(f.vanguard || []), ...(f.bastion_left.warriors || []), ...(f.bastion_right.warriors || [])]
+          .find(x => x.instance_id === w.instance_id);
+        if (now) openEnemyCardSheet(now, p);
+      },
     });
   }
 
@@ -2681,6 +2697,10 @@ const Mob = (() => {
       pos: { idx, total: cards.length },
       onPrev: idx > 0 ? () => openLivesSheet(idx - 1) : null,
       onNext: idx < cards.length - 1 ? () => openLivesSheet(idx + 1) : null,
+      refresh: () => {
+        const now = me().life_cards || [];
+        if (now.length > 0) openLivesSheet(now.includes(iid) ? now.indexOf(iid) : Math.min(idx, now.length - 1));
+      },
     });
   }
 
@@ -2700,6 +2720,7 @@ const Mob = (() => {
       title: '✨ Effetti attivi',
       body,
       footer: [{ label: 'Chiudi', onClick: () => Sheet.close() }],
+      refresh: openActiveFxSheet,
     });
   }
 
@@ -2719,6 +2740,7 @@ const Mob = (() => {
       subtitle: list.length && list[0].id > 1 ? 'Le mosse più vecchie non sono più mostrate' : '',
       body: html || '<div class="log-empty">Ancora nessuna mossa.</div>',
       footer: [{ label: 'Chiudi', onClick: () => Sheet.close() }],
+      refresh: openLogSheet,
     });
   }
 

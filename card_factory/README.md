@@ -93,7 +93,9 @@ e le immagini delle loro minicarte (vedi sotto).
 il gioco disegna una minicarta in HTML/CSS (`frontend/cardart.js`), così i testi restano nitidi a ogni
 dimensione. Lo Step 2 le prepara solo le immagini, in `output/mini/` (`lib/mini.py`): l'illustrazione
 di ogni carta ridotta a 320 px, con la trasparenza (le carte senza illustrazione usano quella di
-ripiego, come la carta intera), e `sfondo.webp`, la pergamena. Per rigenerarle senza toccare le carte
+ripiego, come la carta intera), `sfondo.webp`, la pergamena, e `retro.webp`, il dorso con la cornice
+della minicarta, per i mazzi coperti (Muri, Vite, Carte Attive); quest'ultimo si ricava da
+`output/full/retro.png`, che va quindi generato prima. Per rigenerarle senza toccare le carte
 intere:
 
 ```bash

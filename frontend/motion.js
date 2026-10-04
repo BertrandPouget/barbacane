@@ -13,6 +13,9 @@
  * - carta sparita (diventata Muro o Vita, Magia lanciata, Guerriero scartato):
  *   il fantasma vola verso opts.targetFor (es. il Bastione) o si dissolve.
  *
+ * Per le carte che non sono disegnate (il campo riassunto degli avversari sul
+ * desktop) ci sono travel (da un elemento a un altro) e vanish (si dissolve).
+ *
  * I fantasmi vivono in un livello fisso sopra l'interfaccia, così il volo non
  * viene tagliato dai contenitori che scorrono (mano, righe delle Regioni).
  * Con "riduci movimento" attivo nel sistema non si anima nulla.
@@ -206,6 +209,40 @@ const Motion = (() => {
     });
   }
 
+  // Rettangolo di lato size.w × size.h centrato sull'elemento
+  function _centeredOn(el, size) {
+    const r = _visibleRect(el);
+    return r ? { left: r.left + r.width / 2 - size.w / 2, top: r.top + r.height / 2 - size.h / 2, width: size.w, height: size.h } : null;
+  }
+
+  /**
+   * Carta che non è disegnata sul tavolo (es. il campo riassunto di un avversario
+   * sul desktop): un fantasma `node` grande size {w, h} parte dal centro di `fromEl`,
+   * vola verso il centro di `toEl` rimpicciolendosi e sparisce lì.
+   * opts: { size, delay, onLand(toEl) }
+   */
+  function travel(node, fromEl, toEl, opts = {}) {
+    if (reducedMotion() || !node || !fromEl || !toEl) return;
+    const size = opts.size || { w: 99, h: 143 };
+    const from = _centeredOn(fromEl, size);
+    const to = _centeredOn(toEl, { w: size.w * 0.35, h: size.h * 0.35 });
+    if (!from || !to) return;
+    _fly(node, from, to, {
+      duration: MOVE_MS + 120, delay: opts.delay || 0, fadeOut: true,
+      onDone: () => { if (opts.onLand && toEl.isConnected) opts.onLand(toEl); },
+    });
+  }
+
+  /** Come travel, ma la carta compare su `atEl` e si dissolve salendo (scartata). */
+  function vanish(node, atEl, opts = {}) {
+    if (reducedMotion() || !node || !atEl) return;
+    const size = opts.size || { w: 99, h: 143 };
+    const from = _centeredOn(atEl, size);
+    if (!from) return;
+    const to = { left: from.left - size.w * 0.1, top: from.top - 40, width: size.w * 1.2, height: size.h * 1.2 };
+    _fly(node, from, to, { duration: LEAVE_MS, delay: opts.delay || 0, fadeOut: true });
+  }
+
   /** Breve impulso su un elemento (es. la Regione dove è appena arrivata una carta). */
   function pulse(el) {
     if (!el || reducedMotion()) return;
@@ -238,5 +275,5 @@ const Motion = (() => {
     return null;
   }
 
-  return { snapshot, play, pulse, locate, reducedMotion };
+  return { snapshot, play, travel, vanish, pulse, locate, reducedMotion };
 })();

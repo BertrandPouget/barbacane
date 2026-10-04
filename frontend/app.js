@@ -326,7 +326,7 @@ const App = (() => {
 
   async function startPracticeGame(difficulty) {
     try {
-      const res = await api('/practice/start', { player_name: PlayerName.get() || 'Giocatore', difficulty, num_bots: practiceBotCount });
+      const res = await api('/practice/start', { player_name: 'Giocatore', difficulty, num_bots: practiceBotCount });
       sessionToken = res.session_token;
       myPlayerId = res.player_id;
       gameId = res.game_id;
@@ -377,7 +377,7 @@ const App = (() => {
         const full = await apiFetch(`/tutorials/${tutorialId}`);
         tutorialStepsCache[tutorialId] = full.steps || [];
       }
-      const res = await api('/tutorial/start', { tutorial_id: tutorialId, player_name: PlayerName.get() || 'Giocatore' });
+      const res = await api('/tutorial/start', { tutorial_id: tutorialId, player_name: 'Giocatore' });
       sessionToken = res.session_token;
       myPlayerId = res.player_id;
       gameId = res.game_id;
@@ -868,13 +868,15 @@ const App = (() => {
   function onStateUpdate(state, action, result) {
     if (leavingGame) return;
     const prevTurnPlayer = lastTurnPlayer;
+    const prevState = currentState && currentState.game_id === state.game_id ? currentState : null;
     currentState = state;
     lastTurnPlayer = state.current_player_id;
     // Le carte si spostano con una transizione invece di ricomparire di colpo
     const table = document.getElementById('game-table');
     const before = Motion.snapshot(table);
     Renderer.render(state, myPlayerId);
-    Motion.play(before, table, _motionOptions(state));
+    Motion.play(before, table, _motionOptions(state, prevState));
+    _animateOpponents(prevState, state);
 
     if (prevTurnPlayer !== state.current_player_id && !state.winner_id) {
       _showTurnBanner(state);
@@ -1016,22 +1018,105 @@ const App = (() => {
     vanguard: 'my-vanguard', village: 'my-village', life: 'my-life-deck',
   };
 
-  function _motionOptions(state) {
+  function _motionOptions(state, prevState) {
+    const before = prevState ? _fieldIndex(prevState) : new Map();
+    const after = _fieldIndex(state);
     return {
-      // Carte pescate: arrivano dal mazzo. Carte nuove di un avversario: dalla sua mano.
+      // Carte pescate: arrivano dal mazzo. Carte prese a un avversario: dal suo tassello.
       sourceFor: (iid, el) => {
         if (el.closest('#hand-cards')) return document.getElementById('hdr-deck');
-        const opp = el.closest('[data-player-id]');
-        return opp ? (opp.querySelector('.opp-info-row, .strip-header') || opp) : null;
+        const was = before.get(iid);
+        return was && was.pid !== myPlayerId ? _oppZoneEl(was.pid, was.zone) : null;
       },
       // Carte sparite dalla vista: verso il Bastione se sono diventate Muri, verso
-      // le Vite se sono diventate una Vita; altrimenti si dissolvono.
+      // le Vite se sono diventate una Vita, verso il tassello di un avversario se
+      // sono passate a lui; altrimenti si dissolvono.
       targetFor: (iid) => {
         const id = _MY_REGION_EL[Motion.locate(state, myPlayerId, iid)];
-        return id ? document.getElementById(id) : null;
+        if (id) return document.getElementById(id);
+        const now = after.get(iid);
+        return now && now.pid !== myPlayerId ? _oppZoneEl(now.pid, now.zone) : null;
       },
       onLand: Motion.pulse,
     };
+  }
+
+  // Dove sta ogni Guerriero e Costruzione in campo: iid → { pid, zone, obj }
+  function _fieldIndex(state) {
+    const index = new Map();
+    (state.players || []).forEach(p => {
+      const f = p.field;
+      if (!f) return;
+      (f.vanguard || []).forEach(w => index.set(w.instance_id, { pid: p.id, zone: 'vanguard', obj: w }));
+      ['left', 'right'].forEach(side => {
+        ((f[`bastion_${side}`] || {}).warriors || []).forEach(w =>
+          index.set(w.instance_id, { pid: p.id, zone: `bastion_${side}`, obj: w }));
+      });
+      ((f.village || {}).buildings || []).forEach(b => index.set(b.instance_id, { pid: p.id, zone: 'village', obj: b }));
+    });
+    return index;
+  }
+
+  // Tassello di una Regione di un avversario (renderer.js → _oppTile), o il
+  // contatore della sua mano se `zone` è null
+  function _oppZoneEl(pid, zone) {
+    const field = document.querySelector(`.opponent-field[data-player-id="${pid}"]`);
+    if (!field) return null;
+    return field.querySelector(zone ? `.opp-tile[data-zone="${zone}"]` : '.opp-hand-count');
+  }
+
+  // Dimensione dei fantasmi: quella delle carte del mio campo
+  function _ghostSize() {
+    const css = getComputedStyle(document.documentElement);
+    return {
+      w: parseFloat(css.getPropertyValue('--card-w-field')) || 99,
+      h: parseFloat(css.getPropertyValue('--card-h-field')) || 143,
+    };
+  }
+
+  // Le carte degli avversari non sono disegnate sul tavolo (solo i tasselli
+  // riassuntivi): quelle giocate volano dalla loro mano al tassello della Regione,
+  // quelle spostate da un tassello all'altro, quelle scartate si dissolvono sul
+  // tassello. I Muri, coperti, volano come dorsi verso il Bastione (o se ne vanno).
+  // Le carte che passano dal mio campo a quello di un avversario (e viceversa)
+  // le anima già Motion.play con sourceFor / targetFor.
+  function _animateOpponents(prevState, state) {
+    if (!prevState || Motion.reducedMotion()) return;
+    const before = _fieldIndex(prevState);
+    const after = _fieldIndex(state);
+    const size = _ghostSize();
+    let n = 0;
+    const next = () => n++ * 90;
+
+    after.forEach((now, iid) => {
+      if (now.pid === myPlayerId) return;
+      const was = before.get(iid);
+      if (was && (was.pid === myPlayerId || (was.pid === now.pid && was.zone === now.zone))) return;
+      const from = was ? _oppZoneEl(was.pid, was.zone) : _oppZoneEl(now.pid, null);
+      Motion.travel(Renderer.motionCardNode(now.obj, now.zone), from, _oppZoneEl(now.pid, now.zone),
+        { size, delay: next(), onLand: Motion.pulse });
+    });
+    before.forEach((was, iid) => {
+      if (was.pid === myPlayerId || after.has(iid)) return;
+      Motion.vanish(Renderer.motionCardNode(was.obj, was.zone), _oppZoneEl(was.pid, was.zone), { size, delay: next() });
+    });
+
+    state.players.forEach(p => {
+      const old = p.id !== myPlayerId && prevState.players.find(x => x.id === p.id);
+      if (!old) return;
+      ['left', 'right'].forEach(side => {
+        const zone = `bastion_${side}`;
+        const diff = (p.field[zone].wall_count || 0) - (old.field[zone].wall_count || 0);
+        for (let i = 0; i < Math.abs(diff); i++) {
+          if (diff > 0) {
+            Motion.travel(Renderer.motionBackNode(), _oppZoneEl(p.id, null), _oppZoneEl(p.id, zone),
+              { size, delay: next(), onLand: Motion.pulse });
+          } else {
+            Motion.vanish(Renderer.motionBackNode(), _oppZoneEl(p.id, zone), { size, delay: next() });
+          }
+        }
+      });
+    });
   }
 
   function _playerName(pid) {

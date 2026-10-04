@@ -100,6 +100,25 @@ const Render = (() => {
     return div;
   }
 
+  // Mazzo coperto (es. i Muri di un Bastione avversario): il dorso della carta
+  // con, sotto la scritta, un riquadro marrone e il numero di carte dentro un
+  // simbolo. Parità con renderDeck di renderer.js (desktop).
+  const DECK_SHAPES = {
+    wall:   '<rect x="2.5" y="2.5" width="19" height="19" rx="3"/>',
+    life:   '<path d="M12 22 10.5 20.6C5.2 15.8 1.5 12.5 1.5 8.4 1.5 5.1 4.1 2.5 7.4 2.5c1.8 0 3.6.9 4.6 2.3 1-1.4 2.8-2.3 4.6-2.3 3.3 0 5.9 2.6 5.9 5.9 0 4.1-3.7 7.4-9 12.2L12 22z"/>',
+    active: '<path d="M12 0 15.6 8.4 24 12 15.6 15.6 12 24 8.4 15.6 0 12 8.4 8.4z"/>',
+  };
+
+  function deckNode(kind, count) {
+    const div = el('div', { className: `card card-sm in-field deck deck-${kind}`, dataset: { type: 'deck' } });
+    div.appendChild(el('img', { className: 'deck-back', alt: '', draggable: 'false', src: '/card_images/mini/retro.webp' }));
+    const badge = el('div', { className: 'deck-count' });
+    badge.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${DECK_SHAPES[kind]}</svg>`;
+    badge.appendChild(el('span', {}, [String(count)]));
+    div.appendChild(badge);
+    return div;
+  }
+
   // ---------------------------------------------------------------------------
   // Riassunto di una Regione dentro i suoi tasselli — solo numeri, come per
   // gli avversari ma con più respiro. Il dettaglio carta per carta si apre
@@ -595,6 +614,7 @@ const Render = (() => {
     hand,
     markWallPicks,
     warriorMini,
+    deckNode,
     activeEffectItems,
     cardTextHTML,
     cardViewNode,

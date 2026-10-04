@@ -141,6 +141,11 @@ const Sheet = (() => {
   let _open = false;
   let _locked = false;
   let _onClose = null;
+  // Sheet di consultazione: funzione che lo riapre con lo stato nuovo (vedi refresh)
+  let _refresh = null;
+  let _refreshing = false;
+  let _opens = 0;
+  let _sig = '';
 
   // -- drag-to-dismiss ------------------------------------------------------
   let dragStartY = null;
@@ -181,11 +186,33 @@ const Sheet = (() => {
   /**
    * Apre (o sostituisce il contenuto del) bottom sheet.
    * opts: { title, subtitle, body: Node|Node[]|string, footer: [{label, className, disabled, onClick}],
-   *         locked: bool, onClose: fn }
+   *         locked: bool, onClose: fn,
+   *         refresh: fn — solo per gli sheet di consultazione: lo riapre con lo stato
+   *                  nuovo; con questa opzione lo sheet resta aperto quando arriva un
+   *                  aggiornamento della partita invece di essere chiuso (vedi refresh()) }
    */
   function open(opts = {}) {
     const sheet = sheetEl();
     const scrim = scrimEl();
+    _opens++;
+
+    // Contenuto nuovo costruito fuori dallo sheet: in un aggiornamento si confronta
+    // con quello mostrato e, se è uguale, lo sheet non viene toccato.
+    const newBody = document.createElement('div');
+    if (opts.body) {
+      const items = Array.isArray(opts.body) ? opts.body : [opts.body];
+      items.forEach(item => {
+        if (typeof item === 'string') newBody.insertAdjacentHTML('beforeend', item);
+        else if (item) newBody.appendChild(item);
+      });
+    }
+    const footer = opts.footer || [];
+    const sig = JSON.stringify([opts.title || '', opts.subtitle || '', newBody.innerHTML,
+      footer.map(btn => [btn.label, btn.className || '', !!btn.disabled])]);
+    const updating = _refreshing && _open;
+    _refresh = opts.refresh || null;
+    if (updating && sig === _sig) return;
+    _sig = sig;
 
     _locked = !!opts.locked;
     _onClose = opts.onClose || null;
@@ -195,24 +222,20 @@ const Sheet = (() => {
     $('sheet-sub').textContent = opts.subtitle || '';
 
     const body = $('sheet-body');
+    const scroll = body.scrollTop;
     body.innerHTML = '';
-    if (opts.body) {
-      const items = Array.isArray(opts.body) ? opts.body : [opts.body];
-      items.forEach(item => {
-        if (typeof item === 'string') body.insertAdjacentHTML('beforeend', item);
-        else if (item) body.appendChild(item);
-      });
-    }
-    body.scrollTop = 0;
+    while (newBody.firstChild) body.appendChild(newBody.firstChild);
+    body.scrollTop = updating ? scroll : 0;
 
     const foot = $('sheet-foot');
     foot.innerHTML = '';
-    (opts.footer || []).forEach(btn => {
+    footer.forEach(btn => {
       const b = el('button', { className: `mbtn ${btn.className || ''}` }, [btn.label]);
       b.disabled = !!btn.disabled;
       b.addEventListener('click', () => { haptic(); btn.onClick && btn.onClick(); });
       foot.appendChild(b);
     });
+    if (updating) return;
 
     scrim.hidden = false;
     sheet.hidden = false;
@@ -229,6 +252,7 @@ const Sheet = (() => {
     const scrim = scrimEl();
     _open = false;
     _locked = false;
+    _refresh = null;
     sheet.classList.remove('show', 'locked');
     scrim.classList.remove('show');
     setTimeout(() => {
@@ -240,6 +264,22 @@ const Sheet = (() => {
   }
 
   function isOpen() { return _open; }
+
+  /**
+   * Aggiorna lo sheet aperto dopo un aggiornamento della partita, se è di
+   * consultazione (aperto con opts.refresh): lo riapre con lo stato nuovo tenendo
+   * lo scorrimento; se ciò che mostrava non c'è più (la funzione non riapre nulla)
+   * lo chiude. Ritorna false se lo sheet aperto non è aggiornabile.
+   */
+  function refresh() {
+    if (!_open || !_refresh) return false;
+    const fn = _refresh;
+    const before = _opens;
+    _refreshing = true;
+    try { fn(); } finally { _refreshing = false; }
+    if (_opens === before) close(true);
+    return true;
+  }
 
   /**
    * Sheet di scelta: lista di righe tappabili. Il tap sceglie subito.
@@ -309,7 +349,7 @@ const Sheet = (() => {
     });
   }
 
-  return { open, close, isOpen, choice, confirm };
+  return { open, close, isOpen, refresh, choice, confirm };
 })();
 
 // ---------------------------------------------------------------------------
