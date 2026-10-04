@@ -257,6 +257,25 @@ def start_game(lobby_code: str, requester_id: str) -> "GameState":
     return state
 
 
+def leave_lobby(lobby_code: str, player_id: str) -> None:
+    """Un giocatore esce dalla sala d'attesa prima dell'avvio.
+
+    Se esce il creatore, il ruolo passa al primo umano rimasto; se non resta
+    nessun umano la sala viene chiusa (i Bot da soli non giocano).
+    """
+    lobby = _lobbies.get(lobby_code)
+    if lobby is None:
+        return
+    if lobby.game_id is not None:
+        raise ValueError("La partita è già iniziata.")
+    lobby.players = [p for p in lobby.players if p.player_id != player_id]
+    humans = [p for p in lobby.players if not p.is_bot]
+    if not humans:
+        remove_lobby(lobby_code)
+    elif player_id == lobby.creator_id:
+        lobby.creator_id = humans[0].player_id
+
+
 def remove_lobby(lobby_code: str) -> None:
     _lobbies.pop(lobby_code, None)
 
@@ -296,7 +315,7 @@ def rematch(state: "GameState", requester_id: str) -> dict:
     lobby = _lobbies.get(entry["lobby_code"]) if entry else None
     if lobby is not None:
         known = entry["members"].get(requester_id)
-        if known:
+        if known and lobby.get_player(known["player_id"]):
             return {**known, "lobby": lobby.to_dict(), "created": False}
         if lobby.game_id is not None:
             raise ValueError("La rivincita è già cominciata.")

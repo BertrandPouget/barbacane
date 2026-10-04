@@ -84,6 +84,9 @@ function placeMusicToggle(name) {
   } else if (name === 'multi') {
     target = $('multi-head');
     cls = 'in-catalog-header';
+  } else if (name === 'wait') {
+    target = $('wait-head');
+    cls = 'in-catalog-header';
   }
 
   if (target) {

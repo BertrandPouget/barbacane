@@ -234,17 +234,18 @@ const Mob = (() => {
     const url = Invite.link(code);
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'Barbacane', text: `Unisciti alla mia partita di Barbacane (codice ${code})`, url });
+        await navigator.share({ title: 'Barbacane', text: Invite.TEXT, url });
         return;
       } catch (e) {
         if (e && e.name === 'AbortError') return;  // condivisione annullata
       }
     }
     const done = () => Toast.show('Link d\'invito copiato!', 'success');
+    const text = Invite.message(code);
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(done).catch(() => Toast.show(url));
+      navigator.clipboard.writeText(text).then(done).catch(() => Toast.show(text));
     } else {
-      Toast.show(url);
+      Toast.show(text);
     }
   }
 
@@ -285,6 +286,7 @@ const Mob = (() => {
     });
     $('btn-rematch').addEventListener('click', () => { haptic(); onRematchClick(); });
     $('btn-over-log').addEventListener('click', () => { haptic(); openLogSheet(); });
+    $('over-scores').addEventListener('click', () => { haptic(); openStatsSheet(); });
 
     // Catalogo carte
     $('btn-catalog').addEventListener('click', openCatalog);
@@ -320,6 +322,7 @@ const Mob = (() => {
     $('btn-mode-single').addEventListener('click', () => { haptic(); Screens.show('bot-difficulty'); });
     $('btn-mode-multi').addEventListener('click', () => { haptic(); Screens.show('multi'); });
     $('multi-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
+    $('wait-back').addEventListener('click', () => { haptic(); leaveWaitingRoom(); });
     $('bot-diff-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
     document.querySelectorAll('.bot-count-btn').forEach(btn => {
       btn.addEventListener('click', () => { haptic(); selectBotCount(parseInt(btn.dataset.bots, 10)); });
@@ -685,16 +688,31 @@ const Mob = (() => {
     lobbyCode = lobby.lobby_code;
     $('wait-code-text').textContent = lobby.lobby_code;
     updateWaitingRoom(lobby);
-    $('btn-start').hidden = !isCreator;
-    $('wait-bots').hidden = !isCreator;
     $('wait-status').textContent = '';
     Screens.show('wait');
     startLobbyPolling();
   }
 
+  // Uscita dalla sala d'attesa: si torna a Crea / Unisciti. Se esce il
+  // creatore, il server passa il ruolo al primo umano rimasto.
+  function leaveWaitingRoom() {
+    const code = lobbyCode, token = sessionToken;
+    stopLobbyPolling();
+    lobbyCode = null;
+    sessionToken = null;
+    myPlayerId = null;
+    isCreator = false;
+    Screens.show('multi');
+    if (code && token) api('/lobby/leave', { lobby_code: code, session_token: token }).catch(() => {});
+  }
+
   let waitingPlayers = [];
 
   function updateWaitingRoom(lobby) {
+    // Il creatore può cambiare: se esce, il ruolo passa al primo umano rimasto
+    isCreator = lobby.creator_id === myPlayerId;
+    $('btn-start').hidden = !isCreator;
+    $('wait-bots').hidden = !isCreator;
     waitingPlayers = lobby.players || [];
     updateWaitingPlayers(waitingPlayers);
     $('btn-start').disabled = !lobby.can_start;
@@ -758,6 +776,7 @@ const Mob = (() => {
     lobbyPollTimer = setInterval(async () => {
       try {
         const lobby = await apiFetch(`/lobby/${lobbyCode}`);
+        if (!lobbyPollTimer) return;  // uscito dalla sala durante la richiesta
         updateWaitingRoom(lobby);
         if (lobby.game_id && !gameId) {
           stopLobbyPolling();
@@ -766,7 +785,13 @@ const Mob = (() => {
           const gameState = await apiFetch(`/game/${lobby.game_id}?session_token=${sessionToken}`);
           enterGame(gameState);
         }
-      } catch (_) {}
+      } catch (e) {
+        // Sala chiusa (es. riavvio del server): inutile restare in attesa
+        if (e.message === 'Lobby non trovata' && lobbyPollTimer) {
+          leaveWaitingRoom();
+          Toast.show("La sala d'attesa non esiste più", 'error');
+        }
+      }
     }, 2000);
   }
 
@@ -2981,21 +3006,47 @@ const Mob = (() => {
     $('over-winner').textContent = iWon ? 'Hai conquistato il Barbacane'
       : winner ? `${winner.name} conquista il Barbacane` : 'Nessun vincitore';
 
-    // Riepilogo: classifica e statistiche della partita (chronicle.js)
+    // Riepilogo: solo la classifica; toccandola si aprono le statistiche
+    // complete in tabella (come sul desktop). Dati da chronicle.js.
     const esc = Chronicle.escapeHTML;
     $('over-scores').innerHTML = Chronicle.standings(state).map(r => {
       const seat = state.players.indexOf(r.player);
       const me = r.player.id === myPlayerId;
-      const stats = Chronicle.STAT_COLUMNS
-        .map(c => `<span class="over-stat"><b>${r.stats[c.key] || 0}</b> ${c.label}</span>`).join('');
-      return `<div class="over-row glass${r.player.id === state.winner_id ? ' winner' : ''}">`
-        + `<div class="over-row-head"><span class="over-place">${r.place}°</span>`
-        + `<span class="chr-player chr-seat-${seat}">${esc(r.player.name)}</span>${me ? ' <span class="over-you">(tu)</span>' : ''}`
-        + `<span class="over-outcome">${esc(r.outcome)}</span></div>`
-        + `<div class="over-stats">${stats}</div></div>`;
-    }).join('');
+      const win = r.player.id === state.winner_id;
+      return `<div class="over-row${win ? ' winner' : ''}">`
+        + `<span class="over-place">${r.place}</span>`
+        + `<span class="over-who"><span class="over-name"><span class="chr-player chr-seat-${seat}">${esc(r.player.name)}</span>`
+        + `${me ? ' <span class="over-you">(tu)</span>' : ''}</span>`
+        + `<span class="over-outcome">${esc(r.outcome)}</span></span></div>`;
+    }).join('') + '<span class="over-more">Statistiche della partita ›</span>';
     updateRematchUI(state);
     haptic(iWon ? 120 : 40);
+  }
+
+  // Statistiche di fine partita in tabella: una colonna per giocatore (in
+  // ordine di classifica), una riga per statistica, per starci in verticale.
+  function openStatsSheet() {
+    const state = currentState;
+    if (!state) return;
+    const esc = Chronicle.escapeHTML;
+    const rows = Chronicle.standings(state);
+    const cls = r => (r.player.id === state.winner_id ? ' class="winner"' : '');
+    const head = rows.map(r => {
+      const seat = state.players.indexOf(r.player);
+      return `<th${cls(r)}><span class="ost-place">${r.place}°</span>`
+        + `<span class="chr-player chr-seat-${seat}">${esc(r.player.name)}</span>`
+        + `${r.player.id === myPlayerId ? '<span class="over-you">(tu)</span>' : ''}</th>`;
+    }).join('');
+    const outcomes = '<tr class="ost-outcome"><th scope="row">Esito</th>'
+      + rows.map(r => `<td${cls(r)}>${esc(r.outcome)}</td>`).join('') + '</tr>';
+    const stats = Chronicle.STAT_COLUMNS.map(c => `<tr><th scope="row">${c.label}</th>`
+      + rows.map(r => `<td${cls(r)}>${r.stats[c.key] || 0}</td>`).join('') + '</tr>').join('');
+    Sheet.open({
+      title: 'Statistiche della partita',
+      body: `<div class="ost-wrap"><table class="over-table"><thead><tr><th></th>${head}</tr></thead>`
+        + `<tbody>${outcomes}${stats}</tbody></table></div>`,
+      footer: [{ label: 'Chiudi', onClick: () => Sheet.close() }],
+    });
   }
 
   function updateRematchUI(state) {

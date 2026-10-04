@@ -702,12 +702,14 @@ const Renderer = (() => {
     panel.classList.toggle('above-overlay', aboveOverlay);
     panel.classList.remove('hidden');
     document.body.classList.add('chronicle-open');
+    placeMusicToggle(_currentScreen);
     renderChroniclePanel(state, myPlayerId, cardDefs, new Set(), true);
   }
 
   function closeChroniclePanel() {
     document.getElementById('chronicle-panel').classList.add('hidden');
     document.body.classList.remove('chronicle-open');
+    placeMusicToggle(_currentScreen);
   }
 
   function isChroniclePanelOpen() {
@@ -1290,18 +1292,22 @@ const Renderer = (() => {
   // Schermate
   // ---------------------------------------------------------------------------
 
+  let _currentScreen = null;
+
   function showScreen(name) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     const target = document.getElementById(`screen-${name}`);
     if (target) target.classList.add('active');
     if (window.Sparks) Sparks.setScreen(name);
+    _currentScreen = name;
     placeMusicToggle(name);
   }
 
   // In partita, nel catalogo e nelle schermate di scelta tutorial/bot il pulsante
   // musica vive nella barra dell'header (rispettivamente dopo "Esci" e accanto al
-  // titolo); altrove resta fisso in alto a destra.
-  const MUSIC_HOME_CLASSES = ['in-header', 'in-catalog-header'];
+  // titolo); altrove resta fisso in alto a destra. Con la cronaca aperta sta
+  // nella sua intestazione, accanto alla ✕ (il pannello copre l'header).
+  const MUSIC_HOME_CLASSES = ['in-header', 'in-catalog-header', 'in-chronicle'];
 
   function placeMusicToggle(name) {
     const btn = document.getElementById('btn-music-toggle');
@@ -1328,10 +1334,18 @@ const Renderer = (() => {
     } else if (name === 'multiplayer') {
       target = document.getElementById('multiplayer-header');
       cls = 'in-catalog-header';
+    } else if (name === 'waiting') {
+      target = document.getElementById('waiting-header');
+      cls = 'in-catalog-header';
+    }
+    if (isChroniclePanelOpen()) {
+      target = document.querySelector('#chronicle-panel .chronicle-head');
+      cls = 'in-chronicle';
     }
 
     if (target) {
-      if (btn.parentElement !== target) target.appendChild(btn);
+      if (cls === 'in-chronicle') target.insertBefore(btn, document.getElementById('chronicle-close'));
+      else if (btn.parentElement !== target) target.appendChild(btn);
       MUSIC_HOME_CLASSES.forEach(c => btn.classList.toggle(c, c === cls));
     } else if (MUSIC_HOME_CLASSES.some(c => btn.classList.contains(c))) {
       document.body.appendChild(btn);

@@ -60,6 +60,12 @@ const Invite = {
     return `${location.origin}/?join=${encodeURIComponent(code)}`;
   },
 
+  /** Testo dell'invito da condividere (uguale su desktop e mobile). */
+  TEXT: 'Unisciti alla mia partita di Barbacane:',
+  message(code) {
+    return `${this.TEXT} ${this.link(code)}`;
+  },
+
   /** Codice lobby passato con ?join=, rimosso dall'indirizzo per non riusarlo al ricaricamento. */
   takeFromURL() {
     const qs = new URLSearchParams(location.search);

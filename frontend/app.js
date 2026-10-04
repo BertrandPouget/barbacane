@@ -27,10 +27,6 @@ const App = (() => {
   // 'recast_spell' (stessa UI di targeting, azione diversa).
   let recastPending = null;
 
-  // Modalità battaglia
-  let battleMode = false;
-  let battleTargets = [];   // [{playerId, playerIndex, side}]
-
   // Timer
   let timerInterval = null;
   let timerSecondsLeft = 0;
@@ -232,11 +228,8 @@ const App = (() => {
     document.getElementById('banner-btn-play').addEventListener('click', enterPlayCardMode);
     document.getElementById('banner-btn-complete').addEventListener('click', enterCompleteBuildingMode);
     document.getElementById('banner-btn-wall').addEventListener('click', enterAddWallsMode);
-    document.getElementById('btn-cancel-action').addEventListener('click', onCancelClick);
+    document.getElementById('btn-cancel-action').addEventListener('click', cancelActionMode);
     document.getElementById('wall-confirm-btn').addEventListener('click', confirmWalls);
-
-    // Click delegato su bastioni avversari (possono stare in top-opponents o nelle strip laterali)
-    document.getElementById('game-table').addEventListener('click', onOpponentBastionClick);
 
     // Toggle pannello mobile
     const panelToggle = document.getElementById('panel-toggle');
@@ -304,6 +297,8 @@ const App = (() => {
     document.getElementById('btn-mode-single').addEventListener('click', () => Renderer.showScreen('bot-difficulty'));
     document.getElementById('btn-mode-multi').addEventListener('click', () => Renderer.showScreen('multiplayer'));
     document.getElementById('btn-multiplayer-back').addEventListener('click', () => Renderer.showScreen('lobby'));
+    document.getElementById('btn-waiting-leave').addEventListener('click', leaveWaitingRoom);
+    document.getElementById('btn-invite-link').addEventListener('click', copyInviteLink);
     document.getElementById('btn-bot-difficulty-back').addEventListener('click', () => Renderer.showScreen('lobby'));
     document.querySelectorAll('.bot-count-btn').forEach(btn => {
       btn.addEventListener('click', () => selectBotCount(parseInt(btn.dataset.bots, 10)));
@@ -404,8 +399,6 @@ const App = (() => {
     document.getElementById('modal-confirm').onclick = null;
     document.getElementById('modal-cancel').onclick = null;
     recastPending = null;
-    battleMode = false;
-    battleTargets = [];
   }
 
   function exitTutorial() {
@@ -674,15 +667,30 @@ const App = (() => {
     lobbyCode = lobby.lobby_code;
     document.getElementById('lobby-code-text').textContent = lobby.lobby_code;
     updateWaitingRoom(lobby);
-    document.getElementById('btn-start').style.display = isCreator ? 'block' : 'none';
-    document.getElementById('waiting-bot-controls').style.display = isCreator ? 'flex' : 'none';
     document.getElementById('waiting-status').textContent = '';
     Renderer.showScreen('waiting');
+  }
+
+  // Uscita dalla sala d'attesa: si torna a Crea / Unisciti. Se esce il
+  // creatore, il server passa il ruolo al primo umano rimasto.
+  function leaveWaitingRoom() {
+    const code = lobbyCode, token = sessionToken;
+    stopLobbyPolling();
+    lobbyCode = null;
+    sessionToken = null;
+    myPlayerId = null;
+    isCreator = false;
+    Renderer.showScreen('multiplayer');
+    if (code && token) api('/lobby/leave', { lobby_code: code, session_token: token }).catch(() => {});
   }
 
   let waitingPlayers = [];
 
   function updateWaitingRoom(lobby) {
+    // Il creatore può cambiare: se esce, il ruolo passa al primo umano rimasto
+    isCreator = lobby.creator_id === myPlayerId;
+    document.getElementById('btn-start').style.display = isCreator ? 'block' : 'none';
+    document.getElementById('waiting-bot-controls').style.display = isCreator ? 'flex' : 'none';
     waitingPlayers = lobby.players;
     updateWaitingPlayers(lobby.players);
     document.getElementById('btn-start').disabled = !lobby.can_start;
@@ -767,6 +775,7 @@ const App = (() => {
     lobbyPollTimer = setInterval(async () => {
       try {
         const lobby = await apiFetch(`/lobby/${lobbyCode}`);
+        if (!lobbyPollTimer) return;  // uscito dalla sala durante la richiesta
         updateWaitingRoom(lobby);
         if (lobby.game_id && !gameId) {
           stopLobbyPolling();
@@ -774,7 +783,13 @@ const App = (() => {
           const gameState = await apiFetch(`/game/${lobby.game_id}?session_token=${sessionToken}`);
           enterGame(gameState);
         }
-      } catch (_) {}
+      } catch (e) {
+        // Sala chiusa (es. riavvio del server): inutile restare in attesa
+        if (e.message === 'Lobby non trovata' && lobbyPollTimer) {
+          leaveWaitingRoom();
+          Renderer.toast("La sala d'attesa non esiste più", 'error');
+        }
+      }
     }, 2000);
   }
 
@@ -849,7 +864,6 @@ const App = (() => {
     const prevTurnPlayer = lastTurnPlayer;
     currentState = state;
     lastTurnPlayer = state.current_player_id;
-    if (battleMode) exitBattleMode();
     Renderer.render(state, myPlayerId);
 
     if (prevTurnPlayer !== state.current_player_id && !state.winner_id) {
@@ -2470,77 +2484,45 @@ const App = (() => {
       Renderer.toast('Hai già attaccato questo turno', 'error');
       return;
     }
-    const _myP = currentState.players.find(p => p.id === myPlayerId);
-    if (!_myP || !_myP.field.vanguard || _myP.field.vanguard.length === 0) {
+    const my = currentState.players.find(p => p.id === myPlayerId);
+    if (!my || !my.field.vanguard || my.field.vanguard.length === 0) {
       Renderer.toast('Non hai Guerrieri in Avanscoperta', 'error');
       return;
     }
-    if (battleMode) { exitBattleMode(); return; }
 
-    const targets = [];
-    const seen = new Set();
+    // Bersagli: i Bastioni che il campo segna come attaccabili (adiacenza, Guerremoto)
+    const indexOf = new Map();
     document.querySelectorAll('.attack-target').forEach(el => {
       const pid  = el.dataset.targetPlayerId;
       const side = el.dataset.targetSide;
-      const key  = `${pid}:${side}`;
-      if (pid && side && !seen.has(key)) {
-        const p = currentState.players.find(pp => pp.id === pid);
-        if (p && p.lives > 0) {
-          seen.add(key);
-          const idx = currentState.players.indexOf(p);
-          targets.push({ playerId: pid, playerIndex: idx, side });
-        }
-      }
+      const p = pid && side && currentState.players.find(pp => pp.id === pid);
+      if (p && p.lives > 0) indexOf.set(`${pid}:${side}`, currentState.players.indexOf(p));
     });
-
-    if (targets.length === 0) {
+    if (indexOf.size === 0) {
       Renderer.toast('Nessun bersaglio adiacente disponibile', 'error');
       return;
     }
 
-    enterBattleMode(targets);
-  }
+    const attAtt = Math.max(0, ...my.field.vanguard.map(w => w.att));
+    const attGit = Math.max(0, ...my.field.vanguard.map(w => w.git));
+    const bastionOf = (p, side) => p.field[side === 'left' ? 'bastion_left' : 'bastion_right'];
 
-  function enterBattleMode(targets) {
-    battleMode = true;
-    battleTargets = targets;
-    document.getElementById('game-table').classList.add('battle-mode');
-    targets.forEach(t => {
-      document.querySelectorAll(
-        `.attack-target[data-target-player-id="${t.playerId}"][data-target-side="${t.side}"]`
-      ).forEach(el => el.classList.add('attackable'));
+    Renderer.showBastionPicker(currentState, {
+      title: 'Battaglia — scegli il Bastione da attaccare',
+      subtitle: `I tuoi attaccanti: ATT ${attAtt} · GIT ${attGit}`,
+      filter: (p, side) => indexOf.has(`${p.id}:${side}`),
+      note: (p, side) => {
+        const defs = bastionOf(p, side).warriors || [];
+        const defDif = defs.length ? Math.max(...defs.map(w => w.dif)) : 0;
+        const defGit = defs.length ? Math.max(...defs.map(w => w.git)) : 0;
+        const est = Math.max(attAtt - defDif, 0) + Math.max(attGit - defGit, 0);
+        return `Danno stimato: ${est}`;
+      },
+      onPick: (p, side) => sendAction('battle', {
+        defender_player_index: indexOf.get(`${p.id}:${side}`),
+        defender_bastion_side: side,
+      }),
     });
-    document.getElementById('btn-cancel-action').classList.remove('hidden');
-    document.getElementById('action-hint').textContent = '⚔ Clicca un bastione avversario per attaccare';
-  }
-
-  function exitBattleMode() {
-    battleMode = false;
-    battleTargets = [];
-    document.getElementById('game-table').classList.remove('battle-mode');
-    document.querySelectorAll('.attack-target').forEach(el => el.classList.remove('attackable'));
-    document.getElementById('btn-cancel-action').classList.add('hidden');
-    document.getElementById('action-hint').textContent = '';
-  }
-
-  function onOpponentBastionClick(e) {
-    if (!battleMode) return;
-    const bastionEl = e.target.closest('.attack-target');
-    if (!bastionEl) return;
-    const pid  = bastionEl.dataset.targetPlayerId;
-    const side = bastionEl.dataset.targetSide;
-    const target = battleTargets.find(t => t.playerId === pid && t.side === side);
-    if (!target) {
-      Renderer.toast('Non puoi attaccare questo bastione', 'error');
-      return;
-    }
-    exitBattleMode();
-    sendAction('battle', { defender_player_index: target.playerIndex, defender_bastion_side: target.side });
-  }
-
-  function onCancelClick() {
-    if (battleMode) exitBattleMode();
-    else cancelActionMode();
   }
 
   // ---------------------------------------------------------------------------
@@ -2641,12 +2623,6 @@ const App = (() => {
     document.getElementById('btn-abandon').classList.remove('hidden');
     Renderer.showScreen('lobby');
     refreshResumeButton();
-  }
-
-  function copyLobbyCode() {
-    navigator.clipboard.writeText(
-      document.getElementById('lobby-code-text').textContent
-    ).then(() => Renderer.toast('Codice copiato!', 'success'));
   }
 
   // ---------------------------------------------------------------------------
@@ -3055,11 +3031,8 @@ const App = (() => {
 })();
 
 function returnToLobby() { App.returnToLobby(); }
-function copyLobbyCode() {
-  _copyText(document.getElementById('lobby-code-text').textContent.trim(), 'Codice copiato!');
-}
 function copyInviteLink() {
-  _copyText(Invite.link(document.getElementById('lobby-code-text').textContent.trim()),
+  _copyText(Invite.message(document.getElementById('lobby-code-text').textContent.trim()),
             'Link d\'invito copiato: mandalo ai tuoi amici!');
 }
 

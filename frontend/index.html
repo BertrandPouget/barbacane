@@ -167,13 +167,15 @@
 
 <!-- ===== SCHERMATA: SALA D'ATTESA ===== -->
 <div id="screen-waiting" class="screen">
-  <div class="waiting-container">
+  <div id="waiting-header">
+    <button id="btn-waiting-leave" class="btn btn-secondary btn-small" title="Esci dalla sala d'attesa">← Esci</button>
     <h2>Sala d'Attesa</h2>
+  </div>
+  <div class="waiting-container">
     <div class="lobby-code-display">
       Codice: <span id="lobby-code-text">—</span>
-      <button class="btn btn-small" onclick="copyLobbyCode()">Copia</button>
-      <button class="btn btn-small" onclick="copyInviteLink()" title="Chi apre il link trova il codice già inserito">Copia link</button>
     </div>
+    <button id="btn-invite-link" class="btn btn-secondary btn-invite" title="Chi apre il link trova il codice già inserito">Copia link d'invito</button>
     <div id="waiting-players" class="player-list"></div>
     <div id="waiting-bot-controls" class="waiting-bot-controls" style="display:none">
       <button id="btn-add-bot" class="btn btn-secondary btn-small">+ Aggiungi Bot</button>

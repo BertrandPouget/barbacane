@@ -467,7 +467,8 @@ input {
   overflow: hidden;
 }
 
-#multi-head {
+#multi-head,
+#wait-head {
   position: relative;
   display: flex;
   align-items: center;
@@ -503,13 +504,18 @@ input {
 
 /* ═══════════════════════ SALA D'ATTESA ═══════════════════════ */
 
-#scr-wait { align-items: center; justify-content: center; }
+#scr-wait.active {
+  height: 100dvh;
+  overflow: hidden;
+}
+/* Sotto l'intestazione la scheda resta centrata; se non ci sta, scorre */
 .wait-wrap {
   width: min(430px, 100%);
-  max-height: 100%;
+  min-height: 0;
+  margin: auto;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: calc(var(--sat) + 20px) 20px calc(var(--sab) + 20px);
+  padding: 20px 20px calc(var(--sab) + 20px);
 }
 .wait-card {
   width: 100%;
@@ -523,7 +529,6 @@ input {
   gap: 18px;
   text-align: center;
 }
-.wait-title { font-size: 1.4rem; color: var(--gold); }
 
 .code-chip {
   display: inline-flex;
@@ -1793,22 +1798,90 @@ input {
 .over-wrap > * { flex: 0 0 auto; }
 #over-title { font-size: 2rem; color: var(--gold); }
 #over-winner { color: var(--text); font-size: 1.12rem; }
+/* Riepilogo: la classifica in un pannello unico (posto, nome, esito); un
+   tocco apre le statistiche complete in tabella (openStatsSheet) */
 #over-scores {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 8px;
   text-align: left;
+  background: var(--bg-medium);
+  border: 1px solid var(--border-gold);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-/* Riepilogo: una scheda per giocatore, in ordine di classifica */
-.over-row { border-radius: var(--r-md); padding: 10px 12px; }
-.over-row.winner { border-color: var(--gold); }
-.over-row-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.over-place { color: var(--gold); font-weight: 700; }
-.over-you { color: var(--text-faint); font-size: 0.8rem; }
-.over-outcome { margin-left: auto; color: var(--text-dim); font-size: 0.78rem; }
-.over-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 0.76rem; color: var(--text-dim); }
-.over-stat b { color: var(--text); }
+#over-scores:active { filter: brightness(1.12); }
+.over-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-bottom: 1px solid rgba(106, 48, 16, 0.6);
+}
+.over-row.winner {
+  background: linear-gradient(90deg, rgba(251, 196, 2, 0.16), rgba(251, 196, 2, 0.03));
+}
+/* Posto: tondo con bordo dorato, pieno per il vincitore */
+.over-place {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--gold-light);
+  border: 1px solid var(--border-gold);
+  background: var(--bg-dark);
+}
+.over-row.winner .over-place {
+  color: var(--bg-dark);
+  background: var(--gold);
+  border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(251, 196, 2, 0.45);
+}
+.over-who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.over-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.02rem; }
+.over-you { color: var(--text-faint); font-size: 0.78rem; }
+.over-outcome { color: var(--text-dim); font-size: 0.78rem; }
+.over-more {
+  padding: 9px 14px;
+  text-align: center;
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-light);
+}
+
+/* Statistiche di fine partita (sheet): un giocatore per colonna */
+.ost-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.over-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.over-table th,
+.over-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid rgba(106, 48, 16, 0.6);
+  text-align: center;
+}
+.over-table thead th { vertical-align: bottom; border-bottom-color: var(--border-gold); }
+.over-table thead th .chr-player { display: block; font-size: 0.85rem; word-break: break-word; }
+.over-table thead th .over-you { display: block; }
+.ost-place { display: block; color: var(--gold); font-size: 0.78rem; }
+.over-table tbody th {
+  text-align: left;
+  font-weight: normal;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.over-table td { color: var(--text); font-variant-numeric: tabular-nums; }
+.over-table .winner { background: rgba(251, 196, 2, 0.08); }
+.over-table .ost-outcome td { color: var(--text-dim); font-size: 0.74rem; }
 .over-note { color: var(--gold-light); font-size: 0.9rem; }
 .over-note[hidden] { display: none; }
 #scr-over .cta { width: 100%; }

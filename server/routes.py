@@ -52,6 +52,7 @@ from server.lobby import (
     authenticate_player,
     generate_session_token,
     rematch,
+    leave_lobby,
 )
 from server.ws_manager import manager
 from engine.tutorial import (
@@ -217,6 +218,18 @@ async def api_lobby_reorder(req: LobbyEditRequest):
 @router.post("/lobby/bot_difficulty")
 async def api_lobby_bot_difficulty(req: LobbyEditRequest):
     return _edit_lobby(req, lambda pid: set_bot_difficulty(req.lobby_code, pid, req.difficulty or ""))
+
+
+@router.post("/lobby/leave")
+async def api_lobby_leave(req: StartGameRequest):
+    auth = authenticate_player(req.session_token)
+    if auth is None or auth[0] is None:
+        return {"ok": True}  # sala già chiusa: niente da fare
+    try:
+        leave_lobby(auth[0], auth[1])
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
 
 
 @router.post("/lobby/start")

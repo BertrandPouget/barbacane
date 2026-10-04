@@ -130,6 +130,16 @@ body::before {
 }
 .music-toggle.in-catalog-header:hover { transform: translateY(-50%) scale(1.08); }
 
+/* Con la cronaca aperta si inserisce nella sua intestazione, accanto alla ✕ */
+.music-toggle.in-chronicle {
+  position: static;
+  z-index: auto;
+  width: 28px;
+  height: 28px;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
 /* ==================== LOBBY ==================== */
 
 #screen-lobby,
@@ -412,9 +422,8 @@ input:focus {
 #screen-waiting.active {
   min-height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
+  flex-direction: column;
+  padding-bottom: 4rem;
 }
 
 .waiting-container {
@@ -430,10 +439,9 @@ input:focus {
   gap: 1.5rem;
   min-width: 360px;
   max-width: 500px;
-  width: 100%;
+  width: calc(100% - 4rem);
+  margin: auto;
 }
-
-.waiting-container h2 { color: var(--gold); font-size: 1.8rem; }
 
 .lobby-code-display {
   font-size: 1.4rem;
@@ -450,6 +458,15 @@ input:focus {
 }
 
 #lobby-code-text { white-space: nowrap; letter-spacing: 0.06em; }
+
+/* Invito: stesso pulsante pieno della sala d'attesa mobile */
+.btn-invite {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
 
 .player-list {
   display: flex;
@@ -731,14 +748,6 @@ input:focus {
   border-color: var(--gold);
   background: rgba(200, 168, 75, 0.1);
 }
-.strip-section.adj.attackable {
-  border-color: var(--red-light);
-  background: rgba(176, 48, 48, 0.15);
-  box-shadow: 0 0 8px rgba(224, 64, 64, 0.5);
-  animation: pulse-attack 1.4s ease-in-out infinite;
-  cursor: crosshair;
-}
-
 /* Bastione NON adiacente nel campo specchiato top-opponents */
 .opp-bastion.nonadj { opacity: 0.45; cursor: default; }
 
@@ -884,27 +893,6 @@ input:focus {
   color: var(--text-dim);
 }
 
-/* Bastione attaccabile in modalità battaglia */
-.opp-region.opp-bastion.attackable {
-  border-color: var(--red-light);
-  background: rgba(176, 48, 48, 0.12);
-  box-shadow: 0 0 8px rgba(224, 64, 64, 0.45);
-  animation: pulse-attack 1.4s ease-in-out infinite;
-  cursor: crosshair;
-}
-
-@keyframes pulse-attack {
-  0%, 100% { box-shadow: 0 0 6px rgba(224, 64, 64, 0.4); }
-  50%       { box-shadow: 0 0 14px rgba(224, 64, 64, 0.75); }
-}
-
-/* Evidenzia la colonna di attacco sul game-table in battaglia */
-#game-table.battle-mode #my-bastion-right,
-#game-table.battle-mode #my-bastion-left {
-  border-style: solid;
-  border-color: rgba(224, 64, 64, 0.4);
-}
-
 /* ==================== LANE SEPARATOR ==================== */
 
 
@@ -1004,12 +992,23 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.7rem 0.9rem;
-  /* Sopra la fine partita il pulsante musica (fisso in alto a destra) cade qui */
-  padding-right: 4.2rem;
   border-bottom: 1px solid rgba(160, 104, 32, 0.5);
 }
-.chronicle-head h3 { color: var(--gold); font-size: 1.05rem; }
+.chronicle-head h3 { color: var(--gold); font-size: 1.05rem; margin-right: auto; }
+/* ✕ e pulsante musica: due tondi gemelli, allineati sulla stessa riga */
+#chronicle-close {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  border-color: var(--border-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
 
 .chronicle-body {
   flex: 1;
@@ -2399,7 +2398,8 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
    (titolo crema maiuscolo al centro, «Indietro» a sinistra, filetto dorato). */
 #tutorial-list-header,
 #bot-difficulty-header,
-#multiplayer-header {
+#multiplayer-header,
+#waiting-header {
   position: relative;
   display: flex;
   align-items: center;
@@ -2412,14 +2412,16 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 
 #tutorial-list-header .btn,
 #bot-difficulty-header .btn,
-#multiplayer-header .btn {
+#multiplayer-header .btn,
+#waiting-header .btn {
   position: absolute;
   left: 1.2rem;
 }
 
 #tutorial-list-header h2,
 #bot-difficulty-header h2,
-#multiplayer-header h2 {
+#multiplayer-header h2,
+#waiting-header h2 {
   color: var(--card-cream);
   font-size: 1.35rem;
   font-weight: 700;
