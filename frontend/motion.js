@@ -75,7 +75,7 @@ const Motion = (() => {
     g.classList.add('motion-ghost');
     // Il fantasma deve avere la sua immagine pronta fin dal primo fotogramma
     g.querySelectorAll('img').forEach(img => { img.decoding = 'sync'; img.loading = 'eager'; });
-    // Carta con miniatura: il fantasma la mostra anche se l'originale non aveva
+    // Carta con immagine: il fantasma la mostra anche se l'originale non aveva
     // ancora finito di caricarla (es. una carta appena pescata)
     if (g.querySelector('.card-art')) g.classList.add('has-art');
     g.style.left = `${rect.left}px`;

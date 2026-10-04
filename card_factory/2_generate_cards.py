@@ -7,15 +7,19 @@ images/<id>.png (assenti = carta con sola cornice, senza illustrazione).
 
 render_cards() (lib/render.py) è riutilizzato anche da 3_make_print_pdf.py, che
 rigenera le carte a risoluzione più alta apposta per la stampa senza toccare i
-PNG in output/.
+PNG in output/full/.
 
-In coda aggiorna anche le miniature leggere delle carte generate
-(output/miniature/<id>.webp, vedi 4_make_miniatures.py).
+In coda aggiorna anche le anteprime delle carte generate
+(output/preview/<id>.webp: la carta intera rimpicciolita, per catalogo e anteprima,
+vedi 4_make_previews.py) e le immagini delle loro minicarte (output/mini/:
+illustrazione ridotta e pergamena, vedi lib/mini.py; la minicarta vera e propria
+la disegna il gioco in HTML/CSS).
 
 Utilizzo:
     python 2_generate_cards.py                   # tutte le carte
     python 2_generate_cards.py faust joseph      # solo le carte indicate
     python 2_generate_cards.py --scale 2         # 2x risoluzione (default 1 = 300 DPI)
+    python 2_generate_cards.py --mini-only       # solo le immagini delle minicarte
 """
 
 import argparse
@@ -23,11 +27,13 @@ import sys
 from pathlib import Path
 
 from lib.cards_data import CARDS_JSON, load_cards
-from lib.miniature import make_miniatures
+from lib.preview import make_previews
+from lib.mini import make_minis
 from lib.render import render_cards
 
 ROOT = Path(__file__).resolve().parent
 OUT_DIR = ROOT / "output"
+FULL_DIR = OUT_DIR / "full"
 
 
 def main():
@@ -48,6 +54,10 @@ def main():
         "--debug-borders", action="store_true",
         help="Disegna i bordi colorati dei contenitori flex (per verificare centratura/spaziatura).",
     )
+    parser.add_argument(
+        "--mini-only", action="store_true",
+        help="Rigenera solo le immagini delle minicarte (output/mini/), senza toccare le carte intere.",
+    )
     args = parser.parse_args()
 
     cards, id_to_name = load_cards(CARDS_JSON)
@@ -59,11 +69,15 @@ def main():
             print(f"Attenzione: id non trovati nel JSON: {', '.join(sorted(missing))}", file=sys.stderr)
         cards = [c for c in cards if c.get("id") in wanted]
 
-    print(f"Carte da generare: {len(cards)}  (scala {args.scale}x)\n")
-    render_cards(cards, id_to_name, OUT_DIR, scale=args.scale, debug=args.debug_borders)
+    if not args.mini_only:
+        print(f"Carte da generare: {len(cards)}  (scala {args.scale}x)\n")
+        render_cards(cards, id_to_name, FULL_DIR, scale=args.scale, debug=args.debug_borders)
 
-    print("\nMiniature per l'interfaccia:")
-    make_miniatures([c.get("id") for c in cards])
+        print("\nAnteprime (catalogo e passaggio del mouse):")
+        make_previews([c.get("id") for c in cards])
+
+    print("\nImmagini delle minicarte (mano e campo):")
+    make_minis(cards)
     print(f"\nFatto — output in '{OUT_DIR}'")
 
 

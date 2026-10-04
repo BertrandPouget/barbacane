@@ -97,21 +97,7 @@ const Render = (() => {
     stats.appendChild(el('span', { className: 'stat stat-git' }, [`🏹${w.git}`]));
     stats.appendChild(el('span', { className: 'stat stat-dif' }, [`🛡️${w.dif}`]));
     div.appendChild(stats);
-    // Illustrazione con le Caratteristiche correnti sovrapposte (i testi restano come ripiego)
-    CardArt.attachField(div, Mob.getCardDef(w.instance_id), w);
     return div;
-  }
-
-  // Icona di una riga-opzione (elenchi di Regioni e Villaggio): la miniatura
-  // della carta, con l'emoji come ripiego finché manca o se non si carica.
-  function rowThumb(iid, fallback) {
-    const span = el('span', { className: 'opt-icon' }, [fallback]);
-    const def = Mob.getCardDef(iid);
-    if (!def) return span;
-    const img = el('img', { className: 'opt-thumb', alt: '', draggable: 'false' });
-    img.addEventListener('load', () => { span.replaceChildren(img); span.classList.add('has-thumb'); });
-    img.src = CardArt.miniatureUrl(def.id);
-    return span;
   }
 
   // ---------------------------------------------------------------------------
@@ -410,8 +396,11 @@ const Render = (() => {
         node = prev.node;
         node.classList.remove('wall-marked');  // la modalità Muri la riapplica se serve
         node.style.opacity = '';
+        // La fascia della minicarta può cambiare anche se la carta resta (es. Prodigio)
+        const def = Mob.getCardDef(iid);
+        CardArt.update(node, def, CardArt.handInfo(def, iid, me.prodigy_ready));
       } else {
-        node = handCard(iid, etherealCard);
+        node = handCard(iid, etherealCard, me.prodigy_ready);
       }
       next.set(iid, { node, ethereal });
       return node;
@@ -420,7 +409,7 @@ const Render = (() => {
     _handNodes = next;
   }
 
-  function handCard(iid, etherealCard) {
+  function handCard(iid, etherealCard, prodigyReady) {
     const isEthereal = etherealCard === iid;
     const div = el('div', { className: isEthereal ? 'card ethereal' : 'card', dataset: { instanceId: iid } });
 
@@ -429,9 +418,9 @@ const Render = (() => {
       div.dataset.type = def.type;
       div.dataset.baseId = def.id;
 
-      // Badge costo: notifica in alto a destra, oro = Mana, azzurro = Maghe
+      // Badge costo come sulle carte stampate: esagono giallo per il Mana, stella azzurra per le Maghe, bianco per la carta Eterea
       const badgeCls = isEthereal ? 'ethereal' : (def.cost_type === 'maga' ? 'maga' : 'mana');
-      div.appendChild(el('div', { className: `card-cost-badge ${badgeCls}` }, [String(isEthereal ? 0 : def.cost)]));
+      div.appendChild(el('div', { className: `card-cost-badge ${badgeCls}${def.cost_type === 'maga' ? ' star' : ''}` }, [String(isEthereal ? 0 : def.cost)]));
 
       div.appendChild(el('div', { className: 'card-name' }, [def.name]));
 
@@ -457,8 +446,8 @@ const Render = (() => {
           el('span', { className: 'stat stat-mana' }, [`🏗️${def.completion_cost}`]),
         ]));
       }
-      // Miniatura della carta: i testi qui sopra restano come ripiego se manca
-      CardArt.attach(div, def);
+      // Minicarta disegnata sopra la versione testuale, che resta nascosta
+      CardArt.attach(div, def, CardArt.handInfo(def, iid, prodigyReady));
     } else {
       div.appendChild(el('div', { className: 'card-name' }, [iid]));
     }
@@ -521,7 +510,7 @@ const Render = (() => {
 
   /**
    * Vista carta per lo sheet: immagine con flip verso il testo, o solo flashcard.
-   * Ritorna un Node. Prova a caricare /card_images/{baseId}.png.
+   * Ritorna un Node. Prova a caricare /card_images/full/{baseId}.png.
    */
   // Immagini carta caricate almeno una volta: per queste la vista carta viene
   // costruita subito, senza il flash della flashcard testuale in attesa della rete.
@@ -531,7 +520,7 @@ const Render = (() => {
     if (!baseId || _imgLoaded.has(baseId)) return;
     const i = new Image();
     i.onload = () => _imgLoaded.add(baseId);
-    i.src = `/card_images/${baseId}.png`;
+    i.src = `/card_images/full/${baseId}.png`;
   }
 
   function cardViewNode(def, ctx = {}) {
@@ -550,7 +539,7 @@ const Render = (() => {
     const back = el('div', { className: 'flip-face flip-back' });
     if (ctx.realBack) {
       back.classList.add('flip-back-img');
-      back.appendChild(el('img', { alt: 'Retro carta', draggable: 'false', src: '/card_images/retro.png' }));
+      back.appendChild(el('img', { alt: 'Retro carta', draggable: 'false', src: '/card_images/full/retro.png' }));
     } else {
       back.innerHTML = textHTML;
     }
@@ -568,12 +557,12 @@ const Render = (() => {
 
     if (_imgLoaded.has(def.id)) {
       img.onerror = () => { wrap.innerHTML = ''; wrap.appendChild(textOnly); };
-      img.src = `/card_images/${def.id}.png`;
+      img.src = `/card_images/full/${def.id}.png`;
       showFlip();
     } else {
       img.onload = showFlip;
       img.onerror = () => { /* resta la flashcard testuale */ };
-      img.src = `/card_images/${def.id}.png`;
+      img.src = `/card_images/full/${def.id}.png`;
       wrap.appendChild(textOnly);
     }
     return wrap;
@@ -606,7 +595,6 @@ const Render = (() => {
     hand,
     markWallPicks,
     warriorMini,
-    rowThumb,
     activeEffectItems,
     cardTextHTML,
     cardViewNode,

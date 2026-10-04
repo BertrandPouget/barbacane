@@ -61,7 +61,9 @@ const Spotlight = (() => {
     if (!el) return null;
     const box = el.getBoundingClientRect();
     if (!own) return box;
+    // Con i figli diretti dei figli: il badge del costo sporge dalla carta
     const kids = [...el.children]
+      .flatMap(c => [c, ...c.children])
       .map(c => c.getBoundingClientRect())
       .filter(r => r.width > 0 && r.height > 0);
     if (!kids.length) return box;

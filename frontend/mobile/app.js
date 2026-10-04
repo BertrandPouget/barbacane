@@ -504,10 +504,10 @@ const Mob = (() => {
     const focus = step.card_focus;
     // Precarica le altre carte del tutorial, così il cambio carta non sfarfalla.
     steps.forEach(s => {
-      if (s.card_focus) new window.Image().src = `/card_images/${s.card_focus.card}.png`;
+      if (s.card_focus) new window.Image().src = `/card_images/full/${s.card_focus.card}.png`;
     });
     const img = $('card-anatomy-img');
-    const src = `/card_images/${focus.card}.png`;
+    const src = `/card_images/full/${focus.card}.png`;
     if (img.getAttribute('src') !== src) img.setAttribute('src', src);
 
     const box = $('card-anatomy-focus');
@@ -601,13 +601,13 @@ const Mob = (() => {
         const cell = el('div', { className: 'cat-card' });
         const img = el('img', { alt: def.name, draggable: 'false' });
         img.loading = 'lazy';
-        // Nella griglia basta la miniatura; la carta ingrandita usa il PNG grande
-        img.src = CardArt.miniatureUrl(def.id);
-        // Senza miniatura si ripiega sul PNG; senza nemmeno quello, una tessera col nome
+        // Nella griglia basta l'anteprima; la carta ingrandita usa il PNG grande
+        img.src = CardArt.previewUrl(def.id);
+        // Senza anteprima si ripiega sul PNG; senza nemmeno quello, una tessera col nome
         img.onerror = () => {
           if (!img.dataset.fallback) {
             img.dataset.fallback = '1';
-            img.src = `/card_images/${def.id}.png`;
+            img.src = `/card_images/full/${def.id}.png`;
             return;
           }
           cell.innerHTML = '';
@@ -1787,7 +1787,7 @@ const Mob = (() => {
       walls.forEach((iid, i) => {
         const def = getCardDef(iid);
         const row = el('button', { className: 'opt-row' }, [
-          Render.rowThumb(iid, '🧱'),
+          el('span', { className: 'opt-icon' }, ['🧱']),
           el('span', { className: 'opt-main' }, [
             el('span', { className: 'opt-label' }, [def ? def.name : iid]),
             el('span', { className: 'opt-sub', style: 'display:block' },
@@ -1805,7 +1805,7 @@ const Mob = (() => {
       warriors.forEach(w => {
         const hasAssigned = w.assigned_cards && w.assigned_cards.length > 0;
         const row = el('button', { className: `opt-row sp-${w.species || 'umano'}${hasAssigned ? ' has-assigned' : ''}` }, [
-          Render.rowThumb(w.instance_id, '🗡️'),
+          el('span', { className: 'opt-icon' }, ['🗡️']),
           el('span', { className: 'opt-main' }, [
             el('span', { className: 'opt-label' }, [(hasAssigned ? '📌 ' : '') + (w.name || w.base_card_id)]),
             el('span', { className: 'opt-sub', style: 'display:block' },
@@ -1929,7 +1929,7 @@ const Mob = (() => {
     warriors.forEach(w => {
       const hasAssigned = w.assigned_cards && w.assigned_cards.length > 0;
       const row = el('button', { className: `opt-row sp-${w.species || 'umano'}${hasAssigned ? ' has-assigned' : ''}` }, [
-        Render.rowThumb(w.instance_id, '🗡️'),
+        el('span', { className: 'opt-icon' }, ['🗡️']),
         el('span', { className: 'opt-main' }, [
           el('span', { className: 'opt-label' }, [(hasAssigned ? '📌 ' : '') + (w.name || w.base_card_id)]),
           el('span', { className: 'opt-sub', style: 'display:block' },
@@ -1968,8 +1968,8 @@ const Mob = (() => {
     buildings.forEach(b => {
       const def = getCardDef(b.instance_id);
       const isEth = my.ethereal_complete === b.instance_id;
-      const row = el('button', { className: `opt-row${b.completed ? ' gold' : ' incomplete'}` }, [
-        Render.rowThumb(b.instance_id, b.completed ? '🏰' : '🏗️'),
+      const row = el('button', { className: `opt-row${b.completed ? ' gold' : ''}` }, [
+        el('span', { className: 'opt-icon' }, [b.completed ? '🏰' : '🏗️']),
         el('span', { className: 'opt-main' }, [
           el('span', { className: 'opt-label' }, [(def ? def.name : b.base_card_id) + (b.completed ? ' ✓' : '')]),
           el('span', { className: 'opt-sub', style: 'display:block' },
@@ -2499,8 +2499,8 @@ const Mob = (() => {
     body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' }, ['🏰 Villaggio']));
     buildings.forEach(b => {
       const def = getCardDef(b.instance_id);
-      const row = el('button', { className: `opt-row${b.completed ? ' gold' : ' incomplete'}` }, [
-        Render.rowThumb(b.instance_id, b.completed ? '🏰' : '🏗️'),
+      const row = el('button', { className: `opt-row${b.completed ? ' gold' : ''}` }, [
+        el('span', { className: 'opt-icon' }, [b.completed ? '🏰' : '🏗️']),
         el('span', { className: 'opt-main' }, [
           el('span', { className: 'opt-label' }, [(def ? def.name : b.base_card_id) + (b.completed ? ' ✓' : '')]),
           el('span', { className: 'opt-sub', style: 'display:block' }, [b.effect || '']),

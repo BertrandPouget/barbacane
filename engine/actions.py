@@ -298,6 +298,43 @@ def _apply_spell_post_effects(
         })
 
 
+def _prodigy_active(player: Player, school: Optional[str], effective_cost: int, free_or_ethereal: bool) -> bool:
+    """Regola del Prodigio: servono in campo almeno tante Maghe della Scuola della
+    Magia quanto il costo effettivo (con l'Orda di Madeleine, per gli Incantesimi
+    vale qualsiasi Maga). A costo 0 si attiva solo per una Magia gratuita o Eterea."""
+    mages_count = len(player.mages_in_field())
+    if mages_count == 0:
+        return False
+    madeleine_active = any(
+        e.get("type") == "madeleine_prodigy_any_school"
+        for e in player.active_effects
+    )
+    if madeleine_active and school == "incantesimo":
+        count = mages_count
+    else:
+        count = player.mages_by_school().get(school, 0)
+    return count >= effective_cost and (effective_cost > 0 or free_or_ethereal)
+
+
+def spell_prodigy_ready(player: Player, instance_id: str) -> bool:
+    """True se giocando ora questa Magia dalla mano si attiverebbe il Prodigio
+    (stessa regola di play_spell, senza consumare nulla). Usata dai client per
+    la stella piena/vuota sulle Magie in mano."""
+    card = get_card(get_base_card_id(instance_id))
+    if not isinstance(card, SpellCard):
+        return False
+    if player.ethereal_card == instance_id:
+        return _prodigy_active(player, card.school, card.cost, True)
+    free = any(
+        e.get("type") == "spell_free" and e.get("school") == card.school and e.get("uses", 0) > 0
+        for e in player.active_effects
+    )
+    if free:
+        return _prodigy_active(player, card.school, 0, True)
+    cost_to_pay = max(0, card.cost - player.spell_cost_reductions.get(card.school, 0))
+    return _prodigy_active(player, card.school, cost_to_pay, False)
+
+
 def play_spell(
     state: GameState,
     player_id: str,
@@ -351,19 +388,8 @@ def play_spell(
                 raise ActionError(f"Maghe insufficienti: {mages_count} disponibili, {cost_to_pay} richieste.")
 
     # Verifica Prodigio (basato sulle Maghe in campo, indipendentemente dall'eterea)
-    prodigy = False
-    if mages_count > 0:
-        mages_by_school = player.mages_by_school()
-        same_school_count = mages_by_school.get(school, 0)
-        madeleine_active = any(
-            e.get("type") == "madeleine_prodigy_any_school"
-            for e in player.active_effects
-        )
-        effective_cost = cost if is_ethereal else cost_to_pay
-        if madeleine_active and school == "incantesimo":
-            prodigy = (mages_count >= effective_cost) and (effective_cost > 0 or free_effect or is_ethereal)
-        else:
-            prodigy = (same_school_count >= effective_cost) and (effective_cost > 0 or free_effect or is_ethereal)
+    prodigy = _prodigy_active(player, school, cost if is_ethereal else cost_to_pay,
+                              bool(free_effect) or is_ethereal)
 
     # Pre-validazione: vitalflusso richiede una Sorgiva completa propria
     # oppure, se il prodigio è attivo, almeno una Sorgiva avversaria da eliminare

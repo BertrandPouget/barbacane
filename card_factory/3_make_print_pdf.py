@@ -3,7 +3,7 @@
 3_make_print_pdf.py
 
 Rigenera tutte le carte (lib/render.py) a risoluzione di stampa in una cartella
-temporanea — senza toccare i PNG in output/, usati dal frontend — e per ognuna
+temporanea — senza toccare i PNG in output/full/, usati dal frontend — e per ognuna
 crea una coppia di pagine (back, carta) con un bordo monocromo di 3mm su tutti
 i lati (dello stesso colore del bordo della carta, estratto dal pixel più a
 sinistra in centro verticale). Salva il PDF risultante in output/cards_to_print.pdf.
@@ -64,7 +64,7 @@ def main():
     parser.add_argument(
         "--scale", type=float, default=4.0,
         help="Risoluzione di stampa, moltiplicatore della base 300 DPI (4 = ~1200 DPI). "
-             "Non tocca i PNG in output/. Default 4.",
+             "Non tocca i PNG in output/full/. Default 4.",
     )
     args = parser.parse_args()
 

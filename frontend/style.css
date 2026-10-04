@@ -29,6 +29,16 @@
   --card-brown: #4a2c15;
   --card-gold:  #b98a3e;
   --card-cream: #f4dea0;
+  /* Colori delle specie (come i bollini del client mobile) */
+  --elfo:  #7aaa55;
+  --nano:  #b85a3a;
+  --maga:  #9966cc;
+  --umano: #5599cc;
+  /* Esagono del costo, come sulle carte stampate (card_factory/assets/esagono.png) */
+  --hex-mana:   radial-gradient(closest-side, #fe8c16 0%, #fe9c1c 55%, #fed222 86%, #fee822 100%);
+  --hex-maga:   radial-gradient(closest-side, #8fcde4 0%, #a3d7ed 60%, #d4eef8 100%);
+  --hex-border: #5a3518;
+  --hex-ink:    #5a2d06;
   --card-ink:   #171009;   /* fondo su cui sono renderizzati i PNG delle carte */
 
   /* Colori dei giocatori nella cronaca e nel riepilogo, per posto al tavolo */
@@ -1277,10 +1287,10 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 
 #hand-cards {
   display: flex;
-  gap: 6px;
+  gap: 13px;  /* spazio per il badge del costo, che sporge a destra */
   flex-wrap: nowrap;
   overflow-x: auto;
-  padding-top: 16px;
+  padding-top: 22px;  /* spazio per il badge del costo, che sporge sopra */
   padding-bottom: 4px;
   justify-content: center;
   /* Altezza fissa anche a mano vuota: altrimenti la zona in basso si
@@ -1347,35 +1357,53 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   pointer-events: none;
 }
 
-/* Badge costo: esagono in alto a destra sulla carta.
-   Oro = costo in Mana, azzurro = costo in Maghe, bianco = carta eterea (gratis). */
+/* Badge costo: l'esagono della carta stampata (giallo e arancio, con un bordino
+   marrone), fuori dalla carta in alto a destra. La minicarta non riporta il
+   costo: è solo qui. Il costo in Maghe sta in una stella azzurra (come sulle
+   Magie stampate); bianco = carta eterea (gratis).
+   Il bordo è il fondo dell'esagono, il colore uno strato interno (::before):
+   con clip-path un border vero verrebbe tagliato. */
 .card-cost-badge {
   position: absolute;
-  top: -8px;
-  right: -7px;
+  top: -17px;   /* quasi tutto fuori: non copre il nome sulla minicarta */
+  right: -11px;
   min-width: 23px;
   height: 26px;
   padding: 0 5px;
-  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  clip-path: var(--badge-shape);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
+  font-family: 'Caudex', Georgia, serif;
+  font-size: 0.78rem;
   font-weight: 800;
+  color: var(--hex-ink);
+  background: var(--hex-border);
+  isolation: isolate;
   z-index: 2;
 }
-.card-cost-badge.mana {
-  background: var(--gold);
-  color: var(--bg-dark);
+.card-cost-badge::before {
+  content: '';
+  position: absolute;
+  inset: 1.5px;
+  z-index: -1;
+  clip-path: var(--badge-shape);
+  background: var(--hex-fill, var(--hex-mana));
 }
-.card-cost-badge.maga {
-  background: var(--blue-light);
-  color: #fff;
+.card-cost-badge { --badge-shape: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+/* Stella: più grande dell'esagono, perché il numero sta nella parte centrale */
+.card-cost-badge.star {
+  --badge-shape: polygon(50% 4%, 65.9% 32.2%, 97.6% 38.5%, 75.7% 62.3%, 79.4% 94.5%, 50% 81%, 20.6% 94.5%, 24.3% 62.3%, 2.4% 38.5%, 34.1% 32.2%);
+  top: -21px;
+  right: -14px;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 4px 0 0;
 }
-.card-cost-badge.ethereal {
-  background: #ffffff;
-  color: #241608;
-}
+.card-cost-badge.star::before { inset: 2px; }
+.card-cost-badge.maga { --hex-fill: var(--hex-maga); }
+.card-cost-badge.ethereal { --hex-fill: #ffffff; color: #241608; }
 
 /* Carta piccola (per campo) */
 .card-sm {
@@ -1448,42 +1476,133 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   margin-top: 0.25rem;
 }
 
-/* Carte in mano con le proporzioni della carta stampata (744×1040): l'altezza
-   è quella della mano, la larghezza ne deriva, così la miniatura entra intera. */
+/* Carte in mano con le proporzioni della minicarta (280×400): l'altezza è
+   quella della mano, la larghezza ne deriva. */
 #hand-cards .card {
   height: var(--card-h-hand);
   width: auto;
   min-width: 0;
-  aspect-ratio: 744 / 1040;
+  aspect-ratio: 7 / 10;
   flex-shrink: 0;
 }
 #hand-cards .card .card-name { font-size: 0.82rem; }
 #hand-cards .card .card-species { font-size: 0.72rem; }
 
-/* Carta in mano con la sua miniatura (cardart.js): l'immagine riempie la carta,
-   resta solo il badge del costo (che mostra 0 per la carta Eterea). Finché la
-   miniatura non è caricata, o se manca, si vede la versione testuale. */
+/* Minicarta (cardart.js): sopra la carta testuale, che resta nascosta, ci sono
+   solo la minicarta (.card-art), il badge del costo (che mostra 0 per la carta
+   Eterea) e la fascia con le informazioni che cambiano (.card-keep). */
 .card-art { display: none; }
 .card.has-art {
   padding: 0;
   border-width: 1px;
   background: transparent;
+  container-type: inline-size;  /* testi e simboli si misurano sulla larghezza della carta */
 }
 /* Nessun contorno a riposo: si vede solo la cornice stampata della carta (oro se evidenziata) */
+/* Sulla minicarta nessun bordo spesso dei tipi (es. Costruzione completata):
+   tutte le carte hanno la stessa misura */
+.card.has-art[data-type] { border-width: 1px; }
 .card.has-art:not(:hover):not(.selected):not(.wall-marked) { border-color: transparent; }
 .card.has-art > :not(.card-art):not(.card-cost-badge):not(.card-keep) { display: none; }
+/* La minicarta (.mc), disegnata in HTML: posizioni in % della carta (la
+   minicarta è progettata a 280×400 con cornice di 13), testi in cqw (larghezza
+   della carta), così è identica a ogni dimensione. */
 .card.has-art .card-art {
   display: block;
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;  /* sempre intera, mai ritagliata */
-  border-radius: 5px;
+  border-radius: 5.7cqw;
+  background: var(--mc-frame, #7a0000);
+  font-family: 'Caudex', Georgia, serif;
+  overflow: hidden;
   pointer-events: none;
 }
+.mc-spell    { --mc-frame: #123a52; }
+.mc-building { --mc-frame: #245e33; }
+/* Pergamena dentro la cornice colorata */
+.mc::before {
+  content: '';
+  position: absolute;
+  left: 4.64%; right: 4.64%; top: 3.25%; bottom: 3.25%;
+  border-radius: 2.9cqw;
+  background: linear-gradient(rgba(60,35,15,.06), rgba(60,35,15,.14)),
+              url('/card_images/mini/sfondo.webp') center / cover;
+}
+.mc > * { position: absolute; }
+/* Stendardo del nome, come sulla carta intera: stesso corpo per tutte le carte,
+   tarato sul nome più lungo («KAISER JOSEPH»; i nomi troppo lunghi hanno una
+   versione abbreviata, mini_name in cards.json) */
+.mc-name {
+  left: 5.36%; right: 5.36%; top: 4.75%; height: 11%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-brown);
+  border: max(1px, 1cqw) solid var(--card-gold);
+  clip-path: polygon(0 0, 100% 0, 95% 50%, 100% 100%, 0 100%, 5% 50%);
+}
+.mc-name > span {
+  font-weight: 700;
+  font-size: 8cqw;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: var(--card-cream);
+}
+.mc-name .ini { font-size: 1.36em; }
+/* Sotto il nome: bollino della specie (Guerrieri) e Scuola (Magie e Maghe),
+   separati da un punto. Lo spazio resta anche quando è vuoto (Costruzioni),
+   così le illustrazioni stanno tutte alla stessa altezza. */
+.mc-school {
+  left: 5%; right: 5%; top: 16.25%; height: 7.5%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 8.6cqw;
+  line-height: 1;
+  white-space: nowrap;
+  color: #2e1a0c;
+  gap: 2cqw;
+}
+.mc-sep { font-style: normal; color: var(--card-brown); }
+/* «E» degli Eroi: solo la lettera, nel colore del testo */
+.mc-hero { font-style: normal; font-weight: 700; }
+/* Illustrazione nel suo riquadro con fondo e bordo, come sulla carta intera:
+   quelle rettangolari lo riempiono, quelle (quasi quadrate) degli Eroi ci
+   stanno intere, ingrandite un po' */
+.mc-illus {
+  left: 7.5%; right: 7.5%; top: 24.75%; height: 35%;
+  border: max(1px, 1cqw) solid var(--card-brown);
+  border-radius: 1cqw;
+  overflow: hidden;
+  background: linear-gradient(rgba(52,30,13,.22), rgba(52,30,13,.34)),
+              url('/card_images/mini/sfondo.webp') center / cover;
+}
+.mc-illus img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 35%;
+}
+.mc-illus.hero img { object-fit: contain; object-position: 50% 50%; transform: scale(1.25); transform-origin: 50% 40%; }
+.mc-dot {
+  flex: 0 0 auto;
+  width: 7cqw;
+  height: 7cqw;
+  border-radius: 50%;
+  background: var(--mc-sp);
+}
+.mc-sp-elfo  { --mc-sp: var(--elfo); }
+.mc-sp-nano  { --mc-sp: var(--nano); }
+.mc-sp-maga  { --mc-sp: var(--maga); }
+.mc-sp-umano { --mc-sp: var(--umano); }
 /* Selezionata come Muro: la carta si scurisce e mostra il segno del Muro */
 .card.has-art.wall-marked .card-art { filter: brightness(0.45) sepia(0.6); }
+.card.has-art.wall-marked .mc-band { opacity: 0.4; }
 .card.has-art.wall-marked::after {
   content: '🧱';
   position: absolute;
@@ -1494,69 +1613,84 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   font-size: 1.8rem;
 }
 
-/* Carta in campo con la miniatura: le Caratteristiche correnti stanno in una
-   fascia sopra la parte bassa della carta (il testo, illeggibile a questa
-   misura), con i rombi delle carte stampate. Verde = sopra il valore stampato,
-   rosso = sotto. Le misure seguono la larghezza delle carte in campo. */
+/* Fascia della minicarta (cardart.js → _band), sotto l'illustrazione (dal
+   60,75% al 96% dell'altezza): le informazioni che cambiano durante la
+   partita. Rombi, torre e stella occupano circa lo stesso spazio. Le misure sono in cqw (larghezza della carta),
+   così valgono a ogni dimensione. */
 .card-keep { display: none; }
 .card.has-art > .card-keep { display: flex; }
-.card.has-art .card-field-stats {
-  --cfs: calc(var(--card-w-sm) * 0.27);
+.mc-band {
   position: absolute;
-  left: 0; right: 0; bottom: 0;
-  height: 36%;
+  left: 5%; right: 5%;
+  top: 60.75%; bottom: 4%;
   align-items: center;
   justify-content: center;
-  gap: calc(var(--card-w-sm) * 0.03);
-  padding-top: 8%;
-  background: linear-gradient(to bottom, rgba(23,16,9,0) 0%, rgba(23,16,9,0.88) 32%, rgba(23,16,9,0.94) 100%);
-  border-radius: 0 0 5px 5px;
+  gap: 2cqw;
+  font-family: 'Caudex', Georgia, serif;
   pointer-events: none;
 }
-.cfs-stat {
+/* Caratteristiche (ATT, GIT, DIF) nei rombi della carta stampata:
+   verde = sopra il valore stampato, rosso = sotto */
+.mc-band.mc-warrior { gap: 0.5cqw; }
+.mc-dia {
   position: relative;
   isolation: isolate;
-  width: var(--cfs);
-  height: var(--cfs);
+  width: 29.5cqw;
+  height: 29.5cqw;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Caudex', Georgia, serif;
   font-weight: 700;
-  font-size: calc(var(--card-w-sm) * 0.17);
+  font-size: 17cqw;
   line-height: 1;
   color: var(--card-cream);
 }
-.cfs-stat::before {
+.mc-dia::before {
   content: '';
   position: absolute;
-  inset: 14%;
+  inset: 15%;
   z-index: -1;
-  background: #45301b;
-  border: 1px solid var(--card-gold);
+  background: var(--card-brown);
+  border: max(1px, 0.9cqw) solid var(--card-gold);
+  border-radius: 1cqw;
   transform: rotate(45deg);
 }
-.cfs-stat.up   { color: var(--seat-2); }
-.cfs-stat.up::before   { border-color: var(--seat-2); }
-.cfs-stat.down { color: var(--seat-3); }
-.cfs-stat.down::before { border-color: var(--seat-3); }
-
-/* Costruzione non completata: immagine spenta e nastro «Incompleta» */
-.card.has-art.incomplete .card-art { filter: grayscale(0.75) brightness(0.7); }
-.card.has-art .card-field-tag {
-  position: absolute;
-  left: 0; right: 0; bottom: 12%;
+.mc-dia.up   { color: var(--seat-2); }
+.mc-dia.up::before   { border-color: var(--seat-2); }
+.mc-dia.down { color: var(--seat-3); }
+.mc-dia.down::before { border-color: var(--seat-3); }
+/* Torre della Costruzione (piena = completata) e stella della Magia (piena =
+   Prodigio attivo), disegnate come sulla carta stampata */
+.mc-sym {
+  width: 34cqw;
+  height: 34cqw;
+  color: var(--card-brown);
+}
+.mc-sym svg { display: block; width: 100%; height: 100%; }
+/* Costo per completare la Costruzione, nell'esagono della carta stampata */
+.mc-gem {
+  position: relative;
+  isolation: isolate;
+  width: 22cqw;
+  height: 24.5cqw;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  padding: 2px 0;
-  background: rgba(23,16,9,0.9);
-  border-top: 1px solid var(--card-gold);
-  border-bottom: 1px solid var(--card-gold);
-  color: var(--card-cream);
-  font-family: 'Caudex', Georgia, serif;
-  font-style: italic;
-  font-weight: 700;
-  font-size: max(7px, calc(var(--card-w-sm) * 0.14));
-  pointer-events: none;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--hex-border);
+  color: var(--hex-ink);
+  font-weight: 800;
+  font-size: 14cqw;
+  line-height: 1;
+  padding-top: 0.9cqw;  /* le cifre di Caudex stanno alte: così cadono al centro dell'esagono */
+}
+.mc-gem::before {
+  content: '';
+  position: absolute;
+  inset: max(1px, 0.8cqw);
+  z-index: -1;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--hex-mana);
 }
 
 /* Orda attiva sopra un'illustrazione: il fulmine in un tondo, ben visibile */
@@ -1637,12 +1771,10 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   color: var(--text-dim);
 }
 
-/* Carta-stack muri (sostituisce le cartine individuali): i Muri sono carte
-   coperte, quindi la pila mostra il dorso con il conteggio sopra */
+/* Carta-stack muri (sostituisce le cartine individuali) */
 .card.wall-stack {
-  background: url('/card_images/miniature/retro.webp') center / contain no-repeat;
-  border-color: transparent;
-  padding: 0;
+  background: #181818;
+  border-color: var(--text-dim);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1655,18 +1787,15 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   border-color: var(--gold);
 }
 
-.wall-stack-icon { display: none; }
+.wall-stack-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
 
 .wall-stack-count {
-  min-width: 1.9em;
-  padding: 2px 6px;
-  text-align: center;
   font-size: 1rem;
   font-weight: bold;
-  color: var(--card-cream);
-  background: rgba(23,16,9,0.88);
-  border: 1px solid var(--card-gold);
-  border-radius: 4px;
+  color: var(--text);
 }
 
 /* Horde indicator */
@@ -2019,7 +2148,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 
 /* Specie colori */
 .species-elfo   { color: #7aaa55; }
-.species-nano   { color: #aa8844; }
+.species-nano   { color: #b85a3a; }
 .species-maga   { color: #9966cc; }
 .species-umano  { color: #5599cc; }
 

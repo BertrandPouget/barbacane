@@ -328,7 +328,7 @@ const Renderer = (() => {
     renderVillage('my-village', player.field.village, player.ethereal_complete || null);
 
     // Mano
-    renderHand(player.hand || [], player.ethereal_card || null);
+    renderHand(player.hand || [], player.ethereal_card || null, player.prodigy_ready || []);
     document.getElementById('hand-count').textContent = (player.hand || []).length;
   }
 
@@ -483,9 +483,9 @@ const Renderer = (() => {
   // ogni aggiornamento le farebbe sparire per un fotogramma (sfarfallio).
   let _handNodes = new Map();  // iid -> { node, ethereal }
 
-  function renderHand(cards, etherealCard) {
+  function renderHand(cards, etherealCard, prodigyReady) {
     const container = document.getElementById('hand-cards');
-    HandPreview.hide();
+    CardPreview.hide();
     const next = new Map();
     const nodes = cards.map(iid => {
       const ethereal = etherealCard === iid;
@@ -495,8 +495,11 @@ const Renderer = (() => {
         node = prev.node;
         node.classList.remove('wall-marked');  // la modalità Muri la riapplica se serve
         node.style.opacity = '';
+        // La fascia della minicarta può cambiare anche se la carta resta (es. Prodigio)
+        const def = App.getCardDef ? App.getCardDef(iid) : null;
+        CardArt.update(node, def, CardArt.handInfo(def, iid, prodigyReady));
       } else {
-        node = renderHandCard(iid, etherealCard);
+        node = renderHandCard(iid, etherealCard, prodigyReady);
       }
       next.set(iid, { node, ethereal });
       return node;
@@ -509,7 +512,7 @@ const Renderer = (() => {
   // Carte
   // ---------------------------------------------------------------------------
 
-  function renderHandCard(iid, etherealCard) {
+  function renderHandCard(iid, etherealCard, prodigyReady) {
     const isEthereal = etherealCard === iid;
     const div = el('div', { className: isEthereal ? 'card ethereal' : 'card', dataset: { instanceId: iid } });
 
@@ -518,9 +521,9 @@ const Renderer = (() => {
       div.dataset.type = def.type;
       div.dataset.baseId = def.id;
 
-      // Badge costo: notifica a esagono in alto a destra, oro = Mana, azzurro = Maghe
+      // Badge costo come sulle carte stampate: esagono giallo per il Mana, stella azzurra per le Maghe, bianco per la carta Eterea
       const badgeCls = isEthereal ? 'ethereal' : (def.cost_type === 'maga' ? 'maga' : 'mana');
-      div.appendChild(el('div', { className: `card-cost-badge ${badgeCls}` }, [String(isEthereal ? 0 : def.cost)]));
+      div.appendChild(el('div', { className: `card-cost-badge ${badgeCls}${def.cost_type === 'maga' ? ' star' : ''}` }, [String(isEthereal ? 0 : def.cost)]));
 
       div.appendChild(el('div', { className: 'card-name' }, [def.name]));
 
@@ -546,23 +549,23 @@ const Renderer = (() => {
           el('span', { className: 'stat stat-mana' }, [`🏗️${def.completion_cost}`]),
         ]));
       }
-      // Miniatura della carta: i testi qui sopra restano come ripiego se manca
-      CardArt.attach(div, def);
-      div.addEventListener('mouseenter', () => HandPreview.schedule(div, def));
-      div.addEventListener('mouseleave', HandPreview.hide);
+      // Minicarta disegnata sopra la versione testuale, che resta nascosta
+      CardArt.attach(div, def, CardArt.handInfo(def, iid, prodigyReady));
+      CardPreview.bind(div, def);
     } else {
       div.appendChild(el('div', { className: 'card-name' }, [iid]));
     }
 
-    div.addEventListener('click', () => { HandPreview.hide(); App.onCardClick(iid, 'hand'); });
+    div.addEventListener('click', () => { CardPreview.hide(); App.onCardClick(iid, 'hand'); });
     return div;
   }
 
-  // Anteprima ingrandita della carta in mano al passaggio del mouse. Vive in un
-  // livello fisso: la riga della mano scorre in orizzontale e taglierebbe una
-  // carta ingrandita sul posto.
-  const HandPreview = (() => {
+  // Anteprima della carta intera al passaggio del mouse sulle minicarte (mano e
+  // campo). Vive in un livello fisso: le righe delle carte scorrono in orizzontale
+  // e taglierebbero una carta ingrandita sul posto.
+  const CardPreview = (() => {
     const WIDTH = 230;
+    const GAP = 12;
     let timer = null;
     let node = null;
 
@@ -578,24 +581,40 @@ const Renderer = (() => {
       timer = setTimeout(() => show(cardEl, def), 280);
     }
 
+    function bind(cardEl, def) {
+      cardEl.addEventListener('mouseenter', () => schedule(cardEl, def));
+      cardEl.addEventListener('mouseleave', hide);
+      cardEl.addEventListener('click', hide);
+    }
+
     function show(cardEl, def) {
       if (!cardEl.isConnected || !cardEl.classList.contains('has-art')) return;
       const r = cardEl.getBoundingClientRect();
       const height = Math.round(WIDTH * 1040 / 744);
-      if (r.top - height - 12 < 0) return;  // non c'è spazio sopra la carta
+      const vw = window.innerWidth, vh = window.innerHeight;
+      // Sopra la carta se c'è spazio, altrimenti sotto, altrimenti di fianco
+      let left = Math.max(8, Math.min(vw - WIDTH - 8, r.left + r.width / 2 - WIDTH / 2));
+      let top;
+      if (r.top - height - GAP >= 0) top = r.top - height - GAP;
+      else if (r.bottom + GAP + height <= vh) top = r.bottom + GAP;
+      else {
+        top = Math.max(8, Math.min(vh - height - 8, r.top + r.height / 2 - height / 2));
+        left = r.right + GAP + WIDTH <= vw ? r.right + GAP : r.left - GAP - WIDTH;
+        if (left < 0) return;
+      }
       if (!node) {
         node = el('img', { className: 'hand-preview', alt: '' });
         document.body.appendChild(node);
       }
-      node.src = CardArt.miniatureUrl(def.id);
+      node.src = CardArt.previewUrl(def.id);
       node.alt = def.name;
       node.style.width = `${WIDTH}px`;
-      node.style.left = `${Math.max(8, Math.min(window.innerWidth - WIDTH - 8, r.left + r.width / 2 - WIDTH / 2))}px`;
-      node.style.top = `${r.top - height - 12}px`;
+      node.style.left = `${left}px`;
+      node.style.top = `${top}px`;
       node.hidden = false;
     }
 
-    return { schedule, hide };
+    return { schedule, bind, hide };
   })();
 
   function renderWarriorCard(warrior, inField, interactive) {
@@ -619,9 +638,10 @@ const Renderer = (() => {
     stats.appendChild(el('span', { className: 'stat stat-dif' }, [`🛡️${warrior.dif}`]));
     div.appendChild(stats);
 
-    // Illustrazione con le Caratteristiche correnti sovrapposte (i testi restano come ripiego)
+    // Minicarta con le Caratteristiche correnti, sopra la versione testuale
     const def = App.getCardDef ? App.getCardDef(warrior.instance_id) : null;
-    CardArt.attachField(div, def, warrior);
+    CardArt.attach(div, def, warrior);
+    if (def) CardPreview.bind(div, def);
 
     if (interactive) {
       div.style.cursor = 'pointer';
@@ -647,8 +667,10 @@ const Renderer = (() => {
     }, [building.completed ? '✓ Completa' : '— Incompleta']);
     div.appendChild(badge);
 
+    // Minicarta con la torre piena o vuota, sopra la versione testuale
     const def = App.getCardDef ? App.getCardDef(building.instance_id) : null;
-    CardArt.attachField(div, def, building);
+    CardArt.attach(div, def, building);
+    if (def) CardPreview.bind(div, def);
 
     if (inField) {
       div.style.cursor = 'pointer';
@@ -895,14 +917,14 @@ const Renderer = (() => {
     }
 
     if (baseCardId) {
-      const imgUrl = `/card_images/${baseCardId}.png`;
+      const imgUrl = `/card_images/full/${baseCardId}.png`;
       const probe = new window.Image();
       probe.onload = () => _showImageMode(imgUrl);
       probe.onerror = () => {
         // Easter egg (es. obelisco_completo): se il PNG alternativo manca,
         // torna alla carta ufficiale invece di scadere a modalità testo.
         if (fallbackBaseCardId) {
-          const fallbackUrl = `/card_images/${fallbackBaseCardId}.png`;
+          const fallbackUrl = `/card_images/full/${fallbackBaseCardId}.png`;
           const fallbackProbe = new window.Image();
           fallbackProbe.onload = () => _showImageMode(fallbackUrl);
           fallbackProbe.onerror = () => _showTextMode();

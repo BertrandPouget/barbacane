@@ -73,13 +73,14 @@ frontend/               Client desktop
   sparks.js, audio.js   Scintille e musica (condivisi)
   chronicle.js          Formattazione della cronaca e classifica di fine partita (condiviso)
   session.js            Partita salvata nel browser (SavedGame), link d'invito (Invite), nome ricordato (condiviso)
-  cardart.js            Miniature delle carte (condiviso): CardArt.attach per la mano, attachField per il campo
-                        (fascia con le Caratteristiche correnti, nastro «Incompleta»), preload in sottofondo
+  cardart.js            Minicarte (condiviso): CardArt.attach(el, def, info) per mano e campo, update per
+                        ridisegnare solo la fascia, handInfo; anteprime per l'anteprima; preload in sottofondo
   motion.js             Transizioni delle carte tra due stati: snapshot prima del ridisegno, play dopo (condiviso)
   mobile/               Client mobile: app.js (modulo Mob), render.js, ui.js (sheet, toast), mobile.css
-card_factory/           Pipeline grafica carte (vedi suo README): cards.json + illustrazioni → output/<id>.png,
-                        servite al frontend come /card_images/<id>.png (retro.png = dorso); miniature WebP
-                        leggere in output/miniature/<id>.webp (4_make_miniatures.py), per le carte in mano
+card_factory/           Pipeline grafica carte (vedi suo README): cards.json + illustrazioni → output/full/<id>.png,
+                        servite al frontend come /card_images/full/<id>.png (retro.png = dorso); anteprime WebP
+                        (carta intera rimpicciolita) in output/preview/<id>.webp, per anteprima e catalogo;
+                        immagini delle minicarte in output/mini/ (illustrazioni ridotte + sfondo.webp, lib/mini.py)
 assets/                 rules.md, logo, sfondo, musica, immagini home
 ```
 
@@ -128,13 +129,13 @@ assets/                 rules.md, logo, sfondo, musica, immagini home
 
 ## Modello dati: cose da sapere
 
-- `cards.json` ha tre liste (`warriors`, `spells`, `buildings`); campi principali: `id`, `cost`, `cost_type` (`mana`/`maga`), `att/git/dif`, `species`, `school`, `evolves_from/into`, `horde_effect_id`, `effect_id`, `base_effect`, `prodigy_effect`/`complete_effect`, `*_is_additive` (il testo con `&` iniziale si somma al Base), `auto_complete` (solo Cardo e Decumano), `completion_cost`, `copies`.
+- `cards.json` ha tre liste (`warriors`, `spells`, `buildings`); campi principali: `id`, `cost`, `cost_type` (`mana`/`maga`), `att/git/dif`, `species`, `school`, `evolves_from/into`, `horde_effect_id`, `effect_id`, `base_effect`, `prodigy_effect`/`complete_effect`, `*_is_additive` (il testo con `&` iniziale si somma al Base), `auto_complete` (solo Cardo e Decumano), `completion_cost`, `copies`, `mini_name` (facoltativo: nome abbreviato per le minicarte, solo client).
 - **Instance id** = `{base_card_id}_{n}` (es. `patrizio_3`); `get_base_card_id()` lo inverte. Mano, Vite, Muri, mazzo e scarti contengono instance id.
 - Istanze: `WarriorInstance` (`assigned_cards`, `horde_active`, `temp_modifiers`, `evolved_from`), `BuildingInstance` (`completed`, `assigned_warrior` per il Trono), `WallInstance` (`durability`, 2 con Plasmattone), `Bastion` (`walls`, `warriors`, `dif_bonus`).
 - `Player` oltre alle risorse ha molti flag di effetti: `active_effects` (lista di dict con `type`), `skip_mana_next_turn`, `extra_battles`, `spell_cost_reductions`, `ethereal_card`, `ethereal_complete` (Velocemento prodigio), `pending_velocemento_*`, `turns_completed` (non si attacca chi non ha ancora giocato un turno).
 - `GameState` oltre al flusso turno ha `tutorial`, `bot_player_ids`, `bot_difficulty`, `turn_timer`, `log`.
 - **I parametri di gioco sono nel codice** (non esiste un file di configurazione): Mana in `GameState.mana_for_turn`, 2 Azioni e pesca a 6 in `game.py`, 3 Vite in `create_game`.
-- `public_state` nasconde agli avversari mano, Vite, identità dei Muri, mana/azioni, `ethereal_card` e la maggior parte degli `active_effects` (whitelist dei tipi visibili). In fase `battaglia` i Guerrieri mostrano già i bonus di Ariete/Catapulta/Saracinesca.
+- `public_state` nasconde agli avversari mano, Vite, identità dei Muri, mana/azioni, `ethereal_card` e la maggior parte degli `active_effects` (whitelist dei tipi visibili). In fase `battaglia` i Guerrieri mostrano già i bonus di Ariete/Catapulta/Saracinesca. Al proprietario manda anche `prodigy_ready` (Magie in mano che ora attiverebbero il Prodigio, da `actions.spell_prodigy_ready`, stessa regola di `play_spell`).
 
 ---
 
@@ -154,7 +155,7 @@ assets/                 rules.md, logo, sfondo, musica, immagini home
 3. Targeting/interazione in **entrambi** i client (`frontend/app.js` e `frontend/mobile/app.js`; spesso c'è un ramo dedicato per `base_id`). Ogni scelta passa dai **selettori comuni**, mai da liste fatte a mano: desktop `Renderer.showWarriorPicker / showBastionPicker / showBuildingPicker / showCardPicker / showPlayerPicker / showRegionPicker` (base: `Renderer.showPicker`), mobile `pickWarrior / pickBastion / pickBuilding / pickCard / pickPlayer / pickRegion` (base: `pickGrouped`). Dividono per giocatore e Regione (o tipo di carta), mettono "Possibile Bersaglio" sui Bastioni adiacenti e usano i simboli di Regione del client (desktop ⚔ 🛡 monocromi, mobile ⚔️ 🏰); stesse opzioni nei due client (`players`, `filter`, `note`, `onPick`, `cancelLabel`, `empty`).
 4. Bot: candidati e kwargs in `bot.py` (`_default_spell_kwargs`, `_card_value`, `_SPELL_EFFECT_EXCLUDE`) e, se c'è un nuovo pending, `_auto_resolve_bot_pending` in `routes.py`.
 5. Tutorial: controllare se la carta compare negli script di `tutorial.py`.
-6. Grafica: illustrazione in `card_factory/images/<id>.png`, poi `python card_factory/2_generate_cards.py <id>` → `card_factory/output/<id>.png` e la sua miniatura `output/miniature/<id>.webp` (entrambe committate, il frontend le serve da lì). `4_make_miniatures.py` rifà solo le miniature mancanti o più vecchie del PNG.
+6. Grafica: illustrazione in `card_factory/images/<id>.png`, poi `python card_factory/2_generate_cards.py <id>` → `card_factory/output/full/<id>.png`, la sua anteprima `output/preview/<id>.webp` e l'illustrazione per la minicarta `output/mini/<id>.webp` (tutte committate, il frontend le serve da lì). `4_make_previews.py` rifà solo le anteprime mancanti o più vecchie del PNG.
 7. Se il testo della regola cambia, aggiornare `assets/rules.md`.
 
 ---
@@ -178,5 +179,5 @@ assets/                 rules.md, logo, sfondo, musica, immagini home
 - Nel tutorial la fine turno automatica dopo la Battaglia è disattivata (il Manichino non gioca).
 - I nomi delle partite di pratica (`vs-…`) e le partite tutorial hanno una sola riga in `players` (`player_1`).
 - **Transizioni delle carte** (`motion.js`): i client ridisegnano tutto a ogni `state_update`; `onStateUpdate` fotografa le carte con `data-instance-id` prima di `Renderer.render` / `Render.game` e le anima dopo (fantasmi in un livello fisso). Una carta disegnata senza `data-instance-id` non si anima; una che sparisce dalla vista va verso l'elemento indicato da `targetFor` (in base a `Motion.locate`) o si dissolve. Il mobile non anima più al momento dell'invio dell'azione, ma solo quando arriva lo stato.
-- **Carte in campo con illustrazione**: i Guerrieri mostrano sopra l'immagine le Caratteristiche *correnti* (`CardArt.attachField`, verde/rosso rispetto al valore stampato): le statistiche stampate in campo non valgono. Gli elementi da lasciare visibili sopra una carta `.has-art` vanno marcati `card-keep` (il CSS nasconde tutto il resto, salvo il badge del costo). Sul mobile i tasselli del campo restano riassunti numerici: le illustrazioni compaiono solo nei pannelli (`Render.warriorMini`, `Render.rowThumb`).
+- **Minicarte** (`cardart.js` + classi `.mc-*` in entrambi i CSS): le carte piccole (mano e campo su desktop, solo mano sul mobile) sono disegnate in HTML/CSS sopra la carta testuale (che resta nascosta con `.has-art`): cornice del colore del tipo, stendardo con il nome (corpo fisso `8cqw`, tarato perché ci stia «KAISER JOSEPH»; i nomi troppo lunghi usano `mini_name` di `cards.json`, oggi «Bastioncontr.» e «Dr. Faustus»: se arriva un nome più lungo, abbreviarlo lì o ritarare il corpo), sotto il nome il bollino della specie (colori `--elfo/--nano/--maga/--umano`, come nel mobile) la Scuola (Magie e Maghe) e la «E» degli Eroi, separati da un punto (lo spazio resta anche quando è vuoto, così le illustrazioni sono tutte alla stessa altezza), illustrazione nel suo riquadro con fondo e bordo (`/card_images/mini/<id>.webp`; quelle degli Eroi ci stanno intere, un po' ingrandite), fascia `.mc-band` con ciò che cambia (Caratteristiche *correnti* nei rombi, verde/rosso rispetto alla stampata; le statistiche stampate in campo non valgono; torre piena/vuota + costo di completamento per le Costruzioni; stella piena/vuota per le Magie in mano, da `prodigy_ready`; rombi, torre e stella occupano circa lo stesso spazio). Posizioni in % della carta (progetto 280×400 con cornice 13), testi in `cqw` (`.card.has-art` ha `container-type: inline-size`). Il costo di gioco sta solo nel badge fuori dalla carta (`.card-cost-badge`: esagono per il Mana, stella per le Maghe). Le carte in mano riusate tra un ridisegno e l'altro aggiornano la fascia con `CardArt.update`. Gli elementi da lasciare visibili sopra una carta `.has-art` vanno marcati `card-keep` (il CSS nasconde tutto il resto, salvo minicarta e badge del costo). Su desktop il passaggio del mouse su una minicarta (mano o campo) mostra la carta intera (`CardPreview` in `renderer.js`); sul mobile la carta intera si apre toccandola. Sul mobile le minicarte ci sono solo nella mano: tasselli del campo e pannelli restano testuali.
 - `engine/game.py` contiene ancora un bot casuale (`random_bot_turn`, `_bot_try_horde` riusato da `bot.py`) usato da `simulate_game`: non è il Bot delle partite reali.

@@ -229,7 +229,7 @@ def _reset_field(player: Player) -> None:
 # Tutorial 1 — Anatomia di una Carta
 # ---------------------------------------------------------------------------
 
-# Riquadri delle sezioni sulle immagini delle carte (card_factory/output/*.png),
+# Riquadri delle sezioni sulle immagini delle carte (card_factory/output/full/*.png),
 # in percentuale della carta: [x, y, larghezza, altezza]. Misurati sul layout
 # di card_factory/assets/card.html (carta 744x1039px) con un piccolo margine
 # attorno a ogni sezione: se card.html cambia layout vanno rimisurati.

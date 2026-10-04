@@ -108,7 +108,7 @@ Le carte vivono tutte in un unico file, `data/cards.json`: è la fonte da cui le
 
 4. **Insegnarla ai Bot**: in `engine/bot.py` si stabilisce quanto vale la carta e con quali bersagli giocarla. Se la carta introduce una nuova scelta in attesa di risposta, va gestita anche la risposta automatica dei Bot, altrimenti una partita contro di loro resterebbe bloccata.
 
-5. **Generare la grafica** con la [Card Factory](card_factory/README.md): si aggiunge l'illustrazione in `card_factory/images/<id>.png` e si lancia `python card_factory/2_generate_cards.py <id>`. La carta finita compare in `card_factory/output/` e da lì viene mostrata nel gioco.
+5. **Generare la grafica** con la [Card Factory](card_factory/README.md): si aggiunge l'illustrazione in `card_factory/images/<id>.png` e si lancia `python card_factory/2_generate_cards.py <id>`. La carta finita compare in `card_factory/output/full/` (con anteprima e minicarta in `output/preview/` e `output/mini/`) e da lì viene mostrata nel gioco.
 
 6. **Provarla** con la Modalità Test: aggiungendo l'`id` della carta a `data/test_cards.json` e entrando con il nome `Test`, la si ritrova subito in mano.
 

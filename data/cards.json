@@ -201,6 +201,7 @@
     {
       "id": "doktor_faustus",
       "name": "Doktor Faustus",
+      "mini_name": "Dr. Faustus",
       "type": "warrior",
       "subtype": "hero",
       "species": "nano",
@@ -577,6 +578,7 @@
     {
       "id": "bastioncontrario",
       "name": "Bastioncontrario",
+      "mini_name": "Bastioncontr.",
       "type": "spell",
       "subtype": "sortilegio",
       "school": "sortilegio",

@@ -486,10 +486,10 @@ const App = (() => {
     const focus = step.card_focus;
     // Precarica le altre carte del tutorial, così il cambio carta non sfarfalla.
     steps.forEach(s => {
-      if (s.card_focus) new window.Image().src = `/card_images/${s.card_focus.card}.png`;
+      if (s.card_focus) new window.Image().src = `/card_images/full/${s.card_focus.card}.png`;
     });
     const img = document.getElementById('card-anatomy-img');
-    const src = `/card_images/${focus.card}.png`;
+    const src = `/card_images/full/${focus.card}.png`;
     if (img.getAttribute('src') !== src) img.setAttribute('src', src);
 
     const box = document.getElementById('card-anatomy-focus');
@@ -588,16 +588,16 @@ const App = (() => {
         const cell = document.createElement('div');
         cell.className = 'catalog-card';
         const img = document.createElement('img');
-        // Nella griglia basta la miniatura; la carta ingrandita usa il PNG grande
-        img.src = CardArt.miniatureUrl(def.id);
+        // Nella griglia basta l'anteprima; la carta ingrandita usa il PNG grande
+        img.src = CardArt.previewUrl(def.id);
         img.alt = def.name;
         img.loading = 'lazy';
         img.draggable = false;
-        // Senza miniatura si ripiega sul PNG; senza nemmeno quello, una tessera col nome
+        // Senza anteprima si ripiega sul PNG; senza nemmeno quello, una tessera col nome
         img.onerror = () => {
           if (!img.dataset.fallback) {
             img.dataset.fallback = '1';
-            img.src = `/card_images/${def.id}.png`;
+            img.src = `/card_images/full/${def.id}.png`;
             return;
           }
           cell.innerHTML = `<div class="catalog-card-fallback">${def.name}</div>`;

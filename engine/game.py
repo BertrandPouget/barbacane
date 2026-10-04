@@ -37,6 +37,7 @@ from engine.actions import (
     reposition_warrior,
     activate_horde,
     evolve_warrior,
+    spell_prodigy_ready,
 )
 from engine.effects import _apply_scrigno_bonus
 from engine import chronicle
@@ -726,6 +727,11 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
             "pending_velocemento_buildings": p.pending_velocemento_buildings if p.id == viewer_player_id else [],
             "hand_count": len(p.hand),
             "hand": p.hand if p.id == viewer_player_id else None,
+            # Magie in mano che ora attiverebbero il Prodigio (stella piena sulla minicarta)
+            "prodigy_ready": (
+                [iid for iid in p.hand if spell_prodigy_ready(p, iid)]
+                if p.id == viewer_player_id else None
+            ),
             "field": {
                 "vanguard": [_warrior_view(w, p, viewer_player_id, bb) for w in p.field.vanguard],
                 "bastion_left": {
