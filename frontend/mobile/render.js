@@ -97,7 +97,21 @@ const Render = (() => {
     stats.appendChild(el('span', { className: 'stat stat-git' }, [`🏹${w.git}`]));
     stats.appendChild(el('span', { className: 'stat stat-dif' }, [`🛡️${w.dif}`]));
     div.appendChild(stats);
+    // Illustrazione con le Caratteristiche correnti sovrapposte (i testi restano come ripiego)
+    CardArt.attachField(div, Mob.getCardDef(w.instance_id), w);
     return div;
+  }
+
+  // Icona di una riga-opzione (elenchi di Regioni e Villaggio): la miniatura
+  // della carta, con l'emoji come ripiego finché manca o se non si carica.
+  function rowThumb(iid, fallback) {
+    const span = el('span', { className: 'opt-icon' }, [fallback]);
+    const def = Mob.getCardDef(iid);
+    if (!def) return span;
+    const img = el('img', { className: 'opt-thumb', alt: '', draggable: 'false' });
+    img.addEventListener('load', () => { span.replaceChildren(img); span.classList.add('has-thumb'); });
+    img.src = CardArt.miniatureUrl(def.id);
+    return span;
   }
 
   // ---------------------------------------------------------------------------
@@ -592,6 +606,7 @@ const Render = (() => {
     hand,
     markWallPicks,
     warriorMini,
+    rowThumb,
     activeEffectItems,
     cardTextHTML,
     cardViewNode,

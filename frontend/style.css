@@ -1466,12 +1466,12 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 .card-art { display: none; }
 .card.has-art {
   padding: 0;
-  border-left-width: 1px;
+  border-width: 1px;
   background: transparent;
 }
 /* Nessun contorno a riposo: si vede solo la cornice stampata della carta (oro se evidenziata) */
 .card.has-art:not(:hover):not(.selected):not(.wall-marked) { border-color: transparent; }
-.card.has-art > :not(.card-art):not(.card-cost-badge) { display: none; }
+.card.has-art > :not(.card-art):not(.card-cost-badge):not(.card-keep) { display: none; }
 .card.has-art .card-art {
   display: block;
   position: absolute;
@@ -1492,6 +1492,85 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   align-items: center;
   justify-content: center;
   font-size: 1.8rem;
+}
+
+/* Carta in campo con la miniatura: le Caratteristiche correnti stanno in una
+   fascia sopra la parte bassa della carta (il testo, illeggibile a questa
+   misura), con i rombi delle carte stampate. Verde = sopra il valore stampato,
+   rosso = sotto. Le misure seguono la larghezza delle carte in campo. */
+.card-keep { display: none; }
+.card.has-art > .card-keep { display: flex; }
+.card.has-art .card-field-stats {
+  --cfs: calc(var(--card-w-sm) * 0.27);
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 36%;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--card-w-sm) * 0.03);
+  padding-top: 8%;
+  background: linear-gradient(to bottom, rgba(23,16,9,0) 0%, rgba(23,16,9,0.88) 32%, rgba(23,16,9,0.94) 100%);
+  border-radius: 0 0 5px 5px;
+  pointer-events: none;
+}
+.cfs-stat {
+  position: relative;
+  isolation: isolate;
+  width: var(--cfs);
+  height: var(--cfs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Caudex', Georgia, serif;
+  font-weight: 700;
+  font-size: calc(var(--card-w-sm) * 0.17);
+  line-height: 1;
+  color: var(--card-cream);
+}
+.cfs-stat::before {
+  content: '';
+  position: absolute;
+  inset: 14%;
+  z-index: -1;
+  background: #45301b;
+  border: 1px solid var(--card-gold);
+  transform: rotate(45deg);
+}
+.cfs-stat.up   { color: var(--seat-2); }
+.cfs-stat.up::before   { border-color: var(--seat-2); }
+.cfs-stat.down { color: var(--seat-3); }
+.cfs-stat.down::before { border-color: var(--seat-3); }
+
+/* Costruzione non completata: immagine spenta e nastro «Incompleta» */
+.card.has-art.incomplete .card-art { filter: grayscale(0.75) brightness(0.7); }
+.card.has-art .card-field-tag {
+  position: absolute;
+  left: 0; right: 0; bottom: 12%;
+  justify-content: center;
+  padding: 2px 0;
+  background: rgba(23,16,9,0.9);
+  border-top: 1px solid var(--card-gold);
+  border-bottom: 1px solid var(--card-gold);
+  color: var(--card-cream);
+  font-family: 'Caudex', Georgia, serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: max(7px, calc(var(--card-w-sm) * 0.14));
+  pointer-events: none;
+}
+
+/* Orda attiva sopra un'illustrazione: il fulmine in un tondo, ben visibile */
+.card.has-art.horde-active::after {
+  top: -6px; right: -6px;
+  width: 17px; height: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-ink);
+  border: 1px solid var(--gold);
+  border-radius: 50%;
+  font-size: 0.62rem;
+  z-index: 3;
 }
 
 /* Anteprima ingrandita della carta in mano (al passaggio del mouse) */
@@ -1558,10 +1637,12 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   color: var(--text-dim);
 }
 
-/* Carta-stack muri (sostituisce le cartine individuali) */
+/* Carta-stack muri (sostituisce le cartine individuali): i Muri sono carte
+   coperte, quindi la pila mostra il dorso con il conteggio sopra */
 .card.wall-stack {
-  background: #181818;
-  border-color: var(--text-dim);
+  background: url('/card_images/miniature/retro.webp') center / contain no-repeat;
+  border-color: transparent;
+  padding: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1574,15 +1655,18 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   border-color: var(--gold);
 }
 
-.wall-stack-icon {
-  font-size: 1.6rem;
-  line-height: 1;
-}
+.wall-stack-icon { display: none; }
 
 .wall-stack-count {
+  min-width: 1.9em;
+  padding: 2px 6px;
+  text-align: center;
   font-size: 1rem;
   font-weight: bold;
-  color: var(--text);
+  color: var(--card-cream);
+  background: rgba(23,16,9,0.88);
+  border: 1px solid var(--card-gold);
+  border-radius: 4px;
 }
 
 /* Horde indicator */

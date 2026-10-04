@@ -619,6 +619,10 @@ const Renderer = (() => {
     stats.appendChild(el('span', { className: 'stat stat-dif' }, [`🛡️${warrior.dif}`]));
     div.appendChild(stats);
 
+    // Illustrazione con le Caratteristiche correnti sovrapposte (i testi restano come ripiego)
+    const def = App.getCardDef ? App.getCardDef(warrior.instance_id) : null;
+    CardArt.attachField(div, def, warrior);
+
     if (interactive) {
       div.style.cursor = 'pointer';
       div.addEventListener('click', () => App.onCardClick(warrior.instance_id, 'field'));
@@ -642,6 +646,9 @@ const Renderer = (() => {
       style: `color: ${building.completed ? 'var(--gold)' : 'var(--text-dim)'}`
     }, [building.completed ? '✓ Completa' : '— Incompleta']);
     div.appendChild(badge);
+
+    const def = App.getCardDef ? App.getCardDef(building.instance_id) : null;
+    CardArt.attachField(div, def, building);
 
     if (inField) {
       div.style.cursor = 'pointer';

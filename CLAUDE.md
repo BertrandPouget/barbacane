@@ -73,7 +73,8 @@ frontend/               Client desktop
   sparks.js, audio.js   Scintille e musica (condivisi)
   chronicle.js          Formattazione della cronaca e classifica di fine partita (condiviso)
   session.js            Partita salvata nel browser (SavedGame), link d'invito (Invite), nome ricordato (condiviso)
-  cardart.js            Miniature delle carte in mano (CardArt.attach, preload in sottofondo) (condiviso)
+  cardart.js            Miniature delle carte (condiviso): CardArt.attach per la mano, attachField per il campo
+                        (fascia con le Caratteristiche correnti, nastro «Incompleta»), preload in sottofondo
   motion.js             Transizioni delle carte tra due stati: snapshot prima del ridisegno, play dopo (condiviso)
   mobile/               Client mobile: app.js (modulo Mob), render.js, ui.js (sheet, toast), mobile.css
 card_factory/           Pipeline grafica carte (vedi suo README): cards.json + illustrazioni → output/<id>.png,
@@ -177,4 +178,5 @@ assets/                 rules.md, logo, sfondo, musica, immagini home
 - Nel tutorial la fine turno automatica dopo la Battaglia è disattivata (il Manichino non gioca).
 - I nomi delle partite di pratica (`vs-…`) e le partite tutorial hanno una sola riga in `players` (`player_1`).
 - **Transizioni delle carte** (`motion.js`): i client ridisegnano tutto a ogni `state_update`; `onStateUpdate` fotografa le carte con `data-instance-id` prima di `Renderer.render` / `Render.game` e le anima dopo (fantasmi in un livello fisso). Una carta disegnata senza `data-instance-id` non si anima; una che sparisce dalla vista va verso l'elemento indicato da `targetFor` (in base a `Motion.locate`) o si dissolve. Il mobile non anima più al momento dell'invio dell'azione, ma solo quando arriva lo stato.
+- **Carte in campo con illustrazione**: i Guerrieri mostrano sopra l'immagine le Caratteristiche *correnti* (`CardArt.attachField`, verde/rosso rispetto al valore stampato): le statistiche stampate in campo non valgono. Gli elementi da lasciare visibili sopra una carta `.has-art` vanno marcati `card-keep` (il CSS nasconde tutto il resto, salvo il badge del costo). Sul mobile i tasselli del campo restano riassunti numerici: le illustrazioni compaiono solo nei pannelli (`Render.warriorMini`, `Render.rowThumb`).
 - `engine/game.py` contiene ancora un bot casuale (`random_bot_turn`, `_bot_try_horde` riusato da `bot.py`) usato da `simulate_game`: non è il Bot delle partite reali.

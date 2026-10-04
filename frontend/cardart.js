@@ -46,6 +46,41 @@ const CardArt = (() => {
     cardEl.appendChild(img);
   }
 
+  function _div(cls, text) {
+    const d = document.createElement('div');
+    d.className = cls;
+    if (text != null) d.textContent = text;
+    return d;
+  }
+
+  /**
+   * Miniatura per una carta in campo. Le Caratteristiche stampate sulla carta
+   * non bastano: in campo cambiano (carte assegnate, Orde, Costruzioni...),
+   * quindi sopra l'immagine compare una fascia con i valori correnti, verdi se
+   * più alti di quelli stampati e rossi se più bassi. Una Costruzione non
+   * completata appare spenta, con il nastro «Incompleta».
+   * Gli elementi aggiunti hanno la classe "card-keep": restano visibili sopra
+   * l'immagine (il CSS di .has-art nasconde tutto il resto).
+   */
+  function attachField(cardEl, def, current) {
+    if (!cardEl || !def || !def.id) return;
+    attach(cardEl, def);
+    if (def.type === 'warrior' && current) {
+      const band = _div('card-keep card-field-stats');
+      [['att', 'ATT'], ['git', 'GIT'], ['dif', 'DIF']].forEach(([k, label]) => {
+        const v = current[k] ?? 0;
+        const base = def[k] ?? 0;
+        const s = _div('cfs-stat' + (v > base ? ' up' : v < base ? ' down' : ''), String(v));
+        s.title = v === base ? `${label} ${v}` : `${label} ${v} (stampata ${base})`;
+        band.appendChild(s);
+      });
+      cardEl.appendChild(band);
+    } else if (def.type === 'building' && current && !current.completed) {
+      cardEl.classList.add('incomplete');
+      cardEl.appendChild(_div('card-keep card-field-tag', 'Incompleta'));
+    }
+  }
+
   /**
    * Scarica in sottofondo le miniature delle carte indicate (tutto il mazzo
    * pesa ~2 MB), così una carta appena pescata ha già la sua immagine anche
@@ -71,5 +106,5 @@ const CardArt = (() => {
     idle(next);
   }
 
-  return { miniatureUrl, attach, preload };
+  return { miniatureUrl, attach, attachField, preload };
 })();
