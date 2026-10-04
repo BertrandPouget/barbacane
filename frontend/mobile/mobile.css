@@ -1282,8 +1282,8 @@ input {
    con clip-path un border vero verrebbe tagliato. */
 .card-cost-badge {
   position: absolute;
-  top: -17px;   /* quasi tutto fuori: non copre il nome sulla minicarta */
-  right: -11px;
+  top: -9px;    /* sull'angolo della carta, un po' dentro */
+  right: -7px;
   min-width: 23px;
   height: 26px;
   padding: 0 5px;
@@ -1311,8 +1311,8 @@ input {
 /* Stella: più grande dell'esagono, perché il numero sta nella parte centrale */
 .card-cost-badge.star {
   --badge-shape: polygon(50% 4%, 65.9% 32.2%, 97.6% 38.5%, 75.7% 62.3%, 79.4% 94.5%, 50% 81%, 20.6% 94.5%, 24.3% 62.3%, 2.4% 38.5%, 34.1% 32.2%);
-  top: -21px;
-  right: -14px;
+  top: -12px;
+  right: -9px;
   width: 34px;
   min-width: 34px;
   height: 34px;
@@ -1373,10 +1373,10 @@ input {
 }
 #hand {
   display: flex;
-  gap: 13px;  /* spazio per il badge del costo, che sporge a destra */
+  gap: 8px;  /* spazio per il badge del costo, che sporge a destra */
   flex-wrap: nowrap;
   overflow-x: auto;
-  padding: 22px 12px calc(var(--sab) + 10px);  /* sopra: spazio per il badge del costo */
+  padding: 14px 12px calc(var(--sab) + 10px);  /* sopra: spazio per il badge del costo */
   scrollbar-width: none;
 }
 #hand::-webkit-scrollbar { display: none; }
@@ -1453,7 +1453,7 @@ input {
    tarato sul nome più lungo («KAISER JOSEPH»; i nomi troppo lunghi hanno una
    versione abbreviata, mini_name in cards.json) */
 .mc-name {
-  left: 5.36%; right: 5.36%; top: 4.75%; height: 11%;
+  left: 5.36%; right: 5.36%; top: 5.5%; height: 11%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1475,7 +1475,7 @@ input {
    separati da un punto. Lo spazio resta anche quando è vuoto (Costruzioni),
    così le illustrazioni stanno tutte alla stessa altezza. */
 .mc-school {
-  left: 5%; right: 5%; top: 16.25%; height: 7.5%;
+  left: 5%; right: 5%; top: 18%; height: 7.5%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1488,13 +1488,11 @@ input {
   gap: 2cqw;
 }
 .mc-sep { font-style: normal; color: var(--card-brown); }
-/* «E» degli Eroi: solo la lettera, nel colore del testo */
-.mc-hero { font-style: normal; font-weight: 700; }
 /* Illustrazione nel suo riquadro con fondo e bordo, come sulla carta intera:
    quelle rettangolari lo riempiono, quelle (quasi quadrate) degli Eroi ci
    stanno intere, ingrandite un po' */
 .mc-illus {
-  left: 7.5%; right: 7.5%; top: 24.75%; height: 35%;
+  left: 7.5%; right: 7.5%; top: 27.5%; height: 36%;
   border: max(1px, 1cqw) solid var(--card-brown);
   border-radius: 1cqw;
   overflow: hidden;
@@ -1521,7 +1519,7 @@ input {
 .mc-sp-maga  { --mc-sp: var(--maga); }
 .mc-sp-umano { --mc-sp: var(--umano); }
 /* Fascia della minicarta (cardart.js → _band), sotto l'illustrazione (dal
-   60,75% al 96% dell'altezza): le informazioni che cambiano durante la
+   66% al 95% dell'altezza): le informazioni che cambiano durante la
    partita. Rombi, torre e stella occupano circa lo stesso spazio. Le misure sono in cqw (larghezza della carta),
    così valgono a ogni dimensione. */
 .card-keep { display: none; }
@@ -1529,7 +1527,7 @@ input {
 .mc-band {
   position: absolute;
   left: 5%; right: 5%;
-  top: 60.75%; bottom: 4%;
+  top: 66%; bottom: 5%;
   align-items: center;
   justify-content: center;
   gap: 2cqw;
@@ -1542,13 +1540,13 @@ input {
 .mc-dia {
   position: relative;
   isolation: isolate;
-  width: 29.5cqw;
-  height: 29.5cqw;
+  width: 27cqw;
+  height: 27cqw;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 17cqw;
+  font-size: 15.5cqw;
   line-height: 1;
   color: var(--card-cream);
 }
@@ -1569,17 +1567,18 @@ input {
 /* Torre della Costruzione (piena = completata) e stella della Magia (piena =
    Prodigio attivo), disegnate come sulla carta stampata */
 .mc-sym {
-  width: 34cqw;
-  height: 34cqw;
+  width: 30cqw;
+  height: 30cqw;
   color: var(--card-brown);
 }
 .mc-sym svg { display: block; width: 100%; height: 100%; }
-/* Costo per completare la Costruzione, nell'esagono della carta stampata */
+/* Costo per completare la Costruzione (finché non è completata), nell'esagono
+   della carta stampata */
 .mc-gem {
   position: relative;
   isolation: isolate;
-  width: 22cqw;
-  height: 24.5cqw;
+  width: 25cqw;
+  height: 28cqw;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1587,9 +1586,9 @@ input {
   background: var(--hex-border);
   color: var(--hex-ink);
   font-weight: 800;
-  font-size: 14cqw;
+  font-size: 16cqw;
   line-height: 1;
-  padding-top: 0.9cqw;  /* le cifre di Caudex stanno alte: così cadono al centro dell'esagono */
+  padding-top: 1cqw;  /* le cifre di Caudex stanno alte: così cadono al centro dell'esagono */
 }
 .mc-gem::before {
   content: '';

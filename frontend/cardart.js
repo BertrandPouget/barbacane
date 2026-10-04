@@ -52,8 +52,8 @@ const CardArt = (() => {
    * Fascia in basso della minicarta, con lo stato corrente della carta:
    * - Guerriero: le tre Caratteristiche nei rombi, verdi se più alte di quelle
    *   stampate e rosse se più basse (info = il Guerriero in campo, o la carta).
-   * - Costruzione: torre piena se completata, vuota se no, con accanto il costo
-   *   per completarla (info = { completed }).
+   * - Costruzione: torre piena se completata, altrimenti il costo per
+   *   completarla nell'esagono (info = { completed }).
    * - Magia: stella piena se giocandola ora si attiva il Prodigio (info = { prodigy }).
    * Ha la classe "card-keep": resta visibile sopra la carta testuale.
    */
@@ -71,13 +71,14 @@ const CardArt = (() => {
       });
     } else if (def.type === 'building') {
       const done = !!info.completed;
-      const tower = _el('span', 'mc-sym');
-      tower.innerHTML = _symbol(TOWER_PATH, done);
-      band.appendChild(tower);
-      if (!done && def.completion_cost > 0 && !def.auto_complete) {
+      if (done) {
+        const tower = _el('span', 'mc-sym');
+        tower.innerHTML = _symbol(TOWER_PATH, true);
+        band.appendChild(tower);
+      } else if (def.completion_cost > 0 && !def.auto_complete) {
         band.appendChild(_el('span', 'mc-gem', String(def.completion_cost)));
       }
-      band.title = done ? 'Completata' : 'Non completata';
+      band.title = done ? 'Completata' : `Non completata: costo per completarla ${def.completion_cost}`;
     } else if (def.type === 'spell') {
       const star = _el('span', 'mc-sym');
       star.innerHTML = _symbol(STAR_PATH, !!info.prodigy);
@@ -97,7 +98,7 @@ const CardArt = (() => {
     return span;
   }
 
-  // Riga sotto il nome: bollino della specie (Guerrieri) · Scuola (Magie e Maghe) · «E» (Eroi)
+  // Riga sotto il nome: bollino della specie (Guerrieri) · Scuola (Magie e Maghe)
   function _kindLine(def) {
     const line = _el('div', 'mc-school');
     if (def.type === 'warrior' && def.species) {
@@ -108,12 +109,6 @@ const CardArt = (() => {
     if (def.school) {
       if (line.firstChild) line.appendChild(_el('span', 'mc-sep', '·'));
       line.appendChild(_el('span', '', SCHOOLS[def.school] || _cap(def.school)));
-    }
-    if (def.type === 'warrior' && def.evolves_from) {
-      if (line.firstChild) line.appendChild(_el('span', 'mc-sep', '·'));
-      const e = _el('span', 'mc-hero', 'E');
-      e.title = 'Eroe';
-      line.appendChild(e);
     }
     return line;
   }
