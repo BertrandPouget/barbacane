@@ -601,9 +601,15 @@ const Mob = (() => {
         const cell = el('div', { className: 'cat-card' });
         const img = el('img', { alt: def.name, draggable: 'false' });
         img.loading = 'lazy';
-        img.src = `/card_images/${def.id}.png`;
-        // Senza immagine: tessera testuale col nome
+        // Nella griglia basta la miniatura; la carta ingrandita usa il PNG grande
+        img.src = CardArt.miniatureUrl(def.id);
+        // Senza miniatura si ripiega sul PNG; senza nemmeno quello, una tessera col nome
         img.onerror = () => {
+          if (!img.dataset.fallback) {
+            img.dataset.fallback = '1';
+            img.src = `/card_images/${def.id}.png`;
+            return;
+          }
           cell.innerHTML = '';
           cell.appendChild(el('div', { className: 'cat-card-fallback' }, [def.name]));
         };
@@ -896,6 +902,7 @@ const Mob = (() => {
     currentState = state;
     rematchOffer = null;
     chronicleSeenId = Chronicle.lastId(state);
+    CardArt.preload(Object.keys(cardDefs));
     saveSession();
     connectGameWS();
     Screens.show('game');
@@ -938,7 +945,11 @@ const Mob = (() => {
     _lastTurnPlayer = state.current_player_id;
 
     exitWallMode(true);
+    // Le carte si spostano con una transizione invece di ricomparire di colpo
+    const screen = $('scr-game');
+    const before = Motion.snapshot(screen);
     Render.game(state, myPlayerId);
+    Motion.play(before, screen, _motionOptions(state));
 
     // Banner al cambio turno
     if (prevTurnPlayer !== state.current_player_id && !state.winner_id) {
@@ -3094,46 +3105,29 @@ const Mob = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Animazione: la carta giocata vola dalla mano al bersaglio
+  // Transizioni delle carte (motion.js)
   // ---------------------------------------------------------------------------
 
-  const PLAY_TARGETS = {
+  // Sul telefono il campo mostra le Regioni come tasselli riassuntivi: una carta
+  // che lascia la mano vola verso il tassello in cui è finita.
+  const MOTION_TILES = {
     vanguard: 'fld-vanguard',
-    bastion_left: 'tw-left',
-    bastion_right: 'tw-right',
+    bastion_left: 'tw-left', wall_left: 'tw-left',
+    bastion_right: 'tw-right', wall_right: 'tw-right',
+    village: 'tw-village', life: 'st-lives',
   };
 
-  function flyFromHand(iid, targetElId) {
-    const src = document.querySelector(`#hand .card[data-instance-id="${iid}"]`);
-    if (!src) return;
-    const r = src.getBoundingClientRect();
-    const ghost = src.cloneNode(true);
-    ghost.classList.add('hcard-ghost');
-    ghost.style.left = `${r.left}px`;
-    ghost.style.top = `${r.top}px`;
-    ghost.style.bottom = 'auto';
-    ghost.style.width = `${r.width}px`;
-    ghost.style.height = `${r.height}px`;
-    document.body.appendChild(ghost);
-
-    const target = targetElId ? document.getElementById(targetElId) : null;
-    const tr = target ? target.getBoundingClientRect()
-      : { left: window.innerWidth / 2 - r.width / 2, top: window.innerHeight * 0.3, width: r.width, height: 0 };
-    const dx = (tr.left + tr.width / 2) - (r.left + r.width / 2);
-    const dy = (tr.top + tr.height / 2) - (r.top + r.height / 2);
-
-    requestAnimationFrame(() => {
-      ghost.style.transform = `translate(${dx.toFixed(0)}px, ${dy.toFixed(0)}px) scale(0.3) rotate(8deg)`;
-      ghost.style.opacity = '0';
-    });
-    setTimeout(() => ghost.remove(), 600);
-  }
-
-  function _animateAction(action, params) {
-    if (action === 'play_warrior') flyFromHand(params.instance_id, PLAY_TARGETS[params.region]);
-    else if (action === 'play_building') flyFromHand(params.instance_id, 'tw-village');
-    else if (action === 'play_spell') flyFromHand(params.instance_id, null);
-    else if (action === 'evolve') flyFromHand(params.hero_instance_id, null);
+  function _motionOptions(state) {
+    return {
+      // Carte pescate: arrivano dal mazzo (contatore in alto)
+      sourceFor: (iid, el) => (el.closest('#hand') ? $('tb-deck') : null),
+      // Carte giocate: verso il tassello della Regione; Magie e scarti si dissolvono
+      targetFor: (iid) => {
+        const id = MOTION_TILES[Motion.locate(state, myPlayerId, iid)];
+        return id ? $(id) : null;
+      },
+      onLand: Motion.pulse,
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -3147,7 +3141,6 @@ const Mob = (() => {
       params = { base_card_id: recastPending, ...rest };
       recastPending = null;
     }
-    _animateAction(action, params);
     if (WS && gameId) {
       WS.sendAction(action, params);
       return;

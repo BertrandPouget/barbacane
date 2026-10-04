@@ -6,13 +6,14 @@ Mini-progetto autonomo all'interno di Barbacane. Legge i dati delle carte da `..
 input/          ← PDF delle illustrazioni (da creare / aggiungere tu)
 images/         ← PNG delle illustrazioni, rinominati con l'id carta
 output/         ← PNG carte finali → usati dal frontend di Barbacane
-lib/            ← libreria condivisa: cards_data.py, image_ops.py, render.py
+  miniature/    ← versioni leggere in WebP (~30 KB) per le carte piccole dell'interfaccia
+lib/            ← libreria condivisa: cards_data.py, image_ops.py, render.py, miniature.py
 assets/
   card.html     ← il renderer: unica fonte di verità per la grafica delle carte
   sfondo.png, esagono*.png, stella*.png, spade.png, logo.png  ← texture/icone usate da card.html
 ```
 
-Gli script numerati (`1_prepare_images.py`, `2_generate_cards.py`, `3_make_print_pdf.py`) sono CLI sottili: la logica di image processing e rendering vive in `lib/`.
+Gli script numerati (`1_prepare_images.py`, `2_generate_cards.py`, `3_make_print_pdf.py`, `4_make_miniatures.py`) sono CLI sottili: la logica di image processing e rendering vive in `lib/`.
 
 ---
 
@@ -83,6 +84,8 @@ La risoluzione di default (300 DPI) è la stessa della vecchia pipeline: i PNG i
 sono tracciati in git, quindi non conviene alzarla qui — per la stampa ad alta qualità
 c'è lo Step 3, che rigenera le carte a parte senza appesantire il repo.
 
+Alla fine lo Step 2 aggiorna da solo anche le miniature delle carte appena generate (vedi Step 4).
+
 ---
 
 ### Step 3 — Genera il PDF di stampa
@@ -100,6 +103,22 @@ risultato in `output/cards_to_print.pdf`.
 
 ---
 
+### Step 4 — Miniature per l'interfaccia
+
+```bash
+python 4_make_miniatures.py                # tutte le carte in output/
+python 4_make_miniatures.py faust joseph   # solo quelle indicate
+python 4_make_miniatures.py --force        # rigenera anche quelle già aggiornate
+```
+
+Ricava da ogni `output/<id>.png` una versione ridotta (360 px di larghezza, WebP qualità 82,
+~30 KB invece di ~1,2 MB) in `output/miniature/<id>.webp`. Il gioco la usa per le carte piccole
+(es. le carte in mano), dove il PNG pieno sarebbe uno spreco di banda; le viste ingrandite
+continuano a usare il PNG. Rifà solo le miniature mancanti o più vecchie del loro PNG, quindi
+si può rilanciare in qualunque momento; lo Step 2 lo fa già da solo per le carte che genera.
+
+---
+
 ## Output
 
-I PNG in `output/` sono già referenziati dal frontend di Barbacane. Una volta rigenerati basta sostituire i file nella stessa cartella; non serve toccare altro.
+I PNG in `output/` (e le miniature in `output/miniature/`) sono già referenziati dal frontend di Barbacane. Una volta rigenerati basta sostituire i file nella stessa cartella; non serve toccare altro.

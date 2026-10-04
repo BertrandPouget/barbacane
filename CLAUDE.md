@@ -73,9 +73,12 @@ frontend/               Client desktop
   sparks.js, audio.js   Scintille e musica (condivisi)
   chronicle.js          Formattazione della cronaca e classifica di fine partita (condiviso)
   session.js            Partita salvata nel browser (SavedGame), link d'invito (Invite), nome ricordato (condiviso)
+  cardart.js            Miniature delle carte in mano (CardArt.attach, preload in sottofondo) (condiviso)
+  motion.js             Transizioni delle carte tra due stati: snapshot prima del ridisegno, play dopo (condiviso)
   mobile/               Client mobile: app.js (modulo Mob), render.js, ui.js (sheet, toast), mobile.css
 card_factory/           Pipeline grafica carte (vedi suo README): cards.json + illustrazioni → output/<id>.png,
-                        servite al frontend come /card_images/<id>.png (retro.png = dorso)
+                        servite al frontend come /card_images/<id>.png (retro.png = dorso); miniature WebP
+                        leggere in output/miniature/<id>.webp (4_make_miniatures.py), per le carte in mano
 assets/                 rules.md, logo, sfondo, musica, immagini home
 ```
 
@@ -150,7 +153,7 @@ assets/                 rules.md, logo, sfondo, musica, immagini home
 3. Targeting/interazione in **entrambi** i client (`frontend/app.js` e `frontend/mobile/app.js`; spesso c'è un ramo dedicato per `base_id`). Ogni scelta passa dai **selettori comuni**, mai da liste fatte a mano: desktop `Renderer.showWarriorPicker / showBastionPicker / showBuildingPicker / showCardPicker / showPlayerPicker / showRegionPicker` (base: `Renderer.showPicker`), mobile `pickWarrior / pickBastion / pickBuilding / pickCard / pickPlayer / pickRegion` (base: `pickGrouped`). Dividono per giocatore e Regione (o tipo di carta), mettono "Possibile Bersaglio" sui Bastioni adiacenti e usano i simboli di Regione del client (desktop ⚔ 🛡 monocromi, mobile ⚔️ 🏰); stesse opzioni nei due client (`players`, `filter`, `note`, `onPick`, `cancelLabel`, `empty`).
 4. Bot: candidati e kwargs in `bot.py` (`_default_spell_kwargs`, `_card_value`, `_SPELL_EFFECT_EXCLUDE`) e, se c'è un nuovo pending, `_auto_resolve_bot_pending` in `routes.py`.
 5. Tutorial: controllare se la carta compare negli script di `tutorial.py`.
-6. Grafica: illustrazione in `card_factory/images/<id>.png`, poi `python card_factory/2_generate_cards.py <id>` → `card_factory/output/<id>.png` (committato, il frontend lo serve da lì).
+6. Grafica: illustrazione in `card_factory/images/<id>.png`, poi `python card_factory/2_generate_cards.py <id>` → `card_factory/output/<id>.png` e la sua miniatura `output/miniature/<id>.webp` (entrambe committate, il frontend le serve da lì). `4_make_miniatures.py` rifà solo le miniature mancanti o più vecchie del PNG.
 7. Se il testo della regola cambia, aggiornare `assets/rules.md`.
 
 ---
@@ -173,4 +176,5 @@ assets/                 rules.md, logo, sfondo, musica, immagini home
 - **Massimo 2 Azioni** è scritto anche lato client per la modalità Test (`maxActions` in `app.js`).
 - Nel tutorial la fine turno automatica dopo la Battaglia è disattivata (il Manichino non gioca).
 - I nomi delle partite di pratica (`vs-…`) e le partite tutorial hanno una sola riga in `players` (`player_1`).
+- **Transizioni delle carte** (`motion.js`): i client ridisegnano tutto a ogni `state_update`; `onStateUpdate` fotografa le carte con `data-instance-id` prima di `Renderer.render` / `Render.game` e le anima dopo (fantasmi in un livello fisso). Una carta disegnata senza `data-instance-id` non si anima; una che sparisce dalla vista va verso l'elemento indicato da `targetFor` (in base a `Motion.locate`) o si dissolve. Il mobile non anima più al momento dell'invio dell'azione, ma solo quando arriva lo stato.
 - `engine/game.py` contiene ancora un bot casuale (`random_bot_turn`, `_bot_try_horde` riusato da `bot.py`) usato da `simulate_game`: non è il Bot delle partite reali.

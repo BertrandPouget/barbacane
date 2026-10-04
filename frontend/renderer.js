@@ -223,7 +223,8 @@ const Renderer = (() => {
     const adjLabel     = adjTarget    ? `${adjName} (Possibile Bersaglio)`    : adjName;
     const nonAdjLabel  = nonAdjTarget ? `${nonAdjName} (Possibile Bersaglio)` : nonAdjName;
     const wrapper = el('div', { className: 'strip-player' +
-      (player.id === state.current_player_id ? ' active-player-content' : '') });
+      (player.id === state.current_player_id ? ' active-player-content' : ''),
+      dataset: { playerId: player.id } });
 
     // Header
     const headerEl = el('div', { className: 'strip-header' }, [
@@ -478,12 +479,30 @@ const Renderer = (() => {
     container.appendChild(stack);
   }
 
+  // Carte della mano dell'ultimo ridisegno, per riusarle: ricreare le immagini a
+  // ogni aggiornamento le farebbe sparire per un fotogramma (sfarfallio).
+  let _handNodes = new Map();  // iid -> { node, ethereal }
+
   function renderHand(cards, etherealCard) {
     const container = document.getElementById('hand-cards');
-    container.innerHTML = '';
-    cards.forEach(iid => {
-      container.appendChild(renderHandCard(iid, etherealCard));
+    HandPreview.hide();
+    const next = new Map();
+    const nodes = cards.map(iid => {
+      const ethereal = etherealCard === iid;
+      const prev = _handNodes.get(iid);
+      let node;
+      if (prev && prev.ethereal === ethereal && prev.node.dataset.instanceId === iid) {
+        node = prev.node;
+        node.classList.remove('wall-marked');  // la modalità Muri la riapplica se serve
+        node.style.opacity = '';
+      } else {
+        node = renderHandCard(iid, etherealCard);
+      }
+      next.set(iid, { node, ethereal });
+      return node;
     });
+    container.replaceChildren(...nodes);
+    _handNodes = next;
   }
 
   // ---------------------------------------------------------------------------
@@ -527,13 +546,57 @@ const Renderer = (() => {
           el('span', { className: 'stat stat-mana' }, [`🏗️${def.completion_cost}`]),
         ]));
       }
+      // Miniatura della carta: i testi qui sopra restano come ripiego se manca
+      CardArt.attach(div, def);
+      div.addEventListener('mouseenter', () => HandPreview.schedule(div, def));
+      div.addEventListener('mouseleave', HandPreview.hide);
     } else {
       div.appendChild(el('div', { className: 'card-name' }, [iid]));
     }
 
-    div.addEventListener('click', () => App.onCardClick(iid, 'hand'));
+    div.addEventListener('click', () => { HandPreview.hide(); App.onCardClick(iid, 'hand'); });
     return div;
   }
+
+  // Anteprima ingrandita della carta in mano al passaggio del mouse. Vive in un
+  // livello fisso: la riga della mano scorre in orizzontale e taglierebbe una
+  // carta ingrandita sul posto.
+  const HandPreview = (() => {
+    const WIDTH = 230;
+    let timer = null;
+    let node = null;
+
+    function hide() {
+      clearTimeout(timer);
+      timer = null;
+      if (node) node.hidden = true;
+    }
+
+    function schedule(cardEl, def) {
+      hide();
+      if (!window.matchMedia || !matchMedia('(hover: hover)').matches) return;
+      timer = setTimeout(() => show(cardEl, def), 280);
+    }
+
+    function show(cardEl, def) {
+      if (!cardEl.isConnected || !cardEl.classList.contains('has-art')) return;
+      const r = cardEl.getBoundingClientRect();
+      const height = Math.round(WIDTH * 1040 / 744);
+      if (r.top - height - 12 < 0) return;  // non c'è spazio sopra la carta
+      if (!node) {
+        node = el('img', { className: 'hand-preview', alt: '' });
+        document.body.appendChild(node);
+      }
+      node.src = CardArt.miniatureUrl(def.id);
+      node.alt = def.name;
+      node.style.width = `${WIDTH}px`;
+      node.style.left = `${Math.max(8, Math.min(window.innerWidth - WIDTH - 8, r.left + r.width / 2 - WIDTH / 2))}px`;
+      node.style.top = `${r.top - height - 12}px`;
+      node.hidden = false;
+    }
+
+    return { schedule, hide };
+  })();
 
   function renderWarriorCard(warrior, inField, interactive) {
     const div = el('div', { className: 'card card-sm in-field', dataset: {

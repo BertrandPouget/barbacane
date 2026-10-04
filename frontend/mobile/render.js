@@ -374,15 +374,36 @@ const Render = (() => {
   // Mano — riga orizzontale scorrevole, carte identiche al desktop
   // ---------------------------------------------------------------------------
 
+  // Carte della mano dell'ultimo ridisegno, per riusarle: ricreare le immagini a
+  // ogni aggiornamento le farebbe sparire per un fotogramma (sfarfallio).
+  let _handNodes = new Map();  // iid -> { node, ethereal }
+
   function hand(me) {
     const wrap = $('hand');
-    wrap.innerHTML = '';
     const cards = me.hand || [];
     if (cards.length === 0) {
-      wrap.appendChild(el('div', { className: 'hand-empty' }, ['Mano vuota']));
+      _handNodes = new Map();
+      wrap.replaceChildren(el('div', { className: 'hand-empty' }, ['Mano vuota']));
       return;
     }
-    cards.forEach(iid => wrap.appendChild(handCard(iid, me.ethereal_card || null)));
+    const etherealCard = me.ethereal_card || null;
+    const next = new Map();
+    const nodes = cards.map(iid => {
+      const ethereal = etherealCard === iid;
+      const prev = _handNodes.get(iid);
+      let node;
+      if (prev && prev.ethereal === ethereal) {
+        node = prev.node;
+        node.classList.remove('wall-marked');  // la modalità Muri la riapplica se serve
+        node.style.opacity = '';
+      } else {
+        node = handCard(iid, etherealCard);
+      }
+      next.set(iid, { node, ethereal });
+      return node;
+    });
+    wrap.replaceChildren(...nodes);
+    _handNodes = next;
   }
 
   function handCard(iid, etherealCard) {
@@ -422,6 +443,8 @@ const Render = (() => {
           el('span', { className: 'stat stat-mana' }, [`🏗️${def.completion_cost}`]),
         ]));
       }
+      // Miniatura della carta: i testi qui sopra restano come ripiego se manca
+      CardArt.attach(div, def);
     } else {
       div.appendChild(el('div', { className: 'card-name' }, [iid]));
     }

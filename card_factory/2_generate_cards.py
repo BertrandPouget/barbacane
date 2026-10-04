@@ -9,6 +9,9 @@ render_cards() (lib/render.py) è riutilizzato anche da 3_make_print_pdf.py, che
 rigenera le carte a risoluzione più alta apposta per la stampa senza toccare i
 PNG in output/.
 
+In coda aggiorna anche le miniature leggere delle carte generate
+(output/miniature/<id>.webp, vedi 4_make_miniatures.py).
+
 Utilizzo:
     python 2_generate_cards.py                   # tutte le carte
     python 2_generate_cards.py faust joseph      # solo le carte indicate
@@ -20,6 +23,7 @@ import sys
 from pathlib import Path
 
 from lib.cards_data import CARDS_JSON, load_cards
+from lib.miniature import make_miniatures
 from lib.render import render_cards
 
 ROOT = Path(__file__).resolve().parent
@@ -57,6 +61,9 @@ def main():
 
     print(f"Carte da generare: {len(cards)}  (scala {args.scale}x)\n")
     render_cards(cards, id_to_name, OUT_DIR, scale=args.scale, debug=args.debug_borders)
+
+    print("\nMiniature per l'interfaccia:")
+    make_miniatures([c.get("id") for c in cards])
     print(f"\nFatto — output in '{OUT_DIR}'")
 
 

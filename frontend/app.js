@@ -588,12 +588,18 @@ const App = (() => {
         const cell = document.createElement('div');
         cell.className = 'catalog-card';
         const img = document.createElement('img');
-        img.src = `/card_images/${def.id}.png`;
+        // Nella griglia basta la miniatura; la carta ingrandita usa il PNG grande
+        img.src = CardArt.miniatureUrl(def.id);
         img.alt = def.name;
         img.loading = 'lazy';
         img.draggable = false;
-        // Senza immagine: mostra una tessera testuale col nome
+        // Senza miniatura si ripiega sul PNG; senza nemmeno quello, una tessera col nome
         img.onerror = () => {
+          if (!img.dataset.fallback) {
+            img.dataset.fallback = '1';
+            img.src = `/card_images/${def.id}.png`;
+            return;
+          }
           cell.innerHTML = `<div class="catalog-card-fallback">${def.name}</div>`;
         };
         cell.appendChild(img);
@@ -864,7 +870,11 @@ const App = (() => {
     const prevTurnPlayer = lastTurnPlayer;
     currentState = state;
     lastTurnPlayer = state.current_player_id;
+    // Le carte si spostano con una transizione invece di ricomparire di colpo
+    const table = document.getElementById('game-table');
+    const before = Motion.snapshot(table);
     Renderer.render(state, myPlayerId);
+    Motion.play(before, table, _motionOptions(state));
 
     if (prevTurnPlayer !== state.current_player_id && !state.winner_id) {
       _showTurnBanner(state);
@@ -979,6 +989,7 @@ const App = (() => {
     chronicleSeenId = Chronicle.lastId(state);
     Renderer.renderChronicle(state, myPlayerId, cardDefs);
     rememberGame(state);
+    CardArt.preload(Object.keys(cardDefs));
     _refreshActionUI();
     // Mostra modali in attesa (es. riconnessione)
     const myPending = _myPendingInteraction(state);
@@ -996,6 +1007,31 @@ const App = (() => {
     }
     // Tutorial: aggiornata per ultima (vedi nota in onStateUpdate).
     if (isTutorial) updateTutorialUI(state);
+  }
+
+  // Da dove entrano e dove finiscono le carte nelle transizioni (motion.js)
+  const _MY_REGION_EL = {
+    wall_left: 'my-bastion-left', wall_right: 'my-bastion-right',
+    bastion_left: 'my-bastion-left', bastion_right: 'my-bastion-right',
+    vanguard: 'my-vanguard', village: 'my-village', life: 'my-life-deck',
+  };
+
+  function _motionOptions(state) {
+    return {
+      // Carte pescate: arrivano dal mazzo. Carte nuove di un avversario: dalla sua mano.
+      sourceFor: (iid, el) => {
+        if (el.closest('#hand-cards')) return document.getElementById('hdr-deck');
+        const opp = el.closest('[data-player-id]');
+        return opp ? (opp.querySelector('.opp-info-row, .strip-header') || opp) : null;
+      },
+      // Carte sparite dalla vista: verso il Bastione se sono diventate Muri, verso
+      // le Vite se sono diventate una Vita; altrimenti si dissolvono.
+      targetFor: (iid) => {
+        const id = _MY_REGION_EL[Motion.locate(state, myPlayerId, iid)];
+        return id ? document.getElementById(id) : null;
+      },
+      onLand: Motion.pulse,
+    };
   }
 
   function _playerName(pid) {
