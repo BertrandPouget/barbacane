@@ -1667,6 +1667,13 @@ input {
 .motion-ghost {
   position: fixed;
   margin: 0;
+  /* Le misure sono quelle della carta fotografata (inline): i minimi delle
+     carte la deformerebbero */
+  box-sizing: border-box;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
   transform-origin: 0 0;
   pointer-events: none;
   will-change: transform, opacity;
@@ -2187,6 +2194,9 @@ input {
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-dark); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-width: thin; scrollbar-color: var(--border) var(--bg-dark); }
+}
 
 @media (min-width: 560px) {
   /* tablet / telefono in landscape: contieni la larghezza del gioco */

@@ -29,6 +29,126 @@ const Renderer = (() => {
 
     if (myPlayer) renderMyField(myPlayer, state, myPlayerId);
     updateActionPanel(state, myPlayerId);
+    fitCards(state, myPlayerId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dimensione delle carte (mano e campo)
+  //
+  // Il tavolo è un tabellone fisso: le Regioni del mio campo hanno un'altezza
+  // che non dipende da quante carte contengono (le carte scorrono in
+  // orizzontale). La dimensione delle carte si calcola quindi una volta sola,
+  // all'ingresso al tavolo e quando cambia la finestra, la più grande per cui
+  // tutto ci sta: riga dei Bastioni, Villaggio e mano.
+  // Lo spazio degli avversari in cima è riservato già pieno (tasselli con
+  // Guerrieri, Muri e Costruzioni), così non cresce durante la partita.
+  // ---------------------------------------------------------------------------
+
+  const CARD_RATIO = 99 / 143;   // larghezza / altezza delle minicarte
+  const CARD_H_MIN = 90;
+  const CARD_H_MAX = 190;
+  const FIT_RESERVE = 12;        // margine per il pannello azioni che va a capo
+  let _fitKey = null;
+
+  function _setCardSize(h) {
+    const root = document.documentElement.style;
+    const w = Math.round(h * CARD_RATIO);
+    root.setProperty('--card-w-hand', `${w}px`);
+    root.setProperty('--card-h-hand', `${h}px`);
+    root.setProperty('--card-w-field', `${w}px`);
+    root.setProperty('--card-h-field', `${h}px`);
+  }
+
+  // Altezza del riassunto di un avversario in cima con tutte le Regioni occupate
+  function _fullOpponentHeight(state, myPlayerId) {
+    const topArea = document.getElementById('top-opponents');
+    const opp = state.players.find(p => p.id !== myPlayerId);
+    if (!opp) return 0;
+    const ws = Array.from({ length: 8 }, (_, i) =>
+      ({ instance_id: `probe_${i}`, species: ['elfo', 'nano', 'maga', 'umano'][i % 4], att: 10, git: 10, dif: 10 }));
+    const bastion = { walls: [], wall_count: 3, warriors: ws };
+    const full = {
+      ...opp, lives: 3,
+      field: {
+        vanguard: ws, bastion_left: bastion, bastion_right: bastion,
+        village: { buildings: [{ completed: true }, { completed: false }] },
+      },
+    };
+    const probe = renderOpponentSummary(full, state, 'row');
+    probe.classList.add('active-player');
+    const saved = Array.from(topArea.childNodes);
+    topArea.replaceChildren(probe);
+    const h = topArea.getBoundingClientRect().height;
+    topArea.replaceChildren(...saved);
+    return h;
+  }
+
+  function fitCards(state, myPlayerId, force = false) {
+    const topArea = document.getElementById('top-opponents');
+    const column = document.getElementById('center-column');
+    const surface = document.getElementById('table-surface');
+    const field = document.getElementById('my-field');
+    if (!column || !column.offsetParent) return;
+    const hasTop = topArea.childElementCount > 0;
+    const key = `${window.innerWidth}x${window.innerHeight}|${state.players.length}|${hasTop}`;
+    if (!force && key === _fitKey) return;
+    _fitKey = key;
+
+    column.classList.add('fitting');
+    const bar = document.getElementById('center-bar');
+    // Quanto potrà ancora crescere l'avversario in cima: lo lascia libero
+    // #table-surface, sopra il mio campo (le strip laterali non ne risentono).
+    // Una parte la cede la cronaca, che può scendere da 3 righe a una.
+    // Misure a schermo (getBoundingClientRect): avversari e cronaca possono
+    // avere uno zoom CSS (style.css, schermi non alti), la colonna no.
+    const topExtra = hasTop
+      ? Math.max(0, _fullOpponentHeight(state, myPlayerId) - topArea.getBoundingClientRect().height) : 0;
+    let barShrink = 0;
+    if (bar) {
+      const cs = getComputedStyle(bar);
+      const own = parseFloat(cs.height), min = parseFloat(cs.minHeight) || 0;
+      if (own > 0) barShrink = bar.getBoundingClientRect().height * (1 - min / own);
+    }
+    const reserve = FIT_RESERVE + Math.max(0, topExtra - barShrink);
+
+    // Lo spazio richiesto cresce di 3 altezze di carta per ogni pixel in più
+    // (riga dei Bastioni, Villaggio, mano): si parte da una misura e si corregge.
+    let h = CARD_H_MAX;
+    _setCardSize(h);
+    for (let i = 0; i < 3; i++) {
+      const avail = column.clientHeight - reserve;
+      const need = column.clientHeight - surface.offsetHeight + (field.scrollHeight - field.clientHeight);
+      const next = Math.max(CARD_H_MIN, Math.min(CARD_H_MAX, Math.floor(h + (avail - need) / 3)));
+      if (next === h) break;
+      h = next;
+      _setCardSize(h);
+    }
+    column.classList.remove('fitting');
+    _panelHeight = _measurePanel();
+  }
+
+  // Il pannello azioni si riempie dopo il primo disegno (app.js) e può andare
+  // a capo: se diventa più alto di quanto misurato si ricalcola (solo in
+  // crescita, così le carte non cambiano a ogni azione)
+  let _panelHeight = 0;
+  function _measurePanel() {
+    return document.getElementById('action-panel')?.offsetHeight || 0;
+  }
+  if (window.ResizeObserver) {
+    const panel = document.getElementById('action-panel');
+    if (panel) new ResizeObserver(() => {
+      if (_lastState && _measurePanel() > _panelHeight + 1) fitCards(_lastState, _myPlayerId, true);
+    }).observe(panel);
+  }
+
+  let _fitTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(_fitTimer);
+    _fitTimer = setTimeout(() => { if (_lastState) fitCards(_lastState, _myPlayerId, true); }, 150);
+  });
+  // Il font delle carte cambia le misure: si ricalcola quando è caricato
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => { if (_lastState) fitCards(_lastState, _myPlayerId, true); });
   }
 
   // ---------------------------------------------------------------------------
