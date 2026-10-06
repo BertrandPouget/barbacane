@@ -1,186 +1,113 @@
 # Barbacane — Note per Claude
 
-Questo file è il contesto di lavoro per Claude all'inizio di ogni conversazione. Il `README.md` è per gli umani (regole, come provare il gioco, come aggiungere carte) e non va duplicato qui: qui c'è come è fatto il codice, dove stanno le cose e quali trappole evitare.
+Contesto di lavoro per Claude. Il `README.md` è per gli umani (regole, come provare, come aggiungere carte) e non va duplicato qui.
 
-> **Mantenerlo asciutto.** Aggiornalo solo per cambi strutturali (nuovo modulo, nuova modalità, nuova azione o interazione pendente, cambio di stack/deploy) o per una trappola non ovvia, con una riga sola; correggi le affermazioni che non corrispondono più al codice. Non descrivere qui il dettaglio di una funzionalità o di un ritocco di UI: si legge nel codice.
+## Come mantenere questo file
 
----
+Scopo: evitare che un Claude futuro **sbagli** o perda molto tempo. Non è documentazione del gioco né diario delle modifiche.
 
-## Stato attuale (aggiornato al 2026-10-04)
-
-Il gioco è **completo e in produzione**:
-
-- **Tutte le carte di `data/cards.json` sono implementate** (24 Guerrieri, 21 Magie, 15 Costruzioni; 200 copie nel mazzo), effetti Orda inclusi.
-- **Deploy attivo** su Render (free tier) + Postgres su Neon: https://barbacane-online.onrender.com (deploy automatico da GitHub, configurazione in `render.yaml`).
-- **Modalità di gioco** (nomi come appaiono in home, identici su desktop e mobile): **Giocatore Singolo** (partita contro 1–3 Bot "Mecha-…"), **Multigiocatore** (lobby online, anche con Bot ai posti liberi), **Tutorial** (6 partite scriptate), **Catalogo Carte**. Nei documenti per gli utenti usare questi nomi esatti.
-- **Due client**: desktop (`frontend/`) e mobile (`frontend/mobile/`, servito su `/m`).
-- Musica di sottofondo, scintille animate, grafica carte generata da `card_factory/`.
-
-Non ci sono fasi aperte: il lavoro corrente è rifinitura (bilanciamento carte, fix, UI/UX, forza dei Bot, nuove illustrazioni).
+- **Prova**: una riga entra solo se, senza di essa, un Claude che legge il codice sbaglierebbe (rompe un invariante, modifica un posto solo dove ne servono tre, viola una convenzione dell'utente). Se il codice lo dice da solo in un minuto, non va qui.
+- **Sì**: convenzioni dell'utente, logica duplicata in più file, "va aggiunto in N posti", trappole controintuitive, dove sta cosa (a livello di file, non di funzione minore).
+- **No**: come funziona una funzionalità, dettagli di UI/CSS (misure, colori, zoom, valori tarati), elenchi che il codice già contiene (azioni, flag, campi), numeri di righe, date, cronaca di cosa è stato fatto.
+- **Forma**: una voce = 1–2 righe, rimandando al file/funzione per il resto. Lunghezza massima del file ~130 righe: per aggiungere, prima comprimi o togli.
+- **Quando**: alla fine di un lavoro che cambia la struttura (nuovo modulo, modalità, interazione pendente, stack/deploy) o che ha fatto scoprire una trappola. Ritocchi, fix e funzionalità di UI di norma non lo toccano. Correggi sempre ciò che non è più vero.
 
 ---
 
-## Convenzioni di lavoro
+## Stato e convenzioni
 
-- **Lingua**: codice commentato in italiano, messaggi per il giocatore in italiano, commit liberi. Rispondere all'utente in italiano.
-- **Ambiente Python**: conda, ambiente `barbacane` (non venv). Avvio locale: `python main.py` → `http://localhost:8000` (desktop) e `/m` (mobile; da desktop `?desktop=1` forza la versione desktop).
-- **Ogni modifica di UI va fatta su entrambi i client**: `frontend/app.js` + `renderer.js` + `style.css` *e* `frontend/mobile/app.js` + `render.js` + `mobile.css`. Sono due codebase separate che parlano lo stesso protocollo; `mobile.css` ha una sua copia della palette.
-- **Estetica**: la UI riusa il linguaggio grafico delle carte (font Caudex, palette, nastri/esagoni di `card_factory/assets/card.html`). Niente librerie esterne nel frontend, solo CSS/JS vanilla.
-- **Nessuna test suite**. Per verificare il motore: `python -m engine.game` (simula una partita tra bot casuali), oppure piccoli script ad hoc nello scratchpad che creano uno stato con `create_game` / `create_practice_game` e chiamano le azioni. Per la UI: avviare il server e provare (nome `Test` per avere carte e risorse a piacere, vedi sotto).
-- **Fonte autoritativa delle regole**: `assets/rules.md`. Il testo delle carte è in `data/cards.json`.
-
----
+- Gioco **completo e in produzione** (tutte le carte di `data/cards.json` implementate). Deploy automatico da GitHub su Render free tier + Postgres Neon: https://barbacane-online.onrender.com (`render.yaml`). Lavoro corrente: rifinitura.
+- **Nomi delle modalità** (identici in home desktop e mobile, da usare nei testi per gli utenti): **Giocatore Singolo**, **Multigiocatore**, **Tutorial**, **Catalogo Carte**.
+- **Lingua**: commenti e messaggi al giocatore in italiano; rispondere all'utente in italiano.
+- **Python**: conda, ambiente `barbacane`. Avvio: `python main.py` → `http://localhost:8000` (desktop), `/m` (mobile; `?desktop=1` forza il desktop).
+- **Due client separati** con lo stesso protocollo: desktop `frontend/` (`app.js`, `renderer.js`, `style.css`) e mobile `frontend/mobile/` (`app.js`, `render.js`, `mobile.css`, con una sua copia della palette). **Ogni modifica di UI va fatta su entrambi.**
+- **Estetica**: la UI riusa il linguaggio delle carte (Caudex, palette, nastri/esagoni di `card_factory/assets/card.html`). Solo CSS/JS vanilla, niente librerie.
+- **Nessuna test suite**: `python -m engine.game` simula una partita; per il resto script nello scratchpad con `create_game`/`create_practice_game`. UI: server + nome giocatore `Test`.
+- Regole autoritative: `assets/rules.md`. Testo delle carte: `data/cards.json` (unica fonte per motore, frontend e card_factory).
 
 ## Mappa del codice
 
 ```
-main.py                 FastAPI: monta router, static (/data, /assets, /card_images), SPA catch-all,
-                        /m → client mobile, /health, cache busting (?v=<hash di frontend/>), cleanup loop
-render.yaml             Deploy Render (DATABASE_URL impostata in dashboard, non nel repo)
-data/
-  cards.json            Database carte: unica fonte per motore, frontend e card_factory
-  test_cards.json       base_id messi in cima al mazzo per i giocatori "Test"/"Test2"
+main.py            FastAPI: router, static, SPA, /m, /health, cache busting (?v=<hash>), cleanup loop
 engine/
-  models.py             Pydantic: carte, istanze, Player, GameState (mana_for_turn è qui)
-  cards.py              CARD_REGISTRY da cards.json, get_card()
-  deck.py               build_deck, draw_cards, draw_to_hand_limit, make_*_instance, get_base_card_id
-  actions.py            Azioni di turno (play_*, complete, add_wall, evolve, reposition, horde, arena,
-                        recast_spell, eracle_destroy) + pre-validazioni per carta; ActionError
-  effects.py            EFFECT_REGISTRY: effetti di Magie, Costruzioni, Orde (~1700 righe)
-  battle.py             adjacent_bastions, statistiche att/dif con bonus Costruzioni, calculate_damage,
-                        apply_damage_to_bastion, resolve_battle
-  game.py               create_game, create_practice_game, _begin_turn, end_turn, do_battle,
-                        abandon_game, public_state, bot casuale (random_bot_turn), simulate_game
-  bot.py                IA euristica dei Bot (easy/normal/hard), entry point run_bot_turn
-  tutorial.py           6 tutorial scriptati (TutorialDef/TutorialStep), validazione e avanzamento step
-  chronicle.py          Cronaca della partita: da log + recent_events a frasi italiane (con testo privato
-                        per chi può vedere le carte coperte) e statistiche del riepilogo finale
+  models.py        Pydantic: carte, istanze, Player, GameState (mana_for_turn)
+  cards.py, deck.py  Registry carte; mazzo, pescata, instance id
+  actions.py       Azioni di turno + pre-validazioni per carta (ActionError)
+  effects.py       EFFECT_REGISTRY: Magie, Costruzioni, Orde
+  battle.py        Adiacenza, statistiche con bonus, danni, resolve_battle
+  game.py          create_game/create_practice_game, _begin_turn, end_turn, public_state, simulate_game
+  bot.py           IA dei Bot (docstring in testa: easy/normal/hard), run_bot_turn
+  tutorial.py      6 tutorial scriptati
+  chronicle.py     Cronaca (log/eventi → frasi) e statistiche di fine partita
 server/
-  routes.py             REST + WebSocket, _dispatch_action, timer turno, scheduling turni Bot,
-                        handler resolve_* delle interazioni pendenti
-  lobby.py              Lobby IN MEMORIA (_lobbies), Bot in lobby, nomi Mecha-, start_game, auth token,
-                        rivincita multigiocatore (rematch, _rematches)
-  ws_manager.py         Connessioni per partita, send/broadcast, timer turno
-db/storage.py           Postgres (se DATABASE_URL) o SQLite; save/load game, players, cleanup_games
-frontend/               Client desktop
-  index.html            Schermate (splash, home = #screen-lobby, multigiocatore, catalogo, tutorial,
-                        giocatore singolo = #screen-bot-difficulty, sala d'attesa, partita, gameover) + redirect automatico a /m da telefono
-  app.js                Tutta la logica UI desktop (~3200 righe): stato, macchina a stati azioni,
-                        modali per ogni carta con targeting, tutorial, catalogo, lobby
-  renderer.js           Rendering del campo; contiene anche la logica client dell'adiacenza
-  ws.js                 Client WebSocket (condiviso con mobile)
-  spotlight.js          "Occhio di bue" dei tutorial (condiviso)
-  sparks.js, audio.js   Scintille e musica (condivisi)
-  chronicle.js          Formattazione della cronaca e classifica di fine partita (condiviso)
-  session.js            Partita salvata nel browser (SavedGame), link d'invito (Invite), nome ricordato (condiviso)
-  cardart.js            Minicarte (condiviso): CardArt.attach(el, def, info) per mano e campo, update per
-                        ridisegnare solo la fascia, handInfo; anteprime per l'anteprima; preload in sottofondo
-  motion.js             Transizioni delle carte tra due stati: snapshot prima del ridisegno, play dopo (condiviso)
-  mobile/               Client mobile: app.js (modulo Mob), render.js, ui.js (sheet, toast), mobile.css
-card_factory/           Pipeline grafica carte (vedi suo README): cards.json + illustrazioni → output/full/<id>.png,
-                        servite al frontend come /card_images/full/<id>.png (retro.png = dorso); anteprime WebP
-                        (carta intera rimpicciolita) in output/preview/<id>.webp, per anteprima e catalogo;
-                        immagini delle minicarte in output/mini/ (illustrazioni ridotte, sfondo.webp, retro.webp; lib/mini.py)
-assets/                 rules.md, logo, sfondo, musica, immagini home
+  routes.py        REST + WebSocket, _dispatch_action, timer, turni Bot, handler resolve_*
+  lobby.py         Lobby in memoria, Bot in lobby, rivincita multigiocatore
+  ws_manager.py    Connessioni, broadcast, timer turno
+db/storage.py      Postgres (DATABASE_URL) o SQLite
+frontend/          Desktop (app.js, renderer.js) + moduli condivisi col mobile: ws, spotlight, sparks,
+                   audio, chronicle, session, cardart (minicarte), motion (transizioni)
+frontend/mobile/   Client mobile (modulo Mob), ui.js (sheet, toast)
+card_factory/      Grafica carte (vedi suo README) → output/full, output/preview, output/mini, serviti su /card_images
 ```
-
----
 
 ## Flusso di un'azione
 
-1. Il client invia via WebSocket `{type: "action", action, params}` (esiste anche `POST /game/action`, stesso flusso).
-2. `routes.py` → `_handle_ws_message` carica lo stato dal DB e chiama `_dispatch_action(state, player_id, action, params)`, che nell'ordine:
-   - azzera `state.recent_events`; gestisce subito `leave_game` (abbandono, sempre consentito);
-   - nei tutorial rifiuta le azioni fuori copione (`tutorial_engine.validate_action`);
-   - azzera `ethereal_card` / `ethereal_complete` se l'azione è in `_ETHEREAL_BREAKING` e non è il gioco della carta eterea stessa;
-   - blocca tutto se c'è un `pending_search` o una `pending_interactions[0]` non risolta (mappa tipo → azione `resolve_*` ammessa), o un Velocemento in sospeso;
-   - verifica la fase richiesta (`_PHASE_REQUIRED`);
-   - chiama l'handler; dopo un'azione che consuma Azione controlla la Fucina (`check_fucina_after_action`);
-   - dopo `battle`/`eracle_destroy`, se non restano battaglie, chiama `end_turn` automaticamente (non nei tutorial);
-   - nei tutorial avanza lo step; con Bot in partita risolve subito le loro interazioni pendenti (`_auto_resolve_bot_pending`);
-   - infine `chronicle.sync(state)` racconta nella cronaca ciò che l'azione ha prodotto.
-3. Salva (`save_game`), invia a ogni connesso il proprio `public_state(state, pid)` con `type: "state_update"` (`_broadcast_state`), riavvia il timer se il turno è cambiato, poi `_schedule_bot_turn(state)`.
-4. Gli errori di regola sono `ActionError` → messaggio `{type: "error"}` solo a chi ha agito.
+Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_action`, che: gestisce `leave_game`; valida il copione nei tutorial; azzera l'eterea (`_ETHEREAL_BREAKING`); **blocca tutto se c'è un `pending_search` o una `pending_interactions[0]`** (ammette solo il `resolve_*` corrispondente); controlla la fase (`_PHASE_REQUIRED`); chiama l'handler (elenco in `handlers`); Fucina; fine turno automatica dopo l'ultima battaglia (non nei tutorial); risolve i pending dei Bot; `chronicle.sync`. Poi salva, manda a ognuno il proprio `public_state` e schedula il turno Bot. Errori di regola = `ActionError` → `{type: "error"}` solo a chi ha agito.
 
-**Fasi del turno** (`state.phase`): `"action"` → `"schieramento"` (riposizionamento + Orde) → `"battaglia"`, avanzate dal client con l'azione `next_phase`; `"end"` a partita finita.
-
-**Azioni disponibili** (chiavi di `handlers` in `_dispatch_action`): `play_warrior`, `play_spell`, `play_building`, `complete_building`, `add_wall`, `evolve` (consumano Azione) · `reposition`, `horde`, `battle`, `arena_activate`, `recast_spell`, `eracle_destroy`, `next_phase`, `end_turn`, `leave_game` · `resolve_search`, `resolve_biblioteca`, `resolve_velocemento`, `resolve_agilpesca`, `resolve_cardo_move`, `resolve_magiscudo_counter`, `resolve_malcomune` · `tutorial_next`, `tutorial_prev`.
-
-**Interazioni asincrone**: un effetto che richiede una scelta imposta `state.pending_search` (cercare nel mazzo) o accoda in `state.pending_interactions` un dict `{type, player_id, ...}`. Tipi attuali: `biblioteca_discard`, `biblioteca_wall`, `cardo_move`, `agilpesca_discard`, `magiscudo_counter` (la risposta la dà il *bersaglio*, anche fuori dal suo turno), `malcomune_discard`, `evelyn_recast`. Possono coesistere (es. Orda di Giulio + Biblioteca a inizio turno): il `pending_search` ha la precedenza, `_dispatch_action` accetta `resolve_search` anche con interazioni in coda, e i client mostrano prima la ricerca e solo dopo l'interazione. Un nuovo tipo va aggiunto in tre posti: la mappa in `_dispatch_action`, `_auto_resolve_bot_pending` (altrimenti una partita con Bot si blocca) e la UI di entrambi i client.
-
-**Turno** (`game.py`): `_begin_turn` azzera azioni/eterea, assegna Mana (`mana_for_turn`, Dazipazzi può azzerarlo), applica la modalità Test, `_trigger_building_start` (Estrattore, Sorgiva, Biblioteca, Fucina, Trono), effetti differiti (Investimento, Divinazione), Orda di Giulio. `end_turn` gestisce prima l'eventuale `cardo_move` (ritorna presto: il turno riprende dopo `resolve_cardo_move`), poi Granaio, pesca fino a 6 (+ Granai), controllo vittoria, passaggio al prossimo vivo; il numero di turno avanza quando il giro torna al primo giocatore vivo.
-
-**Orde**: restano attive tra un turno e l'altro finché il gruppo non si rompe (`deactivate_broken_horde`) o si sceglie un altro effetto per lo stesso gruppo (`deactivate_horde_for_switch`). `hordes_activated_this_turn` impedisce di riattivare la stessa zona:specie nello stesso turno. Gli Eroi ereditano l'effetto Orda della Recluta (gli `horde_effect_id` sono del tipo `<recluta>_horde`).
-
----
+- Fasi: `action` → `schieramento` → `battaglia` (azione `next_phase`); `end` a partita finita.
+- **Interazioni pendenti**: un effetto che chiede una scelta imposta `pending_search` o accoda `{type, player_id, ...}` in `pending_interactions` (alcune le risolve il bersaglio fuori turno). Possono coesistere: il `pending_search` ha la precedenza, anche nei client (prima la ricerca, poi l'interazione). **Un nuovo tipo va aggiunto in tre posti**: mappa in `_dispatch_action`, `_auto_resolve_bot_pending` (altrimenti le partite con Bot si bloccano), UI di entrambi i client.
+- `end_turn` può fermarsi su `cardo_move` e riprendere dopo `resolve_cardo_move`.
+- Orde attive finché il gruppo regge; gli Eroi ereditano l'Orda della Recluta (`<recluta>_horde`).
 
 ## Modalità di partita
 
-- **Multigiocatore** (`server/lobby.py`): codice tipo `BARB-7X3K`. Le lobby vivono **solo in memoria** (`_lobbies`): un riavvio del server perde le sale d'attesa, non le partite già avviate (che sono nel DB). Il creatore può aggiungere/rimuovere Bot, sceglierne la difficoltà (unica) e riordinare i posti (`/lobby/add_bot|remove_bot|bot_difficulty|reorder`). Chiunque può uscire dalla sala d'attesa (`/lobby/leave`, pulsante ← nell'intestazione): se esce il creatore il ruolo passa al primo umano rimasto (i client ricavano `isCreator` da `creator_id` a ogni aggiornamento), se non resta nessun umano la sala viene chiusa. l'ordine della lobby = ordine di `state.players` = adiacenza. Nomi Bot: "Mecha-" + Recluta casuale, unici case-insensitive; un umano omonimo fa ribattezzare il Bot. I Bot non hanno riga in `players`.
-- **Giocatore Singolo** (`POST /practice/start`, `create_practice_game`): 1–3 Bot, umano sempre primo, game_id `vs-…`, timer disattivato.
-- **Bot**: `state.bot_player_ids` + `state.bot_difficulty`. I turni girano in background (`_schedule_bot_turn` → `_play_bot_turn` in thread), uno alla volta per partita, e **solo se almeno un umano è connesso**. Il turno è calcolato tutto insieme (`run_bot_turn(..., on_step)` fotografa lo stato dopo ogni mossa), lo stato finale viene salvato subito e poi il tavolo riceve le fotografie una alla volta (`action: "bot_step"`, pausa `_BOT_STEP_SECONDS`, prima mossa dopo `_BOT_THINK_SECONDS`), infine lo stato vero (`bot_turn`). Il racconto si interrompe se nel frattempo il tavolo riceve uno stato più recente (`_game_versions`). La strategia è in `engine/bot.py` (docstring in testa spiega le tre difficoltà; `hard` simula fino a fine turno e stima la minaccia avversaria). Un turno da 3–4 s è accettabile: non sacrificare la forza per la velocità; `hard` ha comunque un tetto di riflessione per la fase Azioni (`HARD_THINK_SECONDS`), oltre il quale gioca la mossa migliore trovata. Magie che il Bot non sa usare: `_SPELL_EFFECT_EXCLUDE`.
-- **Cronaca** (`engine/chronicle.py`): `sync()` trasforma le nuove voci di `state.log` (cursore `chronicle_cursor`) e gli eventi non ancora raccontati (marcati `_told`) in voci di `state.chronicle`, con segnaposto `{p:player_id}` e `{c:base_card_id}` che i client rendono con `frontend/chronicle.js`. Le informazioni coperte (carte pescate, Muri, carte scartate dalla mano) vanno in `private_text` per il solo proprietario; `view()` invia a ciascuno la propria versione. Una carta nuova che produce eventi o voci di log merita una frase in `_tell_log`/`_tell_event`. Aggiorna anche `match_stats` ed `eliminations`, usati dal riepilogo di fine partita.
-- **Fine partita**: riepilogo (classifica + statistiche) e **Rivincita** (`POST /game/rematch`): in Giocatore Singolo crea una nuova partita contro gli stessi Bot; in multigiocatore il primo che la chiede crea una nuova sala d'attesa con timer, Bot e posti della partita precedente (`seat_hint`), gli altri ricevono `{type: "rematch_offer"}` via WebSocket e con la stessa chiamata ci entrano. `state.mode` ("lobby" | "practice" | "tutorial", vedi `game_mode()` per le partite vecchie) dice quale delle due.
-- **Ripresa e inviti** (`frontend/session.js`): la partita in corso è salvata in `localStorage` (pulsante «Riprendi la partita» in home) e in `sessionStorage` (ricaricando la pagina si torna subito al tavolo). Il link d'invito è `/?join=BARB-XXXX` (passa anche al redirect mobile); il testo da condividere è `Invite.message()` («Unisciti alla mia partita di Barbacane: <link>»), uguale nei due client.
-- **Tutorial** (`engine/tutorial.py`, `GET /tutorials`, `POST /tutorial/start`): partita contro un "Manichino" che non gioca; ogni step `info` (avanza con `tutorial_next`) o `action` (richiede un'azione precisa, con `match`). Si torna indietro solo verso step `info` tramite snapshot. Gli step usano `highlight` per lo spotlight (con `_MOBILE_HIGHLIGHT_MAP` per i selettori mobile) e `card_focus` con rettangoli in percentuale sull'immagine della carta: se cambia il layout di `card.html`, quei rettangoli vanno ritarati.
-- **Modalità Test**: nome `Test` o `Test2` → le carte di `data/test_cards.json` in cima al mazzo prima della pescata iniziale, e a ogni inizio turno 10 Mana e 5 Azioni.
+- **Multigiocatore**: le lobby vivono **solo in memoria** (un riavvio perde le sale d'attesa, non le partite avviate). Ordine della lobby = ordine di `state.players` = adiacenza. I Bot non hanno riga in `players`.
+- **Giocatore Singolo**: game_id `vs-…`, umano primo, timer disattivato.
+- **Bot**: girano in background **solo se almeno un umano è connesso**; il turno è calcolato tutto, salvato, poi raccontato al tavolo mossa per mossa (`bot_step`). Un turno da 3–4 s è accettabile: non sacrificare la forza per la velocità. Magie non gestite: `_SPELL_EFFECT_EXCLUDE`.
+- **Cronaca**: le informazioni coperte (pescate, Muri, scarti dalla mano) vanno in `private_text`, mai nel testo pubblico. Una carta nuova che produce eventi/log merita una frase in `_tell_log`/`_tell_event`.
+- **Tutorial**: `card_focus` usa rettangoli in % sull'immagine della carta: se cambia il layout di `card.html` vanno ritarati. Selettori mobile in `_MOBILE_HIGHLIGHT_MAP`.
+- **Modalità Test**: nome `Test`/`Test2` → carte di `data/test_cards.json` in cima al mazzo, 10 Mana e 5 Azioni a turno.
+- Rivincita e ripresa partita: `POST /game/rematch` (`state.mode` distingue i casi), `frontend/session.js`.
 
----
+## Modello dati
 
-## Modello dati: cose da sapere
-
-- `cards.json` ha tre liste (`warriors`, `spells`, `buildings`); campi principali: `id`, `cost`, `cost_type` (`mana`/`maga`), `att/git/dif`, `species`, `school`, `evolves_from/into`, `horde_effect_id`, `effect_id`, `base_effect`, `prodigy_effect`/`complete_effect`, `*_is_additive` (il testo con `&` iniziale si somma al Base), `auto_complete` (solo Cardo e Decumano), `completion_cost`, `copies`, `mini_name` (facoltativo: nome abbreviato per le minicarte, solo client).
-- **Instance id** = `{base_card_id}_{n}` (es. `patrizio_3`); `get_base_card_id()` lo inverte. Mano, Vite, Muri, mazzo e scarti contengono instance id.
-- Istanze: `WarriorInstance` (`assigned_cards`, `horde_active`, `temp_modifiers`, `evolved_from`), `BuildingInstance` (`completed`, `assigned_warrior` per il Trono), `WallInstance` (`durability`, 2 con Plasmattone), `Bastion` (`walls`, `warriors`, `dif_bonus`).
-- `Player` oltre alle risorse ha molti flag di effetti: `active_effects` (lista di dict con `type`), `skip_mana_next_turn`, `extra_battles`, `spell_cost_reductions`, `ethereal_card`, `ethereal_complete` (Velocemento prodigio), `pending_velocemento_*`, `turns_completed` (non si attacca chi non ha ancora giocato un turno).
-- `GameState` oltre al flusso turno ha `tutorial`, `bot_player_ids`, `bot_difficulty`, `turn_timer`, `log`.
-- **I parametri di gioco sono nel codice** (non esiste un file di configurazione): Mana in `GameState.mana_for_turn`, 2 Azioni e pesca a 6 in `game.py`, 3 Vite in `create_game`.
-- `public_state` nasconde agli avversari mano, Vite, identità dei Muri, mana/azioni, `ethereal_card` e la maggior parte degli `active_effects` (whitelist dei tipi visibili). In fase `battaglia` i Guerrieri mostrano già i bonus di Ariete/Catapulta/Saracinesca. Al proprietario manda anche `prodigy_ready` (Magie in mano che ora attiverebbero il Prodigio, da `actions.spell_prodigy_ready`, stessa regola di `play_spell`).
-
----
+- **Instance id** = `{base_card_id}_{n}` (`get_base_card_id()` lo inverte); mano, Vite, Muri, mazzo e scarti contengono instance id.
+- Testo con `&` iniziale (`*_is_additive`) si somma al Base. `mini_name` in `cards.json` è solo per le minicarte del client.
+- **Parametri di gioco nel codice**, non in un config: Mana in `mana_for_turn`, 2 Azioni e pesca a 6 in `game.py`, 3 Vite in `create_game`.
+- `public_state` nasconde agli avversari mano, Vite, Muri, risorse e gran parte di `active_effects` (whitelist): un nuovo effetto visibile va aggiunto lì.
 
 ## Effetti delle carte
 
-- `@register_effect("<effect_id>")` in `effects.py`; `apply_effect(effect_id, state, player, **kwargs)` ritorna `{"warning": ...}` se l'id non è registrato.
-- Firme: Magie `(state, player, prodigy=False, **targeting)`, Costruzioni `(state, player, completed=False, **kw)`, Orde `(state, player, warrior_iid=None, **kw)`.
-- **Passive** (Ariete, Catapulta, Saracinesca, Fossato, Obelisco, Scrigno, Fucina…): l'effetto registrato ritorna `{"passive": True, ...}`; il comportamento vero sta in `battle.py` / `actions.py` / `game.py`, che controllano le Costruzioni in campo.
-- **Pre-validazione Magie**: le condizioni per poter giocare una Magia vanno in `actions.py` → `play_spell()`, nel blocco `if base_id == "...": raise ActionError(...)` **prima** di `player.hand.remove(instance_id)`. Un errore ritornato dall'effetto arriva troppo tardi: la carta è già consumata. Stessa logica per le Costruzioni in `play_building` / `complete_building`.
-- Una carta già in campo si sposta/scarta solo se un effetto lo richiede: non esistono scarto libero né recupero di Muri.
-- Eroe scartato → la Recluta torna in campo con le carte assegnate; Recluta scartata → anche le assegnate vanno negli scarti.
-- D10: `_roll_d10()`, il risultato va in `state.recent_events` (visibile a tutti, azzerato a ogni azione).
+- `@register_effect("<effect_id>")` in `effects.py`. Firme: Magie `(state, player, prodigy=False, **targeting)`, Costruzioni `(state, player, completed=False, **kw)`, Orde `(state, player, warrior_iid=None, **kw)`.
+- **Passive** (Ariete, Catapulta, Fossato, Fucina…): l'effetto ritorna `{"passive": True}`, la logica vera è in `battle.py`/`actions.py`/`game.py`.
+- **Pre-validazione**: le condizioni per giocare una Magia/Costruzione vanno in `actions.py` (`play_spell`/`play_building`/`complete_building`) **prima** che la carta lasci la mano: un errore dall'effetto arriva quando la carta è già consumata.
+- Non esistono scarto libero né recupero di Muri. Eroe scartato → torna la Recluta con le assegnate; Recluta scartata → anche le assegnate negli scarti. D10 con `_roll_d10()` → `recent_events`.
 
-**Checklist quando si aggiunge o cambia una carta:**
-1. `data/cards.json` (testo, costi, statistiche, copie).
-2. Effetto in `engine/effects.py` (+ pre-validazione in `actions.py`, + logica passiva o trigger in `game.py`/`battle.py` se serve).
-3. Targeting/interazione in **entrambi** i client (`frontend/app.js` e `frontend/mobile/app.js`; spesso c'è un ramo dedicato per `base_id`). Ogni scelta passa dai **selettori comuni**, mai da liste fatte a mano: desktop `Renderer.showWarriorPicker / showBastionPicker / showBuildingPicker / showCardPicker / showPlayerPicker / showRegionPicker` (base: `Renderer.showPicker`), mobile `pickWarrior / pickBastion / pickBuilding / pickCard / pickPlayer / pickRegion` (base: `pickGrouped`). Dividono per giocatore e Regione (o tipo di carta), mettono "Possibile Bersaglio" sui Bastioni adiacenti e usano i simboli di Regione del client (desktop ⚔ 🛡 monocromi, mobile ⚔️ 🏰); stesse opzioni nei due client (`players`, `filter`, `note`, `onPick`, `cancelLabel`, `empty`).
-4. Bot: candidati e kwargs in `bot.py` (`_default_spell_kwargs`, `_card_value`, `_SPELL_EFFECT_EXCLUDE`) e, se c'è un nuovo pending, `_auto_resolve_bot_pending` in `routes.py`.
-5. Tutorial: controllare se la carta compare negli script di `tutorial.py`.
-6. Grafica: illustrazione in `card_factory/images/<id>.png`, poi `python card_factory/2_generate_cards.py <id>` → `card_factory/output/full/<id>.png`, la sua anteprima `output/preview/<id>.webp` e l'illustrazione per la minicarta `output/mini/<id>.webp` (tutte committate, il frontend le serve da lì). `4_make_previews.py` rifà solo le anteprime mancanti o più vecchie del PNG.
-7. Se il testo della regola cambia, aggiornare `assets/rules.md`.
-
----
+**Checklist per una carta nuova o cambiata:**
+1. `data/cards.json`.
+2. Effetto in `effects.py` (+ pre-validazione in `actions.py`, + passiva/trigger in `game.py`/`battle.py`).
+3. Targeting in **entrambi** i client, sempre con i **selettori comuni** (desktop `Renderer.show*Picker`, mobile `pick*`), mai liste fatte a mano.
+4. Bot: `_default_spell_kwargs`, `_card_value`, `_SPELL_EFFECT_EXCLUDE` in `bot.py`; nuovo pending → `_auto_resolve_bot_pending`.
+5. Tutorial: la carta compare negli script?
+6. Grafica: `card_factory/images/<id>.png` → `python card_factory/2_generate_cards.py <id>` (genera full, preview, mini; tutto committato).
+7. Regola cambiata → `assets/rules.md`.
 
 ## Persistenza e deploy
 
-- `db/storage.py`: Postgres se `DATABASE_URL` è impostata, altrimenti SQLite (`barbacane.db`, path sovrascrivibile con `BARBACANE_DB`). Placeholder `?` convertiti in `%s` da `_q()`; timestamp ISO 8601 UTC generati in Python.
-- Tabelle `games` (`game_id`, `lobby_code`, `state` JSON, `status` lobby|playing|finished, timestamp) e `players` (PK `(game_id, player_id)`, FK su `games`, `session_token` unico). **Prima `save_game`, poi `save_player`**: Postgres applica la FK.
-- `cleanup_games` (all'avvio e ogni 5 min) elimina le partite `finished` da più di 5 min e quelle ferme da più di 1 ora.
-- Ogni azione ricarica lo stato dal DB e lo risalva: lo stato in memoria non è mai la fonte di verità per una partita avviata.
-- Render free tier andrebbe in spindown dopo ~15 min senza traffico HTTP (il WebSocket non conta). Il servizio è tenuto sempre acceso da un **cron-job esterno** che interroga periodicamente il sito, quindi in pratica non ci sono cold start; in più il client fa un ping a `/health` ogni 4 minuti durante le partite (`ws.js`), come rete di sicurezza se il cron-job si fermasse.
-- Il cache busting di `main.py` aggiunge `?v=<hash>` a CSS/JS negli `index.html`: un nuovo file JS/CSS va referenziato con `src`/`href` relativo per esserne coperto.
-
----
+- Ogni azione ricarica lo stato dal DB e lo risalva: lo stato in memoria non è mai la fonte di verità di una partita avviata.
+- **Prima `save_game`, poi `save_player`** (FK su Postgres). Placeholder `?` convertiti da `_q()`.
+- `cleanup_games` elimina le partite finite da 5 min e quelle ferme da 1 ora.
+- Render è tenuto sveglio da un cron-job esterno (+ ping `/health` del client ogni 4 min).
+- Un nuovo file JS/CSS va referenziato con percorso relativo negli `index.html`, altrimenti sfugge al cache busting.
 
 ## Trappole note
 
-- **Disconnessione**: non c'è un salto automatico del turno dopo 120 s; il turno passa da solo solo se in lobby è stato impostato un timer (`turn_timer > 0`, `_on_turn_expire`).
-- **Adiacenza**: il Bastione destro di X confina col sinistro del primo giocatore **vivo** alla sua destra (eliminati saltati). La logica è duplicata in `battle.py → adjacent_bastions`, `frontend/renderer.js`, `frontend/mobile/render.js` e `frontend/mobile/app.js`: cambiarla ovunque.
-- **Massimo 2 Azioni** è scritto anche lato client per la modalità Test (`maxActions` in `app.js`).
-- Nel tutorial la fine turno automatica dopo la Battaglia è disattivata (il Manichino non gioca).
-- I nomi delle partite di pratica (`vs-…`) e le partite tutorial hanno una sola riga in `players` (`player_1`).
-- **Transizioni delle carte** (`motion.js`): i client ridisegnano tutto a ogni `state_update`; `onStateUpdate` fotografa le carte con `data-instance-id` prima di `Renderer.render` / `Render.game` e le anima dopo (fantasmi in un livello fisso). Una carta disegnata senza `data-instance-id` non si anima; una che sparisce dalla vista va verso l'elemento indicato da `targetFor` (in base a `Motion.locate`) o si dissolve. Il mobile non anima più al momento dell'invio dell'azione, ma solo quando arriva lo stato.
-- **Sheet del mobile**: un nuovo sheet di sola consultazione deve passare `refresh` a `Sheet.open`, altrimenti viene chiuso al cambio di turno.
-- **Minicarte** (`cardart.js` + classi `.mc-*` in entrambi i CSS): le carte piccole (mano e campo su desktop, solo mano sul mobile) sono disegnate in HTML/CSS sopra la carta testuale (che resta nascosta con `.has-art`): cornice del colore del tipo, stendardo con il nome (corpo fisso `8cqw`, tarato perché ci stia «KAISER JOSEPH»; i nomi troppo lunghi usano `mini_name` di `cards.json`, oggi «Bastioncontr.» e «Dr. Faustus»: se arriva un nome più lungo, abbreviarlo lì o ritarare il corpo), sotto il nome il bollino della specie (colori `--elfo/--nano/--maga/--umano`, come nel mobile) e la Scuola (Magie e Maghe), separati da un punto (lo spazio resta anche quando è vuoto, così le illustrazioni sono tutte alla stessa altezza), illustrazione nel suo riquadro con fondo e bordo (`/card_images/mini/<id>.webp`; quelle degli Eroi ci stanno intere, un po' ingrandite), fascia `.mc-band` con ciò che cambia (Caratteristiche *correnti* nei rombi, verde/rosso rispetto alla stampata; le statistiche stampate in campo non valgono; per le Costruzioni torre piena se completate, altrimenti il costo di completamento nell'esagono; stella piena/vuota per le Magie in mano, da `prodigy_ready`; rombi, torre e stella occupano circa lo stesso spazio). Posizioni in % della carta (progetto 280×400 con cornice 13), testi in `cqw` (`.card.has-art` ha `container-type: inline-size`). Il costo di gioco sta solo nel badge fuori dalla carta (`.card-cost-badge`: esagono per il Mana, stella per le Maghe). Le carte in mano riusate tra un ridisegno e l'altro aggiornano la fascia con `CardArt.update`. Gli elementi da lasciare visibili sopra una carta `.has-art` vanno marcati `card-keep` (il CSS nasconde tutto il resto, salvo minicarta e badge del costo). Su desktop il passaggio del mouse su una minicarta (mano o campo) mostra la carta intera (`CardPreview` in `renderer.js`); sul mobile la carta intera si apre toccandola. Sul mobile le minicarte ci sono solo nella mano: tasselli del campo e pannelli restano testuali.
-- **Altezza del tavolo desktop**: `#center-column` è una colonna alta quanto lo schermo. La mano (`#my-bottom-area`) non si restringe mai; le Regioni hanno altezza fissa (le carte scorrono in orizzontale) e la dimensione delle carte di mano e campo la calcola `fitCards()` (`renderer.js`) all'ingresso al tavolo, al ridimensionamento e se il pannello azioni cresce, lasciando libero lo spazio che servirà all'avversario in cima con tutte le Regioni occupate (in parte lo cede la cronaca `#center-bar`, alta 3 righe e comprimibile a una); `#my-field` scorre in verticale solo come ripiego. Con altezza ≤ 1000px intestazione, avversari, cronaca, pannello azioni e Mana/Azioni hanno `zoom: 0.9`: misurarli con `getBoundingClientRect`.
-- **Avversari sul desktop**: sul tavolo solo tasselli riassuntivi (`renderOpponentSummary`), senza carte con `data-instance-id`: le loro transizioni sono in `_animateOpponents` (`app.js`). I riassunti `.rg-*` sono duplicati nei due client.
-- `engine/game.py` contiene ancora un bot casuale (`random_bot_turn`, `_bot_try_horde` riusato da `bot.py`) usato da `simulate_game`: non è il Bot delle partite reali.
+- **Adiacenza**: il Bastione destro confina col sinistro del primo giocatore **vivo** a destra. Logica duplicata in `battle.py`, `frontend/renderer.js`, `frontend/mobile/render.js`, `frontend/mobile/app.js`: cambiarla ovunque.
+- **Massimo 2 Azioni** è scritto anche lato client (`maxActions` in `app.js`).
+- Nessun salto turno automatico per disconnessione: solo con timer di lobby (`turn_timer > 0`).
+- Partite `vs-…` e tutorial hanno una sola riga in `players` (`player_1`).
+- **Transizioni** (`motion.js`): i client ridisegnano tutto a ogni `state_update`; si anima solo ciò che ha `data-instance-id`. Gli avversari sul desktop sono riassunti senza carte: le loro animazioni sono in `_animateOpponents`.
+- **Minicarte** (`cardart.js`, classi `.mc-*` in entrambi i CSS): sopra una carta `.has-art` il CSS nasconde tutto tranne minicarta e badge del costo; ciò che deve restare visibile va marcato `card-keep`. Il corpo del nome è tarato sul nome più lungo: se arriva un nome più lungo, usa `mini_name`.
+- **Tavolo desktop**: la dimensione delle carte la calcola `fitCards()` (`renderer.js`); con altezza ≤ 1000px alcune zone hanno `zoom`, quindi si misurano con `getBoundingClientRect`.
+- **Sheet mobile** di sola consultazione: passare `refresh` a `Sheet.open`, altrimenti si chiude al cambio turno.
+- `game.py` contiene ancora un bot casuale (`random_bot_turn`) per `simulate_game`: non è il Bot delle partite reali.
