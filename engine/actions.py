@@ -298,22 +298,20 @@ def _apply_spell_post_effects(
         })
 
 
-def _prodigy_active(player: Player, school: Optional[str], effective_cost: int, free_or_ethereal: bool) -> bool:
-    """Regola del Prodigio: servono in campo almeno tante Maghe della Scuola della
-    Magia quanto il costo effettivo (con l'Orda di Madeleine, per gli Incantesimi
-    vale qualsiasi Maga). A costo 0 si attiva solo per una Magia gratuita o Eterea."""
-    mages_count = len(player.mages_in_field())
-    if mages_count == 0:
-        return False
-    madeleine_active = any(
-        e.get("type") == "madeleine_prodigy_any_school"
-        for e in player.active_effects
+def _prodigy_active(player: Player, school: Optional[str], effective_cost: int) -> bool:
+    """Regola del Prodigio: servono in campo almeno tante Maghe quanto il costo
+    effettivo, di cui almeno una della Scuola della Magia."""
+    return (
+        player.mages_by_school().get(school, 0) >= 1
+        and len(player.mages_in_field()) >= effective_cost
     )
-    if madeleine_active and school == "incantesimo":
-        count = mages_count
-    else:
-        count = player.mages_by_school().get(school, 0)
-    return count >= effective_cost and (effective_cost > 0 or free_or_ethereal)
+
+
+def _madeleine_free_action(player: Player, card: SpellCard) -> bool:
+    """Orda di Madeleine: gli Incantesimi a costo 1 non consumano Azioni."""
+    return card.school == "incantesimo" and card.cost == 1 and any(
+        e.get("type") == "madeleine_free_action" for e in player.active_effects
+    )
 
 
 def spell_prodigy_ready(player: Player, instance_id: str) -> bool:
@@ -324,15 +322,15 @@ def spell_prodigy_ready(player: Player, instance_id: str) -> bool:
     if not isinstance(card, SpellCard):
         return False
     if player.ethereal_card == instance_id:
-        return _prodigy_active(player, card.school, card.cost, True)
+        return _prodigy_active(player, card.school, card.cost)
     free = any(
         e.get("type") == "spell_free" and e.get("school") == card.school and e.get("uses", 0) > 0
         for e in player.active_effects
     )
     if free:
-        return _prodigy_active(player, card.school, 0, True)
+        return _prodigy_active(player, card.school, 0)
     cost_to_pay = max(0, card.cost - player.spell_cost_reductions.get(card.school, 0))
-    return _prodigy_active(player, card.school, cost_to_pay, False)
+    return _prodigy_active(player, card.school, cost_to_pay)
 
 
 def play_spell(
@@ -344,19 +342,20 @@ def play_spell(
     """
     Gioca una Magia dalla mano.
     Costo: numero di Maghe in campo del costo della Magia.
-    Prodigio: attivo se le Maghe in campo sono tutte della stessa scuola della Magia.
-    Consuma 1 Azione.
+    Prodigio: attivo se almeno una delle Maghe in campo è della Scuola della Magia.
+    Consuma 1 Azione (non se Eterea o con l'Orda di Madeleine).
     """
     player = _require_current_player(state, player_id)
     is_ethereal = player.ethereal_card == instance_id
-    if not is_ethereal:
-        _require_actions(player)
     _require_in_hand(player, instance_id)
 
     base_id = get_base_card_id(instance_id)
     card = get_card(base_id)
     if not isinstance(card, SpellCard):
         raise ActionError(f"{instance_id} non è una Magia.")
+    uses_action = not is_ethereal and not _madeleine_free_action(player, card)
+    if uses_action:
+        _require_actions(player)
 
     cost = card.cost
     school = card.school
@@ -388,8 +387,7 @@ def play_spell(
                 raise ActionError(f"Maghe insufficienti: {mages_count} disponibili, {cost_to_pay} richieste.")
 
     # Verifica Prodigio (basato sulle Maghe in campo, indipendentemente dall'eterea)
-    prodigy = _prodigy_active(player, school, cost if is_ethereal else cost_to_pay,
-                              bool(free_effect) or is_ethereal)
+    prodigy = _prodigy_active(player, school, cost if is_ethereal else cost_to_pay)
 
     # Pre-validazione: vitalflusso richiede una Sorgiva completa propria
     # oppure, se il prodigio è attivo, almeno una Sorgiva avversaria da eliminare
@@ -477,7 +475,7 @@ def play_spell(
 
     # Rimuovi dalla mano e consuma azione
     player.hand.remove(instance_id)
-    if not is_ethereal:
+    if uses_action:
         player.actions_remaining -= 1
     player.ethereal_card = None
 
@@ -980,11 +978,7 @@ def recast_spell(
     state.pending_interactions.pop(0)
 
     # Prodigio: stessa logica della prima giocata
-    mages_count = len(player.mages_in_field())
-    prodigy = False
-    if mages_count > 0 and card.cost > 0:
-        mages_by_school = player.mages_by_school()
-        prodigy = mages_by_school.get(card.school, 0) >= card.cost
+    prodigy = _prodigy_active(player, card.school, card.cost)
 
     result = apply_effect(card.effect_id, state, player, prodigy=prodigy, **kwargs)
 

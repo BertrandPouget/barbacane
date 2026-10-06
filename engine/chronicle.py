@@ -335,7 +335,8 @@ def _tell_event(state: GameState, ev: Dict[str, Any]) -> None:
         _add(state, "event", pid, f"{who} · {_c(card)}: D10 = {roll}, {outcome}.".replace(", .", "."))
 
     elif t == "mana":
-        _add(state, "event", pid, f"{who} · {_c(card)}: +{ev.get('mana_gained', 0)} Mana.")
+        scrigno = f" (+{ev['scrigno_bonus']} dallo {_c('scrigno')})" if ev.get("scrigno_bonus") else ""
+        _add(state, "event", pid, f"{who} · {_c(card)}: +{ev.get('mana_gained', 0)} Mana{scrigno}.")
 
     elif t == "damage":
         damage = ev.get("damage", 0)

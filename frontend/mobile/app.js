@@ -1223,7 +1223,7 @@ const Mob = (() => {
     const idx = hand.indexOf(iid);
     const isEthereal = my && my.ethereal_card === iid;
     const canAct = isMyTurn() && currentState.phase === 'action' &&
-      my && (my.actions_remaining > 0 || isEthereal);
+      my && (my.actions_remaining > 0 || isEthereal || isFreeActionSpell(my, def));
 
     const footer = [];
     footer.push({
@@ -1312,21 +1312,19 @@ const Mob = (() => {
 
   // -- Magie ------------------------------------------------------------------
 
+  // Orda di Madeleine: gli Incantesimi a costo 1 non consumano Azioni
+  function isFreeActionSpell(player, def) {
+    return !!def && def.type === 'spell' && def.school === 'incantesimo' && def.cost === 1 &&
+      (player.active_effects || []).some(e => e.type === 'madeleine_free_action');
+  }
+
   function computeSpellProdigy(def) {
     const my = me();
     if (!my || !def) return false;
     const all = getAllWarriors(my);
-    // Orda Madeleine: i Prodigi degli Incantesimi si attivano indipendentemente
-    // dalla Scuola delle Maghe -> contano tutte le Maghe in campo.
-    const madeleineActive = (my.active_effects || []).some(
-      e => e.type === 'madeleine_prodigy_any_school'
-    );
-    const countable = all.filter(w => {
-      const d = getCardDef(w.instance_id) || {};
-      if (madeleineActive && def.school === 'incantesimo') return d.species === 'maga';
-      return d.school === def.school;
-    }).length;
-    return countable >= def.cost && def.cost > 0;
+    // Prodigio: almeno tante Maghe quanto il costo, di cui almeno una della Scuola
+    const mages = all.map(w => getCardDef(w.instance_id)).filter(d => d && d.species === 'maga');
+    return mages.length >= def.cost && mages.some(d => d.school === def.school);
   }
 
   function getAllWarriors(player) {

@@ -49,6 +49,8 @@ from engine.cards import get_card, WarriorCard, SpellCard, BuildingCard
 from engine.deck import get_base_card_id
 from engine.actions import (
     ActionError,
+    _madeleine_free_action,
+    _prodigy_active,
     _troni_blocked,
     play_warrior,
     play_building,
@@ -141,6 +143,7 @@ def _play_actions(state: GameState, player_id: str, difficulty: str,
                   threat: Optional["_ThreatModel"] = None,
                   deadline: Optional[float] = None, step=None) -> None:
     player = state.get_player(player_id)
+    _play_free_spells(state, player_id, difficulty, threat, step)
     while player.actions_remaining > 0:
         if difficulty == "hard":
             # Anche con una sola Azione rimasta la valutazione a fine turno
@@ -152,6 +155,46 @@ def _play_actions(state: GameState, player_id: str, difficulty: str,
             done = _play_best_single(state, player_id, difficulty)
         if not done:
             break
+        if step:
+            step()
+        _play_free_spells(state, player_id, difficulty, threat, step)
+
+
+def _play_free_spells(state: GameState, player_id: str, difficulty: str,
+                      threat: Optional["_ThreatModel"] = None, step=None) -> None:
+    """Orda di Madeleine: gli Incantesimi a costo 1 non consumano Azioni, quindi
+    si giocano a parte (anche ad Azioni esaurite), senza togliere posto alle
+    Azioni del turno. 'easy' li gioca sempre; 'normal'/'hard' solo se la
+    simulazione non peggiora l'esito."""
+    while True:
+        player = state.get_player(player_id)
+        free = [
+            c for c in _generate_candidates(state, player_id, difficulty)
+            if c[1][0] == "play_spell"
+            and _madeleine_free_action(player, get_card(get_base_card_id(c[1][1])))
+        ]
+        if not free:
+            return
+        free.sort(key=lambda c: c[0], reverse=True)
+        baseline = None if difficulty == "easy" else _evaluate_outcome(state, player_id, difficulty, threat)
+        played = False
+        for _, spec in free:
+            if baseline is not None:
+                sim = _sim_copy(state)
+                try:
+                    _apply_spec(sim, player_id, spec)
+                except ActionError:
+                    continue
+                if _evaluate_outcome(sim, player_id, difficulty, threat) < baseline:
+                    continue
+            try:
+                _apply_spec(state, player_id, spec)
+                played = True
+                break
+            except ActionError:
+                continue
+        if not played:
+            return
         if step:
             step()
 
@@ -562,8 +605,7 @@ def _best_trono_target(player: Player) -> Optional[str]:
 
 
 def _score_spell(card: SpellCard, player: Player) -> float:
-    same_school = player.mages_by_school().get(card.school, 0)
-    prodigy = same_school >= card.cost
+    prodigy = _prodigy_active(player, card.school, card.cost)
     base = 2.0 + card.cost * 0.5
     return base * 1.6 if prodigy else base
 

@@ -331,9 +331,8 @@ TUTORIAL_ANATOMIA_CARTA = TutorialDef(
         ),
         TutorialStep(
             "spell_prodigy", "Effetto Prodigio",
-            "Sotto la stella piena c'è l'effetto Prodigio, più potente: lo ottieni al posto del Base se le Maghe "
-            "in campo della stessa Scuola della Magia (qui Anatema) sono almeno quante ne indica la stella. Se il "
-            "testo inizia "
+            "Sotto la stella piena c'è l'effetto Prodigio, più potente: lo ottieni al posto del Base se almeno una "
+            "delle Maghe in campo è della stessa Scuola della Magia (qui Anatema). Se il testo inizia "
             "con «&», si aggiunge al Base invece di sostituirlo.",
             card_focus=_focus("ardolancio", _RECT_EFFECT_BOTTOM),
         ),
@@ -845,9 +844,9 @@ def _t7_setup_active(state: GameState) -> None:
 
 
 def _t7_setup_ethereal(state: GameState) -> None:
-    # Velocemento richiede 3 Maghe: si aggiunge Madeleine. Nessun Mana e una
-    # sola Azione, spesa per Velocemento: l'Estrattore si potrà giocare solo
-    # perché diventa Etereo.
+    # Velocemento richiede 3 Maghe: si aggiunge Madeleine (Evelyn, Sortilegio,
+    # ne attiva il Prodigio). Nessun Mana e una sola Azione, spesa per
+    # Velocemento: l'Estrattore si potrà giocare solo perché diventa Etereo.
     me = _human(state)
     _set_vanguard(me, ["evelyn_1", "araminta_1", "madeleine_2"])
     _set_hand(me, ["velocemento_1", "estrattore_1"])
@@ -885,7 +884,7 @@ TUTORIAL_MAGIE = TutorialDef(
         TutorialStep(
             "prodigio_explain", "Effetto Prodigio",
             "Fatto: il lancio Base ha scartato 2 Muri su 2! Ora aggiungiamo Araminta, Maga di Scuola Anatema: "
-            "essendo proprio la Scuola di Ardolancio, il prossimo lancio attiverà il Prodigio, fino a 4 Muri "
+            "basta una Maga della Scuola di Ardolancio perché il prossimo lancio attivi il Prodigio, fino a 4 Muri "
             "invece di 2. Il Bastione Destro del Manichino ne ha esattamente 4.",
             highlight=["my-vanguard"], setup=_t7_setup_add_araminta,
         ),
@@ -921,7 +920,8 @@ TUTORIAL_MAGIE = TutorialDef(
             "ethereal_intro", "Le Carte Eteree",
             "Alcune carte rendono Eterea un'altra carta in mano: una carta Eterea si gioca gratis, senza pagare "
             "Mana o Maghe e senza usare un'Azione. Velocemento rende Eterea una Costruzione e richiede 3 Maghe: "
-            "ti diamo Madeleine e un'Azione per lanciarlo. Non hai Mana.",
+            "ti diamo Madeleine e un'Azione per lanciarlo. Non hai Mana. Nota la stella piena: Velocemento è un "
+            "Sortilegio, e per il Prodigio basta Evelyn, anche se le altre due Maghe sono di Scuole diverse.",
             highlight=["my-vanguard", ">hand-cards"], setup=_t7_setup_ethereal,
         ),
         TutorialStep(
@@ -948,10 +948,10 @@ TUTORIAL_MAGIE = TutorialDef(
         ),
         TutorialStep(
             "outro", "Ottimo lavoro!",
-            "Una carta resta Eterea solo finché non usi un'Azione, dichiari Battaglia o finisci il turno: va "
-            "giocata subito. Ricorda anche che il Prodigio si attiva quando in campo hai almeno tante Maghe della "
-            "Scuola giusta quante ne richiede la Magia, e che le Magie vengono scartate dopo l'uso (salvo rare "
-            "eccezioni). Prova ora «Schieramento e Orde».",
+            "Una carta resta Eterea solo finché non compi un'altra Azione (anche se non la consumi), dichiari "
+            "Battaglia o finisci il turno: va giocata subito. Ricorda anche che il Prodigio si attiva quando tra "
+            "le Maghe in campo ce n'è almeno una della Scuola giusta, e che le Magie vengono scartate dopo l'uso "
+            "(salvo rare eccezioni). Prova ora «Schieramento e Orde».",
             highlight=[],
         ),
     ],

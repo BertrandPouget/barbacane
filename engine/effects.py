@@ -1090,11 +1090,11 @@ def divinazione_effect(
     **kwargs,
 ) -> dict:
     """
-    Base: il prossimo turno ottieni +1 Mana per ogni tua Maga di Scuola Incantesimo.
+    Base: il prossimo turno ottieni +1 Mana.
     Prodigio (sostituisce): il prossimo turno ottieni +1 Mana per ogni tua Maga.
     Deferred effect.
     """
-    effect_type = "divinazione_all_mage" if prodigy else "divinazione_incantesimo"
+    effect_type = "divinazione_all_mage" if prodigy else "divinazione_base"
     player.active_effects.append({
         "type": effect_type,
         "expires": "start_of_next_own_turn",
@@ -1706,16 +1706,16 @@ def joseph_horde(state: GameState, player: Player, warrior_iid: Optional[str] = 
 
 @register_effect("madeleine_horde")
 def madeleine_horde(state: GameState, player: Player, **kwargs) -> dict:
-    """I Prodigi dei tuoi Incantesimi si attivano indipendentemente dalla Scuola delle Maghe."""
+    """Gli Incantesimi a costo 1 che giochi non consumano Azioni (vedi play_spell)."""
     player.active_effects.append({
-        "type": "madeleine_prodigy_any_school",
+        "type": "madeleine_free_action",
         "school": "incantesimo",
     })
     state.recent_events.append({
         "type": "horde", "card": "madeleine",
-        "player_id": player.id, "incantesimo_prodigy_any_school": True,
+        "player_id": player.id, "incantesimo_free_action": True,
     })
-    return {"incantesimo_prodigy_any_school": True}
+    return {"incantesimo_free_action": True}
 
 
 @register_effect("eracle_horde")

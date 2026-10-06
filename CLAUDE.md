@@ -66,7 +66,7 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 - **Bot**: girano in background **solo se almeno un umano è connesso**; il turno è calcolato tutto, salvato, poi raccontato al tavolo mossa per mossa (`bot_step`). Un turno da 3–4 s è accettabile: non sacrificare la forza per la velocità. Magie non gestite: `_SPELL_EFFECT_EXCLUDE`.
 - **Cronaca**: le informazioni coperte (pescate, Muri, scarti dalla mano) vanno in `private_text`, mai nel testo pubblico. Una carta nuova che produce eventi/log merita una frase in `_tell_log`/`_tell_event`.
 - **Tutorial**: `card_focus` usa rettangoli in % sull'immagine della carta: se cambia il layout di `card.html` vanno ritarati. Selettori mobile in `_MOBILE_HIGHLIGHT_MAP`.
-- **Modalità Test**: nome `Test`/`Test2` → carte di `data/test_cards.json` in cima al mazzo, 10 Mana e 5 Azioni a turno.
+- **Modalità Test**: nome `Test`/`Test2` → carte di `data/test_cards.json` in cima al mazzo, 10 Mana e 3 Azioni a turno.
 - Rivincita e ripresa partita: `POST /game/rematch` (`state.mode` distingue i casi), `frontend/session.js`.
 
 ## Modello dati
@@ -104,6 +104,7 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 
 - **Adiacenza**: il Bastione destro confina col sinistro del primo giocatore **vivo** a destra. Logica duplicata in `battle.py`, `frontend/renderer.js`, `frontend/mobile/render.js`, `frontend/mobile/app.js`: cambiarla ovunque.
 - **Massimo 2 Azioni** è scritto anche lato client (`maxActions` in `app.js`).
+- **Regola del Prodigio**: `_prodigy_active` in `actions.py` (usata anche da `bot.py`), ricopiata nei client per il targeting (`_computeSpellProdigy` desktop, `computeSpellProdigy` mobile). La stella delle minicarte usa invece `prodigy_ready` dal server.
 - Nessun salto turno automatico per disconnessione: solo con timer di lobby (`turn_timer > 0`).
 - Partite `vs-…` e tutorial hanno una sola riga in `players` (`player_1`).
 - **Transizioni** (`motion.js`): i client ridisegnano tutto a ogni `state_update`; si anima solo ciò che ha `data-instance-id`. Gli avversari sul desktop sono riassunti senza carte: le loro animazioni sono in `_animateOpponents`.

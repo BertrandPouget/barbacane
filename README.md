@@ -38,7 +38,7 @@ In locale la persistenza usa un file SQLite (`barbacane.db`) creato automaticame
 
 ### Modalità Test
 
-Entrando con il nome `Test` o `Test2`, le carte elencate in `data/test_cards.json` finiscono in cima al mazzo (e quindi nella mano iniziale), e a ogni turno si ricevono 10 Mana e 5 Azioni. È il modo più rapido per provare una carta specifica senza dover giocare i turni di preparazione.
+Entrando con il nome `Test` o `Test2`, le carte elencate in `data/test_cards.json` finiscono in cima al mazzo (e quindi nella mano iniziale), e a ogni turno si ricevono 10 Mana e 3 Azioni. È il modo più rapido per provare una carta specifica senza dover giocare i turni di preparazione.
 
 ## Come si Gioca
 
@@ -66,7 +66,7 @@ I giocatori siedono in cerchio: il Bastione destro di ciascuno confina con il Ba
 ### Tipi di Carta
 
 - **Guerrieri** (Reclute ed Eroi): hanno ATT, GIT e DIF e una Specie; le Reclute evolvono negli Eroi corrispondenti, che ne ereditano l'effetto Orda
-- **Magie** (Anatemi, Sortilegi, Incantesimi): costo in Maghe anziché Mana; attivano il Prodigio se le Maghe della stessa Scuola in campo sono sufficienti
+- **Magie** (Anatemi, Sortilegi, Incantesimi): costo in Maghe anziché Mana; attivano il Prodigio se almeno una delle Maghe in campo è della stessa Scuola
 - **Costruzioni**: piazzate incomplete con effetto Base, completabili con un'azione aggiuntiva per sbloccare l'effetto Completo
 - **Muri**: qualsiasi carta può essere convertita in Muro per assorbire danni in Battaglia
 

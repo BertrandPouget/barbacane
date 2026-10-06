@@ -1397,7 +1397,7 @@ const App = (() => {
   }
 
   function _showBanner(player) {
-    const maxActions = (player.name === 'Test' || player.name === 'Test2') ? 5 : 2;
+    const maxActions = (player.name === 'Test' || player.name === 'Test2') ? 3 : 2;
     const actNum = maxActions - player.actions_remaining + 1;
     document.getElementById('banner-turn-label').textContent =
       `Azione ${actNum} · ${player.actions_remaining} rimast${player.actions_remaining === 1 ? 'a' : 'e'}`;
@@ -1739,7 +1739,7 @@ const App = (() => {
       if (actionMode === 'play_card' || actionMode === null) {
         const player = currentState.players.find(p => p.id === myPlayerId);
         const isEtherealCard = player && player.ethereal_card === instanceId;
-        if (player && (player.actions_remaining > 0 || isEtherealCard)) {
+        if (player && (player.actions_remaining > 0 || isEtherealCard || _isFreeActionSpell(player, def))) {
           actionLabel = 'Gioca';
           onAction = () => { Renderer.closeCardDetail(); showPlayOptions(instanceId, def); };
         }
@@ -1911,6 +1911,12 @@ const App = (() => {
     });
   }
 
+  // Orda di Madeleine: gli Incantesimi a costo 1 non consumano Azioni
+  function _isFreeActionSpell(player, def) {
+    return !!def && def.type === 'spell' && def.school === 'incantesimo' && def.cost === 1 &&
+      (player.active_effects || []).some(e => e.type === 'madeleine_free_action');
+  }
+
   function _computeSpellProdigy(def) {
     if (!currentState) return false;
     const me = currentState.players.find(p => p.id === myPlayerId);
@@ -1921,18 +1927,9 @@ const App = (() => {
       ...(me.field.bastion_left.warriors || []),
       ...(me.field.bastion_right.warriors || []),
     ];
-    // Orda Madeleine: i Prodigi degli Incantesimi si attivano indipendentemente
-    // dalla Scuola delle Maghe -> contano tutte le Maghe in campo.
-    const madeleineActive = (me.active_effects || []).some(
-      e => e.type === 'madeleine_prodigy_any_school'
-    );
-    const countable = allWarriors.filter(w => {
-      const d = getCardDef(w.instance_id);
-      if (!d) return false;
-      if (madeleineActive && def.school === 'incantesimo') return d.species === 'maga';
-      return d.school === def.school;
-    }).length;
-    return countable >= def.cost && def.cost > 0;
+    // Prodigio: almeno tante Maghe quanto il costo, di cui almeno una della Scuola
+    const mages = allWarriors.map(w => getCardDef(w.instance_id)).filter(d => d && d.species === 'maga');
+    return mages.length >= def.cost && mages.some(d => d.school === def.school);
   }
 
   function _showSpellOptions(instanceId, def) {

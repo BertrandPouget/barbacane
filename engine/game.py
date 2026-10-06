@@ -206,7 +206,7 @@ def _begin_turn(state: GameState) -> None:
     # Modalità test: mana e azioni illimitate per il giocatore "Test"
     if player.name in ("Test", "Test2"):
         player.mana_remaining = 10
-        player.actions_remaining = 5
+        player.actions_remaining = 3
 
     # Effetti Costruzioni a inizio turno (estrattore, biblioteca, fucina completata)
     _trigger_building_start(state, player)
@@ -346,24 +346,21 @@ def _process_deferred_effects(state: GameState, player: Player) -> None:
         if eff.get("expires") != "start_of_next_own_turn":
             continue
         etype = eff.get("type")
+        mana = 0
         if etype == "investimento_deferred":
             mana = eff.get("mana", 2)
-            player.mana_remaining += mana
-            _apply_scrigno_bonus(player, mana)
-        elif etype == "divinazione_incantesimo":
-            count = sum(
-                1 for w in player.mages_in_field()
-                if CARD_REGISTRY.get(w.base_card_id) and
-                getattr(CARD_REGISTRY[w.base_card_id], "school", None) == "incantesimo"
-            )
-            if count > 0:
-                player.mana_remaining += count
-                _apply_scrigno_bonus(player, count)
+        elif etype == "divinazione_base":
+            mana = 1
         elif etype == "divinazione_all_mage":
-            count = len(player.mages_in_field())
-            if count > 0:
-                player.mana_remaining += count
-                _apply_scrigno_bonus(player, count)
+            mana = len(player.mages_in_field())
+        if mana > 0:
+            player.mana_remaining += mana
+            # Il Mana arriva ora: la cronaca lo racconta in questo turno
+            state.recent_events.append({
+                "type": "mana", "card": etype.split("_")[0],
+                "player_id": player.id, "mana_gained": mana,
+                "scrigno_bonus": _apply_scrigno_bonus(player, mana),
+            })
         elif etype == "equipotenza_own":
             warrior_iid = eff.get("warrior_iid")
             for w in player.all_warriors():
@@ -718,7 +715,7 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
                 e for e in p.active_effects
                 if e.get("type") in {
                     "spell_immune", "guerremoto", "investimento_deferred",
-                    "divinazione_incantesimo", "divinazione_all_mage", "equipotenza_own",
+                    "divinazione_base", "divinazione_all_mage", "equipotenza_own",
                 }
             ],
             "spell_immune": any(e.get("type") == "spell_immune" for e in p.active_effects),
