@@ -75,8 +75,8 @@ const CardArt = (() => {
         const tower = _el('span', 'mc-sym');
         tower.innerHTML = _symbol(TOWER_PATH, true);
         band.appendChild(tower);
-      } else if (def.completion_cost > 0 && !def.auto_complete) {
-        band.appendChild(_el('span', 'mc-gem', String(def.completion_cost)));
+      } else if (!def.auto_complete) {
+        band.appendChild(_el('span', 'mc-gem', String(def.completion_cost || 0)));
       }
       band.title = done ? 'Completata' : `Non completata: costo per completarla ${def.completion_cost}`;
     } else if (def.type === 'spell') {

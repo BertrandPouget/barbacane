@@ -44,7 +44,7 @@ const Renderer = (() => {
   // Guerrieri, Muri e Costruzioni), così non cresce durante la partita.
   // ---------------------------------------------------------------------------
 
-  const CARD_RATIO = 99 / 143;   // larghezza / altezza delle minicarte
+  const CARD_RATIO = 7 / 10;     // larghezza / altezza delle minicarte (280×400)
   const CARD_H_MIN = 90;
   const CARD_H_MAX = 190;
   const FIT_RESERVE = 12;        // margine per il pannello azioni che va a capo

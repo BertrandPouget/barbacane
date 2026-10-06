@@ -1397,7 +1397,7 @@ const App = (() => {
   }
 
   function _showBanner(player) {
-    const maxActions = (player.name === 'Test' || player.name === 'Test2') ? 3 : 2;
+    const maxActions = (player.name === 'Test' || player.name === 'Test2') ? 5 : 2;
     const actNum = maxActions - player.actions_remaining + 1;
     document.getElementById('banner-turn-label').textContent =
       `Azione ${actNum} · ${player.actions_remaining} rimast${player.actions_remaining === 1 ? 'a' : 'e'}`;

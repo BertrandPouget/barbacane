@@ -38,7 +38,7 @@ In locale la persistenza usa un file SQLite (`barbacane.db`) creato automaticame
 
 ### Modalità Test
 
-Entrando con il nome `Test` o `Test2`, le carte elencate in `data/test_cards.json` finiscono in cima al mazzo (e quindi nella mano iniziale), e a ogni turno si ricevono 10 Mana e 3 Azioni. È il modo più rapido per provare una carta specifica senza dover giocare i turni di preparazione.
+Entrando con il nome `Test` o `Test2`, le carte elencate in `data/test_cards.json` finiscono in cima al mazzo (e quindi nella mano iniziale), e a ogni turno si ricevono 10 Mana e 5 Azioni. È il modo più rapido per provare una carta specifica senza dover giocare i turni di preparazione.
 
 ## Come si Gioca
 

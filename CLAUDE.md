@@ -66,7 +66,7 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 - **Bot**: girano in background **solo se almeno un umano è connesso**; il turno è calcolato tutto, salvato, poi raccontato al tavolo mossa per mossa (`bot_step`). Un turno da 3–4 s è accettabile: non sacrificare la forza per la velocità. Magie non gestite: `_SPELL_EFFECT_EXCLUDE`.
 - **Cronaca**: le informazioni coperte (pescate, Muri, scarti dalla mano) vanno in `private_text`, mai nel testo pubblico. Una carta nuova che produce eventi/log merita una frase in `_tell_log`/`_tell_event`.
 - **Tutorial**: `card_focus` usa rettangoli in % sull'immagine della carta: se cambia il layout di `card.html` vanno ritarati. Selettori mobile in `_MOBILE_HIGHLIGHT_MAP`.
-- **Modalità Test**: nome `Test`/`Test2` → carte di `data/test_cards.json` in cima al mazzo, 10 Mana e 3 Azioni a turno.
+- **Modalità Test**: nome `Test`/`Test2` → carte di `data/test_cards.json` in cima al mazzo, 10 Mana e 5 Azioni a turno.
 - Rivincita e ripresa partita: `POST /game/rematch` (`state.mode` distingue i casi), `frontend/session.js`.
 
 ## Modello dati

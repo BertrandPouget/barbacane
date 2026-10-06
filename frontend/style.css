@@ -1239,11 +1239,13 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   position: absolute;
   left: 8px;
   bottom: 6px;
-  height: calc(var(--card-h-field) + 26px);
+  /* 24px per l'etichetta, 6px sotto: il dorso finisce alla stessa altezza
+     delle carte in mano */
+  height: calc(var(--card-h-field) + 30px);
   width: calc(var(--card-w-field) + 10px);
   justify-content: flex-end;
   align-items: center;
-  padding: 0 4px 4px 4px;
+  padding: 0 4px 6px 4px;
 }
 
 /* Carte attive — specchio simmetrico di .region.life-deck */
@@ -1251,11 +1253,11 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   position: absolute;
   right: 8px;
   bottom: 6px;
-  height: calc(var(--card-h-field) + 26px);
+  height: calc(var(--card-h-field) + 30px);
   width: calc(var(--card-w-field) + 10px);
   justify-content: flex-end;
   align-items: center;
-  padding: 0 4px 4px 4px;
+  padding: 0 4px 6px 4px;
 }
 
 /* Mano */
@@ -1495,6 +1497,10 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
    tutte le carte hanno la stessa misura */
 .card.has-art[data-type] { border-width: 1px; }
 .card.has-art:not(:hover):not(.selected):not(.wall-marked) { border-color: transparent; }
+/* Cornice oro uniforme: senza questa regola il bordo sinistro manterrebbe il
+   colore del tipo (.card[data-type], più specifica di .card:hover) */
+.card.has-art[data-type]:hover { border-color: var(--gold); }
+.card.has-art[data-type].selected { border-color: var(--gold-light); }
 .card.has-art > :not(.card-art):not(.card-cost-badge):not(.card-keep) { display: none; }
 /* La minicarta (.mc), disegnata in HTML: posizioni in % della carta (la
    minicarta è progettata a 280×400 con cornice di 13), testi in cqw (larghezza
@@ -1778,8 +1784,9 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   width: var(--card-w-field);
   min-width: var(--card-w-field);
   height: var(--card-h-field);
+  /* Bordo trasparente come le minicarte: il dorso ha la misura della loro illustrazione */
   padding: 0;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 6px;  /* in px: i cqw qui si misurerebbero sul contenitore esterno */
   background: transparent;
   overflow: hidden;

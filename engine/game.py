@@ -206,7 +206,7 @@ def _begin_turn(state: GameState) -> None:
     # Modalità test: mana e azioni illimitate per il giocatore "Test"
     if player.name in ("Test", "Test2"):
         player.mana_remaining = 10
-        player.actions_remaining = 3
+        player.actions_remaining = 5
 
     # Effetti Costruzioni a inizio turno (estrattore, biblioteca, fucina completata)
     _trigger_building_start(state, player)
