@@ -1429,6 +1429,9 @@ input {
 }
 #hand .card.wall-marked:active { border-color: #8a6a20; }
 
+/* Carta non giocabile ora (Azioni esaurite) */
+#hand .card.unplayable { opacity: 0.4; filter: grayscale(0.6); }
+
 .hand-empty {
   width: 100%;
   text-align: center;

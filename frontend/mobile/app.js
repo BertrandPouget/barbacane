@@ -1117,6 +1117,8 @@ const Mob = (() => {
   function refreshDock() {
     const dock = $('dock');
     dock.innerHTML = '';
+    // Le carte della mano sono riusate tra un render e l'altro: si riaccendono qui
+    document.querySelectorAll('#hand .card.unplayable').forEach(c => c.classList.remove('unplayable'));
     if (!currentState) return;
     const my = me();
     Render.phaseDimmed(!isMyTurn());
@@ -1180,7 +1182,16 @@ const Mob = (() => {
         dock.appendChild(mkBtn('🧱', '', enterWallMode, !hasCards, 'dock-wall'));
         dock.appendChild(mkBtn('›', '', () => sendAction('next_phase', {}), false, 'dock-next'));
       } else {
-        dock.appendChild(hint(hasEthereal ? 'Gioca la carta eterea o avanza' : 'Azioni esaurite'));
+        // Orda di Madeleine: gli Incantesimi a costo 1 restano giocabili, le altre carte si spengono
+        const freeSpells = my && (my.hand || []).some(iid => isFreeActionSpell(my, getCardDef(iid)));
+        if (freeSpells) {
+          document.querySelectorAll('#hand .card').forEach(c => {
+            const iid = c.dataset.instanceId;
+            c.classList.toggle('unplayable', my.ethereal_card !== iid && !isFreeActionSpell(my, getCardDef(iid)));
+          });
+        }
+        dock.appendChild(hint(freeSpells ? 'Puoi ancora giocare gli Incantesimi a costo 1'
+          : hasEthereal ? 'Gioca la carta eterea o avanza' : 'Azioni esaurite'));
         dock.appendChild(mkBtn('Schieramento ›', 'mbtn-gold mbtn-pulse', () => sendAction('next_phase', {}), false, 'dock-next'));
       }
 

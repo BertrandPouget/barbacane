@@ -1328,7 +1328,7 @@ const App = (() => {
     });
 
     if (phase === 'action') {
-      if (player && player.actions_remaining > 0) {
+      if (player && (player.actions_remaining > 0 || _hasFreeActionSpells(player))) {
         _showBanner(player);
       } else {
         document.getElementById('action-hint').textContent = 'Nessuna azione rimasta.';
@@ -1399,15 +1399,18 @@ const App = (() => {
   function _showBanner(player) {
     const maxActions = (player.name === 'Test' || player.name === 'Test2') ? 5 : 2;
     const actNum = maxActions - player.actions_remaining + 1;
-    document.getElementById('banner-turn-label').textContent =
-      `Azione ${actNum} · ${player.actions_remaining} rimast${player.actions_remaining === 1 ? 'a' : 'e'}`;
+    // Azioni finite: con l'Orda di Madeleine restano giocabili gli Incantesimi a costo 1
+    const noActions = player.actions_remaining <= 0;
+    document.getElementById('banner-turn-label').textContent = noActions
+      ? 'Azioni esaurite · Incantesimi a costo 1 gratuiti'
+      : `Azione ${actNum} · ${player.actions_remaining} rimast${player.actions_remaining === 1 ? 'a' : 'e'}`;
 
     const hasCards = player.hand && player.hand.length > 0;
     const hasIncomplete = (player.field.village.buildings || []).some(b => !b.completed);
 
     document.getElementById('banner-btn-play').disabled     = !hasCards;
-    document.getElementById('banner-btn-complete').disabled = !hasIncomplete;
-    document.getElementById('banner-btn-wall').disabled     = !hasCards;
+    document.getElementById('banner-btn-complete').disabled = noActions || !hasIncomplete;
+    document.getElementById('banner-btn-wall').disabled     = noActions || !hasCards;
 
     document.getElementById('action-banner').classList.remove('hidden');
     document.getElementById('action-hint').textContent = '';
@@ -1419,6 +1422,19 @@ const App = (() => {
     document.getElementById('action-banner').classList.add('hidden');
     document.getElementById('btn-cancel-action').classList.remove('hidden');
     document.getElementById('action-hint').textContent = 'Clicca una carta dalla mano.';
+    _updatePlayableMarkings();
+  }
+
+  // Senza Azioni restano "accese" solo le carte giocabili (Incantesimi a costo 1 con
+  // l'Orda di Madeleine, carta eterea)
+  function _updatePlayableMarkings() {
+    const player = currentState && currentState.players.find(p => p.id === myPlayerId);
+    const dim = actionMode === 'play_card' && player && player.actions_remaining <= 0;
+    document.querySelectorAll('#hand-cards .card').forEach(card => {
+      const iid = card.dataset.instanceId;
+      const playable = !dim || player.ethereal_card === iid || _isFreeActionSpell(player, getCardDef(iid));
+      card.classList.toggle('unplayable', !playable);
+    });
   }
 
   function enterCompleteBuildingMode() {
@@ -1476,10 +1492,12 @@ const App = (() => {
     document.getElementById('action-hint').textContent = '';
     document.getElementById('selection-info').classList.add('hidden');
     document.querySelectorAll('#hand-cards .card.wall-marked').forEach(c => c.classList.remove('wall-marked'));
+    document.querySelectorAll('#hand-cards .card.unplayable').forEach(c => c.classList.remove('unplayable'));
 
     if (!currentState || currentState.current_player_id !== myPlayerId) return;
     const player = currentState.players.find(p => p.id === myPlayerId);
-    if (player && player.actions_remaining > 0) _showBanner(player);
+    if (player && currentState.phase === 'action' &&
+        (player.actions_remaining > 0 || _hasFreeActionSpells(player))) _showBanner(player);
   }
 
   // ---------------------------------------------------------------------------
@@ -1915,6 +1933,10 @@ const App = (() => {
   function _isFreeActionSpell(player, def) {
     return !!def && def.type === 'spell' && def.school === 'incantesimo' && def.cost === 1 &&
       (player.active_effects || []).some(e => e.type === 'madeleine_free_action');
+  }
+
+  function _hasFreeActionSpells(player) {
+    return (player.hand || []).some(iid => _isFreeActionSpell(player, getCardDef(iid)));
   }
 
   function _computeSpellProdigy(def) {

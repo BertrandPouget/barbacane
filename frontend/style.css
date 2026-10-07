@@ -2517,6 +2517,9 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   transform: translateY(-3px);
 }
 
+/* Carta non giocabile ora (Azioni esaurite) */
+.card.unplayable { opacity: 0.4; filter: grayscale(0.6); }
+
 /* ==================== RESPONSIVE ==================== */
 
 /* La dimensione delle carte di mano e campo sul tavolo è calcolata in base allo
