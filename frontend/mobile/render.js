@@ -556,7 +556,9 @@ const Render = (() => {
     const img = el('img', { alt: def.name, draggable: 'false' });
     front.appendChild(img);
     const back = el('div', { className: 'flip-face flip-back' });
-    if (ctx.realBack) {
+    // Girando la carta si vede il retro (come nel catalogo); la scheda testuale
+    // resta solo se la chiamata la chiede (ctx.textBack)
+    if (!ctx.textBack) {
       back.classList.add('flip-back-img');
       back.appendChild(el('img', { alt: 'Retro carta', draggable: 'false', src: '/card_images/full/retro.png' }));
     } else {

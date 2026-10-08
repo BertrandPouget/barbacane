@@ -1,0 +1,12 @@
+<!-- Cornice a bastione dei pannelli dei menu (border-image, slice 30): solo
+     il contorno. Il marrone del pannello è un riempimento CSS con la stessa
+     sagoma (.menu-frame::before, clip-path): dentro l'immagine, stirata a
+     pezzi, la trasparenza lascerebbe righe più scure nei punti di taglio. Le punte
+     hanno un tratto più sottile dei lati: le diagonali, nette, altrimenti
+     sembrerebbero più spesse dei lati dritti, che cadono tra due pixel. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="90" height="90" viewBox="0 0 90 90">
+  <polyline points="26,16 64,16" fill="none" stroke-linecap="round" stroke="#b98a3e" stroke-width="1.1" stroke-linejoin="miter"/>
+  <polyline points="74,26 74,74 16,74 16,26" fill="none" stroke-linecap="round" stroke="#b98a3e" stroke-width="1.1" stroke-linejoin="miter"/>
+  <polyline points="16,26 6,6 26,16" fill="none" stroke-linecap="round" stroke="#b98a3e" stroke-width="0.9" stroke-linejoin="miter" stroke-miterlimit="3"/>
+  <polyline points="64,16 84,6 74,26" fill="none" stroke-linecap="round" stroke="#b98a3e" stroke-width="0.9" stroke-linejoin="miter" stroke-miterlimit="3"/>
+</svg>

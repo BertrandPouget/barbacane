@@ -1,0 +1,6 @@
+<!-- Fregio sotto i titoli dei pannelli dei menu -->
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="12" viewBox="0 0 140 12">
+  <path d="M2 6 L58 4.8 L58 7.2 Z M138 6 L82 4.8 L82 7.2 Z" fill="#b98a3e"/>
+  <path d="M70 0.5 L76 6 L70 11.5 L64 6 Z" fill="#fbc402" stroke="#5a3518" stroke-width="1"/>
+  <path d="M60 6 L62 4 L64 6 L62 8 Z M80 6 L78 4 L76 6 L78 8 Z" fill="#b98a3e"/>
+</svg>

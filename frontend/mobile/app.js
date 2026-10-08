@@ -32,6 +32,7 @@ const Mob = (() => {
   let timerSecondsLeft = 0;
 
   let lobbyPollTimer = null;
+  let goToMultiPage = () => {};  // pagina di Crea partita / Unisciti (setupPager)
   let _lastTurnPlayer = null;
 
   // True mentre stiamo abbandonando la partita: ignora gli update in arrivo
@@ -224,7 +225,7 @@ const Mob = (() => {
     const code = pendingJoinCode;
     pendingJoinCode = null;
     Screens.show('multi');
-    $('tab-join').click();
+    goToMultiPage(1, false);  // Unisciti
     $('in-join-code').value = code;
     Toast.show(`Invito alla lobby ${code}: scegli il tuo nome ed entra`);
   }
@@ -240,7 +241,7 @@ const Mob = (() => {
         if (e && e.name === 'AbortError') return;  // condivisione annullata
       }
     }
-    const done = () => Toast.show('Link d\'invito copiato!', 'success');
+    const done = () => Toast.show('Link d\'invito copiato', 'success');
     const text = Invite.message(code);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(done).catch(() => Toast.show(text));
@@ -249,28 +250,38 @@ const Mob = (() => {
     }
   }
 
+  // Pagine che scorrono di lato, una alla volta (home, Crea partita /
+  // Unisciti): i pallini sotto indicano la pagina e toccandoli ci si sposta.
+  // Restituisce goTo(i, smooth) per spostarsi da codice.
+  function setupPager(strip, dotsBox) {
+    const pages = [...strip.children];
+    const dots = [...dotsBox.children];
+    let current = 0;
+    const step = () => pages[1].offsetLeft - pages[0].offsetLeft;
+    const goTo = (i, smooth = true) =>
+      strip.scrollTo({ left: i * step(), behavior: smooth ? 'smooth' : 'auto' });
+
+    strip.addEventListener('scroll', () => {
+      const i = Math.max(0, Math.min(pages.length - 1, Math.round(strip.scrollLeft / step())));
+      if (i === current) return;
+      current = i;
+      dots.forEach((d, j) => d.classList.toggle('on', j === i));
+    }, { passive: true });
+    dots.forEach((d, i) => d.addEventListener('click', () => goTo(i)));
+    return goTo;
+  }
+
   // ---------------------------------------------------------------------------
   // Lobby
   // ---------------------------------------------------------------------------
 
   function bindLobbyUI() {
-    // Tabs
-    const tabs = document.querySelector('.seg-tabs');
-    $('tab-create').addEventListener('click', () => {
-      tabs.classList.remove('join');
-      $('tab-create').classList.add('on'); $('tab-join').classList.remove('on');
-      $('pane-create').hidden = false; $('pane-join').hidden = true;
-    });
-    $('tab-join').addEventListener('click', () => {
-      tabs.classList.add('join');
-      $('tab-join').classList.add('on'); $('tab-create').classList.remove('on');
-      $('pane-join').hidden = false; $('pane-create').hidden = true;
-    });
+    // Crea partita / Unisciti
+    goToMultiPage = setupPager($('multi-pager'), $('multi-dots'));
 
     $('btn-create').addEventListener('click', onCreateLobby);
     $('btn-join').addEventListener('click', onJoinLobby);
     $('btn-start').addEventListener('click', onStartGame);
-    $('btn-add-bot').addEventListener('click', () => { haptic(); editLobby('/lobby/add_bot'); });
     document.querySelectorAll('.wait-diff-btn').forEach(btn => {
       btn.addEventListener('click', () => { haptic(); editLobby('/lobby/bot_difficulty', { difficulty: btn.dataset.diff }); });
     });
@@ -319,8 +330,8 @@ const Mob = (() => {
     });
 
     // Sfida un Bot
-    $('btn-mode-single').addEventListener('click', () => { haptic(); Screens.show('bot-difficulty'); });
-    $('btn-mode-multi').addEventListener('click', () => { haptic(); Screens.show('multi'); });
+    $('btn-mode-play').addEventListener('click', () => { haptic(); Screens.show('multi'); });
+    setupPager($('home-modes'), $('home-dots'));
     $('multi-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
     $('wait-back').addEventListener('click', () => { haptic(); leaveWaitingRoom(); });
     $('bot-diff-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
@@ -385,8 +396,10 @@ const Mob = (() => {
   function renderTutorialListGrid() {
     const list = $('tut-list');
     list.innerHTML = '';
-    tutorialsMeta.forEach(t => {
-      const item = el('div', { className: 'tut-item' }, [
+    tutorialsMeta.forEach((t, i) => {
+      const n = tutorialsMeta.length;
+      const stack = n === 1 ? '' : i === 0 ? ' menu-frame-alto' : i === n - 1 ? ' menu-frame-basso' : ' menu-frame-centro';
+      const item = el('div', { className: 'tut-item menu-frame' + stack }, [
         el('div', { className: 'tut-item-title' }, [t.title]),
         el('div', { className: 'tut-item-desc' }, [t.description]),
         el('div', { className: 'tut-item-steps' }, [`${t.step_count} passi`]),
@@ -644,7 +657,7 @@ const Mob = (() => {
       title: def.name,
       subtitle: catalogSubtitle(def),
       def,
-      ctx: { realBack: true },
+      ctx: {},
       pos: { idx, total: catalogList.length },
       onPrev: idx > 0 ? () => showCatalogCard(idx - 1) : null,
       onNext: idx < catalogList.length - 1 ? () => showCatalogCard(idx + 1) : null,
@@ -693,6 +706,8 @@ const Mob = (() => {
   function showWaitingRoom(lobby) {
     lobbyCode = lobby.lobby_code;
     $('wait-code-text').textContent = lobby.lobby_code;
+    waitingSeatsKey = '';
+    $('wait-players').innerHTML = '';
     updateWaitingRoom(lobby);
     $('wait-status').textContent = '';
     Screens.show('wait');
@@ -713,51 +728,83 @@ const Mob = (() => {
   }
 
   let waitingPlayers = [];
+  let waitingSeatsKey = '';
+  const LOBBY_SEATS = 4;
+  // Colore di ogni posto nella sala d'attesa: quello delle quattro specie
+  const SEAT_SPECIES = ['elfo', 'nano', 'maga', 'umano'];
 
   function updateWaitingRoom(lobby) {
     // Il creatore può cambiare: se esce, il ruolo passa al primo umano rimasto
     isCreator = lobby.creator_id === myPlayerId;
-    $('btn-start').hidden = !isCreator;
-    $('wait-bots').hidden = !isCreator;
     waitingPlayers = lobby.players || [];
     updateWaitingPlayers(waitingPlayers);
+
+    const n = waitingPlayers.length;
+    $('btn-start').hidden = !isCreator;
     $('btn-start').disabled = !lobby.can_start;
-    $('btn-add-bot').disabled = waitingPlayers.length >= 4;
+    // La difficoltà serve solo se c'è almeno un Bot
+    $('wait-bots').hidden = !isCreator || !waitingPlayers.some(p => p.is_bot);
+    const difficulty = lobby.bot_difficulty || 'normal';
     document.querySelectorAll('.wait-diff-btn').forEach(btn => {
-      btn.classList.toggle('on', btn.dataset.diff === (lobby.bot_difficulty || 'normal'));
+      const on = btn.dataset.diff === difficulty;
+      btn.classList.toggle('on', on);
+      btn.setAttribute('aria-checked', on ? 'true' : 'false');
     });
   }
 
-  // Ordine dei posti al tavolo: i Bastioni confinano con quelli dei vicini,
-  // quindi il creatore può riordinare i giocatori (e rimuovere i Bot).
+  // Posti al tavolo: l'ordine conta perché i Bastioni confinano con quelli dei
+  // vicini, quindi il creatore può riordinare i giocatori (e rimuovere i Bot).
+  // Il polling arriva ogni 2 s: si ridisegna solo se è cambiato qualcosa,
+  // altrimenti l'elenco sfarfalla.
   function updateWaitingPlayers(players) {
+    const key = JSON.stringify([isCreator, myPlayerId, players.map(p => [p.player_id, p.name, p.is_bot])]);
+    if (key === waitingSeatsKey) return;
+    waitingSeatsKey = key;
+
     const list = $('wait-players');
+    const shown = new Set([...list.querySelectorAll('[data-pid]')].map(n => n.dataset.pid));
     list.innerHTML = '';
-    players.forEach((p, i) => {
+    for (let i = 0; i < LOBBY_SEATS; i++) {
+      const p = players[i];
+      const hex = el('span', { className: 'seat-hex' }, [el('span', {}, [String(i + 1)])]);
+      const style = `--seat-color: var(--${SEAT_SPECIES[i]})`;
+      if (!p) {
+        // Il Bot si siede nel primo posto libero: il pulsante sta lì
+        const add = isCreator && i === players.length
+          ? el('button', {
+              className: 'seat-add', 'aria-label': 'Aggiungi un Bot in questo posto',
+              onclick: () => { haptic(); editLobby('/lobby/add_bot'); },
+            }, ['+ Bot'])
+          : null;
+        list.appendChild(el('div', { className: 'wait-seat empty', style },
+          [hex, el('span', { className: 'seat-name' }, ['Posto libero']), add]));
+        continue;
+      }
       const tag = p.is_bot ? 'Bot' : (p.player_id === myPlayerId ? 'tu' : '');
+      // Etichetta sotto il nome: in riga lascerebbe poco spazio ai nomi lunghi
       const children = [
-        el('span', { className: 'wait-seat' }, [`${i + 1}.`]),
-        el('span', { className: p.is_bot ? 'dot bot' : 'dot' }),
-        el('span', { className: 'wait-name' }, [p.name]),
-        tag ? el('span', { className: 'wait-tag' }, [tag]) : null,
+        hex,
+        el('span', { className: 'seat-who' }, [
+          el('span', { className: 'seat-name' }, [p.name]),
+          tag ? el('span', { className: 'seat-tag' }, [tag]) : null,
+        ]),
       ];
       if (isCreator) {
         const seatBtn = (label, ariaLabel, disabled, onClick) => el('button', {
-          className: 'wait-seat-btn', 'aria-label': ariaLabel,
+          className: 'seat-btn', 'aria-label': ariaLabel,
           disabled: disabled ? '' : null,
           onclick: () => { haptic(); onClick(); },
         }, [label]);
-        children.push(
+        children.push(el('span', { className: 'seat-tools' }, [
           seatBtn('▲', 'Sposta su', i === 0, () => moveWaitingPlayer(i, -1)),
           seatBtn('▼', 'Sposta giù', i === players.length - 1, () => moveWaitingPlayer(i, 1)),
-        );
-        if (p.is_bot) {
-          children.push(seatBtn('✕', 'Rimuovi Bot', false,
-            () => editLobby('/lobby/remove_bot', { bot_id: p.player_id })));
-        }
+          p.is_bot ? seatBtn('✕', 'Rimuovi Bot', false,
+            () => editLobby('/lobby/remove_bot', { bot_id: p.player_id })) : null,
+        ]));
       }
-      list.appendChild(el('div', { className: 'wait-player' }, children));
-    });
+      const cls = 'wait-seat' + (p.is_bot ? ' bot' : '') + (shown.size && !shown.has(p.player_id) ? ' seat-enter' : '');
+      list.appendChild(el('div', { className: cls, style, dataset: { pid: p.player_id } }, children));
+    }
   }
 
   function moveWaitingPlayer(index, delta) {
@@ -1656,6 +1703,14 @@ const Mob = (() => {
   }
 
   // Sheet carta con navigazione precedente/successiva
+  // Valori attuali di un Guerriero in campo, se diversi da quelli stampati
+  // (bonus e malus): prima stavano sul retro testuale della carta.
+  function liveStatsLabel(def, w) {
+    if (!def || def.type !== 'warrior' || !w) return '';
+    if (w.att === def.att && w.git === def.git && w.dif === def.dif) return '';
+    return ` · 🗡️${w.att} 🏹${w.git} 🛡️${w.dif}`;
+  }
+
   function showCardNavSheet({ title, subtitle, def, ctx = {}, pos, onPrev, onNext, footer = [], refresh = null }) {
     const body = [Render.cardViewNode(def, ctx)];
     if (onPrev || onNext) {
@@ -1921,7 +1976,7 @@ const Mob = (() => {
 
     Sheet.open({
       title: w.name || iid,
-      subtitle: `${zoneLabel}${w.horde_active ? ' · ⚡ Orda attiva' : ''}` +
+      subtitle: `${zoneLabel}${w.horde_active ? ' · ⚡ Orda attiva' : ''}${liveStatsLabel(def, w)}` +
         (canMove ? '' : ' — spostabile nella fase Schieramento'),
       body: Render.cardViewNode(def, { att: w.att, git: w.git, dif: w.dif, instanceId: iid }),
       footer,
@@ -2575,7 +2630,7 @@ const Mob = (() => {
     footer.push({ label: '‹ Indietro', onClick: () => openOpponentSheet(owner.id) });
     Sheet.open({
       title: w.name || w.instance_id,
-      subtitle: `di ${owner.name}`,
+      subtitle: `di ${owner.name}${liveStatsLabel(def, w)}`,
       body: Render.cardViewNode(def, { att: w.att, git: w.git, dif: w.dif }),
       footer,
       // Il Guerriero si ritrova per instance id nel campo attuale del proprietario

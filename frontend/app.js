@@ -214,9 +214,9 @@ const App = (() => {
     document.getElementById('btn-create').addEventListener('click', onCreateLobby);
     document.getElementById('btn-join').addEventListener('click', onJoinLobby);
     document.getElementById('btn-start').addEventListener('click', onStartGame);
-    document.getElementById('btn-add-bot').addEventListener('click', () => editLobby('/lobby/add_bot'));
-    document.getElementById('waiting-bot-difficulty').addEventListener('change', (e) =>
-      editLobby('/lobby/bot_difficulty', { difficulty: e.target.value }));
+    document.querySelectorAll('#waiting-bot-controls .wait-diff-btn').forEach(btn => {
+      btn.addEventListener('click', () => editLobby('/lobby/bot_difficulty', { difficulty: btn.dataset.diff }));
+    });
     document.getElementById('btn-end-turn').addEventListener('click', onEndTurn);
     document.getElementById('btn-battle').addEventListener('click', onBattleClick);
     document.getElementById('btn-horde').addEventListener('click', onHordeClick);
@@ -294,8 +294,7 @@ const App = (() => {
     });
 
     // Sfida un Bot
-    document.getElementById('btn-mode-single').addEventListener('click', () => Renderer.showScreen('bot-difficulty'));
-    document.getElementById('btn-mode-multi').addEventListener('click', () => Renderer.showScreen('multiplayer'));
+    document.getElementById('btn-mode-play').addEventListener('click', () => Renderer.showScreen('multiplayer'));
     document.getElementById('btn-multiplayer-back').addEventListener('click', () => Renderer.showScreen('lobby'));
     document.getElementById('btn-waiting-leave').addEventListener('click', leaveWaitingRoom);
     document.getElementById('btn-invite-link').addEventListener('click', copyInviteLink);
@@ -355,12 +354,17 @@ const App = (() => {
     }
   }
 
+  // Cornice di un pannello in una pila: punte solo sui lati liberi
+  function stackFrame(i, n) {
+    return n === 1 ? '' : i === 0 ? 'menu-frame-alto' : i === n - 1 ? 'menu-frame-basso' : 'menu-frame-centro';
+  }
+
   function renderTutorialListGrid() {
     const grid = document.getElementById('tutorial-list-grid');
     grid.innerHTML = '';
-    tutorialsMeta.forEach(t => {
+    tutorialsMeta.forEach((t, i) => {
       const card = document.createElement('div');
-      card.className = 'tutorial-card';
+      card.className = `tutorial-card menu-frame clickable ${stackFrame(i, tutorialsMeta.length)}`;
       card.innerHTML = `
         <div class="tutorial-card-title">${t.title}</div>
         <div class="tutorial-card-desc">${t.description}</div>
@@ -672,6 +676,8 @@ const App = (() => {
   function showWaitingRoom(lobby) {
     lobbyCode = lobby.lobby_code;
     document.getElementById('lobby-code-text').textContent = lobby.lobby_code;
+    waitingSeatsKey = '';
+    document.getElementById('waiting-players').innerHTML = '';
     updateWaitingRoom(lobby);
     document.getElementById('waiting-status').textContent = '';
     Renderer.showScreen('waiting');
@@ -691,35 +697,71 @@ const App = (() => {
   }
 
   let waitingPlayers = [];
+  let waitingSeatsKey = '';
+  const LOBBY_SEATS = 4;
+  // Colore di ogni posto nella sala d'attesa: quello delle quattro specie
+  const SEAT_SPECIES = ['elfo', 'nano', 'maga', 'umano'];
 
   function updateWaitingRoom(lobby) {
     // Il creatore può cambiare: se esce, il ruolo passa al primo umano rimasto
     isCreator = lobby.creator_id === myPlayerId;
-    document.getElementById('btn-start').style.display = isCreator ? 'block' : 'none';
-    document.getElementById('waiting-bot-controls').style.display = isCreator ? 'flex' : 'none';
     waitingPlayers = lobby.players;
     updateWaitingPlayers(lobby.players);
-    document.getElementById('btn-start').disabled = !lobby.can_start;
-    document.getElementById('btn-add-bot').disabled = lobby.players.length >= 4;
-    const diff = document.getElementById('waiting-bot-difficulty');
-    if (document.activeElement !== diff) diff.value = lobby.bot_difficulty || 'normal';
+
+    const n = lobby.players.length;
+    const start = document.getElementById('btn-start');
+    start.hidden = !isCreator;
+    start.disabled = !lobby.can_start;
+    // La difficoltà serve solo se c'è almeno un Bot
+    document.getElementById('waiting-bot-controls').hidden = !isCreator || !lobby.players.some(p => p.is_bot);
+    const difficulty = lobby.bot_difficulty || 'normal';
+    document.querySelectorAll('#waiting-bot-controls .wait-diff-btn').forEach(btn => {
+      const on = btn.dataset.diff === difficulty;
+      btn.classList.toggle('on', on);
+      btn.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
   }
 
-  // Ordine dei posti al tavolo: i Bastioni confinano con quelli dei vicini,
-  // quindi il creatore può riordinare i giocatori (e rimuovere i Bot).
+  // Posti al tavolo: l'ordine conta perché i Bastioni confinano con quelli dei
+  // vicini, quindi il creatore può riordinare i giocatori (e rimuovere i Bot).
+  // Il polling arriva ogni 2 s: si ridisegna solo se è cambiato qualcosa,
+  // altrimenti l'elenco sfarfalla (e i pulsanti perdono l'hover).
   function updateWaitingPlayers(players) {
+    const key = JSON.stringify([isCreator, myPlayerId, players.map(p => [p.player_id, p.name, p.is_bot])]);
+    if (key === waitingSeatsKey) return;
+    waitingSeatsKey = key;
+
     const list = document.getElementById('waiting-players');
+    const shown = new Set([...list.querySelectorAll('[data-pid]')].map(n => n.dataset.pid));
     list.innerHTML = '';
-    players.forEach((p, i) => {
-      const item = document.createElement('div');
-      item.className = 'player-list-item';
+    for (let i = 0; i < LOBBY_SEATS; i++) {
+      const p = players[i];
+      const seat = document.createElement('div');
+      seat.style.setProperty('--seat-color', `var(--${SEAT_SPECIES[i]})`);
+      const hex = `<span class="seat-hex"><span>${i + 1}</span></span>`;
+      if (!p) {
+        seat.className = 'wait-seat empty';
+        seat.innerHTML = `${hex}<span class="seat-name">Posto libero</span>`;
+        // Il Bot si siede nel primo posto libero: il pulsante sta lì
+        if (isCreator && i === players.length) {
+          const add = document.createElement('button');
+          add.className = 'seat-add';
+          add.textContent = '+ Bot';
+          add.title = 'Aggiungi un Bot in questo posto';
+          add.addEventListener('click', () => editLobby('/lobby/add_bot'));
+          seat.appendChild(add);
+        }
+        list.appendChild(seat);
+        continue;
+      }
+      seat.className = 'wait-seat' + (p.is_bot ? ' bot' : '') + (shown.size && !shown.has(p.player_id) ? ' seat-enter' : '');
+      seat.dataset.pid = p.player_id;
       const tag = p.is_bot ? 'Bot' : (p.player_id === myPlayerId ? 'tu' : '');
-      item.innerHTML = `<span class="seat">${i + 1}.</span>`
-        + `<span class="dot${p.is_bot ? ' bot' : ''}"></span>`
-        + `<span class="name"></span>`
-        + (tag ? `<span class="tag">${tag}</span>` : '');
-      item.querySelector('.name').textContent = p.name;
+      seat.innerHTML = `${hex}<span class="seat-name"></span>` + (tag ? `<span class="seat-tag">${tag}</span>` : '');
+      seat.querySelector('.seat-name').textContent = p.name;
       if (isCreator) {
+        const tools = document.createElement('span');
+        tools.className = 'seat-tools';
         const btn = (label, title, disabled, onClick) => {
           const b = document.createElement('button');
           b.className = 'seat-btn';
@@ -727,16 +769,15 @@ const App = (() => {
           b.title = title;
           b.disabled = disabled;
           b.addEventListener('click', onClick);
-          item.appendChild(b);
+          tools.appendChild(b);
         };
         btn('▲', 'Sposta su', i === 0, () => moveWaitingPlayer(i, -1));
         btn('▼', 'Sposta giù', i === players.length - 1, () => moveWaitingPlayer(i, 1));
-        if (p.is_bot) {
-          btn('✕', 'Rimuovi Bot', false, () => editLobby('/lobby/remove_bot', { bot_id: p.player_id }));
-        }
+        if (p.is_bot) btn('✕', 'Rimuovi Bot', false, () => editLobby('/lobby/remove_bot', { bot_id: p.player_id }));
+        seat.appendChild(tools);
       }
-      list.appendChild(item);
-    });
+      list.appendChild(seat);
+    }
   }
 
   function moveWaitingPlayer(index, delta) {
@@ -3173,7 +3214,7 @@ const App = (() => {
 function returnToLobby() { App.returnToLobby(); }
 function copyInviteLink() {
   _copyText(Invite.message(document.getElementById('lobby-code-text').textContent.trim()),
-            'Link d\'invito copiato: mandalo ai tuoi amici!');
+            'Link d\'invito copiato');
 }
 
 function _copyText(text, done) {

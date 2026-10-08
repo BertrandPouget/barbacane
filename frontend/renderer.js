@@ -1070,6 +1070,15 @@ const Renderer = (() => {
 
       document.getElementById('card-detail-img').src = imgSrc;
 
+      // Ogni carta si apre sul fronte (senza animazione di ritorno); un clic la gira
+      const flip = document.getElementById('card-flip');
+      const flipInner = flip.querySelector('.card-flip-inner');
+      flipInner.style.transition = 'none';
+      flip.classList.remove('flipped');
+      void flipInner.offsetWidth;
+      flipInner.style.transition = '';
+      flip.onclick = () => flip.classList.toggle('flipped');
+
       const actionBtn = document.getElementById('card-img-action');
       if (actionLabel && onAction) {
         actionBtn.textContent = actionLabel;

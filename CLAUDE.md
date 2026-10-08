@@ -17,11 +17,12 @@ Scopo: evitare che un Claude futuro **sbagli** o perda molto tempo. Non è docum
 ## Stato e convenzioni
 
 - Gioco **completo e in produzione** (tutte le carte di `data/cards.json` implementate). Deploy automatico da GitHub su Render free tier + Postgres Neon: https://barbacane-online.onrender.com (`render.yaml`). Lavoro corrente: rifinitura.
-- **Nomi delle modalità** (identici in home desktop e mobile, da usare nei testi per gli utenti): **Giocatore Singolo**, **Multigiocatore**, **Tutorial**, **Catalogo Carte**.
+- **Voci della home** (identiche su desktop e mobile, da usare nei testi per gli utenti): **Gioca** (Crea/Unisciti lobby, Bot compresi), **Tutorial**, **Catalogo**.
 - **Lingua**: commenti e messaggi al giocatore in italiano; rispondere all'utente in italiano.
 - **Python**: conda, ambiente `barbacane`. Avvio: `python main.py` → `http://localhost:8000` (desktop), `/m` (mobile; `?desktop=1` forza il desktop).
 - **Due client separati** con lo stesso protocollo: desktop `frontend/` (`app.js`, `renderer.js`, `style.css`) e mobile `frontend/mobile/` (`app.js`, `render.js`, `mobile.css`, con una sua copia della palette). **Ogni modifica di UI va fatta su entrambi.**
 - **Estetica**: la UI riusa il linguaggio delle carte (Caudex, palette, nastri/esagoni di `card_factory/assets/card.html`). Solo CSS/JS vanilla, niente librerie.
+- **Pannelli dei menu**: classe `.menu-frame` (cornice con angoli a punta, SVG in `assets/frames/` via border-image), niente bordi arrotondati. Non chiamarla `.bastion`: è la classe dei Bastioni in partita (`.region.bastion`). Sta in fondo a entrambi i CSS: una regola con `#id` sul pannello la scavalca. Gli SVG vanno salvati in UTF-8, se no il browser li scarta in silenzio.
 - **Nessuna test suite**: `python -m engine.game` simula una partita; per il resto script nello scratchpad con `create_game`/`create_practice_game`. UI: server + nome giocatore `Test`.
 - Regole autoritative: `assets/rules.md`. Testo delle carte: `data/cards.json` (unica fonte per motore, frontend e card_factory).
 
@@ -62,7 +63,7 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 ## Modalità di partita
 
 - **Multigiocatore**: le lobby vivono **solo in memoria** (un riavvio perde le sale d'attesa, non le partite avviate). Ordine della lobby = ordine di `state.players` = adiacenza. I Bot non hanno riga in `players`.
-- **Giocatore Singolo**: game_id `vs-…`, umano primo, timer disattivato.
+- **Giocatore Singolo** (schermata `bot-difficulty`, non più raggiungibile dalla home): game_id `vs-…`, umano primo, timer disattivato.
 - **Bot**: girano in background **solo se almeno un umano è connesso**; il turno è calcolato tutto, salvato, poi raccontato al tavolo mossa per mossa (`bot_step`). Un turno da 3–4 s è accettabile: non sacrificare la forza per la velocità. Magie non gestite: `_SPELL_EFFECT_EXCLUDE`.
 - **Cronaca**: le informazioni coperte (pescate, Muri, scarti dalla mano) vanno in `private_text`, mai nel testo pubblico. Una carta nuova che produce eventi/log merita una frase in `_tell_log`/`_tell_event`.
 - **Tutorial**: `card_focus` usa rettangoli in % sull'immagine della carta: se cambia il layout di `card.html` vanno ritarati. Selettori mobile in `_MOBILE_HIGHLIGHT_MAP`.

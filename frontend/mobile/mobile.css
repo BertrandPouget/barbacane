@@ -40,6 +40,7 @@
   --hex-ink:    #5a2d06;
   --card-ink:   #171009;   /* fondo su cui sono renderizzati i PNG delle carte */
 
+
   --danger: var(--red-light);
   --ok:     var(--green-light);
   --info:   var(--blue-light);
@@ -267,8 +268,7 @@ input {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: none; }
 }
-.lobby-scroll.reveal > .home-modes  { animation: lobby-reveal 0.5s ease both 0.32s; }
-.lobby-scroll.reveal > .home-extras { animation: lobby-reveal 0.5s ease both 0.46s; }
+.lobby-scroll.reveal > .pager-wrap { animation: lobby-reveal 0.5s ease both 0.32s; }
 
 /* ═══════════════════════ LOBBY ═══════════════════════ */
 
@@ -288,7 +288,7 @@ input {
 
 .lobby-hero { text-align: center; padding: 8px 0 4px; }
 .lobby-logo {
-  width: 150px; height: auto;
+  width: 200px; height: auto;
 }
 .lobby-title {
   font-size: clamp(1.4rem, 7.4vw, 2.1rem);
@@ -299,46 +299,23 @@ input {
   text-shadow: 0 0 20px rgba(200, 168, 75, 0.5);
 }
 
-.seg-tabs {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  border-radius: var(--r-md);
-  padding: 4px;
-  overflow: hidden;
-  border: 1px solid var(--border-gold);
-  background: var(--bg-medium);
-}
-.seg-tab {
-  position: relative;
-  z-index: 1;
-  padding: 10px 0;
-  border-radius: var(--r-sm);
-  font-weight: 600;
-  font-size: 0.95rem;
-  color: var(--text-dim);
-  transition: color 0.25s;
-}
-.seg-tab.on { color: var(--bg-dark); }
-.seg-thumb {
-  position: absolute;
-  top: 4px; bottom: 4px; left: 4px;
-  width: calc(50% - 4px);
-  border-radius: var(--r-sm);
-  background: var(--gold);
-  border: 1px solid var(--border-gold);
-  transition: transform 0.3s var(--ease-out);
-}
-.seg-tabs.join .seg-thumb { transform: translateX(100%); }
-
 .lobby-pane {
-  border-radius: var(--r-lg);
-  padding: 20px 18px;
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  padding: 6px 4px;
   display: flex;
   flex-direction: column;
   gap: 15px;
-  background: var(--bg-medium);
-  border: 1px solid var(--border-gold);
+}
+.pane-title {
+  color: var(--card-cream);
+  font-size: 1.45rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  text-align: center;
+  margin-bottom: 2px;
 }
 
 .fld { display: flex; flex-direction: column; gap: 7px; }
@@ -373,78 +350,99 @@ input {
 }
 .cta:disabled { opacity: 0.45; }
 
-/* Home: le due modalità, pannelli verticali affiancati con l'aspetto dei
-   pannelli Crea / Unisciti */
-.home-modes {
+/* Pagine che scorrono di lato, una alla volta (scroll-snap), con sotto i
+   pallini: quello acceso segue lo scorrimento (setupPager). Usate nella home
+   (Gioca, Tutorial, Catalogo) e in Crea partita / Unisciti. */
+.pager-wrap { display: flex; flex-direction: column; gap: 14px; }
+
+.pager {
   display: flex;
-  gap: 10px;
+  /* si scorre solo di lato: niente movimento verticale (le figure sporgono di
+     qualche pixel sotto il banner) né rimbalzo ai bordi */
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.pager::-webkit-scrollbar { display: none; }
+
+.pager-dots { display: flex; justify-content: center; gap: 10px; }
+.pager-dots span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--border-gold);
+  opacity: 0.55;
+  transition: background 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+}
+.pager-dots span.on {
+  background: var(--gold);
+  opacity: 1;
+  box-shadow: 0 0 6px rgba(251, 196, 2, 0.55);
 }
 
 .home-mode {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 0 0 100%;
+  height: 370px;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;  /* uno strappo veloce non salta il banner di mezzo */
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 14px 6px;
-  background: var(--bg-medium);
-  border: 1px solid var(--border-gold);
-  border-radius: var(--r-lg);
+  padding: 8px 0 0;
   text-align: center;
-  transition: filter 0.15s;
-}
-.home-mode:active { filter: brightness(1.15); }
-
-.home-mode-title {
-  color: var(--gold);
-  font-size: 0.98rem;
-  font-weight: 700;
+  --frame-size: 26px;
 }
 
+/* Titolo con sotto la descrizione, in alto */
+.home-mode-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 14px;
+}
 .home-mode-desc {
-  min-height: 4.05em;  /* 3 righe: stessa altezza nei due pannelli */
   color: var(--text-dim);
-  font-size: 0.74rem;
-  line-height: 1.35;
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+.home-mode-title {
+  color: var(--card-cream);
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
 }
 
-/* Illustrazione della modalità. Le figure sono ritagliate sul contenuto in
-   assets/home/. Le illustrazioni originali condividono la stessa tela, ma
-   Reinhold e Araminta vi hanno la testa più piccola di Patrizio: qui sono
-   ingranditi del 20% perché le tre teste risultino simili. L'area ha
-   un'altezza fissa (la figura più alta) e le figure poggiano sul suo fondo,
-   subito sopra la descrizione: essendo le descrizioni alte uguali
-   (min-height), nei due pannelli le figure partono dalla stessa linea. Nella coppia Reinhold (a cui nel PNG è stato
-   tolto il martello, che lo teneva lontano da Araminta) sta a sinistra,
-   davanti: i capelli di Araminta passano dietro di lui. Ad Araminta nel PNG
-   è stato tolto il braccio alzato con la fiamma. Ogni illustrazione è
-   centrata sul busto, cioè sul punto medio dei pixel della riga più bassa
-   della figura (per la coppia, della riga più bassa del gruppo): il
-   translateX è quello scarto, in % della larghezza. La
-   trasparenza è sul gruppo, non sulle singole immagini: dove le figure si
-   sovrappongono quella dietro non traspare attraverso quella davanti. */
+/* Illustrazione: le figure sono ritagliate sul contenuto in assets/home/ e
+   vengono tutte dalla stessa tela delle carte, dove le teste hanno già misure
+   coerenti: si scalano quindi con lo stesso fattore (altezza = altezza del
+   PNG × --art-scale), non alla stessa altezza. Orfeo è ridotto del 10%
+   perché l'elmo è più grande di una testa. Poggiano sul bordo visibile della
+   cornice (margine negativo: il contenuto può invadere l'area del
+   border-image) e sono centrate sul busto, cioè sul punto medio dei pixel
+   della riga più bassa della figura: il translateX è quello scarto, in % della
+   larghezza. */
 .home-mode-art {
-  flex: 0 0 auto;
+  --art-scale: 0.74;
+  flex: 1;
   display: flex;
   justify-content: center;
   align-items: flex-end;
   width: 100%;
-  height: 86px;
-  opacity: 0.7;
+  /* fino al tratto dorato (14/30 del bordo oltre l'area del contenuto): senza
+     questo restano pixel vuoti sotto la figura */
+  margin-bottom: calc(var(--frame-size, 26px) * -14 / 30 + 1px);
+  overflow: hidden;
+  opacity: 0.85;
 }
 
 .home-mode-art img { display: block; flex: 0 0 auto; }
-.art-pair { display: flex; align-items: flex-end; transform: translateX(-5.5%); }
-.art-patrizio { height: 76px; transform: translateX(-10.4%); }
-.art-reinhold { height: 85px; margin-right: -69px; position: relative; z-index: 1; }
-.art-araminta { height: 75px; }
-
-.home-extras {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+.art-patrizio { height: calc(269px * var(--art-scale)); transform: translateX(-10.2%); }
+.art-faust    { height: calc(230px * var(--art-scale)); transform: translateX(0.6%); }
+.art-orfeo    { height: calc(295px * var(--art-scale) * 0.9); transform: translateX(-13.1%); }
 
 /* Partita in corso salvata nel browser */
 .home-resume {
@@ -452,18 +450,12 @@ input {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 12px 14px;
-  border-radius: var(--r-lg);
-  background: linear-gradient(180deg, rgba(251, 196, 2, 0.18), rgba(251, 196, 2, 0.06));
-  border: 1px solid var(--gold);
+  padding: 0 8px;
   font-family: inherit;
 }
 .home-resume[hidden] { display: none; }
-.home-resume-title { color: var(--gold); font-size: 1.05rem; font-weight: 700; }
+.home-resume-title { color: var(--card-cream); font-size: 1.05rem; font-weight: 700; letter-spacing: 0.04em; }
 .home-resume-sub { color: var(--text-dim); font-size: 0.8rem; }
-
-/* Sala d'attesa: invito con link */
-.share-invite { width: 100%; margin-top: 10px; }
 
 /* ═══════════════════════ MULTIGIOCATORE ═══════════════════════ */
 
@@ -522,89 +514,174 @@ input {
   -webkit-overflow-scrolling: touch;
   padding: 20px 20px calc(var(--sab) + 20px);
 }
+/* Scheda centrale (cornice a bastione: classe .menu-frame) */
 .wait-card {
+  --frame-size: 28px;
   width: 100%;
-  background: var(--bg-medium);
-  border: 1px solid var(--border-gold);
-  border-radius: var(--r-lg);
-  padding: 26px 22px;
+  padding: 2px 0 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
   text-align: center;
 }
 
-.code-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  border-radius: var(--r-lg);
-  padding: 13px 24px;
-  font-size: 1.4rem;
-  letter-spacing: 0.1em;
-  color: var(--gold-light);
-  background: var(--bg-medium);
-  border: 2px solid var(--border-gold);
-}
-.code-copy {
-  font-size: 0.66rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  padding: 4px 9px;
-}
-
-.wait-players { display: flex; flex-direction: column; gap: 9px; width: 100%; }
-.wait-player {
+/* Codice in chiaro (tocca per copiarlo), con accanto «Invita» */
+.wait-code-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: var(--bg-medium);
+  gap: 8px;
+  width: 100%;
+  height: 50px;
+}
+.wait-code {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  text-align: center;
+}
+#wait-code-text {
+  color: var(--card-cream);
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+.share-invite { align-self: stretch; padding: 0 20px; }
+
+/* I quattro posti: esagono col numero nel colore del giocatore */
+.wait-seats { display: flex; flex-direction: column; gap: 7px; width: 100%; }
+.wait-seat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 0 6px 0 9px;
+  text-align: left;
+  background: rgba(26, 12, 0, 0.55);
   border: 1px solid var(--border);
+  border-left: 3px solid var(--seat-color);
   border-radius: var(--r-sm);
-  padding: 12px 15px;
-  animation: scr-in 0.35s var(--ease-out);
 }
-.wait-player .dot {
-  width: 9px; height: 9px;
-  border-radius: 50%;
-  background: var(--ok);
+.wait-seat.seat-enter { animation: seat-in 0.35s var(--ease-out) both; }
+@keyframes seat-in {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: none; }
 }
-.wait-player .dot.bot { background: var(--info); }
-.wait-seat { color: var(--text-faint); font-size: 0.85rem; min-width: 1.3em; text-align: left; }
-.wait-name { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wait-tag { color: var(--text-dim); font-size: 0.75rem; font-style: italic; }
-.wait-seat-btn {
-  width: 36px; height: 36px;
+
+.seat-hex {
+  --hex: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  position: relative;
+  isolation: isolate;
+  flex: none;
+  width: 26px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  clip-path: var(--hex);
+  background: var(--hex-border);
+  color: var(--card-cream);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+  font-weight: 800;
+  font-size: 0.9rem;
+  padding-top: 1px;
+}
+.seat-hex::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  z-index: -1;
+  clip-path: var(--hex);
+  background: var(--seat-color);
+}
+
+.seat-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--card-cream);
+  font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.seat-who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.seat-tag {
+  color: var(--gold-light);
+  font-size: 0.6rem;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.wait-seat.bot .seat-tag { color: var(--seat-1); }
+
+.seat-tools { display: flex; gap: 4px; flex: none; }
+.seat-btn {
+  width: 34px; height: 34px;
   flex: none;
   border-radius: var(--r-sm);
-  background: var(--bg-light);
+  background: rgba(26, 12, 0, 0.6);
   border: 1px solid var(--border);
   color: var(--text);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
 }
-.wait-seat-btn:disabled { opacity: 0.3; }
-.wait-player:has(.wait-seat-btn) { padding: 6px 8px 6px 15px; gap: 8px; }
+.seat-btn:disabled { opacity: 0.3; }
 
-.wait-bots { display: flex; flex-direction: column; gap: 10px; width: 100%; }
-.wait-bots[hidden] { display: none; }
-.wait-diff { display: flex; gap: 6px; }
+/* Posto libero: esagono vuoto e filetto sottile, senza barra colorata */
+.wait-seat.empty {
+  background: none;
+  border: 1px solid rgba(160, 104, 32, 0.35);
+}
+.wait-seat.empty .seat-hex { background: rgba(160, 104, 32, 0.6); color: rgba(209, 169, 74, 0.7); }
+.wait-seat.empty .seat-hex::before { background: var(--bg-dark); }
+.wait-seat.empty .seat-name { color: var(--text-dim); font-style: italic; opacity: 0.7; }
+.seat-add {
+  flex: none;
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid var(--border-gold);
+  border-radius: var(--r-sm);
+  color: var(--gold-light);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+.seat-add:active { background: rgba(251, 196, 2, 0.12); }
+
+/* Difficoltà dei Bot: etichetta e scelta centrate sotto i posti */
+.wait-botdiff { display: flex; flex-direction: column; align-items: center; gap: 7px; width: 100%; }
+.wait-botdiff-label {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+.wait-diff {
+  display: flex;
+  width: 100%;
+  border: 1px solid var(--border-gold);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
 .wait-diff-btn {
   flex: 1;
   padding: 9px 4px;
-  border-radius: var(--r-sm);
-  background: var(--bg-medium);
-  border: 1px solid var(--border);
+  background: rgba(26, 12, 0, 0.5);
+  border: none;
   color: var(--text-dim);
-  font-size: 0.85rem;
+  font-size: 0.88rem;
 }
-.wait-diff-btn.on { border-color: var(--gold); color: var(--gold); font-weight: 700; }
-.wait-hint { color: var(--text); font-size: 0.9rem; line-height: 1.5; font-style: italic; }
+.wait-diff-btn + .wait-diff-btn { border-left: 1px solid var(--border); }
+.wait-diff-btn.on { background: var(--gold); color: var(--bg-dark); font-weight: 700; }
+
 .wait-status { color: var(--text-dim); font-size: 0.85rem; min-height: 1.2em; }
-#btn-start { width: 100%; }
+.wait-start { width: 100%; text-transform: uppercase; letter-spacing: 0.06em; }
 
 /* ═══════════════════════ GIOCO ═══════════════════════ */
 
@@ -2096,9 +2173,6 @@ input {
   display: flex;
   flex-direction: column;
   text-align: left;
-  background: var(--bg-medium);
-  border: 1px solid var(--border-gold);
-  border-radius: var(--r-lg);
   overflow: hidden;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -2346,27 +2420,21 @@ input {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 12px 12px calc(var(--sab) + 20px);
+  display: flex;
+  flex-direction: column;
 }
+/* Lista centrata in verticale; se non ci sta, scorre (due distanziatori
+   elastici invece di justify-content, che taglierebbe la parte alta) */
+#tut-scroll::before,
+#tut-scroll::after { content: ''; flex: 1 1 0; }
+#tut-list { flex: 0 0 auto; }
 
-.tut-hint {
-  color: var(--text-dim);
-  font-style: italic;
-  font-size: 0.82rem;
-  text-align: center;
-  margin: 4px 4px 14px;
-}
 
 .tut-item {
-  background: var(--bg-medium);
-  border: 1px solid var(--border-gold);
-  border-radius: var(--r-lg);
-  padding: 14px 16px;
-  margin-bottom: 10px;
-  transition: filter 0.15s;
+  padding: 2px 4px;
 }
-.tut-item:active { filter: brightness(1.2); }
 
-.tut-item-title { color: var(--gold-light); font-size: 1rem; font-weight: 700; }
+.tut-item-title { color: var(--card-cream); font-size: 1rem; font-weight: 700; }
 .tut-item-desc  { color: var(--text); font-size: 0.85rem; margin-top: 4px; }
 .tut-item-steps { color: var(--text-faint); font-size: 0.72rem; margin-top: 6px; font-style: italic; }
 
@@ -2395,7 +2463,7 @@ input {
   padding: 12px 12px calc(var(--sab) + 20px);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 4px;
 }
 
 .bot-count-row {
@@ -2403,7 +2471,7 @@ input {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px 12px;
-  padding: 2px 2px 4px;
+  padding: 2px 13px 6px;  /* allineata al bordo visibile delle cornici sotto */
 }
 .bot-count-label {
   color: var(--card-cream);
@@ -2435,13 +2503,8 @@ input {
   display: block;
   width: 100%;
   text-align: left;
-  background: var(--bg-medium);
-  border: 1px solid var(--border-gold);
-  border-radius: var(--r-lg);
-  padding: 14px 16px;
-  transition: filter 0.15s;
+  padding: 2px 4px;
 }
-.difficulty-card:active { filter: brightness(1.2); }
 .difficulty-card-title { font-size: 1.05rem; font-weight: 700; }
 .difficulty-card-desc  { color: var(--text); font-size: 0.82rem; margin-top: 6px; line-height: 1.35; }
 
@@ -2616,4 +2679,90 @@ input {
 #card-anatomy-panel {
   width: 100%;
   max-width: 420px;
+}
+
+/* ═══════════════════════ CORNICE A BASTIONE ═══════════════════════ */
+/* Pannelli dei menu, come sul desktop: bordi dritti e angoli che sporgono a
+   punta. Il disegno è in assets/frames/ e si applica con border-image (lo
+   sfondo è il fill dell'SVG), così le punte restano della stessa misura a
+   ogni dimensione; --frame-size ne regola la scala. Il bordo visibile sta a
+   circa metà del bordo CSS: il padding va ridotto di conseguenza. Sta in
+   fondo al file per prevalere sugli stili dei pannelli. */
+.menu-frame {
+  --frame-normal: url('/assets/frames/bastione.svg');
+  --frame-hover:  url('/assets/frames/bastione-oro.svg');
+  --frame-img: var(--frame-normal);
+  --frame-fill: rgba(44, 24, 0, 0.8);
+  --u: calc(var(--frame-size, 24px) / 30);
+  border: var(--frame-size, 24px) solid transparent;
+  border-image: var(--frame-img) 30 fill / var(--frame-size, 24px) stretch;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  position: relative;
+  isolation: isolate;
+  transition: filter 0.15s;
+}
+/* Il marrone è un riempimento unico con la sagoma esatta della cornice
+   (rettangolo più punte, clip-path; --u = 1/30 del bordo, come le unità degli
+   SVG), steso fin quasi al centro del tratto dorato. Dentro l'immagine,
+   stirata a pezzi, la trasparenza lascerebbe righe più scure nei punti di
+   taglio; con più riempimenti affiancati (rettangolo + punte) resterebbe una
+   sottile giuntura chiara. */
+.menu-frame::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--frame-size, 24px) * -1);  /* tutto il box, bordo compreso */
+  z-index: -1;
+  background: var(--frame-fill);
+  clip-path: var(--frame-clip);
+  pointer-events: none;
+}
+.menu-frame-small {
+  --frame-size: 18px;
+  --frame-normal: url('/assets/frames/bastione-piccola.svg');
+  --frame-hover:  url('/assets/frames/bastione-piccola-oro.svg');
+}
+
+/* Sagoma del riempimento per ogni forma di cornice */
+.menu-frame { --frame-clip: polygon(calc(16.6 * var(--u)) calc(26 * var(--u)), calc(6 * var(--u)) calc(6 * var(--u)), calc(26 * var(--u)) calc(16.6 * var(--u)), calc(100% - 26 * var(--u)) calc(16.6 * var(--u)), calc(100% - 6 * var(--u)) calc(6 * var(--u)), calc(100% - 16.6 * var(--u)) calc(26 * var(--u)), calc(100% - 16.6 * var(--u)) calc(100% - 26 * var(--u)), calc(100% - 6 * var(--u)) calc(100% - 6 * var(--u)), calc(100% - 26 * var(--u)) calc(100% - 16.6 * var(--u)), calc(26 * var(--u)) calc(100% - 16.6 * var(--u)), calc(6 * var(--u)) calc(100% - 6 * var(--u)), calc(16.6 * var(--u)) calc(100% - 26 * var(--u))); }
+.menu-frame-small { --frame-clip: polygon(calc(16.6 * var(--u)) calc(24 * var(--u)), calc(12 * var(--u)) calc(12 * var(--u)), calc(24 * var(--u)) calc(16.6 * var(--u)), calc(100% - 24 * var(--u)) calc(16.6 * var(--u)), calc(100% - 12 * var(--u)) calc(12 * var(--u)), calc(100% - 16.6 * var(--u)) calc(24 * var(--u)), calc(100% - 16.6 * var(--u)) calc(100% - 24 * var(--u)), calc(100% - 12 * var(--u)) calc(100% - 12 * var(--u)), calc(100% - 24 * var(--u)) calc(100% - 16.6 * var(--u)), calc(24 * var(--u)) calc(100% - 16.6 * var(--u)), calc(12 * var(--u)) calc(100% - 12 * var(--u)), calc(16.6 * var(--u)) calc(100% - 24 * var(--u))); }
+.menu-frame-alto { --frame-clip: polygon(calc(16.6 * var(--u)) calc(26 * var(--u)), calc(6 * var(--u)) calc(6 * var(--u)), calc(26 * var(--u)) calc(16.6 * var(--u)), calc(100% - 26 * var(--u)) calc(16.6 * var(--u)), calc(100% - 6 * var(--u)) calc(6 * var(--u)), calc(100% - 16.6 * var(--u)) calc(26 * var(--u)), calc(100% - 16.6 * var(--u)) calc(100% - 16.6 * var(--u)), calc(16.6 * var(--u)) calc(100% - 16.6 * var(--u))); }
+.menu-frame-basso { --frame-clip: polygon(calc(16.6 * var(--u)) calc(16.6 * var(--u)), calc(100% - 16.6 * var(--u)) calc(16.6 * var(--u)), calc(100% - 16.6 * var(--u)) calc(100% - 26 * var(--u)), calc(100% - 6 * var(--u)) calc(100% - 6 * var(--u)), calc(100% - 26 * var(--u)) calc(100% - 16.6 * var(--u)), calc(26 * var(--u)) calc(100% - 16.6 * var(--u)), calc(6 * var(--u)) calc(100% - 6 * var(--u)), calc(16.6 * var(--u)) calc(100% - 26 * var(--u))); }
+.menu-frame-centro { --frame-clip: polygon(calc(16.6 * var(--u)) calc(16.6 * var(--u)), calc(100% - 16.6 * var(--u)) calc(16.6 * var(--u)), calc(100% - 16.6 * var(--u)) calc(100% - 16.6 * var(--u)), calc(16.6 * var(--u)) calc(100% - 16.6 * var(--u))); }
+.menu-frame-sinistra { --frame-clip: polygon(calc(16.6 * var(--u)) calc(26 * var(--u)), calc(6 * var(--u)) calc(6 * var(--u)), calc(26 * var(--u)) calc(16.6 * var(--u)), calc(100% - 16.6 * var(--u)) calc(16.6 * var(--u)), calc(100% - 16.6 * var(--u)) calc(100% - 16.6 * var(--u)), calc(26 * var(--u)) calc(100% - 16.6 * var(--u)), calc(6 * var(--u)) calc(100% - 6 * var(--u)), calc(16.6 * var(--u)) calc(100% - 26 * var(--u))); }
+.menu-frame-destra { --frame-clip: polygon(calc(16.6 * var(--u)) calc(16.6 * var(--u)), calc(100% - 26 * var(--u)) calc(16.6 * var(--u)), calc(100% - 6 * var(--u)) calc(6 * var(--u)), calc(100% - 16.6 * var(--u)) calc(26 * var(--u)), calc(100% - 16.6 * var(--u)) calc(100% - 26 * var(--u)), calc(100% - 6 * var(--u)) calc(100% - 6 * var(--u)), calc(100% - 26 * var(--u)) calc(100% - 16.6 * var(--u)), calc(16.6 * var(--u)) calc(100% - 16.6 * var(--u))); }
+
+/* Pannelli in pila (elenco dei tutorial): le punte restano solo sui lati
+   liberi e i pannelli si avvicinano sovrapponendo i bordi trasparenti (il
+   tratto visibile sta a 16/30 del bordo CSS: 32/30 del bordo farebbero coincidere i
+   due tratti, +8px lasciano un po' di respiro tra un pannello e l'altro). */
+.menu-frame-alto   { --frame-normal: url('/assets/frames/bastione-alto.svg');   --frame-hover: url('/assets/frames/bastione-alto-oro.svg'); }
+.menu-frame-centro { --frame-normal: url('/assets/frames/bastione-centro.svg'); --frame-hover: url('/assets/frames/bastione-centro-oro.svg'); }
+.menu-frame-basso  { --frame-normal: url('/assets/frames/bastione-basso.svg');  --frame-hover: url('/assets/frames/bastione-basso-oro.svg'); }
+.menu-frame-centro,
+.menu-frame-basso  { margin-top: calc(var(--frame-size, 24px) * -1.0667 + 8px); }
+
+/* Al tocco la cornice si fa d'oro */
+button.menu-frame:active,
+.tut-item.menu-frame:active,
+.menu-frame.menu-frame-gold {
+  --frame-img: var(--frame-hover);
+  --frame-fill: rgba(58, 34, 6, 0.8);
+}
+.difficulty-easy.menu-frame:active { --frame-img: url('/assets/frames/bastione-verde.svg'); }
+.difficulty-hard.menu-frame:active { --frame-img: url('/assets/frames/bastione-rosso.svg'); }
+button.menu-frame:active,
+.tut-item.menu-frame:active {
+  filter: drop-shadow(0 0 10px rgba(251, 196, 2, 0.35));
+}
+
+/* Fregio sotto i titoli dei pannelli */
+.fregio::after {
+  content: '';
+  display: block;
+  width: 110px;
+  height: 10px;
+  margin: 6px auto 0;
+  background: url('/assets/frames/fregio.svg') center / contain no-repeat;
 }

@@ -26,7 +26,7 @@ from engine.models import (
 from engine.cards import CARD_REGISTRY, get_card, WarriorCard, SpellCard, BuildingCard
 from engine.deck import build_deck, draw_cards, get_base_card_id
 from engine.effects import apply_effect
-from engine.battle import resolve_battle, get_valid_attack_targets, battle_building_bonus
+from engine.battle import resolve_battle, get_valid_attack_targets, battle_building_bonus, fossato_block_message
 from engine.actions import (
     ActionError,
     play_warrior,
@@ -633,6 +633,11 @@ def do_battle(
     valid_targets = get_valid_attack_targets(state)
     target_key = (defender_player_index, defender_bastion_side)
     if target_key not in valid_targets:
+        # Bersaglio escluso dal Fossato: spiega perché (e quanta GIT serve)
+        if 0 <= defender_player_index < len(state.players):
+            motivo = fossato_block_message(state, defender_player_index, defender_bastion_side)
+            if motivo:
+                raise ActionError(motivo)
         raise ActionError(f"Bersaglio non valido: giocatore {defender_player_index} bastione {defender_bastion_side}.")
 
     # Applica bonus ATT da effetti "next_battle"

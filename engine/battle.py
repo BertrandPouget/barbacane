@@ -160,6 +160,35 @@ def _fossato_blocks(defender: Player, bastion_side: str, attacker_git: int) -> b
     return False
 
 
+def fossato_block_message(state: GameState, defender_index: int, side: str) -> Optional[str]:
+    """
+    Messaggio per il giocatore se il bersaglio è escluso (solo) dal Fossato:
+    quanta GIT serve e quanta ne ha. None se il Fossato non c'entra (bersaglio
+    non adiacente, avversario eliminato o senza turni completati).
+    """
+    attacker_index = state.current_player_index
+    attacker = state.players[attacker_index]
+    defender = state.players[defender_index]
+    if defender_index == attacker_index or not defender.is_alive or defender.turns_completed < 1:
+        return None
+    guerremoto = any(e.get("type") == "guerremoto" and e.get("any_target")
+                     for e in attacker.active_effects)
+    adjacent = (defender_index, side) in adjacent_bastions(attacker_index, state.players).values()
+    if not (guerremoto or adjacent):
+        return None
+    _, att_git = attacker_stats(attacker)
+    git = attacker_git_vs(attacker, defender, att_git)
+    thresholds = [
+        3 if b.completed else 1
+        for b in defender.field.village.buildings if b.base_card_id == "fossato"
+    ]
+    needed = max(thresholds, default=0)
+    if git >= needed:
+        return None
+    return (f"Il Fossato di {defender.name} blocca gli attacchi con meno di {needed} GIT: "
+            f"la tua GIT è {git}.")
+
+
 # ---------------------------------------------------------------------------
 # Calcolo statistiche da campo
 # ---------------------------------------------------------------------------
@@ -335,7 +364,8 @@ def resolve_battle(
 
     # Verifica Fossato: blocca l'attacco se il GIT è insufficiente
     if _fossato_blocks(defender, defender_bastion_side, att_git):
-        raise ActionError("Il Fossato blocca attacchi con GIT insufficiente")
+        raise ActionError(fossato_block_message(state, defender_player_index, defender_bastion_side)
+                          or "Il Fossato blocca attacchi con GIT insufficiente")
 
     # Statistiche difensore
     def_dif, def_git = defender_stats(defender, defender_bastion_side)
