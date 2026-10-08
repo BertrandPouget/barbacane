@@ -17,6 +17,14 @@ const WS = (() => {
   // Ping HTTP: il traffico WebSocket non azzera il timer di inattività di
   // Render (free tier), quindi serve una richiesta HTTP periodica.
   const HTTP_KEEPALIVE_INTERVAL = 4 * 60 * 1000;
+  // Controllo di vitalità: dopo un ping, se il pong non arriva entro questo
+  // tempo la connessione è considerata morta. Serve soprattutto sul mobile:
+  // quando l'app torna in primo piano il socket risulta ancora OPEN ma spesso
+  // è morto, e le azioni inviate si perderebbero finché il sistema non se ne
+  // accorge (anche minuti).
+  const PONG_TIMEOUT = 6000;
+  let lastPong = 0;
+  let pongWatchdog = null;
 
   const handlers = {};
 
@@ -58,6 +66,7 @@ const WS = (() => {
     };
 
     socket.onmessage = (e) => {
+      lastPong = Date.now();  // qualunque messaggio prova che la linea è viva
       try {
         const msg = JSON.parse(e.data);
         _dispatch(msg.type, msg);
@@ -69,17 +78,49 @@ const WS = (() => {
 
   function _startKeepalive() {
     _stopKeepalive();
-    keepaliveTimer = setInterval(() => {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: 'ping' }));
-      }
-    }, KEEPALIVE_INTERVAL);
+    keepaliveTimer = setInterval(_checkAlive, KEEPALIVE_INTERVAL);
     httpKeepaliveTimer = setInterval(() => {
       fetch('/health').catch(() => {});
     }, HTTP_KEEPALIVE_INTERVAL);
   }
 
+  // Manda un ping e, se entro PONG_TIMEOUT non arriva nulla, riconnette.
+  function _checkAlive() {
+    if (!gameId) return;
+    if (!socket || socket.readyState === WebSocket.CLOSING ||
+        socket.readyState === WebSocket.CLOSED) {
+      _reconnectNow();
+      return;
+    }
+    if (socket.readyState !== WebSocket.OPEN) return;  // sta già connettendo
+    const sentAt = Date.now();
+    try {
+      socket.send(JSON.stringify({ type: 'ping' }));
+    } catch (err) {
+      _reconnectNow();
+      return;
+    }
+    clearTimeout(pongWatchdog);
+    pongWatchdog = setTimeout(() => {
+      if (lastPong < sentAt) {
+        console.warn('[WS] Nessuna risposta dal server, riconnessione');
+        _reconnectNow();
+      }
+    }, PONG_TIMEOUT);
+  }
+
+  // Butta via la connessione attuale e ne apre subito una nuova (il server,
+  // alla connessione, rimanda lo stato della partita).
+  function _reconnectNow() {
+    if (!gameId) return;
+    _teardown();
+    reconnectDelay = 1000;
+    _open();
+  }
+
   function _stopKeepalive() {
+    clearTimeout(pongWatchdog);
+    pongWatchdog = null;
     clearInterval(keepaliveTimer);
     keepaliveTimer = null;
     clearInterval(httpKeepaliveTimer);
@@ -98,6 +139,8 @@ const WS = (() => {
   function send(type, data) {
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       console.warn('[WS] Socket non pronto, messaggio perso:', type);
+      // Niente attesa del backoff: si riprova subito a connettersi
+      if (gameId && (!socket || socket.readyState !== WebSocket.CONNECTING)) _reconnectNow();
       return;
     }
     socket.send(JSON.stringify({ type, ...data }));
@@ -143,6 +186,16 @@ const WS = (() => {
     gameId = null;
     playerId = null;
   }
+
+  // Rientro nell'app / nella scheda: i timer erano congelati e il backoff può
+  // essere arrivato a 30 s. Si verifica subito la connessione.
+  function _onResume() {
+    if (document.visibilityState === 'hidden' || !gameId) return;
+    _checkAlive();
+  }
+  document.addEventListener('visibilitychange', _onResume);
+  window.addEventListener('pageshow', _onResume);
+  window.addEventListener('online', _onResume);
 
   return { connect, send, sendAction, on, off, disconnect };
 })();

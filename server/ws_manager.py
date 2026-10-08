@@ -22,26 +22,49 @@ class ConnectionManager:
         await websocket.accept()
         if game_id not in self._connections:
             self._connections[game_id] = {}
+        old = self._connections[game_id].get(player_id)
         self._connections[game_id][player_id] = websocket
+        # Riconnessione (es. app mobile tornata in primo piano): la vecchia
+        # connessione è spesso mezza morta. La chiudiamo in background, senza
+        # attendere: su un socket morto la chiusura può restare appesa.
+        if old is not None and old is not websocket:
+            asyncio.create_task(self._close_quietly(old))
 
-    def disconnect(self, game_id: str, player_id: str) -> None:
-        if game_id in self._connections:
-            self._connections[game_id].pop(player_id, None)
-            if not self._connections[game_id]:
-                del self._connections[game_id]
+    @staticmethod
+    async def _close_quietly(ws: WebSocket) -> None:
+        try:
+            await asyncio.wait_for(ws.close(), timeout=5)
+        except Exception:
+            pass
+
+    def disconnect(self, game_id: str, player_id: str,
+                   websocket: Optional[WebSocket] = None) -> bool:
+        """Rimuove la connessione del giocatore. Se è indicato `websocket`, la
+        rimuove solo se è ancora quella registrata: la chiusura tardiva di una
+        connessione vecchia non deve staccare quella nuova. Ritorna True se ha
+        rimosso qualcosa."""
+        conns = self._connections.get(game_id)
+        if not conns or player_id not in conns:
+            return False
+        if websocket is not None and conns[player_id] is not websocket:
+            return False
+        del conns[player_id]
+        if not conns:
+            del self._connections[game_id]
+        return True
 
     async def broadcast(self, game_id: str, message: dict) -> None:
         """Invia un messaggio a tutti i giocatori connessi nella partita."""
         if game_id not in self._connections:
             return
         dead = []
-        for player_id, ws in self._connections[game_id].items():
+        for player_id, ws in list(self._connections[game_id].items()):
             try:
                 await ws.send_json(message)
             except Exception:
-                dead.append(player_id)
-        for pid in dead:
-            self.disconnect(game_id, pid)
+                dead.append((player_id, ws))
+        for pid, ws in dead:
+            self.disconnect(game_id, pid, ws)
 
     async def send_to_player(self, game_id: str, player_id: str, message: dict) -> None:
         """Invia un messaggio a un singolo giocatore."""
@@ -50,7 +73,7 @@ class ConnectionManager:
             try:
                 await ws.send_json(message)
             except Exception:
-                self.disconnect(game_id, player_id)
+                self.disconnect(game_id, player_id, ws)
 
     def connected_players(self, game_id: str) -> Set[str]:
         return set(self._connections.get(game_id, {}).keys())

@@ -1211,8 +1211,9 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, player_id: str)
             data = await websocket.receive_json()
             await _handle_ws_message(game_id, player_id, data)
     except WebSocketDisconnect:
-        manager.disconnect(game_id, player_id)
-        if not is_tutorial:
+        # Se nel frattempo il giocatore si è riconnesso, questa è la vecchia
+        # connessione: non va tolta quella nuova né annunciata l'uscita.
+        if manager.disconnect(game_id, player_id, websocket) and not is_tutorial:
             await manager.broadcast(game_id, {
                 "type": "player_disconnected",
                 "player_id": player_id,
