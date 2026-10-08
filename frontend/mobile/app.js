@@ -331,7 +331,6 @@ const Mob = (() => {
 
     // Sfida un Bot
     $('btn-mode-play').addEventListener('click', () => { haptic(); Screens.show('multi'); });
-    setupPager($('home-modes'), $('home-dots'));
     $('multi-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
     $('wait-back').addEventListener('click', () => { haptic(); leaveWaitingRoom(); });
     $('bot-diff-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });

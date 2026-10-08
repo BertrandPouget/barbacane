@@ -351,8 +351,8 @@ input {
 .cta:disabled { opacity: 0.45; }
 
 /* Pagine che scorrono di lato, una alla volta (scroll-snap), con sotto i
-   pallini: quello acceso segue lo scorrimento (setupPager). Usate nella home
-   (Gioca, Tutorial, Catalogo) e in Crea partita / Unisciti. */
+   pallini: quello acceso segue lo scorrimento (setupPager). Usate in
+   Crea partita / Unisciti. */
 .pager-wrap { display: flex; flex-direction: column; gap: 14px; }
 
 .pager {
@@ -383,64 +383,59 @@ input {
   box-shadow: 0 0 6px rgba(251, 196, 2, 0.55);
 }
 
+/* Le tre voci della home: banner orizzontali uno sotto l'altro (insieme
+   occupano più o meno un quadrato), titolo a sinistra e personaggio a destra */
+.home-modes { display: flex; flex-direction: column; }
+
 .home-mode {
-  flex: 0 0 100%;
-  height: 370px;
-  scroll-snap-align: center;
-  scroll-snap-stop: always;  /* uno strappo veloce non salta il banner di mezzo */
+  height: 134px;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 8px 0 0;
-  text-align: center;
-  --frame-size: 26px;
+  align-items: stretch;
+  padding: 0;
+  font-family: inherit;
+  --frame-size: 24px;
 }
 
-/* Titolo con sotto la descrizione, in alto */
 .home-mode-text {
+  flex: 1;
+  align-self: center;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 0 14px;
-}
-.home-mode-desc {
-  color: var(--text-dim);
-  font-size: 1.05rem;
-  line-height: 1.4;
+  gap: 5px;
+  padding-left: 20px;
+  text-align: left;
 }
 .home-mode-title {
   color: var(--card-cream);
-  font-size: 1.75rem;
+  font-size: 1.12rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 2.5px;
+  letter-spacing: 2px;
+}
+.home-mode-desc {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
-/* Illustrazione: le figure sono ritagliate sul contenuto in assets/home/ e
-   vengono tutte dalla stessa tela delle carte, dove le teste hanno già misure
-   coerenti: si scalano quindi con lo stesso fattore (altezza = altezza del
-   PNG × --art-scale), non alla stessa altezza. Orfeo è ridotto del 10%
-   perché l'elmo è più grande di una testa. Poggiano sul bordo visibile della
-   cornice (margine negativo: il contenuto può invadere l'area del
-   border-image) e sono centrate sul busto, cioè sul punto medio dei pixel
-   della riga più bassa della figura: il translateX è quello scarto, in % della
-   larghezza. */
+/* Illustrazione: stesse proporzioni del desktop (vedi style.css). La scala è
+   quella del desktop (0.5) ridotta come lo spazio verticale utile del banner
+   (contenuto + margine sotto: 96px contro 128px), così le figure si fermano
+   allo stesso punto. Poggia sul bordo visibile della cornice (margine
+   negativo) e il translateX la centra sul busto. */
 .home-mode-art {
-  --art-scale: 0.74;
-  flex: 1;
+  --art-scale: 0.375;
+  flex: 0 0 38%;
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  width: 100%;
-  /* fino al tratto dorato (14/30 del bordo oltre l'area del contenuto): senza
-     questo restano pixel vuoti sotto la figura */
-  margin-bottom: calc(var(--frame-size, 26px) * -14 / 30 + 1px);
+  margin-bottom: calc(var(--frame-size, 24px) * -14 / 30 + 1px);
   overflow: hidden;
   opacity: 0.85;
 }
 
 .home-mode-art img { display: block; flex: 0 0 auto; }
-.art-patrizio { height: calc(269px * var(--art-scale)); transform: translateX(-10.2%); }
+.art-patrizio { height: calc(269px * var(--art-scale)); transform: translate(-10.2%, 7.5px); }  /* abbassato: le orecchie toccherebbero il bordo superiore */
 .art-faust    { height: calc(230px * var(--art-scale)); transform: translateX(0.6%); }
 .art-orfeo    { height: calc(295px * var(--art-scale) * 0.9); transform: translateX(-13.1%); }
 
