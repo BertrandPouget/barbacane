@@ -105,11 +105,15 @@ const App = (() => {
     const saved = SavedGame.load(true);
     const state = saved ? await SavedGame.check(saved) : null;
     btn.classList.toggle('hidden', !state);
+    // Con Riprendi in cima al menu, Gioca perde le punte in alto
+    const play = document.getElementById('btn-mode-play');
+    play.classList.toggle('menu-frame-alto', !state);
+    play.classList.toggle('menu-frame-centro', !!state);
     if (!state) return;
     const others = state.players.filter(p => p.id !== saved.playerId).map(p => p.name);
-    const kind = state.mode === 'practice' ? 'Giocatore singolo' : 'Multigiocatore';
+    const kind = state.mode === 'practice' ? 'Giocatore singolo · ' : '';
     document.getElementById('btn-resume-sub').textContent =
-      `${kind} · turno ${state.turn} · contro ${others.join(', ')}`;
+      `${kind}Turno ${state.turn} · contro ${others.join(', ')}`;
   }
 
   // La splash mostra solo il logo: cliccandolo (primo gesto utente, sblocca

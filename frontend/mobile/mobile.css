@@ -438,19 +438,29 @@ input {
 .art-patrizio { height: calc(269px * var(--art-scale)); transform: translate(-10.2%, 7.5px); }  /* abbassato: le orecchie toccherebbero il bordo superiore */
 .art-faust    { height: calc(230px * var(--art-scale)); transform: translateX(0.6%); }
 .art-orfeo    { height: calc(295px * var(--art-scale) * 0.9); transform: translateX(-13.1%); }
-
-/* Partita in corso salvata nel browser */
-.home-resume {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 0 8px;
-  font-family: inherit;
+/* Evelyn eterea: tinta d'oro tenue e semitrasparente come il banner. I
+   capelli e il vento escono dal riquadro dell'illustrazione (overflow
+   visibile, sotto il testo) per non essere tagliati. */
+.home-resume .home-mode-art { overflow: visible; min-width: 0; }  /* min-width: senza, il riquadro si allargherebbe alla figura */
+.home-resume .home-mode-text { position: relative; z-index: 1; }
+.art-evelyn {
+  height: calc(219px * var(--art-scale));
+  transform: translateX(-0.4%);
+  filter: grayscale(1) contrast(0.5) brightness(1.35) sepia(0.6) hue-rotate(12deg) saturate(1.6)
+          drop-shadow(0 0 6px rgba(251, 196, 2, 0.4));
+  opacity: 0.55;
 }
+
+/* Partita in corso salvata nel browser: prima voce del menu (.home-mode),
+   con cornice d'oro e fondo giallo trasparente. I selettori doppi scavalcano
+   le regole di .menu-frame, che stanno in fondo al file. */
 .home-resume[hidden] { display: none; }
-.home-resume-title { color: var(--card-cream); font-size: 1.05rem; font-weight: 700; letter-spacing: 0.04em; }
-.home-resume-sub { color: var(--text-dim); font-size: 0.8rem; }
+.home-resume.menu-frame {
+  --frame-img: var(--frame-hover);
+  --frame-fill: rgba(251, 196, 2, 0.12);
+}
+button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
+.home-resume .home-mode-title { color: var(--gold); }
 
 /* ═══════════════════════ MULTIGIOCATORE ═══════════════════════ */
 
@@ -2168,6 +2178,9 @@ input {
   display: flex;
   flex-direction: column;
   text-align: left;
+  background: var(--bg-medium);
+  border: 1px solid var(--border-gold);
+  border-radius: var(--r-lg);
   overflow: hidden;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;

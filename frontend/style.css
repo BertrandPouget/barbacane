@@ -176,7 +176,7 @@ body::before {
 }
 
 .logo-area { text-align: center; }
-.logo { max-width: 440px; width: 80vw; display: block; margin: 0 auto; }
+.logo { width: min(80vw, 400px, 38vh); display: block; margin: 0 auto; }
 
 /* ==================== SPLASH ==================== */
 
@@ -231,20 +231,16 @@ body::before {
   to   { opacity: 1; transform: translateY(0); }
 }
 .lobby-container.reveal .home-modes  { animation: lobby-reveal 0.5s ease both 0.34s; }
-.lobby-container.reveal .home-resume { animation: lobby-reveal 0.5s ease both 0.28s; }
 
-/* Partita in corso salvata nel browser: larga quanto i banner */
-.home-resume {
-  width: min(100%, 620px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-  padding: 0 1rem;
-  font-family: inherit;
+/* Partita in corso salvata nel browser: prima voce del menu (.home-mode),
+   con cornice d'oro e fondo giallo trasparente. I selettori doppi scavalcano
+   le regole di .menu-frame, che stanno in fondo al file. */
+.home-resume.menu-frame {
+  --frame-img: var(--frame-hover);
+  --frame-fill: rgba(251, 196, 2, 0.12);
 }
-.home-resume-title { color: var(--card-cream); font-size: 1.1rem; font-weight: bold; letter-spacing: 0.04em; }
-.home-resume-sub { color: var(--text-dim); font-size: 0.85rem; }
+button.home-resume.menu-frame:hover { --frame-fill: rgba(251, 196, 2, 0.2); }
+.home-resume .home-mode-title { color: var(--gold); }
 
 /* ==================== HOME ==================== */
 
@@ -257,11 +253,17 @@ body::before {
   align-items: center;
   gap: 0;
   width: min(100%, 620px);
+  /* Altezza dei banner: segue quella della finestra, così 3 o 4 voci più il
+     logo stanno nello schermo. Le figure si scalano con lo spazio verticale
+     utile (altezza - 44px: contenuto più il margine sotto), che a 172px vale
+     256 unità di --art-u = 0.5px, la scala di riferimento. */
+  --mode-h: clamp(124px, 16.5vh, 172px);
+  --art-u: calc((var(--mode-h) - 44px) / 256);
 }
 
 .home-mode {
   width: 100%;
-  height: 172px;
+  height: var(--mode-h);
   display: flex;
   align-items: stretch;
   padding: 0;
@@ -294,14 +296,13 @@ body::before {
 /* Illustrazione: le figure sono ritagliate sul contenuto in assets/home/ e
    vengono tutte dalla stessa tela delle carte, dove le teste hanno già misure
    coerenti: si scalano quindi con lo stesso fattore (altezza = altezza del
-   PNG × --art-scale), non alla stessa altezza. Orfeo è ridotto del 10%
+   PNG × --art-u), non alla stessa altezza. Orfeo è ridotto del 10%
    perché l'elmo è più grande di una testa. Poggiano sul bordo visibile della
    cornice (margine negativo: il contenuto può invadere l'area del
    border-image) e sono centrate sul busto, cioè sul punto medio dei pixel
    della riga più bassa della figura: il translateX è quello scarto, in % della
    larghezza. */
 .home-mode-art {
-  --art-scale: 0.5;
   flex: 0 0 210px;
   display: flex;
   justify-content: center;
@@ -316,9 +317,21 @@ body::before {
 .home-mode:hover .home-mode-art { opacity: 1; }
 
 .home-mode-art img { display: block; flex: 0 0 auto; }
-.art-patrizio { height: calc(269px * var(--art-scale)); transform: translate(-10.2%, 10px); }  /* abbassato: le orecchie toccherebbero il bordo superiore */
-.art-faust    { height: calc(230px * var(--art-scale)); transform: translateX(0.6%); }
-.art-orfeo    { height: calc(295px * var(--art-scale) * 0.9); transform: translateX(-13.1%); }
+.art-patrizio { height: calc(269 * var(--art-u)); transform: translate(-10.2%, calc(20 * var(--art-u))); }  /* abbassato: le orecchie toccherebbero il bordo superiore */
+.art-faust    { height: calc(230 * var(--art-u)); transform: translateX(0.6%); }
+.art-orfeo    { height: calc(295 * var(--art-u) * 0.9); transform: translateX(-13.1%); }
+/* Evelyn eterea: tinta d'oro tenue e semitrasparente come il banner. I
+   capelli e il vento escono dal riquadro dell'illustrazione (overflow
+   visibile, sotto il testo) per non essere tagliati. */
+.home-resume .home-mode-art { overflow: visible; min-width: 0; }  /* min-width: senza, il riquadro si allargherebbe alla figura */
+.home-resume .home-mode-text { position: relative; z-index: 1; }
+.art-evelyn {
+  height: calc(219 * var(--art-u));
+  transform: translateX(-0.4%);
+  filter: grayscale(1) contrast(0.5) brightness(1.35) sepia(0.6) hue-rotate(12deg) saturate(1.6)
+          drop-shadow(0 0 6px rgba(251, 196, 2, 0.4));
+  opacity: 0.55;
+}
 
 /* ==================== MULTIGIOCATORE ==================== */
 
@@ -2222,8 +2235,10 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 }
 
 .gameover-container {
-  --frame-size: 36px;
-  padding: 0.8rem 1rem;
+  background: var(--bg-medium);
+  border: 2px solid var(--border-gold);
+  border-radius: 8px;
+  padding: 2.2rem 2rem;
   min-width: 320px;
   max-width: min(920px, 94vw);
   max-height: 92vh;

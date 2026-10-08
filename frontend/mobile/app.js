@@ -214,10 +214,13 @@ const Mob = (() => {
     const saved = SavedGame.load(true);
     const state = saved && saved.mode !== 'tutorial' ? await SavedGame.check(saved) : null;
     btn.hidden = !state || !!state.tutorial;
+    // Con Riprendi in cima al menu, Gioca perde le punte in alto
+    $('btn-mode-play').classList.toggle('menu-frame-alto', btn.hidden);
+    $('btn-mode-play').classList.toggle('menu-frame-centro', !btn.hidden);
     if (btn.hidden) return;
     const others = state.players.filter(p => p.hand === null || p.hand === undefined).map(p => p.name);
-    const kind = state.mode === 'practice' ? 'Giocatore singolo' : 'Multigiocatore';
-    $('btn-resume-sub').textContent = `${kind} · turno ${state.turn} · contro ${others.join(', ')}`;
+    const kind = state.mode === 'practice' ? 'Giocatore singolo · ' : '';
+    $('btn-resume-sub').textContent = `${kind}Turno ${state.turn} · contro ${others.join(', ')}`;
   }
 
   // Link d'invito: si apre "Unisciti" con il codice già inserito

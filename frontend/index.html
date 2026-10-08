@@ -52,14 +52,14 @@
       <h1 class="game-title" id="lobby-title">BARBACANE</h1>
     </div>
 
-    <!-- Partita in corso salvata nel browser (session.js): compare solo se è ancora in gioco -->
-    <button id="btn-resume" class="home-resume menu-frame menu-frame-gold hidden">
-      <span class="home-resume-title">Riprendi la partita</span>
-      <span id="btn-resume-sub" class="home-resume-sub"></span>
-    </button>
-
     <!-- Le tre voci della home: banner orizzontali, titolo a sinistra e personaggio a destra -->
     <div class="home-modes">
+      <!-- Partita in corso salvata nel browser (session.js): compare solo se è ancora
+           in gioco, come prima voce del menu (Gioca passa allora da alto a centro) -->
+      <button id="btn-resume" class="home-mode home-resume menu-frame menu-frame-alto hidden">
+        <span class="home-mode-text"><span class="home-mode-title">Riprendi</span><span id="btn-resume-sub" class="home-mode-desc"></span></span>
+        <span class="home-mode-art"><img src="/assets/home/evelyn.png" alt="" class="art-evelyn" /></span>
+      </button>
       <button id="btn-mode-play" class="home-mode menu-frame menu-frame-alto">
         <span class="home-mode-text"><span class="home-mode-title">Gioca</span><span class="home-mode-desc">Crea una partita o unisciti a quella di un amico, anche contro i Bot.</span></span>
         <span class="home-mode-art"><img src="/assets/home/patrizio.png" alt="" class="art-patrizio" /></span>
@@ -423,8 +423,8 @@
 
 <!-- ===== SCHERMATA: FINE PARTITA ===== -->
 <div id="screen-gameover" class="screen">
-  <div class="gameover-container menu-frame">
-    <h1 id="gameover-title" class="fregio">Fine Partita</h1>
+  <div class="gameover-container">
+    <h1 id="gameover-title">Fine Partita</h1>
     <p id="gameover-winner"></p>
     <div id="gameover-scores"></div>
     <p id="gameover-rematch-note" class="gameover-note hidden"></p>
