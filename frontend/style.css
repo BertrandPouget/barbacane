@@ -531,7 +531,7 @@ input:focus {
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
-.wait-seat.bot .seat-tag { border-color: rgba(127, 184, 232, 0.55); color: var(--seat-1); }
+.wait-seat .seat-tag { border-color: var(--seat-color); color: var(--seat-color); }
 
 .seat-tools {
   display: flex;

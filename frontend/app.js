@@ -699,8 +699,6 @@ const App = (() => {
   let waitingPlayers = [];
   let waitingSeatsKey = '';
   const LOBBY_SEATS = 4;
-  // Colore di ogni posto nella sala d'attesa: quello delle quattro specie
-  const SEAT_SPECIES = ['elfo', 'nano', 'maga', 'umano'];
 
   function updateWaitingRoom(lobby) {
     // Il creatore può cambiare: se esce, il ruolo passa al primo umano rimasto
@@ -737,7 +735,8 @@ const App = (() => {
     for (let i = 0; i < LOBBY_SEATS; i++) {
       const p = players[i];
       const seat = document.createElement('div');
-      seat.style.setProperty('--seat-color', `var(--${SEAT_SPECIES[i]})`);
+      // Colore del posto: lo stesso del giocatore nella cronaca (--seat-N)
+      seat.style.setProperty('--seat-color', `var(--seat-${i})`);
       const hex = `<span class="seat-hex"><span>${i + 1}</span></span>`;
       if (!p) {
         seat.className = 'wait-seat empty';

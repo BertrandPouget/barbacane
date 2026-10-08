@@ -615,7 +615,7 @@ input {
   text-transform: uppercase;
   letter-spacing: 0.12em;
 }
-.wait-seat.bot .seat-tag { color: var(--seat-1); }
+.wait-seat .seat-tag { color: var(--seat-color); }
 
 .seat-tools { display: flex; gap: 4px; flex: none; }
 .seat-btn {

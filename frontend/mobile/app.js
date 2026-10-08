@@ -729,8 +729,6 @@ const Mob = (() => {
   let waitingPlayers = [];
   let waitingSeatsKey = '';
   const LOBBY_SEATS = 4;
-  // Colore di ogni posto nella sala d'attesa: quello delle quattro specie
-  const SEAT_SPECIES = ['elfo', 'nano', 'maga', 'umano'];
 
   function updateWaitingRoom(lobby) {
     // Il creatore può cambiare: se esce, il ruolo passa al primo umano rimasto
@@ -766,7 +764,8 @@ const Mob = (() => {
     for (let i = 0; i < LOBBY_SEATS; i++) {
       const p = players[i];
       const hex = el('span', { className: 'seat-hex' }, [el('span', {}, [String(i + 1)])]);
-      const style = `--seat-color: var(--${SEAT_SPECIES[i]})`;
+      // Colore del posto: lo stesso del giocatore nella cronaca (--seat-N)
+      const style = `--seat-color: var(--seat-${i})`;
       if (!p) {
         // Il Bot si siede nel primo posto libero: il pulsante sta lì
         const add = isCreator && i === players.length
