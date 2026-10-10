@@ -199,10 +199,12 @@ def _tell_log(state: GameState, entry: ActionLog) -> None:
     elif a == "play_building":
         _stat(state, pid, "buildings")
         done = " già completata" if d.get("completed") else ""
-        _add(state, "action", pid, f"{who} costruisce {_c(d.get('card'))}{done}.")
+        free = f" senza usare Azioni (Orda di {_c('faust')})" if d.get("free_action") else ""
+        _add(state, "action", pid, f"{who} costruisce {_c(d.get('card'))}{done}{free}.")
 
     elif a == "complete_building":
-        how = f" gratis (grazie al {_c('decumano')})" if d.get("decumano_free") else ""
+        how = f" gratis (grazie al {_c('decumano')})" if d.get("decumano_free") \
+            else f" senza usare Azioni (Orda di {_c('joseph')})" if d.get("free_action") else ""
         _add(state, "action", pid, f"{who} completa {_c(d.get('card'))}{how}.")
 
     elif a == "add_wall":
@@ -249,9 +251,6 @@ def _tell_log(state: GameState, entry: ActionLog) -> None:
     elif a == "search":
         _add(state, "event", pid, f"{who} prende una carta dal mazzo.",
              pid, f"{who} prende {_c(d.get('card'))} dal mazzo.")
-
-    elif a == "biblioteca_suppressed":
-        _add(state, "event", pid, f"La {_c('biblioteca')} di {who} resta ferma (Orda di {_c('faust')}).")
 
     elif a in ("biblioteca_discard", "agilpesca_discard"):
         source = "biblioteca" if a == "biblioteca_discard" else "agilpesca"
@@ -427,10 +426,6 @@ def _tell_horde(state: GameState, ev: Dict[str, Any]) -> None:
         text = f"{_c(ev['target'])} ottiene +1 ATT e +1 DIF."
     elif card == "polemarco":
         text = f"+{ev.get('att_bonus', 0)} ATT ({_n(ev.get('umani_count', 0), 'Umano', 'Umani')} in campo)."
-    elif card == "joseph":
-        troni = ev.get("enemy_troni_discarded") or []
-        text = f"{_n(len(troni), 'Trono avversario scartato', 'Troni avversari scartati')}." if troni \
-            else "i Troni avversari non hanno effetto."
     else:
         return  # l'attivazione dell'Orda è già raccontata dalla voce di log
     _add(state, "event", pid, f"Orda di {_c(card)}: {text}")

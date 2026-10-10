@@ -243,16 +243,6 @@ def _trigger_giulio_horde_start(state: GameState, player: Player) -> None:
             break
 
 
-def _is_biblioteca_suppressed(state: GameState, player: Player) -> bool:
-    """Controlla se un avversario ha attivo faust_biblioteca_suppress contro questo giocatore."""
-    for opp in state.players:
-        if opp.id == player.id:
-            continue
-        if any(e.get("type") == "faust_biblioteca_suppress" for e in opp.active_effects):
-            return True
-    return False
-
-
 def _trigger_building_start(state: GameState, player: Player) -> None:
     """Attiva gli effetti di Costruzione che si attivano a inizio turno."""
     for b_inst in player.field.village.buildings:
@@ -262,9 +252,6 @@ def _trigger_building_start(state: GameState, player: Player) -> None:
             continue
         if base_id in ("estrattore", "biblioteca", "sorgiva"):
             if base_id == "biblioteca":
-                if _is_biblioteca_suppressed(state, player):
-                    state.add_log(player.id, "biblioteca_suppressed")
-                    continue
                 result = apply_effect(card.effect_id, state, player, completed=b_inst.completed, trigger="start")
                 if result.get("needs_discard") or result.get("needs_wall_choice"):
                     state.pending_interactions.append({

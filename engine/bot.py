@@ -49,9 +49,12 @@ from engine.cards import get_card, WarriorCard, SpellCard, BuildingCard
 from engine.deck import get_base_card_id
 from engine.actions import (
     ActionError,
+    _faust_free_action,
+    _joseph_free_action,
     _madeleine_free_action,
     _prodigy_active,
-    _troni_blocked,
+    building_completion_cost,
+    building_play_cost,
     play_warrior,
     play_building,
     play_spell,
@@ -143,7 +146,7 @@ def _play_actions(state: GameState, player_id: str, difficulty: str,
                   threat: Optional["_ThreatModel"] = None,
                   deadline: Optional[float] = None, step=None) -> None:
     player = state.get_player(player_id)
-    _play_free_spells(state, player_id, difficulty, threat, step)
+    _play_free_actions(state, player_id, difficulty, threat, step)
     while player.actions_remaining > 0:
         if difficulty == "hard":
             # Anche con una sola Azione rimasta la valutazione a fine turno
@@ -157,21 +160,34 @@ def _play_actions(state: GameState, player_id: str, difficulty: str,
             break
         if step:
             step()
-        _play_free_spells(state, player_id, difficulty, threat, step)
+        _play_free_actions(state, player_id, difficulty, threat, step)
 
 
-def _play_free_spells(state: GameState, player_id: str, difficulty: str,
-                      threat: Optional["_ThreatModel"] = None, step=None) -> None:
-    """Orda di Madeleine: gli Incantesimi a costo 1 non consumano Azioni, quindi
-    si giocano a parte (anche ad Azioni esaurite), senza togliere posto alle
-    Azioni del turno. 'easy' li gioca sempre; 'normal'/'hard' solo se la
-    simulazione non peggiora l'esito."""
+def _is_free_action(player: Player, spec: ActionSpec) -> bool:
+    """True se lo spec non consuma Azioni: Incantesimi a costo 1 con l'Orda di
+    Madeleine, Costruzioni giocate con l'Orda di Faust o completate con quella
+    di Joseph."""
+    kind = spec[0]
+    if kind == "play_spell":
+        return _madeleine_free_action(player, get_card(get_base_card_id(spec[1])))
+    if kind == "play_building":
+        return _faust_free_action(player)
+    if kind == "complete_building":
+        return _joseph_free_action(player)
+    return False
+
+
+def _play_free_actions(state: GameState, player_id: str, difficulty: str,
+                       threat: Optional["_ThreatModel"] = None, step=None) -> None:
+    """Le giocate che non consumano Azioni (vedi _is_free_action) si fanno a
+    parte (anche ad Azioni esaurite), senza togliere posto alle Azioni del
+    turno. 'easy' le gioca sempre; 'normal'/'hard' solo se la simulazione non
+    peggiora l'esito."""
     while True:
         player = state.get_player(player_id)
         free = [
             c for c in _generate_candidates(state, player_id, difficulty)
-            if c[1][0] == "play_spell"
-            and _madeleine_free_action(player, get_card(get_base_card_id(c[1][1])))
+            if _is_free_action(player, c[1])
         ]
         if not free:
             return
@@ -388,14 +404,12 @@ def _generate_candidates(state: GameState, player_id: str, difficulty: str = "ea
                         candidates.append((score * 0.95, ("play_warrior", iid, alt_region)))
 
         elif isinstance(card, BuildingCard):
-            if player.mana_remaining >= card.cost:
+            if player.mana_remaining >= building_play_cost(player, card):
                 # Il Trono va assegnato subito a un proprio Guerriero: senza
                 # bersaglio play_building lo rifiuta, quindi o si sceglie qui
                 # a chi darlo o non è una mossa disponibile.
                 target_w = None
                 if base_id == "trono":
-                    if _troni_blocked(state, player):
-                        continue  # Orda Joseph avversaria: i Troni sono vietati
                     target_w = _best_trono_target(player)
                     if target_w is None:
                         continue
@@ -442,7 +456,7 @@ def _generate_candidates(state: GameState, player_id: str, difficulty: str = "ea
         if b.completed:
             continue
         card = get_card(b.base_card_id)
-        if isinstance(card, BuildingCard) and player.mana_remaining >= card.completion_cost:
+        if isinstance(card, BuildingCard) and player.mana_remaining >= building_completion_cost(player, card):
             base_score = 4.0 + card.completion_cost * 0.3
             candidates.append((base_score * 1.5 if planner else base_score, ("complete_building", b.instance_id)))
 

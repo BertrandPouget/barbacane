@@ -1372,7 +1372,7 @@ const App = (() => {
     });
 
     if (phase === 'action') {
-      if (player && (player.actions_remaining > 0 || _hasFreeActionSpells(player))) {
+      if (player && (player.actions_remaining > 0 || _hasFreeActions(player))) {
         _showBanner(player);
       } else {
         document.getElementById('action-hint').textContent = 'Nessuna azione rimasta.';
@@ -1443,17 +1443,17 @@ const App = (() => {
   function _showBanner(player) {
     const maxActions = (player.name === 'Test' || player.name === 'Test2') ? 5 : 2;
     const actNum = maxActions - player.actions_remaining + 1;
-    // Azioni finite: con l'Orda di Madeleine restano giocabili gli Incantesimi a costo 1
+    // Azioni finite: restano solo le giocate che non consumano Azioni (Orde, eterea, Decumano)
     const noActions = player.actions_remaining <= 0;
     document.getElementById('banner-turn-label').textContent = noActions
-      ? 'Azioni esaurite · Incantesimi a costo 1 gratuiti'
+      ? `Azioni esaurite · ${_freeActionsLabel(player)}`
       : `Azione ${actNum} · ${player.actions_remaining} rimast${player.actions_remaining === 1 ? 'a' : 'e'}`;
 
     const hasCards = player.hand && player.hand.length > 0;
     const hasIncomplete = (player.field.village.buildings || []).some(b => !b.completed);
 
-    document.getElementById('banner-btn-play').disabled     = !hasCards;
-    document.getElementById('banner-btn-complete').disabled = noActions || !hasIncomplete;
+    document.getElementById('banner-btn-play').disabled     = !hasCards || (noActions && !_hasFreePlays(player));
+    document.getElementById('banner-btn-complete').disabled = !hasIncomplete || (noActions && !_hasFreeCompletes(player));
     document.getElementById('banner-btn-wall').disabled     = noActions || !hasCards;
 
     document.getElementById('action-banner').classList.remove('hidden');
@@ -1469,14 +1469,13 @@ const App = (() => {
     _updatePlayableMarkings();
   }
 
-  // Senza Azioni restano "accese" solo le carte giocabili (Incantesimi a costo 1 con
-  // l'Orda di Madeleine, carta eterea)
+  // Senza Azioni restano "accese" solo le carte giocabili gratis (vedi _isFreePlay)
   function _updatePlayableMarkings() {
     const player = currentState && currentState.players.find(p => p.id === myPlayerId);
     const dim = actionMode === 'play_card' && player && player.actions_remaining <= 0;
     document.querySelectorAll('#hand-cards .card').forEach(card => {
       const iid = card.dataset.instanceId;
-      const playable = !dim || player.ethereal_card === iid || _isFreeActionSpell(player, getCardDef(iid));
+      const playable = !dim || _isFreePlay(player, iid);
       card.classList.toggle('unplayable', !playable);
     });
   }
@@ -1493,20 +1492,18 @@ const App = (() => {
     document.getElementById('action-hint').textContent = 'Scegli la costruzione da completare.';
 
     const myPlayer = currentState.players.find(p => p.id === myPlayerId);
-    const activeEffects = (myPlayer && myPlayer.active_effects) || [];
-    const reinholdDiscount = activeEffects.find(e => e.type === 'reinhold_sorgiva_discount');
+    const noActions = myPlayer.actions_remaining <= 0;
 
     Renderer.showBuildingPicker(currentState, {
       title: 'Completa una Costruzione',
       players: [myPlayer],
-      filter: (b) => !b.completed,
+      // Senza Azioni restano solo i completamenti gratuiti (Orda di Joseph, Decumano, Velocemento)
+      filter: (b) => !b.completed && (!noActions || _isFreeComplete(myPlayer, b)),
       meta: (b) => {
         if (myPlayer.ethereal_complete === b.instance_id) return 'Gratis (Velocemento)';
         const def = getCardDef(b.instance_id);
-        const baseCost = def ? def.completion_cost : null;
-        const discount = (reinholdDiscount && b.base_card_id === 'sorgiva') ? reinholdDiscount.discount : 0;
-        const effectiveCost = baseCost !== null ? Math.max(0, baseCost - discount) : '?';
-        return `${discount > 0 ? `${baseCost}→` : ''}${effectiveCost} Mana`;
+        const cost = def ? _costLabel(def.completion_cost, _reinholdDiscount(myPlayer)) : '?';
+        return `${cost} Mana${_isFreeComplete(myPlayer, b) ? ' · senza Azione' : ''}`;
       },
       note: (b) => {
         const def = getCardDef(b.instance_id);
@@ -1541,7 +1538,7 @@ const App = (() => {
     if (!currentState || currentState.current_player_id !== myPlayerId) return;
     const player = currentState.players.find(p => p.id === myPlayerId);
     if (player && currentState.phase === 'action' &&
-        (player.actions_remaining > 0 || _hasFreeActionSpells(player))) _showBanner(player);
+        (player.actions_remaining > 0 || _hasFreeActions(player))) _showBanner(player);
   }
 
   // ---------------------------------------------------------------------------
@@ -1749,12 +1746,9 @@ const App = (() => {
       const completeLabel = (fieldBuilding && fieldBuilding.completed) ? 'Effetto Completo <span style="color:var(--green-light)">(attivo)</span>'
         : (fieldBuilding && !fieldBuilding.completed) ? 'Effetto Completo <span style="color:var(--text-dim)">(non attivo)</span>'
         : 'Effetto Completo';
-      const myActiveEffects = currentState ? ((currentState.players.find(p => p.id === myPlayerId) || {}).active_effects || []) : [];
-      const reinholdDiscount = myActiveEffects.find(e => e.type === 'reinhold_sorgiva_discount');
-      const rawCompletionCost = def.completion_cost;
-      const effectiveCompletionCost = (reinholdDiscount && def.id === 'sorgiva') ? Math.max(0, rawCompletionCost - reinholdDiscount.discount) : rawCompletionCost;
-      const completionCostLabel = (effectiveCompletionCost !== rawCompletionCost) ? `${rawCompletionCost}→${effectiveCompletionCost}` : `${rawCompletionCost}`;
-      bodyHTML += `<div class="detail-meta">Costruzione · 💎${def.cost} Mana · 🏗️${completionCostLabel} Mana${completionStatus}</div>
+      const me = currentState && currentState.players.find(p => p.id === myPlayerId);
+      const discount = me ? _reinholdDiscount(me) : 0;
+      bodyHTML += `<div class="detail-meta">Costruzione · 💎${_costLabel(def.cost, discount)} Mana · 🏗️${_costLabel(def.completion_cost, discount)} Mana${completionStatus}</div>
       <div class="detail-section"><strong>${baseLabel}:</strong><br>${def.base_effect || '—'}</div>`;
       if (def.complete_effect) {
         bodyHTML += `<div class="detail-section"><strong>${completeLabel}:</strong><br>${def.complete_effect}</div>`;
@@ -1800,8 +1794,7 @@ const App = (() => {
     if (source === 'hand' && isMyTurn) {
       if (actionMode === 'play_card' || actionMode === null) {
         const player = currentState.players.find(p => p.id === myPlayerId);
-        const isEtherealCard = player && player.ethereal_card === instanceId;
-        if (player && (player.actions_remaining > 0 || isEtherealCard || _isFreeActionSpell(player, def))) {
+        if (player && (player.actions_remaining > 0 || _isFreePlay(player, instanceId))) {
           actionLabel = 'Gioca';
           onAction = () => { Renderer.closeCardDetail(); showPlayOptions(instanceId, def); };
         }
@@ -1935,9 +1928,11 @@ const App = (() => {
         _showTronoPlayOptions(instanceId, def);
         return;
       }
+      const me = currentState.players.find(p => p.id === myPlayerId);
+      const cost = me && me.ethereal_card === instanceId ? 0 : _costLabel(def.cost, me ? _reinholdDiscount(me) : 0);
       Renderer.showModal(
         `Costruisci ${def.name}`,
-        `Costo: <strong>${def.cost} Mana</strong><br>${def.base_effect || ''}`,
+        `Costo: <strong>${cost} Mana</strong><br>${def.base_effect || ''}`,
         () => sendAction('play_building', { instance_id: instanceId }),
       );
     }
@@ -1973,14 +1968,59 @@ const App = (() => {
     });
   }
 
-  // Orda di Madeleine: gli Incantesimi a costo 1 non consumano Azioni
-  function _isFreeActionSpell(player, def) {
-    return !!def && def.type === 'spell' && def.school === 'incantesimo' && def.cost === 1 &&
-      (player.active_effects || []).some(e => e.type === 'madeleine_free_action');
+  // Giocate che non consumano Azioni (stesse regole di play_spell/play_building/
+  // complete_building): carta eterea, Incantesimi a costo 1 con l'Orda di Madeleine,
+  // Costruzioni giocate con l'Orda di Faust o completate con quella di Joseph,
+  // Cardo con Decumano, completamento di Velocemento.
+  function _hasEffect(player, type) {
+    return (player.active_effects || []).some(e => e.type === type);
   }
 
-  function _hasFreeActionSpells(player) {
-    return (player.hand || []).some(iid => _isFreeActionSpell(player, getCardDef(iid)));
+  function _isFreePlay(player, iid) {
+    const def = getCardDef(iid);
+    if (!def) return false;
+    if (player.ethereal_card === iid) return true;
+    if (def.type === 'building') return _hasEffect(player, 'faust_free_play_building');
+    return def.type === 'spell' && def.school === 'incantesimo' && def.cost === 1 &&
+      _hasEffect(player, 'madeleine_free_action');
+  }
+
+  function _isFreeComplete(player, b) {
+    const buildings = player.field.village.buildings || [];
+    return player.ethereal_complete === b.instance_id ||
+      (b.base_card_id === 'cardo' && buildings.some(x => x.base_card_id === 'decumano')) ||
+      _hasEffect(player, 'joseph_free_complete_building');
+  }
+
+  function _hasFreePlays(player) {
+    return (player.hand || []).some(iid => _isFreePlay(player, iid));
+  }
+
+  function _hasFreeCompletes(player) {
+    return (player.field.village.buildings || []).some(b => !b.completed && _isFreeComplete(player, b));
+  }
+
+  function _hasFreeActions(player) {
+    return _hasFreePlays(player) || _hasFreeCompletes(player);
+  }
+
+  function _freeActionsLabel(player) {
+    const parts = [];
+    if (_hasFreePlays(player)) parts.push('gioca le carte accese');
+    if (_hasFreeCompletes(player)) parts.push('completa Costruzioni');
+    return parts.length ? `puoi ancora: ${parts.join(', ')}` : 'nessuna giocata gratuita';
+  }
+
+  // Orda di Reinhold: Costruzioni giocate e completate costano meno
+  function _reinholdDiscount(player) {
+    return (player.active_effects || [])
+      .filter(e => e.type === 'reinhold_building_discount')
+      .reduce((sum, e) => sum + (e.discount || 0), 0);
+  }
+
+  function _costLabel(cost, discount) {
+    const eff = Math.max(0, cost - discount);
+    return eff !== cost ? `${cost}→${eff}` : `${cost}`;
   }
 
   function _computeSpellProdigy(def) {

@@ -1230,16 +1230,22 @@ const Mob = (() => {
         dock.appendChild(mkBtn('🧱', '', enterWallMode, !hasCards, 'dock-wall'));
         dock.appendChild(mkBtn('›', '', () => sendAction('next_phase', {}), false, 'dock-next'));
       } else {
-        // Orda di Madeleine: gli Incantesimi a costo 1 restano giocabili, le altre carte si spengono
-        const freeSpells = my && (my.hand || []).some(iid => isFreeActionSpell(my, getCardDef(iid)));
-        if (freeSpells) {
+        // Azioni finite: restano le giocate che non consumano Azioni (Orde, eterea,
+        // Decumano); le carte non giocabili gratis si spengono
+        const freePlays = my && hasFreePlays(my);
+        const freeCompletes = my && hasFreeCompletes(my);
+        if (freePlays) {
           document.querySelectorAll('#hand .card').forEach(c => {
-            const iid = c.dataset.instanceId;
-            c.classList.toggle('unplayable', my.ethereal_card !== iid && !isFreeActionSpell(my, getCardDef(iid)));
+            c.classList.toggle('unplayable', !isFreePlay(my, c.dataset.instanceId));
           });
         }
-        dock.appendChild(hint(freeSpells ? 'Puoi ancora giocare gli Incantesimi a costo 1'
-          : hasEthereal ? 'Gioca la carta eterea o avanza' : 'Azioni esaurite'));
+        dock.appendChild(hint(
+          hasEthereal && !freeCompletes ? 'Gioca la carta eterea o avanza'
+          : freePlays && freeCompletes ? 'Puoi ancora giocare le carte accese o completare'
+          : freePlays ? 'Puoi ancora giocare le carte accese'
+          : freeCompletes ? 'Puoi ancora completare Costruzioni'
+          : 'Azioni esaurite'));
+        if (freeCompletes) dock.appendChild(mkBtn('🏗️', '', openCompleteSheet, false, 'dock-complete'));
         dock.appendChild(mkBtn('Schieramento ›', 'mbtn-gold mbtn-pulse', () => sendAction('next_phase', {}), false, 'dock-next'));
       }
 
@@ -1282,7 +1288,7 @@ const Mob = (() => {
     const idx = hand.indexOf(iid);
     const isEthereal = my && my.ethereal_card === iid;
     const canAct = isMyTurn() && currentState.phase === 'action' &&
-      my && (my.actions_remaining > 0 || isEthereal || isFreeActionSpell(my, def));
+      my && (my.actions_remaining > 0 || isFreePlay(my, iid));
 
     const footer = [];
     footer.push({
@@ -1331,9 +1337,11 @@ const Mob = (() => {
         showTronoPlayOptions(iid, def);
         return;
       }
+      const my = me();
+      const cost = my && my.ethereal_card === iid ? 0 : costLabel(def.cost, my ? reinholdDiscount(my) : 0);
       Sheet.confirm(
         `Costruisci ${def.name}`,
-        `Costo: <b>${def.cost} Mana</b><br>${def.base_effect || ''}`,
+        `Costo: <b>${cost} Mana</b><br>${def.base_effect || ''}`,
         () => sendAction('play_building', { instance_id: iid }),
         { yesLabel: '🏗️ Costruisci' },
       );
@@ -1371,10 +1379,36 @@ const Mob = (() => {
 
   // -- Magie ------------------------------------------------------------------
 
-  // Orda di Madeleine: gli Incantesimi a costo 1 non consumano Azioni
-  function isFreeActionSpell(player, def) {
-    return !!def && def.type === 'spell' && def.school === 'incantesimo' && def.cost === 1 &&
-      (player.active_effects || []).some(e => e.type === 'madeleine_free_action');
+  // Giocate che non consumano Azioni (stesse regole di play_spell/play_building/
+  // complete_building): carta eterea, Incantesimi a costo 1 con l'Orda di Madeleine,
+  // Costruzioni giocate con l'Orda di Faust o completate con quella di Joseph,
+  // Cardo con Decumano, completamento di Velocemento. Parità con il desktop.
+  function hasEffect(player, type) {
+    return (player.active_effects || []).some(e => e.type === type);
+  }
+
+  function isFreePlay(player, iid) {
+    const def = getCardDef(iid);
+    if (!def) return false;
+    if (player.ethereal_card === iid) return true;
+    if (def.type === 'building') return hasEffect(player, 'faust_free_play_building');
+    return def.type === 'spell' && def.school === 'incantesimo' && def.cost === 1 &&
+      hasEffect(player, 'madeleine_free_action');
+  }
+
+  function isFreeComplete(player, b) {
+    const buildings = player.field.village.buildings || [];
+    return player.ethereal_complete === b.instance_id ||
+      (b.base_card_id === 'cardo' && buildings.some(x => x.base_card_id === 'decumano')) ||
+      hasEffect(player, 'joseph_free_complete_building');
+  }
+
+  function hasFreePlays(player) {
+    return (player.hand || []).some(iid => isFreePlay(player, iid));
+  }
+
+  function hasFreeCompletes(player) {
+    return (player.field.village.buildings || []).some(b => !b.completed && isFreeComplete(player, b));
   }
 
   function computeSpellProdigy(def) {
@@ -1803,27 +1837,33 @@ const Mob = (() => {
   // Completa costruzione
   // ---------------------------------------------------------------------------
 
-  function reinholdDiscountFor(baseId) {
-    const my = me();
-    const fx = ((my && my.active_effects) || []).find(e => e.type === 'reinhold_sorgiva_discount');
-    return (fx && baseId === 'sorgiva') ? fx.discount : 0;
+  // Orda di Reinhold: Costruzioni giocate e completate costano meno
+  function reinholdDiscount(player) {
+    return (player.active_effects || [])
+      .filter(e => e.type === 'reinhold_building_discount')
+      .reduce((sum, e) => sum + (e.discount || 0), 0);
+  }
+
+  function costLabel(cost, discount) {
+    const eff = Math.max(0, cost - discount);
+    return eff !== cost ? `${cost}→${eff}` : `${cost}`;
   }
 
   function openCompleteSheet() {
     const my = me();
     const buildings = (my.field.village.buildings || []).filter(b => !b.completed);
     if (buildings.length === 0) return;
+    const noActions = (my.actions_remaining ?? 0) <= 0;
     pickBuilding({
       title: 'Completa una Costruzione',
       players: [my],
-      filter: (b) => !b.completed,
+      // Senza Azioni restano solo i completamenti gratuiti (Orda di Joseph, Decumano, Velocemento)
+      filter: (b) => !b.completed && (!noActions || isFreeComplete(my, b)),
       meta: (b) => {
         if (my.ethereal_complete === b.instance_id) return 'Gratis (Velocemento)';
         const def = getCardDef(b.instance_id);
-        const baseCost = def ? def.completion_cost : null;
-        const discount = reinholdDiscountFor(b.base_card_id);
-        const eff = baseCost !== null ? Math.max(0, baseCost - discount) : '?';
-        return `${discount > 0 ? `${baseCost}→` : ''}${eff} Mana`;
+        const cost = def ? costLabel(def.completion_cost, reinholdDiscount(my)) : '?';
+        return `${cost} Mana${isFreeComplete(my, b) ? ' · senza Azione' : ''}`;
       },
       note: (b) => {
         const def = getCardDef(b.instance_id);
@@ -2073,10 +2113,7 @@ const Mob = (() => {
     const def = getCardDef(iid);
     const turnOk = isMyTurn();
 
-    const discount = reinholdDiscountFor(b.base_card_id);
-    const rawCost = def ? def.completion_cost : 0;
-    const effCost = Math.max(0, rawCost - discount);
-    const costLabel = discount > 0 ? `${rawCost}→${effCost}` : `${rawCost}`;
+    const completionLabel = costLabel(def ? def.completion_cost : 0, reinholdDiscount(my));
     const isEth = my.ethereal_complete === iid;
 
     const footer = [];
@@ -2092,7 +2129,7 @@ const Mob = (() => {
 
     if (!b.completed) {
       footer.push({
-        label: isEth ? '✧ Completa gratis' : `Completa (${costLabel} Mana)`,
+        label: isEth ? '✧ Completa gratis' : `Completa (${completionLabel} Mana)`,
         className: 'mbtn-gold',
         disabled: !turnOk,
         onClick: () => { Sheet.close(true); sendAction('complete_building', { building_instance_id: iid }); },
@@ -2104,7 +2141,7 @@ const Mob = (() => {
     Sheet.open({
       title: def ? def.name : iid,
       subtitle: b.completed ? '✓ Completata' : 'Incompleta — effetto Base attivo',
-      body: Render.cardViewNode(def, { completed: b.completed, completionCostLabel: costLabel, instanceId: iid }),
+      body: Render.cardViewNode(def, { completed: b.completed, completionCostLabel: completionLabel, instanceId: iid }),
       footer,
       refresh: () => openBuildingSheet(iid),
     });

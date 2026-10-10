@@ -66,14 +66,32 @@ def _require_in_hand(player: Player, instance_id: str) -> None:
         raise ActionError(f"La carta {instance_id} non è nella tua mano.")
 
 
-def _troni_blocked(state: GameState, player: Player) -> bool:
-    """Controlla se un avversario ha attivo joseph_no_troni contro questo giocatore."""
-    for opp in state.players:
-        if opp.id == player.id:
-            continue
-        if any(e.get("type") == "joseph_no_troni" for e in opp.active_effects):
-            return True
-    return False
+def _has_effect(player: Player, effect_type: str) -> bool:
+    return any(e.get("type") == effect_type for e in player.active_effects)
+
+
+def _reinhold_discount(player: Player) -> int:
+    """Orda di Reinhold: il costo per giocare o completare Costruzioni è ridotto."""
+    return sum(e.get("discount", 0) for e in player.active_effects
+               if e.get("type") == "reinhold_building_discount")
+
+
+def building_play_cost(player: Player, card: BuildingCard) -> int:
+    return max(0, card.cost - _reinhold_discount(player))
+
+
+def building_completion_cost(player: Player, card: BuildingCard) -> int:
+    return max(0, card.completion_cost - _reinhold_discount(player))
+
+
+def _faust_free_action(player: Player) -> bool:
+    """Orda di Faust: giocare Costruzioni non consuma Azioni."""
+    return _has_effect(player, "faust_free_play_building")
+
+
+def _joseph_free_action(player: Player) -> bool:
+    """Orda di Joseph: completare Costruzioni non consuma Azioni."""
+    return _has_effect(player, "joseph_free_complete_building")
 
 
 # ---------------------------------------------------------------------------
@@ -525,13 +543,15 @@ def play_building(
 ) -> dict:
     """
     Piazza una Costruzione nel Villaggio (incompleta).
-    Costo: Mana pari al costo. Consuma 1 Azione.
+    Costo: Mana pari al costo (−1 con l'Orda di Reinhold). Consuma 1 Azione
+    (non se Eterea o con l'Orda di Faust).
     Cardo/Decumano si completano automaticamente (completion_cost = 0).
     Trono richiede target_warrior_iid: viene assegnato subito a un proprio Guerriero.
     """
     player = _require_current_player(state, player_id)
     is_ethereal = player.ethereal_card == instance_id
-    if not is_ethereal:
+    uses_action = not is_ethereal and not _faust_free_action(player)
+    if uses_action:
         _require_actions(player)
     _require_in_hand(player, instance_id)
 
@@ -542,25 +562,24 @@ def play_building(
 
     # Pre-validazione: trono richiede la scelta esplicita di un proprio Guerriero
     if base_id == "trono":
-        if _troni_blocked(state, player):
-            raise ActionError("Un'Orda Joseph avversaria ti impedisce di giocare Troni.")
         if not target_warrior_iid or not any(
             w.instance_id == target_warrior_iid for w in player.all_warriors()
         ):
             raise ActionError("Devi scegliere un tuo Guerriero a cui assegnare il Trono.")
 
-    cost = card.cost if not is_ethereal else 0
+    cost = building_play_cost(player, card) if not is_ethereal else 0
     if player.mana_remaining < cost:
         raise ActionError(f"Mana insufficiente: {player.mana_remaining}/{cost}.")
 
     player.mana_remaining -= cost
     player.hand.remove(instance_id)
-    if not is_ethereal:
+    if uses_action:
         player.actions_remaining -= 1
     player.ethereal_card = None
 
     b_inst = _place_building(state, player, instance_id, target_warrior_iid=target_warrior_iid)
-    state.add_log(player_id, "play_building", card=instance_id, completed=b_inst.completed)
+    state.add_log(player_id, "play_building", card=instance_id, completed=b_inst.completed,
+                  free_action=not is_ethereal and not uses_action)
     return {"card": instance_id, "completed": b_inst.completed}
 
 
@@ -608,7 +627,8 @@ def complete_building(
 ) -> dict:
     """
     Completa una Costruzione nel Villaggio.
-    Costo: Mana di completamento. Consuma 1 Azione.
+    Costo: Mana di completamento (−1 con l'Orda di Reinhold). Consuma 1 Azione
+    (non con l'Orda di Joseph).
     Eccezione: Cardo con Decumano in villaggio → gratuito, senza consumare Azione.
     """
     player = _require_current_player(state, player_id)
@@ -635,23 +655,16 @@ def complete_building(
         and any(b.base_card_id == "decumano" for b in player.field.village.buildings)
     )
 
-    if not is_ethereal_complete and not is_decumano_free:
+    uses_action = not is_ethereal_complete and not is_decumano_free and not _joseph_free_action(player)
+    if uses_action:
         _require_actions(player)
 
-    if is_ethereal_complete or is_decumano_free:
-        cost = 0
-    else:
-        cost = card.completion_cost
-        if base_id == "sorgiva":
-            for eff in player.active_effects:
-                if eff.get("type") == "reinhold_sorgiva_discount":
-                    cost = max(0, cost - eff.get("discount", 0))
-                    break
+    cost = 0 if is_ethereal_complete or is_decumano_free else building_completion_cost(player, card)
     if player.mana_remaining < cost:
         raise ActionError(f"Mana insufficiente per completamento: {player.mana_remaining}/{cost}.")
 
     player.mana_remaining -= cost
-    if not is_ethereal_complete and not is_decumano_free:
+    if uses_action:
         player.actions_remaining -= 1
     player.ethereal_complete = None
     b_inst.completed = True
@@ -665,7 +678,8 @@ def complete_building(
         player.actions_remaining += 1
 
     state.add_log(player_id, "complete_building", card=building_instance_id, mana_spent=cost,
-                  decumano_free=is_decumano_free)
+                  decumano_free=is_decumano_free,
+                  free_action=not uses_action and not is_ethereal_complete and not is_decumano_free)
     return {"card": building_instance_id, "mana_spent": cost, "decumano_free": is_decumano_free}
 
 

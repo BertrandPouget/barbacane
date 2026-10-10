@@ -420,7 +420,7 @@ def cardo_effect(state: GameState, player: Player, completed: bool = False, **kw
 @register_effect("decumano_effect")
 def decumano_effect(state: GameState, player: Player, completed: bool = False, **kwargs) -> dict:
     """
-    Base: se hai Cardo in gioco, puoi completarlo in qualsiasi momento senza usare Azioni.
+    Base: se hai Cardo in gioco, puoi completarlo senza consumare Azioni.
     Complete: nessun effetto.
     Passivo.
     """
@@ -1553,16 +1553,16 @@ def patrizio_horde(state: GameState, player: Player, warrior_iid: Optional[str] 
 
 @register_effect("reinhold_horde")
 def reinhold_horde(state: GameState, player: Player, **kwargs) -> dict:
-    """Il costo per completare le Sorgive è ridotto di 2."""
+    """Il costo per giocare o completare Costruzioni è ridotto di 1 (vedi building_play_cost)."""
     player.active_effects.append({
-        "type": "reinhold_sorgiva_discount",
-        "discount": 2,
+        "type": "reinhold_building_discount",
+        "discount": 1,
     })
     state.recent_events.append({
         "type": "horde", "card": "reinhold",
-        "player_id": player.id, "sorgiva_completion_discount": 2,
+        "player_id": player.id, "building_discount": 1,
     })
-    return {"sorgiva_completion_discount": 2}
+    return {"building_discount": 1}
 
 
 @register_effect("araminta_horde")
@@ -1610,16 +1610,13 @@ def giulio_horde(state: GameState, player: Player, **kwargs) -> dict:
 
 @register_effect("faust_horde")
 def faust_horde(state: GameState, player: Player, **kwargs) -> dict:
-    """Le Biblioteche avversarie non hanno effetto fino al prossimo turno del giocatore."""
-    player.active_effects.append({
-        "type": "faust_biblioteca_suppress",
-        "expires": "next_own_turn",
-    })
+    """Giocare Costruzioni non consuma Azioni (vedi play_building)."""
+    player.active_effects.append({"type": "faust_free_play_building"})
     state.recent_events.append({
         "type": "horde", "card": "faust",
-        "player_id": player.id, "opponent_biblioteche_suppressed": True,
+        "player_id": player.id, "building_play_free_action": True,
     })
-    return {"opponent_biblioteche_suppressed": True}
+    return {"building_play_free_action": True}
 
 
 @register_effect("evelyn_horde")
@@ -1680,28 +1677,14 @@ def decimo_horde(state: GameState, player: Player, warrior_iid: Optional[str] = 
 
 
 @register_effect("joseph_horde")
-def joseph_horde(state: GameState, player: Player, warrior_iid: Optional[str] = None, **kwargs) -> dict:
-    """I tuoi avversari non possono avere o giocare Troni. Scartali."""
-    player.active_effects.append({
-        "type": "joseph_no_troni",
-        "expires": "permanent",
-    })
-    discarded = []
-    for p in state.players:
-        if p.id == player.id:
-            continue
-        to_remove = [b for b in p.field.village.buildings if b.base_card_id == "trono"]
-        for b in to_remove:
-            _unassign_building(p, b)
-            p.field.village.buildings.remove(b)
-            state.discard_pile.append(b.instance_id)
-            discarded.append({"player": p.id, "trono": b.instance_id})
+def joseph_horde(state: GameState, player: Player, **kwargs) -> dict:
+    """Completare Costruzioni non consuma Azioni (vedi complete_building)."""
+    player.active_effects.append({"type": "joseph_free_complete_building"})
     state.recent_events.append({
         "type": "horde", "card": "joseph",
-        "player_id": player.id,
-        "enemy_troni_discarded": discarded,
+        "player_id": player.id, "building_complete_free_action": True,
     })
-    return {"enemy_troni_discarded": discarded}
+    return {"building_complete_free_action": True}
 
 
 @register_effect("madeleine_horde")
