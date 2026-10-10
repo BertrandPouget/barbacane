@@ -97,15 +97,24 @@ def sync(state: GameState) -> None:
     if not state.chronicle:
         _add(state, "turn", state.current_player.id, f"Turno {state.turn} · {_p(state.current_player.id)}")
 
-    for entry in state.log[state.chronicle_cursor:]:
-        _tell_log(state, entry)
+    # Gli eventi con `log_at` vanno raccontati prima della voce di log che li
+    # segue (es. il Granaio prima della pesca e del cambio turno); gli altri
+    # dopo tutto il log.
+    def tell_events(upto: Optional[int]) -> None:
+        for ev in state.recent_events:
+            if ev.get("_told"):
+                continue
+            if upto is not None and (ev.get("log_at") is None or ev["log_at"] > upto):
+                continue
+            ev["_told"] = True
+            _tell_event(state, ev)
+
+    for idx in range(state.chronicle_cursor, len(state.log)):
+        tell_events(idx)
+        _tell_log(state, state.log[idx])
     state.chronicle_cursor = len(state.log)
 
-    for ev in state.recent_events:
-        if ev.get("_told"):
-            continue
-        ev["_told"] = True
-        _tell_event(state, ev)
+    tell_events(None)
 
     _check_eliminations(state)
 
@@ -331,7 +340,8 @@ def _tell_event(state: GameState, ev: Dict[str, Any]) -> None:
             outcome = "un'Azione in più" if ev.get("extra_action") else "nessuna Azione in più"
         else:
             outcome = ""
-        _add(state, "event", pid, f"{who} · {_c(card)}: D10 = {roll}, {outcome}.".replace(", .", "."))
+        _add(state, "event", pid, f"{who} · {_c(card)}: D10 = {roll}, {outcome}.".replace(", .", "."),
+             turn=ev.get("turn"))
 
     elif t == "mana":
         scrigno = f" (+{ev['scrigno_bonus']} dallo {_c('scrigno')})" if ev.get("scrigno_bonus") else ""

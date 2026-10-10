@@ -950,6 +950,7 @@ const Mob = (() => {
     currentState = state;
     rematchOffer = null;
     chronicleSeenId = Chronicle.lastId(state);
+    Dice.fromState(state, myPlayerId, cardDefs, { silent: true });
     CardArt.preload(Object.keys(cardDefs));
     saveSession();
     connectGameWS();
@@ -999,14 +1000,21 @@ const Mob = (() => {
     Render.game(state, myPlayerId);
     Motion.play(before, screen, _motionOptions(state));
 
-    // Banner al cambio turno
-    if (prevTurnPlayer !== state.current_player_id && !state.winner_id) {
-      if (state.current_player_id === myPlayerId) {
-        TurnBanner.show('Il tuo turno');
-        haptic(40);
-      } else {
-        TurnBanner.show(`Il turno di ${playerName(state.current_player_id)}`, true);
-      }
+    // Banner al cambio turno. I miei tiri di D10: a inizio del mio turno
+    // (Estrattore) dopo il banner, a fine turno (Granaio) prima del banner
+    // del giocatore successivo
+    const turnChanged = prevTurnPlayer !== state.current_player_id && !state.winner_id;
+    const myTurnStarts = turnChanged && state.current_player_id === myPlayerId;
+    Dice.fromState(state, myPlayerId, cardDefs, { silent: !action, delay: myTurnStarts ? 1700 : 0 });
+    if (myTurnStarts) {
+      TurnBanner.show('Il tuo turno');
+      haptic(40);
+    } else if (turnChanged) {
+      const nextId = state.current_player_id;
+      Dice.afterRolls(() => {
+        // Nel frattempo il turno può essere già passato oltre
+        if (currentState.current_player_id === nextId) TurnBanner.show(`Il turno di ${playerName(nextId)}`, true);
+      });
     }
 
     // Esiti dell'azione

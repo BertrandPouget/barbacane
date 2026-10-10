@@ -723,6 +723,9 @@ def _tutorial_prev_action(state, player_id: str) -> dict:
 # _BOT_STEP_SECONDS: pausa tra una mossa e la successiva.
 _BOT_THINK_SECONDS = 1.0
 _BOT_STEP_SECONDS = 1.1
+# Durata della finestra del D10 nei client (frontend/dice.js): il Bot aspetta
+# che i dadi di fine turno dell'umano (Granaio) siano finiti prima di muovere.
+_BOT_DICE_SECONDS = 4.0
 _bot_turns_running: set = set()
 _bot_tasks: set = set()
 
@@ -754,6 +757,14 @@ async def _play_bot_turn(game_id: str) -> None:
         state = load_game(game_id)
         if state is None or state.winner_id or not state.is_bot(state.current_player.id):
             return
+        # Tiri di D10 dell'umano appena arrivati al tavolo (prima del calcolo,
+        # che non svuota recent_events ma ci aggiunge i tiri del Bot)
+        human_rolls = sum(1 for ev in state.recent_events
+                          if ev.get("type") == "d10" and ev.get("roll_id")
+                          and not state.is_bot(ev.get("player_id")))
+        # Già raccontati e inviati: svuotati, così un secondo Bot di fila non
+        # li riconta né li rimanda
+        state.recent_events = []
         # Fotografie del tavolo dopo ogni mossa del Bot che arricchisce la cronaca
         steps = []
 
@@ -776,7 +787,7 @@ async def _play_bot_turn(game_id: str) -> None:
         played = True
         version = _game_versions.get(game_id, 0)
 
-        remaining = _BOT_THINK_SECONDS - (loop.time() - started)
+        remaining = _BOT_THINK_SECONDS + human_rolls * _BOT_DICE_SECONDS - (loop.time() - started)
         if remaining > 0:
             await asyncio.sleep(remaining)
         for snap in steps:

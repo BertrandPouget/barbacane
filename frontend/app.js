@@ -922,8 +922,17 @@ const App = (() => {
     Motion.play(before, table, _motionOptions(state, prevState));
     _animateOpponents(prevState, state);
 
-    if (prevTurnPlayer !== state.current_player_id && !state.winner_id) {
-      _showTurnBanner(state);
+    // I miei tiri di D10: a inizio del mio turno (Estrattore) dopo il banner,
+    // a fine turno (Granaio) prima del banner del giocatore successivo
+    const turnChanged = prevTurnPlayer !== state.current_player_id && !state.winner_id;
+    const myTurnStarts = turnChanged && state.current_player_id === myPlayerId;
+    Dice.fromState(state, myPlayerId, cardDefs, { silent: !action, delay: myTurnStarts ? 1700 : 0 });
+    if (turnChanged) {
+      if (myTurnStarts) _showTurnBanner(state);
+      else Dice.afterRolls(() => {
+        // Nel frattempo il turno può essere già passato oltre
+        if (currentState.current_player_id === state.current_player_id) _showTurnBanner(state);
+      });
     }
 
     if (result) {
@@ -1034,6 +1043,7 @@ const App = (() => {
     Renderer.render(state, myPlayerId);
     chronicleSeenId = Chronicle.lastId(state);
     Renderer.renderChronicle(state, myPlayerId, cardDefs);
+    Dice.fromState(state, myPlayerId, cardDefs, { silent: true });
     rememberGame(state);
     CardArt.preload(Object.keys(cardDefs));
     _refreshActionUI();

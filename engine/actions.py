@@ -33,6 +33,7 @@ from engine.effects import (
     EFFECT_REGISTRY,
     _reassign_buildings,
     _unassign_building,
+    _d10_event,
 )
 import random as _random
 
@@ -292,11 +293,8 @@ def _apply_spell_post_effects(
                         state.discard_pile.remove(instance_id)
                     player.hand.append(instance_id)
                     result["returned_to_hand"] = True
-                state.recent_events.append({
-                    "type": "d10", "card": "obelisco",
-                    "player_id": player.id, "roll": roll,
-                    "threshold": threshold, "returned": returned,
-                })
+                _d10_event(state, "obelisco", player.id, roll,
+                           threshold=threshold, returned=returned)
                 break
 
     evelyn_eff = next(

@@ -39,7 +39,7 @@ from engine.actions import (
     evolve_warrior,
     spell_prodigy_ready,
 )
-from engine.effects import _apply_scrigno_bonus
+from engine.effects import _apply_scrigno_bonus, _d10_event
 from engine import chronicle
 
 
@@ -296,10 +296,7 @@ def _trigger_building_end(state: GameState, player: Player) -> int:
         triggered = roll >= 6
         if triggered:
             bonus += 1
-        state.recent_events.append({
-            "type": "d10", "card": "granaio",
-            "player_id": player.id, "roll": roll, "triggered": triggered,
-        })
+        _d10_event(state, "granaio", player.id, roll, triggered=triggered)
     return bonus
 
 
@@ -389,10 +386,7 @@ def check_fucina_after_action(state: GameState, player: Player) -> Optional[dict
         extra = roll >= 6
         if extra:
             player.actions_remaining += 1
-        state.recent_events.append({
-            "type": "d10", "card": "fucina",
-            "player_id": player.id, "roll": roll, "extra_action": extra,
-        })
+        _d10_event(state, "fucina", player.id, roll, extra_action=extra)
         rolls.append({"roll": roll, "extra_action": extra})
     return {"fucina_rolls": rolls}
 

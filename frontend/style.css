@@ -3175,6 +3175,69 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   #card-anatomy-panel { flex: 0 0 auto; width: 100%; max-width: 460px; padding: 1rem 1.2rem; }
 }
 
+/* ==================== LANCIO DEL D10 ==================== */
+/* Finestra di dice.js: nome della carta, motivo del lancio, dado 3D (canvas)
+   ed esito. Stesso stile delle finestre di gioco. Un clic la chiude subito. */
+.dice-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 350;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.7);
+  animation: dice-fade 0.2s ease-out;
+  cursor: pointer;
+}
+.dice-overlay[hidden] { display: none; }
+.dice-panel {
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--bg-medium);
+  border: 2px solid var(--border-gold);
+  border-radius: 8px;
+  padding: 1.1rem 1rem 0.9rem;
+  text-align: center;
+  font-family: 'Caudex', Georgia, serif;
+  animation: dice-pop 0.28s cubic-bezier(.2, 1.4, .4, 1);
+}
+.dice-title {
+  color: var(--gold);
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+}
+.dice-reason {
+  color: var(--text);
+  font-size: 0.95rem;
+  font-style: italic;
+  line-height: 1.3;
+}
+.dice-canvas { display: block; position: relative; z-index: 1; pointer-events: none; }
+.dice-result {
+  min-height: 2rem;
+  line-height: 1.25;
+  color: var(--text-dim);
+  font-size: 1.05rem;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.25s, transform 0.25s;
+}
+.dice-result.shown { opacity: 1; transform: none; }
+.dice-num { margin-right: 0.45rem; vertical-align: -0.1em; font-size: 1.7rem; font-weight: 700; color: var(--gold-light); }
+.dice-result.ok .dice-outcome { color: var(--green-light); font-weight: 700; }
+.dice-result.ko .dice-outcome { color: var(--text-dim); }
+@keyframes dice-fade { from { opacity: 0; } }
+@keyframes dice-pop { from { opacity: 0; transform: scale(0.85); } }
+@media (prefers-reduced-motion: reduce) {
+  .dice-overlay, .dice-panel { animation: none; }
+}
+
 /* ==================== CORNICE A BASTIONE ==================== */
 /* Pannelli dei menu: bordi dritti e angoli che sporgono a punta, come i
    bastioni di una fortezza. Il disegno è in assets/frames/ e si applica con

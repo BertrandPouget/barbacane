@@ -82,7 +82,7 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 - `@register_effect("<effect_id>")` in `effects.py`. Firme: Magie `(state, player, prodigy=False, **targeting)`, Costruzioni `(state, player, completed=False, **kw)`, Orde `(state, player, warrior_iid=None, **kw)`.
 - **Passive** (Ariete, Catapulta, Fossato, Fucina…): l'effetto ritorna `{"passive": True}`, la logica vera è in `battle.py`/`actions.py`/`game.py`.
 - **Pre-validazione**: le condizioni per giocare una Magia/Costruzione vanno in `actions.py` (`play_spell`/`play_building`/`complete_building`) **prima** che la carta lasci la mano: un errore dall'effetto arriva quando la carta è già consumata.
-- Non esistono scarto libero né recupero di Muri. Eroe scartato → torna la Recluta con le assegnate; Recluta scartata → anche le assegnate negli scarti. D10 con `_roll_d10()` → `recent_events`.
+- Non esistono scarto libero né recupero di Muri. Eroe scartato → torna la Recluta con le assegnate; Recluta scartata → anche le assegnate negli scarti. D10: tira con `_roll_d10()` e registra con `_d10_event()` (dà il `roll_id` che serve a `frontend/dice.js` per mostrare il dado; testo dell'esito in `OUTCOMES` lì).
 
 **Checklist per una carta nuova o cambiata:**
 1. `data/cards.json`.

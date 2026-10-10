@@ -11,6 +11,7 @@ Convenzioni:
 
 from __future__ import annotations
 import random
+import uuid
 from typing import Any, Callable, Dict, List, Optional
 
 from engine.models import GameState, Player, BuildingInstance, WarriorInstance
@@ -43,6 +44,19 @@ def apply_effect(effect_id: str, state: GameState, player: Player, **kwargs) -> 
 
 def _roll_d10() -> int:
     return random.randint(1, 10)
+
+
+def _d10_event(state: GameState, card: str, player_id: str, roll: int, **extra) -> None:
+    """Registra un tiro di D10 in `recent_events`. `roll_id` permette ai client
+    di animare ogni tiro una volta sola: durante il turno di un Bot lo stesso
+    evento arriva in più aggiornamenti di stato. `log_at` e `turn` collocano il
+    tiro nella cronaca: il Granaio tira a fine turno, prima della pesca e
+    dell'intestazione del turno successivo."""
+    state.recent_events.append({
+        "type": "d10", "card": card, "player_id": player_id, "roll": roll,
+        "roll_id": uuid.uuid4().hex[:12], "log_at": len(state.log), "turn": state.turn,
+        **extra,
+    })
 
 
 def _apply_scrigno_bonus(player: Player, amount: int) -> int:
@@ -217,11 +231,8 @@ def estrattore_effect(state: GameState, player: Player, completed: bool = False,
             total = gained + bonus
         else:
             total = 0
-        state.recent_events.append({
-            "type": "d10", "card": "estrattore",
-            "player_id": player.id, "roll": roll,
-            "mana_gained": total, "triggered": bool(gained),
-        })
+        _d10_event(state, "estrattore", player.id, roll,
+                   mana_gained=total, triggered=bool(gained))
         return {"roll": roll, "mana_gained": total}
 
 
