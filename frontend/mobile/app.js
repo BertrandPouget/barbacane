@@ -449,11 +449,12 @@ const Mob = (() => {
     $('tutorial-panel-prev').hidden = !state.tutorial.can_go_back;
     $('tutorial-panel-prev').disabled = false;
     // Quando c'è una mossa da fare il pannello sta in alto, compatto, così
-    // mano e dock restano liberi: in cima allo schermo, oppure subito sotto
-    // la barra degli avversari quando la mossa riguarda loro (resta visibile)
+    // mano e dock restano liberi: subito sotto la barra superiore (che rispetta
+    // notch e barra di stato anche da webapp installata), oppure sotto la barra
+    // degli avversari quando la mossa riguarda loro (così resta visibile)
     const acting = step.goals.length > 0;
     const ids = step.highlight_mobile && step.highlight_mobile.length ? step.highlight_mobile : step.highlight;
-    const top = acting && ((ids || []).includes('opp-rail') ? 'opp-rail' : true);
+    const top = acting && ((ids || []).includes('opp-rail') ? 'opp-rail' : 'topbar');
     panel.classList.toggle('tut-panel-top', acting);
     panel.hidden = false;
     Spotlight.show(ids || [], panel, { center: !!step.panel_center, top });
@@ -522,6 +523,7 @@ const Mob = (() => {
     ]);
     const cardview = body.querySelector('.cardview');
     if (cardview) cardview.after(panel); else body.prepend(panel);
+    body.scrollTop = 0;
 
     // L'immagine può arrivare dopo (vedi cardViewNode): il riquadro si aggancia
     // alla faccia anteriore appena c'è

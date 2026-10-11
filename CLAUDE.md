@@ -38,7 +38,7 @@ engine/
   battle.py        Adiacenza, statistiche con bonus, danni, resolve_battle
   game.py          create_game/create_practice_game, _begin_turn, end_turn, public_state, simulate_game
   bot.py           IA dei Bot (docstring in testa: easy/normal/hard), run_bot_turn
-  tutorial.py      Tutorial: partita scriptata di 3 turni a obiettivi
+  tutorial.py      Tutorial: partita scriptata di 4 turni a obiettivi
   chronicle.py     Cronaca (log/eventi → frasi) e statistiche di fine partita
 server/
   routes.py        REST + WebSocket, _dispatch_action, timer, turni Bot, handler resolve_*
