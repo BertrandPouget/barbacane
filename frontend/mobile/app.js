@@ -53,9 +53,8 @@ const Mob = (() => {
   // ---------------------------------------------------------------------------
 
   let isTutorial = false;
-  let tutorialsMeta = [];        // elenco tutorial (id, title, description, step_count)
-  let tutorialStepsCache = {};   // tutorial_id -> [step, ...] (con testo/highlight)
   let tutorialCompletedShown = false;
+  let tutorialCardsRead = new Set();  // carte già spiegate (base_card_id)
 
   // Cronaca: id dell'ultima voce già mostrata (le successive sono "nuove")
   let chronicleSeenId = 0;
@@ -200,10 +199,7 @@ const Mob = (() => {
     gameId = saved.gameId;
     lobbyCode = saved.lobbyCode || null;
     isTutorial = !!state.tutorial;
-    if (isTutorial) {
-      tutorialCompletedShown = false;
-      await _ensureTutorialStepsCached(state.tutorial.tutorial_id);
-    }
+    tutorialCompletedShown = false;
     enterGame(state);
     return true;
   }
@@ -307,27 +303,20 @@ const Mob = (() => {
     $('cat-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
 
     // Tutorial
-    $('btn-tutorial').addEventListener('click', openTutorialList);
-    $('tut-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
+    $('btn-tutorial').addEventListener('click', startTutorial);
     $('tutorial-panel-exit').addEventListener('click', exitTutorial);
+    $('tutorial-panel-prev').addEventListener('click', (e) => {
+      haptic();
+      // Disabilitato fino al passo successivo: un doppio tocco tornerebbe indietro due volte.
+      e.currentTarget.disabled = true;
+      sendAction('tutorial_prev', {});
+    });
     $('tutorial-panel-next').addEventListener('click', (e) => {
       haptic();
-      // Fine tutorial: si torna all'elenco senza ricaricare la pagina, che
+      // Fine tutorial: si torna al menu senza ricaricare la pagina, che
       // interromperebbe la musica (il browser non la fa ripartire da solo).
       if (tutorialCompletedShown) { exitTutorial(); return; }
       // Disabilitato fino al passo successivo: un doppio tocco salterebbe un passo.
-      e.currentTarget.disabled = true;
-      sendAction('tutorial_next', {});
-    });
-    ['tutorial-panel-prev', 'card-anatomy-prev'].forEach(id => $(id).addEventListener('click', (e) => {
-      haptic();
-      e.currentTarget.disabled = true;
-      sendAction('tutorial_prev', {});
-    }));
-    $('card-anatomy-exit').addEventListener('click', exitTutorial);
-    $('card-anatomy-next').addEventListener('click', (e) => {
-      // Disabilitato fino al passo successivo: un doppio tocco salterebbe un passo.
-      haptic();
       e.currentTarget.disabled = true;
       sendAction('tutorial_next', {});
     });
@@ -378,56 +367,20 @@ const Mob = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Tutorial — elenco e avvio
+  // Tutorial — avvio e uscita
   // ---------------------------------------------------------------------------
 
-  async function openTutorialList() {
+  async function startTutorial() {
     haptic();
     try {
-      if (!tutorialsMeta.length) {
-        const res = await apiFetch('/tutorials');
-        tutorialsMeta = res.tutorials || [];
-      }
-      renderTutorialListGrid();
-      Screens.show('tutorial-list');
-    } catch (e) {
-      Toast.show('Impossibile caricare i tutorial', 'error');
-    }
-  }
-
-  function renderTutorialListGrid() {
-    const list = $('tut-list');
-    list.innerHTML = '';
-    tutorialsMeta.forEach((t, i) => {
-      const n = tutorialsMeta.length;
-      const stack = n === 1 ? '' : i === 0 ? ' menu-frame-alto' : i === n - 1 ? ' menu-frame-basso' : ' menu-frame-centro';
-      const item = el('div', { className: 'tut-item menu-frame' + stack }, [
-        el('div', { className: 'tut-item-title' }, [t.title]),
-        el('div', { className: 'tut-item-desc' }, [t.description]),
-        el('div', { className: 'tut-item-steps' }, [`${t.step_count} passi`]),
-      ]);
-      item.addEventListener('click', () => { haptic(); startTutorial(t.id); });
-      list.appendChild(item);
-    });
-  }
-
-  async function _ensureTutorialStepsCached(tutorialId) {
-    if (!tutorialStepsCache[tutorialId]) {
-      const full = await apiFetch(`/tutorials/${tutorialId}`);
-      tutorialStepsCache[tutorialId] = full.steps || [];
-    }
-  }
-
-  async function startTutorial(tutorialId) {
-    try {
-      await _ensureTutorialStepsCached(tutorialId);
-      const res = await api('/tutorial/start', { tutorial_id: tutorialId, player_name: 'Giocatore' });
+      const res = await api('/tutorial/start', { player_name: 'Giocatore' });
       sessionToken = res.session_token;
       myPlayerId = res.player_id;
       gameId = res.game_id;
       lobbyCode = null;
       isTutorial = true;
       tutorialCompletedShown = false;
+      tutorialCardsRead = new Set();
       saveSession();
       enterGame(res.state);
     } catch (e) {
@@ -442,7 +395,7 @@ const Mob = (() => {
     stopLocalTimer();
     Sheet.close(true);
     hideTutorialStep();
-    hideCardAnatomy();
+    if (stopCardReading) stopCardReading();
     $('tb-leave').hidden = false;
     clearSession();
     leavingGame = false;
@@ -451,57 +404,74 @@ const Mob = (() => {
     sessionToken = null;
     myPlayerId = null;
     isTutorial = false;
-    Screens.show('tutorial-list');
+    Screens.show('lobby');
   }
 
   // ---------------------------------------------------------------------------
   // Tutorial — occhio di bue sul campo e pannello dei passi
   // ---------------------------------------------------------------------------
 
-  // Tutto lo schermo si scurisce tranne le zone del passo corrente (spotlight.js);
-  // il pannello col testo si piazza accanto e resta visibile anche nei passi
-  // d'azione, dove al posto di "Avanti" invita a compiere la mossa sul campo.
-  // «← Indietro» compare solo se il server lo consente: si torna solo a un
-  // passo di spiegazione, mai a prima di una mossa già giocata.
-  function _setTutorialBackButton(id, canGoBack) {
-    $(id).hidden = !canGoBack;
-    $(id).disabled = false;
-  }
-
-  function showTutorialStep(step, idx, steps, canGoBack) {
+  // Tutto lo schermo si scurisce tranne le zone degli obiettivi ancora da fare
+  // (spotlight.js); il pannello si piazza accanto e mostra il testo del passo,
+  // il commento all'ultima mossa e la lista degli obiettivi. Il passo arriva
+  // già pronto dal server (state.tutorial.step).
+  function showTutorialStep(state) {
+    const step = state.tutorial.step;
+    const dummy = state.players.find(p => p.id !== myPlayerId);
     const panel = $('tutorial-panel');
-    $('tutorial-panel-progress').textContent = `Passo ${idx + 1} di ${steps.length}`;
+    $('tutorial-panel-progress').textContent =
+      dummy ? `${step.chapter} · Vite del Manichino: ${dummy.lives}` : step.chapter;
     $('tutorial-panel-title').textContent = step.title || '';
-    $('tutorial-panel-text').textContent = step.text || '';
+    // Passo di spiegazione: solo il testo. Passo con obiettivi: la lista, e
+    // sotto l'obiettivo da fare ora il suo testo (all'inizio quello del passo,
+    // poi il commento all'ultima mossa); quelli fatti sono spuntati, i
+    // successivi attenuati.
+    const text = $('tutorial-panel-text');
+    text.textContent = step.goals.length ? '' : (step.text || '');
+    text.hidden = !text.textContent;
+    const goals = $('tutorial-panel-goals');
+    goals.innerHTML = '';
+    const current = step.goals.findIndex(g => !g.done);
+    const lead = step.goals.some(g => g.done) ? step.feedback : step.text;
+    step.goals.forEach((g, i) => goals.appendChild(el('li', {
+      className: g.done ? 'done' : i === current ? 'current' : 'todo',
+    }, [
+      el('span', {}, [g.label]),
+      i === current && lead ? el('div', { className: 'tut-goal-text' }, [lead]) : null,
+    ])));
+    goals.hidden = !step.goals.length;
     const nextBtn = $('tutorial-panel-next');
     nextBtn.textContent = 'Avanti →';
-    nextBtn.hidden = !!step.requires_action;
+    nextBtn.hidden = step.goals.length > 0;
     nextBtn.disabled = false;
     $('tutorial-panel-exit').hidden = false;
-    $('tutorial-panel-waiting').hidden = !step.requires_action;
-    _setTutorialBackButton('tutorial-panel-prev', canGoBack);
-    panel.hidden = false;
+    // «← Indietro» solo verso un passo di spiegazione, mai a prima di una mossa giocata
+    $('tutorial-panel-prev').hidden = !state.tutorial.can_go_back;
+    $('tutorial-panel-prev').disabled = false;
+    // Quando c'è una mossa da fare il pannello sta in alto, compatto, così
+    // mano e dock restano liberi: in cima allo schermo, oppure subito sotto
+    // la barra degli avversari quando la mossa riguarda loro (resta visibile)
+    const acting = step.goals.length > 0;
     const ids = step.highlight_mobile && step.highlight_mobile.length ? step.highlight_mobile : step.highlight;
-    Spotlight.show(ids || [], panel);
+    const top = acting && ((ids || []).includes('opp-rail') ? 'opp-rail' : true);
+    panel.classList.toggle('tut-panel-top', acting);
+    panel.hidden = false;
+    Spotlight.show(ids || [], panel, { center: !!step.panel_center, top });
   }
 
-  // Fine tutorial: stesso pannello dei passi, centrato a schermo spento, con
-  // un solo pulsante per tornare all'elenco (e il nome del tutorial successivo).
-  function showTutorialCompleted(tutorialId) {
-    const idx = tutorialsMeta.findIndex(t => t.id === tutorialId);
-    const current = tutorialsMeta[idx];
-    const next = idx >= 0 ? tutorialsMeta[idx + 1] : null;
-    $('tutorial-panel-progress').textContent = current ? current.title : '';
-    $('tutorial-panel-title').textContent = 'Tutorial completato!';
-    $('tutorial-panel-text').textContent = next
-      ? `Torna all'elenco per provare il prossimo: «${next.title}».`
-      : (idx >= 0 ? 'Hai completato tutti i tutorial: sei pronto per una vera partita.'
-                  : 'Torna all\'elenco per provarne un altro.');
+  // Fine tutorial: stesso pannello, centrato a schermo spento, con un solo
+  // pulsante per tornare al menu.
+  function showTutorialCompleted(outro) {
+    $('tutorial-panel-progress').textContent = 'Tutorial completato';
+    $('tutorial-panel-title').textContent = (outro && outro.title) || 'Tutorial completato!';
+    $('tutorial-panel-text').textContent = (outro && outro.text) || '';
+    $('tutorial-panel-text').hidden = false;
     const nextBtn = $('tutorial-panel-next');
-    nextBtn.textContent = 'Torna all\'elenco →';
+    nextBtn.textContent = 'Torna al menu →';
     nextBtn.hidden = false;
     nextBtn.disabled = false;
-    ['tutorial-panel-exit', 'tutorial-panel-prev', 'tutorial-panel-waiting'].forEach(id => { $(id).hidden = true; });
+    ['tutorial-panel-exit', 'tutorial-panel-prev', 'tutorial-panel-goals'].forEach(id => { $(id).hidden = true; });
+    $('tutorial-panel').classList.remove('tut-panel-top');
     const panel = $('tutorial-panel');
     panel.hidden = false;
     Spotlight.show([], panel);
@@ -512,69 +482,112 @@ const Mob = (() => {
     $('tutorial-panel').hidden = true;
   }
 
-  // Passi con card_focus (tutorial "Anatomia di una Carta"): la carta appare a
-  // schermo intero e il riquadro evidenzia la sezione spiegata. rect è in
-  // percentuale della carta ([x, y, w, h]); null = carta intera, niente riquadro.
-  function showCardAnatomy(step, idx, steps, canGoBack) {
-    const focus = step.card_focus;
-    // Precarica le altre carte del tutorial, così il cambio carta non sfarfalla.
-    steps.forEach(s => {
-      if (s.card_focus) new window.Image().src = `/card_images/full/${s.card_focus.card}.png`;
-    });
-    const img = $('card-anatomy-img');
-    const src = `/card_images/full/${focus.card}.png`;
-    if (img.getAttribute('src') !== src) img.setAttribute('src', src);
+  // Lettura di una carta al primo tocco in mano (solo le carte che il copione
+  // spiega, state.tutorial.card_reads): si apre lo sheet normale della carta
+  // e, sopra l'immagine, un riquadro evidenzia una sezione alla volta,
+  // spiegata sotto la carta. Finché la lettura non è finita lo sheet non si
+  // chiude e i suoi pulsanti (Gioca, Chiudi…) restano spenti. rect è in %.
+  let stopCardReading = null;   // chiude la lettura in corso, se c'è
 
-    const box = $('card-anatomy-focus');
-    if (focus.rect) {
-      const [x, y, w, h] = focus.rect;
-      Object.assign(box.style, { left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%` });
-      box.hidden = false;
-    } else {
-      box.hidden = true;
-    }
-
-    $('card-anatomy-progress').textContent = `Passo ${idx + 1} di ${steps.length}`;
-    $('card-anatomy-title').textContent = step.title || '';
-    $('card-anatomy-text').textContent = step.text || '';
-    $('card-anatomy-next').disabled = false;
-    _setTutorialBackButton('card-anatomy-prev', canGoBack);
-    $('card-anatomy-overlay').hidden = false;
+  function maybeReadCard(iid, openSheet) {
+    const reads = isTutorial && currentState && currentState.tutorial && currentState.tutorial.card_reads;
+    const def = getCardDef(iid);
+    const sections = reads && def && reads[def.id];
+    if (!sections || tutorialCardsRead.has(def.id)) return false;
+    // Solo quando tocca al giocatore agire: nei passi di spiegazione si apre il
+    // dettaglio normale e la carta resta da leggere per dopo
+    const step = currentState.tutorial.step;
+    if (!step || !step.goals.length) return false;
+    tutorialCardsRead.add(def.id);
+    hideTutorialStep();
+    openSheet();
+    _startCardReading(def, sections);
+    return true;
   }
 
-  function hideCardAnatomy() {
-    $('card-anatomy-overlay').hidden = true;
+  function _startCardReading(def, sections) {
+    const body = $('sheet-body');
+    const buttons = [...$('sheet-foot').querySelectorAll('button'), ...body.querySelectorAll('.card-nav button')];
+    const wasDisabled = buttons.map(b => b.disabled);
+    buttons.forEach(b => { b.disabled = true; });
+    Sheet.lock(true);
+
+    const prevBtn = el('button', { className: 'mbtn' }, ['← Indietro']);
+    const nextBtn = el('button', { className: 'mbtn mbtn-gold' }, ['Avanti →']);
+    const progress = el('div', { className: 'tut-panel-progress' });
+    const title = el('div', { className: 'tut-panel-title' });
+    const text = el('div', { className: 'tut-panel-text' });
+    const panel = el('div', { className: 'tut-panel card-read' }, [
+      progress, title, text, el('div', { className: 'tut-panel-actions' }, [prevBtn, nextBtn]),
+    ]);
+    const cardview = body.querySelector('.cardview');
+    if (cardview) cardview.after(panel); else body.prepend(panel);
+
+    // L'immagine può arrivare dopo (vedi cardViewNode): il riquadro si aggancia
+    // alla faccia anteriore appena c'è
+    const box = el('div', { className: 'card-read-focus' });
+    let tries = 0;
+    const attach = () => {
+      if (!panel.isConnected) return;
+      const front = body.querySelector('.flip .flip-face:not(.flip-back)');
+      if (front) { front.appendChild(box); front.closest('.flip').classList.add('reading'); }
+      else if (++tries < 180) requestAnimationFrame(attach);
+    };
+    attach();
+
+    let i = 0;
+    const render = () => {
+      const s = sections[i];
+      const [x, y, w, h] = s.rect;
+      Object.assign(box.style, { left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%` });
+      progress.textContent = `${def.name} · ${i + 1} di ${sections.length}`;
+      title.textContent = s.title;
+      text.textContent = s.text;
+      nextBtn.textContent = i < sections.length - 1 ? 'Avanti →' : 'Ho capito';
+      prevBtn.classList.toggle('invisible', i === 0);
+    };
+    // Se lo sheet viene ricostruito (aggiornamento di stato) la lettura finisce
+    const watcher = new MutationObserver(() => { if (!panel.isConnected && stopCardReading) stopCardReading(); });
+    watcher.observe(body, { childList: true });
+    stopCardReading = () => {
+      stopCardReading = null;
+      watcher.disconnect();
+      box.remove();
+      const flip = body.querySelector('.flip.reading');
+      if (flip) flip.classList.remove('reading');
+      panel.remove();
+      buttons.forEach((b, k) => { b.disabled = wasDisabled[k]; });
+      Sheet.lock(false);
+    };
+    prevBtn.addEventListener('click', () => { haptic(); if (i > 0) { i--; render(); } });
+    nextBtn.addEventListener('click', () => {
+      haptic();
+      if (++i < sections.length) { render(); return; }
+      stopCardReading();
+      updateTutorialUI(currentState);
+    });
+    render();
   }
 
   function updateTutorialUI(state) {
     if (!isTutorial || !state.tutorial) {
-      hideCardAnatomy();
+      if (stopCardReading) stopCardReading();
       hideTutorialStep();
       return;
     }
-
-    const steps = tutorialStepsCache[state.tutorial.tutorial_id] || [];
-    const idx = state.tutorial.step_index;
-
-    if (state.tutorial.completed || idx >= steps.length) {
-      hideCardAnatomy();
+    if (state.tutorial.completed || !state.tutorial.step) {
+      if (stopCardReading) stopCardReading();
       if (!tutorialCompletedShown) {
         tutorialCompletedShown = true;
-        showTutorialCompleted(state.tutorial.tutorial_id);
+        showTutorialCompleted(state.tutorial.outro);
       }
       return;
     }
-
-    const step = steps[idx];
-    if (!step) { hideTutorialStep(); return; }
-
-    if (step.card_focus) {
-      hideTutorialStep();
-      showCardAnatomy(step, idx, steps, !!state.tutorial.can_go_back);
-      return;
-    }
-    hideCardAnatomy();
-    showTutorialStep(step, idx, steps, !!state.tutorial.can_go_back);
+    // Durante la lettura di una carta il pannello resta nascosto
+    if (stopCardReading) return;
+    // Mentre si scelgono i Muri lo schermo serve tutto al vassoio
+    if (wallMode) { hideTutorialStep(); return; }
+    showTutorialStep(state);
   }
 
   // ---------------------------------------------------------------------------
@@ -960,7 +973,7 @@ const Mob = (() => {
     Render.game(state, myPlayerId);
     refreshDock();
     _openPendingSheets(state);
-    if (state.winner_id) showGameOver(state);
+    if (state.winner_id && !isTutorial) showGameOver(state);
     // Tutorial: aggiornata per ultima, così un eventuale sheet di completamento
     // non venga chiuso da altra logica di questo ciclo.
     if (isTutorial) updateTutorialUI(state);
@@ -1053,7 +1066,8 @@ const Mob = (() => {
 
     _renderChronicle(state, action);
 
-    if (state.winner_id) {
+    // Nel tutorial la vittoria sul Manichino chiude il copione (pannello finale)
+    if (state.winner_id && !isTutorial) {
       setTimeout(() => showGameOver(state), 900);
       return;
     }
@@ -1286,6 +1300,8 @@ const Mob = (() => {
 
   function onHandTap(iid) {
     if (wallMode) { toggleWallCard(iid); return; }
+    // Nel tutorial, la prima volta che si tocca una carta da spiegare, prima la lettura
+    if (maybeReadCard(iid, () => openHandCardSheet(iid))) return;
     openHandCardSheet(iid);
   }
 
@@ -1783,6 +1799,8 @@ const Mob = (() => {
     $('wall-tray').hidden = false;
     renderWallTray();
     refreshDock();
+    // Nel tutorial pannello e occhio di bue lasciano tutto lo schermo al vassoio
+    if (isTutorial) hideTutorialStep();
   }
 
   function exitWallMode(silent = false) {
@@ -1795,6 +1813,7 @@ const Mob = (() => {
     $('wall-tray').hidden = true;
     Render.markWallPicks(new Set());
     if (!silent) refreshDock();
+    if (isTutorial && currentState) updateTutorialUI(currentState);
   }
 
   function toggleWallCard(iid) {
@@ -1900,38 +1919,24 @@ const Mob = (() => {
 
     if (walls.length > 0) {
       body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' }, [`🧱 Muri (${walls.length})`]));
+      const row = el('div', { className: 'sheet-cards' });
       walls.forEach((iid, i) => {
-        const def = getCardDef(iid);
-        const row = el('button', { className: 'opt-row' }, [
-          el('span', { className: 'opt-icon' }, ['🧱']),
-          el('span', { className: 'opt-main' }, [
-            el('span', { className: 'opt-label' }, [def ? def.name : iid]),
-            el('span', { className: 'opt-sub', style: 'display:block' },
-              [def ? ({ warrior: 'Guerriero', spell: 'Magia', building: 'Costruzione' })[def.type] || '' : '']),
-          ]),
-          el('span', { className: 'opt-chevron' }, ['›']),
-        ]);
-        row.addEventListener('click', () => { haptic(); showMyWallSheet(walls, side, i); });
-        body.push(row);
+        const mini = Render.wallMini(iid);
+        mini.addEventListener('click', () => { haptic(); showMyWallSheet(walls, side, i); });
+        row.appendChild(mini);
       });
+      body.push(row);
     }
 
     if (warriors.length > 0) {
       body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' }, [`🗡️ Guerrieri (${warriors.length})`]));
+      const row = el('div', { className: 'sheet-cards' });
       warriors.forEach(w => {
-        const hasAssigned = w.assigned_cards && w.assigned_cards.length > 0;
-        const row = el('button', { className: `opt-row sp-${w.species || 'umano'}${hasAssigned ? ' has-assigned' : ''}` }, [
-          el('span', { className: 'opt-icon' }, ['🗡️']),
-          el('span', { className: 'opt-main' }, [
-            el('span', { className: 'opt-label' }, [(hasAssigned ? '📌 ' : '') + (w.name || w.base_card_id)]),
-            el('span', { className: 'opt-sub', style: 'display:block' },
-              [`${capitalize(w.species || '')} · 🗡️${w.att} 🏹${w.git} 🛡️${w.dif}${w.horde_active ? ' · ⚡ Orda' : ''}`]),
-          ]),
-          el('span', { className: 'opt-chevron' }, ['›']),
-        ]);
-        row.addEventListener('click', () => { haptic(); openFieldWarriorSheet(w.instance_id); });
-        body.push(row);
+        const mini = Render.warriorMini(w);
+        mini.addEventListener('click', () => { haptic(); openFieldWarriorSheet(w.instance_id); });
+        row.appendChild(mini);
       });
+      body.push(row);
     }
 
     Sheet.open({
@@ -2049,20 +2054,15 @@ const Mob = (() => {
         ['Nessun Guerriero in Avanscoperta. Senza di loro non puoi attaccare in Battaglia.']));
     }
 
-    warriors.forEach(w => {
-      const hasAssigned = w.assigned_cards && w.assigned_cards.length > 0;
-      const row = el('button', { className: `opt-row sp-${w.species || 'umano'}${hasAssigned ? ' has-assigned' : ''}` }, [
-        el('span', { className: 'opt-icon' }, ['🗡️']),
-        el('span', { className: 'opt-main' }, [
-          el('span', { className: 'opt-label' }, [(hasAssigned ? '📌 ' : '') + (w.name || w.base_card_id)]),
-          el('span', { className: 'opt-sub', style: 'display:block' },
-            [`${capitalize(w.species || '')} · 🗡️${w.att} 🏹${w.git} 🛡️${w.dif}${w.horde_active ? ' · ⚡ Orda' : ''}`]),
-        ]),
-        el('span', { className: 'opt-chevron' }, ['›']),
-      ]);
-      row.addEventListener('click', () => { haptic(); openFieldWarriorSheet(w.instance_id); });
+    if (warriors.length > 0) {
+      const row = el('div', { className: 'sheet-cards' });
+      warriors.forEach(w => {
+        const mini = Render.warriorMini(w);
+        mini.addEventListener('click', () => { haptic(); openFieldWarriorSheet(w.instance_id); });
+        row.appendChild(mini);
+      });
       body.push(row);
-    });
+    }
 
     Sheet.open({
       title: '⚔️ Avanscoperta',
@@ -2089,21 +2089,16 @@ const Mob = (() => {
       body.push(el('div', { className: 'sheet-note' }, ['Nessuna Costruzione nel Villaggio. Giocale dalla mano nella fase Azioni.']));
     }
 
-    buildings.forEach(b => {
-      const def = getCardDef(b.instance_id);
-      const isEth = my.ethereal_complete === b.instance_id;
-      const row = el('button', { className: `opt-row${b.completed ? ' gold' : ''}` }, [
-        el('span', { className: 'opt-icon' }, [b.completed ? '🏰' : '🏗️']),
-        el('span', { className: 'opt-main' }, [
-          el('span', { className: 'opt-label' }, [(def ? def.name : b.base_card_id) + (b.completed ? ' ✓' : '')]),
-          el('span', { className: 'opt-sub', style: 'display:block' },
-            [isEth ? '✧ Completabile gratis (Velocemento)' : (b.effect || (b.completed ? 'Completata' : 'Incompleta'))]),
-        ]),
-        el('span', { className: 'opt-chevron' }, ['›']),
-      ]);
-      row.addEventListener('click', () => { haptic(); openBuildingSheet(b.instance_id); });
+    if (buildings.length > 0) {
+      const row = el('div', { className: 'sheet-cards' });
+      buildings.forEach(b => {
+        // Bordo bianco: completabile gratis (Prodigio di Velocemento)
+        const mini = Render.buildingMini(b, my.ethereal_complete === b.instance_id);
+        mini.addEventListener('click', () => { haptic(); openBuildingSheet(b.instance_id); });
+        row.appendChild(mini);
+      });
       body.push(row);
-    });
+    }
 
     Sheet.open({
       title: '🏰 Villaggio',
@@ -2586,7 +2581,7 @@ const Mob = (() => {
     if ((p.field.vanguard || []).length === 0) {
       body.push(el('div', { className: 'sheet-note' }, ['Vuota — non può attaccare.']));
     } else {
-      const row = el('div', { style: 'display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px' });
+      const row = el('div', { className: 'sheet-cards' });
       p.field.vanguard.forEach(w => {
         const mini = Render.warriorMini(w);
         mini.addEventListener('click', () => { haptic(); openEnemyCardSheet(w, p); });
@@ -2601,7 +2596,7 @@ const Mob = (() => {
       const tag = attackable.has(side) ? ' (Possibile Bersaglio)' : '';
       body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' },
         [`🧱 Bastione ${name}${tag}`]));
-      const row = el('div', { style: 'display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px' });
+      const row = el('div', { className: 'sheet-cards' });
       row.appendChild(Render.deckNode('wall', bastion.wall_count ?? 0));
       (bastion.warriors || []).forEach(w => {
         const mini = Render.warriorMini(w);
@@ -2614,16 +2609,10 @@ const Mob = (() => {
     // Villaggio
     const buildings = ((p.field.village && p.field.village.buildings) || []).filter(b => !b.assigned_warrior);
     body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' }, ['🏰 Villaggio']));
+    const villageRow = el('div', { className: 'sheet-cards' });
     buildings.forEach(b => {
       const def = getCardDef(b.instance_id);
-      const row = el('button', { className: `opt-row${b.completed ? ' gold' : ''}` }, [
-        el('span', { className: 'opt-icon' }, [b.completed ? '🏰' : '🏗️']),
-        el('span', { className: 'opt-main' }, [
-          el('span', { className: 'opt-label' }, [(def ? def.name : b.base_card_id) + (b.completed ? ' ✓' : '')]),
-          el('span', { className: 'opt-sub', style: 'display:block' }, [b.effect || '']),
-        ]),
-        el('span', { className: 'opt-chevron' }, ['›']),
-      ]);
+      const row = Render.buildingMini(b);
       row.addEventListener('click', () => {
         haptic();
         Sheet.open({
@@ -2633,9 +2622,10 @@ const Mob = (() => {
           footer: [{ label: '‹ Indietro', onClick: () => openOpponentSheet(playerId) }],
         });
       });
-      body.push(row);
+      villageRow.appendChild(row);
     });
-    if (buildings.length === 0) body.push(el('div', { className: 'sheet-note' }, ['Nessuna Costruzione.']));
+    if (buildings.length > 0) body.push(villageRow);
+    else body.push(el('div', { className: 'sheet-note' }, ['Nessuna Costruzione.']));
 
     Sheet.open({
       title: p.name,

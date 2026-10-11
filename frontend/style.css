@@ -2871,18 +2871,8 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   .catalog-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-/* ==================== TUTORIAL ==================== */
-
-#screen-tutorial-list.active {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  padding-bottom: 4rem;  /* compensa l'intestazione: la lista risulta centrata nello schermo */
-}
-
 /* Intestazioni delle schermate di menu: stesso stile di quella del catalogo
    (titolo crema maiuscolo al centro, «Indietro» a sinistra, filetto dorato). */
-#tutorial-list-header,
 #bot-difficulty-header,
 #multiplayer-header,
 #waiting-header {
@@ -2896,7 +2886,6 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   flex-shrink: 0;
 }
 
-#tutorial-list-header .btn,
 #bot-difficulty-header .btn,
 #multiplayer-header .btn,
 #waiting-header .btn {
@@ -2904,7 +2893,6 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   left: 1.2rem;
 }
 
-#tutorial-list-header h2,
 #bot-difficulty-header h2,
 #multiplayer-header h2,
 #waiting-header h2 {
@@ -2916,22 +2904,6 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   margin: 0;
 }
 
-
-#tutorial-list-grid {
-  max-width: 760px;
-  margin: auto;
-  padding: 0 1.2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  width: 100%;
-}
-
-.tutorial-card { padding: 0.3rem 0.7rem; }
-
-.tutorial-card-title { color: var(--card-cream); font-size: 1.1rem; font-weight: bold; }
-.tutorial-card-desc  { color: var(--text); font-size: 0.9rem; margin-top: 0.3rem; }
-.tutorial-card-steps { color: var(--text-dim); font-size: 0.78rem; margin-top: 0.5rem; font-style: italic; }
 
 /* ==================== SFIDA UN BOT ==================== */
 
@@ -3045,7 +3017,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   50%      { box-shadow: 0 0 22px var(--gold),            inset 0 0 14px rgba(251, 196, 2, 0.3); }
 }
 
-/* Pannello dei passi: stesso aspetto nel tour del campo e nell'anatomia carta */
+/* Pannello del tutorial: stesso aspetto sul campo e nella spiegazione delle carte */
 .tut-panel {
   background: linear-gradient(160deg, var(--bg-medium), var(--bg-light));
   border: 2px solid var(--gold);
@@ -3073,20 +3045,50 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   line-height: 1.55;
 }
 
-.tut-panel-waiting {
-  margin-top: 0.9rem;
-  color: var(--gold-light);
-  font-size: 0.9rem;
-  font-style: italic;
-  animation: tutorial-pulse 1.4s ease-in-out infinite;
+/* Obiettivi del passo: quelli fatti si spuntano */
+.tut-goals {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
 }
 
-.tut-panel-waiting.hidden { display: none; }
+.tut-goals.hidden { display: none; }
 
-@keyframes tutorial-pulse {
-  0%, 100% { opacity: 0.55; }
-  50%      { opacity: 1; }
+.tut-goals li {
+  position: relative;
+  padding: 0.2rem 0 0.2rem 1.6rem;
+  color: var(--card-cream);
+  font-size: 0.95rem;
 }
+
+.tut-goals li::before {
+  content: '';
+  position: absolute;
+  left: 0.15rem;
+  top: 0.42rem;
+  width: 0.8rem;
+  height: 0.8rem;
+  border: 2px solid var(--gold);
+  transform: rotate(45deg) scale(0.8);
+}
+
+.tut-goals li.done { color: var(--text-dim); text-decoration: line-through; }
+
+.tut-goals li.current > span { color: var(--gold-light); font-weight: bold; }
+
+.tut-goals li.todo { opacity: 0.45; }
+
+/* Testo dell'obiettivo da fare ora, sotto la sua voce */
+.tut-goal-text {
+  margin: 0.3rem 0 0.5rem;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: normal;
+  line-height: 1.55;
+  animation: tutorial-panel-in 0.3s ease-out;
+}
+
+.tut-goals li.done::before { background: var(--gold); }
 
 .tut-panel-actions {
   display: flex;
@@ -3103,6 +3105,9 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   display: flex;
   gap: 0.6rem;
 }
+
+/* «Indietro» alla prima sezione della carta: nascosto ma tiene il posto */
+.tut-panel-actions .invisible { visibility: hidden; }
 
 #tutorial-panel {
   position: fixed;
@@ -3122,42 +3127,13 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   to   { opacity: 1; transform: scale(1); }
 }
 
-/* tutorial "Anatomia di una Carta": la carta occupa quasi tutto lo schermo e
-   un riquadro dorato si sposta sulla sezione spiegata; l'ombra enorme del
-   riquadro (ritagliata dalla carta) scurisce tutto il resto. */
-#card-anatomy-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 230;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2.5rem;
-  padding: 2rem;
-  background: rgba(10, 5, 0, 0.94);
-}
-
-#card-anatomy-overlay.hidden { display: none !important; }
-
-#card-anatomy-card {
-  position: relative;
-  flex: 0 0 auto;
-  width: min(calc(88vh * 744 / 1039), calc(100vw - 480px));
-  aspect-ratio: 744 / 1039;
-  border-radius: 2.4% / 1.7%;
-  overflow: hidden;
-  background: var(--card-ink);
-  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.8);
-}
-
-#card-anatomy-img {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-#card-anatomy-focus {
+/* Tutorial, lettura di una carta dentro il suo dettaglio: un riquadro dorato
+   si sposta sulla sezione spiegata (la sua ombra, ritagliata dalla carta,
+   scurisce il resto) e il pannello accanto la spiega. Finché la lettura non è
+   finita la carta non si gira e i pulsanti del dettaglio restano spenti. */
+.card-read-focus {
   position: absolute;
+  z-index: 2;
   border: 3px solid var(--gold);
   border-radius: 8px;
   box-shadow: 0 0 0 200vmax rgba(10, 5, 0, 0.62), 0 0 18px var(--gold);
@@ -3165,14 +3141,21 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   pointer-events: none;
 }
 
-#card-anatomy-focus.hidden { display: none; }
+.card-flip.reading { pointer-events: none; }
+.card-flip.reading .card-flip-inner { overflow: hidden; border-radius: 18px; }
 
-#card-anatomy-panel { flex: 0 1 380px; }
+#card-detail-overlay.reading #card-image-footer button,
+#card-detail-overlay.reading #card-detail-footer button {
+  opacity: 0.35;
+  pointer-events: none;
+}
+#card-detail-overlay.reading .card-flip-hint { visibility: hidden; }
 
-@media (max-width: 800px) {
-  #card-anatomy-overlay { flex-direction: column; gap: 1rem; padding: 1rem; }
-  #card-anatomy-card { width: min(calc(58vh * 744 / 1039), 92vw); }
-  #card-anatomy-panel { flex: 0 0 auto; width: 100%; max-width: 460px; padding: 1rem 1.2rem; }
+/* Posizione calcolata in app.js: accanto alla carta, o sotto se non c'è spazio */
+#card-read {
+  position: fixed;
+  z-index: 5;
+  width: min(380px, calc(100vw - 2rem));
 }
 
 /* ==================== LANCIO DEL D10 ==================== */

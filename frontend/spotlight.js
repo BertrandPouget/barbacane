@@ -15,6 +15,7 @@
 const Spotlight = (() => {
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const PAD = 6;          // margine attorno all'elemento evidenziato
+  const INSET = 4;        // distanza minima dell'anello dal bordo dello schermo
   const GAP = 14;         // distanza tra zona evidenziata e pannello
   const EDGE = 12;        // margine minimo del pannello dal bordo schermo
   const DURATION = 380;   // durata dello scivolamento, ms
@@ -22,6 +23,8 @@ const Spotlight = (() => {
   let root = null, maskGroup = null, ringLayer = null;
   let targets = [];       // id degli elementi DOM da evidenziare
   let panel = null;       // pannello da posizionare accanto
+  let centered = false;   // pannello fermo al centro anche con zone evidenziate
+  let atTop = false;      // pannello in cima (true) o subito sotto l'elemento con quell'id
   let current = [];       // rettangoli attualmente disegnati [{x,y,w,h}]
   let goal = [];          // rettangoli verso cui si sta animando
   let anim = null;
@@ -74,12 +77,20 @@ const Spotlight = (() => {
     return { left, top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
   }
 
+  // Il margine attorno all'elemento non esce dallo schermo: le zone larghe
+  // quanto la finestra (il tuo campo, gli avversari) restano incorniciate.
   function measure() {
+    const vw = window.innerWidth, vh = window.innerHeight;
     return targets
       .map(targetRect)
       .filter(Boolean)
       .filter(r => r.width > 0 && r.height > 0)
-      .map(r => ({ x: r.left - PAD, y: r.top - PAD, w: r.width + 2 * PAD, h: r.height + 2 * PAD }));
+      .map(r => {
+        const x = Math.max(INSET, r.left - PAD), y = Math.max(INSET, r.top - PAD);
+        const right = Math.min(vw - INSET, r.left + r.width + PAD);
+        const bottom = Math.min(vh - INSET, r.top + r.height + PAD);
+        return { x, y, w: Math.max(0, right - x), h: Math.max(0, bottom - y) };
+      });
   }
 
   const collapsed = r => ({ x: r.x + r.w / 2, y: r.y + r.h / 2, w: 0, h: 0 });
@@ -162,15 +173,21 @@ const Spotlight = (() => {
   // quando due zone lontane lasciano spazio in mezzo) con il pannello centrato
   // nello schermo; poi le stesse allineate alla zona; poi ai lati; infine ai
   // bordi dello schermo. Se nessun posto è libero, sceglie quello che copre
-  // meno. Senza zone evidenziate: al centro.
+  // meno. Senza zone evidenziate, o con `center`: al centro (così il
+  // pannello non salta tra passi di spiegazione consecutivi). Con `top`: in
+  // cima allo schermo, per lasciare libere mano e pulsanti in basso; se `top`
+  // è l'id di un elemento, subito sotto di esso (che resta visibile).
   function placePanel(rects) {
     if (!panel) return;
     const vw = window.innerWidth, vh = window.innerHeight;
     const pw = panel.offsetWidth, ph = panel.offsetHeight;
     const clampX = x => Math.max(EDGE, Math.min(vw - pw - EDGE, x));
     const clampY = y => Math.max(EDGE, Math.min(vh - ph - EDGE, y));
-    let best = { left: (vw - pw) / 2, top: (vh - ph) / 2 };
-    if (rects.length) {
+    let topY = EDGE;
+    const anchor = typeof atTop === 'string' && document.getElementById(atTop);
+    if (anchor) topY = anchor.getBoundingClientRect().bottom + GAP;
+    let best = { left: (vw - pw) / 2, top: atTop ? topY : (vh - ph) / 2 };
+    if (rects.length && !centered && !atTop) {
       const u = rects.reduce((a, r) => ({
         x: Math.min(a.x, r.x), y: Math.min(a.y, r.y),
         r: Math.max(a.r, r.x + r.w), b: Math.max(a.b, r.y + r.h),
@@ -219,8 +236,10 @@ const Spotlight = (() => {
     placePanel(next);
   }
 
-  function show(ids, panelEl) {
+  function show(ids, panelEl, opts = {}) {
     build();
+    centered = !!opts.center;
+    atTop = opts.top || false;
     targets = (ids || []).filter(Boolean);
     const wasVisible = visible;
     if (panel && panel !== panelEl) panel.classList.remove('spotlight-panel-placed');

@@ -78,7 +78,8 @@ const Render = (() => {
   // Carte — stesso markup del desktop (renderer.js), usate negli sheet
   // ---------------------------------------------------------------------------
 
-  // Usata dagli sheet di app.js (avversari, ecc.)
+  // Usate dagli sheet di app.js (Regioni, avversari): la versione testuale
+  // con sopra la minicarta, come renderWarriorCard/renderBuildingCard del desktop.
   function warriorMini(w) {
     const div = el('div', {
       className: 'card card-sm in-field',
@@ -97,6 +98,32 @@ const Render = (() => {
     stats.appendChild(el('span', { className: 'stat stat-git' }, [`🏹${w.git}`]));
     stats.appendChild(el('span', { className: 'stat stat-dif' }, [`🛡️${w.dif}`]));
     div.appendChild(stats);
+    // Minicarta con le Caratteristiche correnti
+    CardArt.attach(div, Mob.getCardDef(w.instance_id), w);
+    return div;
+  }
+
+  function buildingMini(b, ethereal) {
+    const div = el('div', {
+      className: `card card-sm in-field${b.completed ? ' completed' : ''}${ethereal ? ' ethereal' : ''}`,
+      dataset: { type: 'building', instanceId: b.instance_id, baseId: b.base_card_id },
+    });
+    div.appendChild(el('div', { className: 'card-name' }, [b.name || b.base_card_id]));
+    div.appendChild(el('div', { className: 'card-species' }, [b.completed ? '✓ Completa' : '— Incompleta']));
+    // Minicarta con la torre piena o vuota
+    CardArt.attach(div, Mob.getCardDef(b.instance_id), b);
+    return div;
+  }
+
+  // Un mio Muro: la carta scoperta, così so cosa c'è nel Bastione
+  function wallMini(iid) {
+    const def = Mob.getCardDef(iid);
+    const div = el('div', {
+      className: 'card card-sm in-field',
+      dataset: { type: def ? def.type : 'wall', instanceId: iid },
+    });
+    div.appendChild(el('div', { className: 'card-name' }, [def ? def.name : iid]));
+    CardArt.attach(div, def, CardArt.handInfo(def, iid, []));
     return div;
   }
 
@@ -616,6 +643,8 @@ const Render = (() => {
     hand,
     markWallPicks,
     warriorMini,
+    buildingMini,
+    wallMini,
     deckNode,
     activeEffectItems,
     cardTextHTML,

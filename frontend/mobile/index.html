@@ -55,7 +55,7 @@
         <span class="home-mode-art"><img src="/assets/home/patrizio.png" alt="" class="art-patrizio" /></span>
       </button>
       <button id="btn-tutorial" class="home-mode menu-frame menu-frame-centro">
-        <span class="home-mode-text"><span class="home-mode-title">Tutorial</span><span class="home-mode-desc">Brevi partite guidate per imparare le regole passo passo.</span></span>
+        <span class="home-mode-text"><span class="home-mode-title">Tutorial</span><span class="home-mode-desc">Una breve partita guidata contro il Manichino: le regole si imparano giocando.</span></span>
         <span class="home-mode-art"><img src="/assets/home/orfeo.png" alt="" class="art-orfeo" /></span>
       </button>
       <button id="btn-catalog" class="home-mode menu-frame menu-frame-basso">
@@ -107,17 +107,6 @@
   </div>
 </section>
 
-<!-- ═══════════ SCHERMATA: TUTORIAL (elenco) ═══════════ -->
-<section id="scr-tutorial-list" class="scr">
-  <header id="tut-head" class="glass">
-    <button id="tut-back" class="tb-btn" aria-label="Torna alla lobby">←</button>
-    <span class="cat-title">Tutorial</span>
-  </header>
-  <div id="tut-scroll">
-    <div id="tut-list"></div>
-  </div>
-</section>
-
 <!-- ═══════════ SCHERMATA: SFIDA UN BOT (scelta difficoltà) ═══════════ -->
 <section id="scr-bot-difficulty" class="scr">
   <header id="bot-diff-head" class="glass">
@@ -136,7 +125,7 @@
     </div>
     <button class="menu-frame difficulty-card difficulty-easy" data-difficulty="easy">
       <div class="difficulty-card-title">🟢 Facile</div>
-      <div class="difficulty-card-desc">Valuta le carte una alla volta e non sceglie sempre la mossa migliore. Ottimo per i primi passi dopo i tutorial.</div>
+      <div class="difficulty-card-desc">Valuta le carte una alla volta e non sceglie sempre la mossa migliore. Ottimo per i primi passi dopo il tutorial.</div>
     </button>
     <button class="menu-frame difficulty-card difficulty-normal" data-difficulty="normal">
       <div class="difficulty-card-title">🟡 Normale</div>
@@ -216,14 +205,14 @@
     </div>
   </header>
 
-  <!-- Pannello dei passi Tutorial: si piazza accanto alla zona evidenziata (spotlight.js) -->
+  <!-- Pannello del Tutorial: si piazza accanto alla zona evidenziata (spotlight.js) -->
   <div id="tutorial-panel" class="tut-panel" hidden>
     <div id="tutorial-panel-progress" class="tut-panel-progress"></div>
     <div id="tutorial-panel-title" class="tut-panel-title"></div>
     <div id="tutorial-panel-text" class="tut-panel-text"></div>
-    <div id="tutorial-panel-waiting" class="tut-panel-waiting" hidden>👉 Completa l'azione indicata</div>
+    <ul id="tutorial-panel-goals" class="tut-goals" hidden></ul>
     <div class="tut-panel-actions">
-      <button id="tutorial-panel-exit" class="mbtn">Esci</button>
+      <button id="tutorial-panel-exit" class="mbtn">Abbandona</button>
       <div class="tut-panel-nav">
         <button id="tutorial-panel-prev" class="mbtn" hidden>← Indietro</button>
         <button id="tutorial-panel-next" class="mbtn mbtn-gold">Avanti →</button>
@@ -231,25 +220,6 @@
     </div>
   </div>
 
-  <!-- tutorial "Anatomia di una Carta": carta a schermo intero con la sezione spiegata evidenziata -->
-  <div id="card-anatomy-overlay" hidden>
-    <div id="card-anatomy-card">
-      <img id="card-anatomy-img" alt="" />
-      <div id="card-anatomy-focus"></div>
-    </div>
-    <div id="card-anatomy-panel" class="tut-panel">
-      <div id="card-anatomy-progress" class="tut-panel-progress"></div>
-      <div id="card-anatomy-title" class="tut-panel-title"></div>
-      <div id="card-anatomy-text" class="tut-panel-text"></div>
-      <div class="tut-panel-actions">
-        <button id="card-anatomy-exit" class="mbtn">Esci</button>
-        <div class="tut-panel-nav">
-          <button id="card-anatomy-prev" class="mbtn" hidden>← Indietro</button>
-          <button id="card-anatomy-next" class="mbtn mbtn-gold">Avanti →</button>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Avversari -->
   <div id="opp-rail"></div>

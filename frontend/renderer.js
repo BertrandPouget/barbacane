@@ -991,6 +991,18 @@ const Renderer = (() => {
   // Card detail overlay
   // ---------------------------------------------------------------------------
 
+  // Funzione da chiamare una volta, appena il prossimo dettaglio carta è a
+  // schermo, con la modalità usata ('image' o 'text'): il tutorial ci aggancia
+  // la lettura della carta (vedi maybeReadCard in app.js).
+  let _afterShown = null;
+  function afterCardShown(fn) { _afterShown = fn; }
+  function _notifyShown(mode) {
+    if (!_afterShown) return;
+    const fn = _afterShown;
+    _afterShown = null;
+    fn(mode);
+  }
+
   function showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons = [], navOptions = null, baseCardId = null, fallbackBaseCardId = null) {
     const overlay = document.getElementById('card-detail-overlay');
 
@@ -1062,6 +1074,7 @@ const Renderer = (() => {
       document.getElementById('card-detail-close').onclick = () => overlay.classList.add('hidden');
       overlay.classList.remove('hidden');
       overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.add('hidden'); };
+      _notifyShown('text');
     }
 
     function _showImageMode(imgSrc) {
@@ -1102,6 +1115,7 @@ const Renderer = (() => {
       document.getElementById('card-img-close').onclick = () => overlay.classList.add('hidden');
       overlay.classList.remove('hidden');
       overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.add('hidden'); };
+      _notifyShown('image');
     }
 
     if (baseCardId) {
@@ -1583,7 +1597,7 @@ const Renderer = (() => {
     placeMusicToggle(name);
   }
 
-  // In partita, nel catalogo e nelle schermate di scelta tutorial/bot il pulsante
+  // In partita, nel catalogo e nelle schermate di scelta il pulsante
   // musica vive nella barra dell'header (rispettivamente dopo "Esci" e accanto al
   // titolo); altrove resta fisso in alto a destra. Con la cronaca aperta sta
   // nella sua intestazione, accanto alla ✕ (il pannello copre l'header).
@@ -1604,9 +1618,6 @@ const Renderer = (() => {
       cls = 'in-header';
     } else if (name === 'catalog') {
       target = document.getElementById('catalog-header');
-      cls = 'in-catalog-header';
-    } else if (name === 'tutorial-list') {
-      target = document.getElementById('tutorial-list-header');
       cls = 'in-catalog-header';
     } else if (name === 'bot-difficulty') {
       target = document.getElementById('bot-difficulty-header');
@@ -1691,6 +1702,7 @@ const Renderer = (() => {
     showCardPicker,
     cardMeta,
     showCardDetail,
+    afterCardShown,
     closeCardDetail,
     motionCardNode,
     motionBackNode,

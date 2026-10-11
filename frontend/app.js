@@ -54,9 +54,8 @@ const App = (() => {
   // ---------------------------------------------------------------------------
 
   let isTutorial = false;
-  let tutorialsMeta = [];        // elenco tutorial (id, title, description, step_count)
-  let tutorialStepsCache = {};   // tutorial_id -> [step, ...] (con testo/highlight)
   let tutorialCompletedShown = false;
+  let tutorialCardsRead = new Set();  // carte già spiegate (base_card_id)
 
   // ---------------------------------------------------------------------------
   // Init
@@ -273,25 +272,17 @@ const App = (() => {
     document.getElementById('btn-catalog-back').addEventListener('click', () => Renderer.showScreen('lobby'));
 
     // Tutorial
-    document.getElementById('btn-tutorial').addEventListener('click', openTutorialList);
-    document.getElementById('btn-tutorial-back').addEventListener('click', () => Renderer.showScreen('lobby'));
+    document.getElementById('btn-tutorial').addEventListener('click', startTutorial);
     document.getElementById('tutorial-panel-exit').addEventListener('click', exitTutorial);
+    document.getElementById('tutorial-panel-prev').addEventListener('click', (e) => {
+      // Disabilitato fino al passo successivo: un doppio click tornerebbe indietro due volte.
+      e.currentTarget.disabled = true;
+      sendAction('tutorial_prev', {});
+    });
     document.getElementById('tutorial-panel-next').addEventListener('click', (e) => {
-      // Fine tutorial: si torna all'elenco senza ricaricare la pagina, che
+      // Fine tutorial: si torna al menu senza ricaricare la pagina, che
       // interromperebbe la musica (il browser non la fa ripartire da solo).
       if (tutorialCompletedShown) { exitTutorial(); return; }
-      // Disabilitato fino al passo successivo: un doppio click salterebbe un passo.
-      e.currentTarget.disabled = true;
-      sendAction('tutorial_next', {});
-    });
-    ['tutorial-panel-prev', 'card-anatomy-prev'].forEach(id => {
-      document.getElementById(id).addEventListener('click', (e) => {
-        e.currentTarget.disabled = true;
-        sendAction('tutorial_prev', {});
-      });
-    });
-    document.getElementById('card-anatomy-exit').addEventListener('click', exitTutorial);
-    document.getElementById('card-anatomy-next').addEventListener('click', (e) => {
       // Disabilitato fino al passo successivo: un doppio click salterebbe un passo.
       e.currentTarget.disabled = true;
       sendAction('tutorial_next', {});
@@ -342,55 +333,18 @@ const App = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Tutorial — elenco e avvio
+  // Tutorial — avvio e uscita
   // ---------------------------------------------------------------------------
 
-  async function openTutorialList() {
+  async function startTutorial() {
     try {
-      if (!tutorialsMeta.length) {
-        const res = await apiFetch('/tutorials');
-        tutorialsMeta = res.tutorials || [];
-      }
-      renderTutorialListGrid();
-      Renderer.showScreen('tutorial-list');
-    } catch (e) {
-      Renderer.toast('Impossibile caricare i tutorial', 'error');
-    }
-  }
-
-  // Cornice di un pannello in una pila: punte solo sui lati liberi
-  function stackFrame(i, n) {
-    return n === 1 ? '' : i === 0 ? 'menu-frame-alto' : i === n - 1 ? 'menu-frame-basso' : 'menu-frame-centro';
-  }
-
-  function renderTutorialListGrid() {
-    const grid = document.getElementById('tutorial-list-grid');
-    grid.innerHTML = '';
-    tutorialsMeta.forEach((t, i) => {
-      const card = document.createElement('div');
-      card.className = `tutorial-card menu-frame clickable ${stackFrame(i, tutorialsMeta.length)}`;
-      card.innerHTML = `
-        <div class="tutorial-card-title">${t.title}</div>
-        <div class="tutorial-card-desc">${t.description}</div>
-        <div class="tutorial-card-steps">${t.step_count} passi</div>
-      `;
-      card.addEventListener('click', () => startTutorial(t.id));
-      grid.appendChild(card);
-    });
-  }
-
-  async function startTutorial(tutorialId) {
-    try {
-      if (!tutorialStepsCache[tutorialId]) {
-        const full = await apiFetch(`/tutorials/${tutorialId}`);
-        tutorialStepsCache[tutorialId] = full.steps || [];
-      }
-      const res = await api('/tutorial/start', { tutorial_id: tutorialId, player_name: 'Giocatore' });
+      const res = await api('/tutorial/start', { player_name: 'Giocatore' });
       sessionToken = res.session_token;
       myPlayerId = res.player_id;
       gameId = res.game_id;
       isTutorial = true;
       tutorialCompletedShown = false;
+      tutorialCardsRead = new Set();
       enterGame(res.state);
       // Nel tutorial l'abbandono normale non ha senso (c'è il "Manichino" come
       // avversario fittizio): nascondi il pulsante "Esci" della testata.
@@ -414,7 +368,7 @@ const App = (() => {
     stopLocalTimer();
     _clearPendingUI();
     hideTutorialStep();
-    hideCardAnatomy();
+    if (stopCardReading) stopCardReading();
     document.getElementById('btn-abandon').classList.remove('hidden');
     leavingGame = false;
     selectedCard = null;
@@ -425,57 +379,75 @@ const App = (() => {
     sessionToken = null;
     myPlayerId = null;
     isTutorial = false;
-    Renderer.showScreen('tutorial-list');
+    Renderer.showScreen('lobby');
   }
 
   // ---------------------------------------------------------------------------
   // Tutorial — occhio di bue sul campo e pannello dei passi
   // ---------------------------------------------------------------------------
 
-  // Tutto lo schermo si scurisce tranne le zone del passo corrente (spotlight.js);
-  // il pannello col testo si piazza accanto e resta visibile anche nei passi
-  // d'azione, dove al posto di "Avanti" invita a compiere la mossa sul campo.
-  // «← Indietro» compare solo se il server lo consente: si torna solo a un
-  // passo di spiegazione, mai a prima di una mossa già giocata.
-  function _setTutorialBackButton(id, canGoBack) {
-    const btn = document.getElementById(id);
-    btn.classList.toggle('hidden', !canGoBack);
-    btn.disabled = false;
-  }
-
-  function showTutorialStep(step, idx, steps, canGoBack) {
+  // Tutto lo schermo si scurisce tranne le zone degli obiettivi ancora da fare
+  // (spotlight.js); il pannello si piazza accanto e mostra il testo del passo,
+  // il commento all'ultima mossa e la lista degli obiettivi. Il passo arriva
+  // già pronto dal server (state.tutorial.step).
+  function showTutorialStep(state) {
+    const step = state.tutorial.step;
+    const dummy = state.players.find(p => p.id !== myPlayerId);
     const panel = document.getElementById('tutorial-panel');
-    document.getElementById('tutorial-panel-progress').textContent = `Passo ${idx + 1} di ${steps.length}`;
+    document.getElementById('tutorial-panel-progress').textContent =
+      dummy ? `${step.chapter} · Vite del Manichino: ${dummy.lives}` : step.chapter;
     document.getElementById('tutorial-panel-title').textContent = step.title || '';
-    document.getElementById('tutorial-panel-text').textContent = step.text || '';
+    // Passo di spiegazione: solo il testo. Passo con obiettivi: la lista, e
+    // sotto l'obiettivo da fare ora il suo testo (all'inizio quello del passo,
+    // poi il commento all'ultima mossa); quelli fatti sono spuntati, i
+    // successivi attenuati.
+    const text = document.getElementById('tutorial-panel-text');
+    text.textContent = step.goals.length ? '' : (step.text || '');
+    text.classList.toggle('hidden', !text.textContent);
+    const goals = document.getElementById('tutorial-panel-goals');
+    goals.innerHTML = '';
+    const current = step.goals.findIndex(g => !g.done);
+    const lead = step.goals.some(g => g.done) ? step.feedback : step.text;
+    step.goals.forEach((g, i) => {
+      const li = document.createElement('li');
+      li.className = g.done ? 'done' : i === current ? 'current' : 'todo';
+      const label = document.createElement('span');
+      label.textContent = g.label;
+      li.appendChild(label);
+      if (i === current && lead) {
+        const p = document.createElement('div');
+        p.className = 'tut-goal-text';
+        p.textContent = lead;
+        li.appendChild(p);
+      }
+      goals.appendChild(li);
+    });
+    goals.classList.toggle('hidden', !step.goals.length);
     const nextBtn = document.getElementById('tutorial-panel-next');
     nextBtn.textContent = 'Avanti →';
-    nextBtn.classList.toggle('hidden', !!step.requires_action);
+    nextBtn.classList.toggle('hidden', step.goals.length > 0);
     nextBtn.disabled = false;
     document.getElementById('tutorial-panel-exit').classList.remove('hidden');
-    document.getElementById('tutorial-panel-waiting').classList.toggle('hidden', !step.requires_action);
-    _setTutorialBackButton('tutorial-panel-prev', canGoBack);
+    // «← Indietro» solo verso un passo di spiegazione, mai a prima di una mossa giocata
+    const prevBtn = document.getElementById('tutorial-panel-prev');
+    prevBtn.classList.toggle('hidden', !state.tutorial.can_go_back);
+    prevBtn.disabled = false;
     panel.classList.remove('hidden');
-    Spotlight.show(step.highlight || [], panel);
+    Spotlight.show(step.highlight || [], panel, { center: !!step.panel_center });
   }
 
-  // Fine tutorial: stesso pannello dei passi, centrato a schermo spento, con
-  // un solo pulsante per tornare all'elenco (e il nome del tutorial successivo).
-  function showTutorialCompleted(tutorialId) {
-    const idx = tutorialsMeta.findIndex(t => t.id === tutorialId);
-    const current = tutorialsMeta[idx];
-    const next = idx >= 0 ? tutorialsMeta[idx + 1] : null;
-    document.getElementById('tutorial-panel-progress').textContent = current ? current.title : '';
-    document.getElementById('tutorial-panel-title').textContent = 'Tutorial completato!';
-    document.getElementById('tutorial-panel-text').textContent = next
-      ? `Torna all'elenco per provare il prossimo: «${next.title}».`
-      : (idx >= 0 ? 'Hai completato tutti i tutorial: sei pronto per una vera partita.'
-                  : 'Torna all\'elenco per provarne un altro.');
+  // Fine tutorial: stesso pannello, centrato a schermo spento, con un solo
+  // pulsante per tornare al menu.
+  function showTutorialCompleted(outro) {
+    document.getElementById('tutorial-panel-progress').textContent = 'Tutorial completato';
+    document.getElementById('tutorial-panel-title').textContent = (outro && outro.title) || 'Tutorial completato!';
+    document.getElementById('tutorial-panel-text').textContent = (outro && outro.text) || '';
+    document.getElementById('tutorial-panel-text').classList.remove('hidden');
     const nextBtn = document.getElementById('tutorial-panel-next');
-    nextBtn.textContent = 'Torna all\'elenco →';
+    nextBtn.textContent = 'Torna al menu →';
     nextBtn.classList.remove('hidden');
     nextBtn.disabled = false;
-    ['tutorial-panel-exit', 'tutorial-panel-prev', 'tutorial-panel-waiting']
+    ['tutorial-panel-exit', 'tutorial-panel-prev', 'tutorial-panel-goals']
       .forEach(id => document.getElementById(id).classList.add('hidden'));
     const panel = document.getElementById('tutorial-panel');
     panel.classList.remove('hidden');
@@ -487,69 +459,118 @@ const App = (() => {
     document.getElementById('tutorial-panel').classList.add('hidden');
   }
 
-  // Passi con card_focus (tutorial "Anatomia di una Carta"): la carta appare a
-  // schermo intero e il riquadro evidenzia la sezione spiegata. rect è in
-  // percentuale della carta ([x, y, w, h]); null = carta intera, niente riquadro.
-  function showCardAnatomy(step, idx, steps, canGoBack) {
-    const focus = step.card_focus;
-    // Precarica le altre carte del tutorial, così il cambio carta non sfarfalla.
-    steps.forEach(s => {
-      if (s.card_focus) new window.Image().src = `/card_images/full/${s.card_focus.card}.png`;
-    });
-    const img = document.getElementById('card-anatomy-img');
-    const src = `/card_images/full/${focus.card}.png`;
-    if (img.getAttribute('src') !== src) img.setAttribute('src', src);
+  // Lettura di una carta al primo tocco in mano (solo le carte che il copione
+  // spiega, state.tutorial.card_reads): si apre il dettaglio normale della
+  // carta e, sopra l'immagine, un riquadro evidenzia una sezione alla volta,
+  // spiegata in un pannello accanto. Finché la lettura non è finita i pulsanti
+  // del dettaglio (Gioca, Chiudi…) restano spenti. rect è in % della carta.
+  let stopCardReading = null;   // chiude la lettura in corso, se c'è
 
-    const box = document.getElementById('card-anatomy-focus');
-    if (focus.rect) {
-      const [x, y, w, h] = focus.rect;
-      Object.assign(box.style, { left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%` });
-      box.classList.remove('hidden');
-    } else {
-      box.classList.add('hidden');
-    }
-
-    document.getElementById('card-anatomy-progress').textContent = `Passo ${idx + 1} di ${steps.length}`;
-    document.getElementById('card-anatomy-title').textContent = step.title || '';
-    document.getElementById('card-anatomy-text').textContent = step.text || '';
-    document.getElementById('card-anatomy-next').disabled = false;
-    _setTutorialBackButton('card-anatomy-prev', canGoBack);
-    document.getElementById('card-anatomy-overlay').classList.remove('hidden');
+  function maybeReadCard(instanceId, openDetail) {
+    const reads = isTutorial && currentState && currentState.tutorial && currentState.tutorial.card_reads;
+    const def = getCardDef(instanceId);
+    const sections = reads && def && reads[def.id];
+    if (!sections || tutorialCardsRead.has(def.id)) return false;
+    // Solo quando tocca al giocatore agire: nei passi di spiegazione si apre il
+    // dettaglio normale e la carta resta da leggere per dopo
+    const step = currentState.tutorial.step;
+    if (!step || !step.goals.length) return false;
+    tutorialCardsRead.add(def.id);
+    hideTutorialStep();
+    Renderer.afterCardShown(mode => _startCardReading(def, sections, mode));
+    openDetail();
+    return true;
   }
 
-  function hideCardAnatomy() {
-    document.getElementById('card-anatomy-overlay').classList.add('hidden');
+  function _startCardReading(def, sections, mode) {
+    const overlay = document.getElementById('card-detail-overlay');
+    const flip = document.getElementById('card-flip');
+    const box = document.createElement('div');
+    box.className = 'card-read-focus';
+    if (mode === 'image') flip.querySelector('.card-flip-inner').appendChild(box);
+
+    const panel = document.createElement('div');
+    panel.id = 'card-read';
+    panel.className = 'tut-panel';
+    panel.innerHTML = `
+      <div class="tut-panel-progress"></div>
+      <div class="tut-panel-title"></div>
+      <div class="tut-panel-text"></div>
+      <div class="tut-panel-actions">
+        <button class="btn btn-secondary">← Indietro</button>
+        <button class="btn btn-primary">Avanti →</button>
+      </div>`;
+    overlay.appendChild(panel);
+    const [prevBtn, nextBtn] = panel.querySelectorAll('button');
+
+    overlay.classList.add('reading');
+    flip.classList.add('reading');
+    const backdropClick = overlay.onclick;
+    overlay.onclick = null;
+
+    // Pannello attaccato alla carta, a destra e centrato; se non c'è spazio, sotto
+    const place = () => {
+      const r = (mode === 'image' ? flip : document.getElementById('card-detail-box')).getBoundingClientRect();
+      const pw = panel.offsetWidth, ph = panel.offsetHeight;
+      const gap = 24, edge = 16;
+      if (r.right + gap + pw <= window.innerWidth - edge) {
+        panel.style.left = `${r.right + gap}px`;
+        panel.style.top = `${Math.max(edge, Math.min(window.innerHeight - ph - edge, r.top + r.height / 2 - ph / 2))}px`;
+      } else {
+        panel.style.left = `${Math.max(edge, (window.innerWidth - pw) / 2)}px`;
+        panel.style.top = `${Math.max(edge, window.innerHeight - ph - edge)}px`;
+      }
+    };
+    window.addEventListener('resize', place);
+
+    let i = 0;
+    const render = () => {
+      const s = sections[i];
+      const [x, y, w, h] = s.rect;
+      Object.assign(box.style, { left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%` });
+      panel.querySelector('.tut-panel-progress').textContent = `${def.name} · ${i + 1} di ${sections.length}`;
+      panel.querySelector('.tut-panel-title').textContent = s.title;
+      panel.querySelector('.tut-panel-text').textContent = s.text;
+      nextBtn.textContent = i < sections.length - 1 ? 'Avanti →' : 'Ho capito';
+      prevBtn.classList.toggle('invisible', i === 0);
+      place();
+    };
+    stopCardReading = () => {
+      stopCardReading = null;
+      window.removeEventListener('resize', place);
+      box.remove();
+      panel.remove();
+      overlay.classList.remove('reading');
+      flip.classList.remove('reading');
+      overlay.onclick = backdropClick;
+    };
+    prevBtn.onclick = (e) => { e.stopPropagation(); if (i > 0) { i--; render(); } };
+    nextBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (++i < sections.length) { render(); return; }
+      stopCardReading();
+      updateTutorialUI(currentState);
+    };
+    render();
   }
 
   function updateTutorialUI(state) {
     if (!isTutorial || !state.tutorial) {
-      hideCardAnatomy();
+      if (stopCardReading) stopCardReading();
       hideTutorialStep();
       return;
     }
-
-    const steps = tutorialStepsCache[state.tutorial.tutorial_id] || [];
-    const idx = state.tutorial.step_index;
-
-    if (state.tutorial.completed || idx >= steps.length) {
-      hideCardAnatomy();
+    if (state.tutorial.completed || !state.tutorial.step) {
+      if (stopCardReading) stopCardReading();
       if (!tutorialCompletedShown) {
         tutorialCompletedShown = true;
-        showTutorialCompleted(state.tutorial.tutorial_id);
+        showTutorialCompleted(state.tutorial.outro);
       }
       return;
     }
-
-    const step = steps[idx];
-    if (!step) { hideTutorialStep(); return; }
-
-    if (step.card_focus) {
-      hideTutorialStep();
-      showCardAnatomy(step, idx, steps, !!state.tutorial.can_go_back);
-      return;
-    }
-    hideCardAnatomy();
-    showTutorialStep(step, idx, steps, !!state.tutorial.can_go_back);
+    // Durante la lettura di una carta il pannello resta nascosto
+    if (stopCardReading) return;
+    showTutorialStep(state);
   }
 
   // ---------------------------------------------------------------------------
@@ -979,7 +1000,8 @@ const App = (() => {
       });
     }
 
-    if (state.winner_id) {
+    // Nel tutorial la vittoria sul Manichino chiude il copione (pannello finale)
+    if (state.winner_id && !isTutorial) {
       setTimeout(() => showGameOver(state), 800);
     }
 
@@ -1639,8 +1661,11 @@ const App = (() => {
       return;
     }
 
-    // In tutti gli altri casi: mostra il dettaglio della carta
-    showCardDetail(instanceId, source === 'life_card' ? 'life_card' : source);
+    // In tutti gli altri casi: mostra il dettaglio della carta (nel tutorial,
+    // la prima volta che si tocca in mano una carta da spiegare, prima la lettura)
+    const detail = () => showCardDetail(instanceId, source === 'life_card' ? 'life_card' : source);
+    if (source === 'hand' && maybeReadCard(instanceId, detail)) return;
+    detail();
   }
 
   // ---------------------------------------------------------------------------
@@ -2853,7 +2878,7 @@ const App = (() => {
     myPlayerId = null;
     isTutorial = false;
     hideTutorialStep();
-    hideCardAnatomy();
+    if (stopCardReading) stopCardReading();
     document.getElementById('btn-abandon').classList.remove('hidden');
     Renderer.showScreen('lobby');
     refreshResumeButton();

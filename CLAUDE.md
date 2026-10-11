@@ -38,7 +38,7 @@ engine/
   battle.py        Adiacenza, statistiche con bonus, danni, resolve_battle
   game.py          create_game/create_practice_game, _begin_turn, end_turn, public_state, simulate_game
   bot.py           IA dei Bot (docstring in testa: easy/normal/hard), run_bot_turn
-  tutorial.py      6 tutorial scriptati
+  tutorial.py      Tutorial: partita scriptata di 3 turni a obiettivi
   chronicle.py     Cronaca (log/eventi → frasi) e statistiche di fine partita
 server/
   routes.py        REST + WebSocket, _dispatch_action, timer, turni Bot, handler resolve_*
@@ -66,7 +66,7 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 - **Giocatore Singolo** (schermata `bot-difficulty`, non più raggiungibile dalla home): game_id `vs-…`, umano primo, timer disattivato.
 - **Bot**: girano in background **solo se almeno un umano è connesso**; il turno è calcolato tutto, salvato, poi raccontato al tavolo mossa per mossa (`bot_step`). Un turno da 3–4 s è accettabile: non sacrificare la forza per la velocità. Magie non gestite: `_SPELL_EFFECT_EXCLUDE`.
 - **Cronaca**: le informazioni coperte (pescate, Muri, scarti dalla mano) vanno in `private_text`, mai nel testo pubblico. Una carta nuova che produce eventi/log merita una frase in `_tell_log`/`_tell_event`.
-- **Tutorial**: `card_focus` usa rettangoli in % sull'immagine della carta: se cambia il layout di `card.html` vanno ritarati. Selettori mobile in `_MOBILE_HIGHLIGHT_MAP`.
+- **Tutorial**: copione a obiettivi con numeri tarati sulle carte vere (Mana, ATT/DIF, Muri): cambiare una carta usata può rompere i conti, ricontrollarli giocandolo. Il turno del Manichino è il `setup` dello step dopo «Fine Turno». `CARD_READS` (lettura delle carte al primo tocco) usa rettangoli in % sull'immagine della carta: se cambia il layout di `card.html` vanno ritarati. Selettori mobile in `_MOBILE_HIGHLIGHT_MAP`.
 - **Modalità Test**: nome `Test`/`Test2` → carte di `data/test_cards.json` in cima al mazzo, 10 Mana e 5 Azioni a turno.
 - Rivincita e ripresa partita: `POST /game/rematch` (`state.mode` distingue i casi), `frontend/session.js`.
 

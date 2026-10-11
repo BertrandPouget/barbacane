@@ -56,8 +56,7 @@ from server.lobby import (
 )
 from server.ws_manager import manager
 from engine.tutorial import (
-    list_tutorials_meta,
-    get_tutorial,
+    DEFAULT_TUTORIAL_ID,
     create_tutorial_game,
     advance_info_step,
 )
@@ -273,21 +272,8 @@ async def api_start_game(req: StartGameRequest):
 # ---------------------------------------------------------------------------
 
 class TutorialStartRequest(BaseModel):
-    tutorial_id: str
+    tutorial_id: str = DEFAULT_TUTORIAL_ID
     player_name: str = "Tu"
-
-
-@router.get("/tutorials")
-async def api_list_tutorials():
-    return {"tutorials": list_tutorials_meta()}
-
-
-@router.get("/tutorials/{tutorial_id}")
-async def api_get_tutorial(tutorial_id: str):
-    tdef = get_tutorial(tutorial_id)
-    if tdef is None:
-        raise HTTPException(404, "Tutorial non trovato")
-    return tdef.to_dict()
 
 
 @router.post("/tutorial/start")
@@ -675,8 +661,8 @@ def _dispatch(state, player_id: str, action: str, params: dict) -> dict:
 
     # Dopo la battaglia (o eracle_destroy), fine turno automatica se non ci sono
     # più battaglie disponibili e nessun eracle_destroy in attesa di scelta.
-    # Nei tutorial la fine turno automatica è disattivata: il "Manichino" non
-    # gioca mai, quindi passare il turno bloccherebbe lo script.
+    # Nei tutorial la fine turno automatica è disattivata: "Fine Turno" è un
+    # obiettivo del copione, che subito dopo gioca il turno del Manichino.
     if action in ("battle", "eracle_destroy") and not state.winner_id and not state.tutorial:
         eracle_pending = action == "battle" and result.get("eracle_destroy_triggered", False)
         if state.battles_remaining <= 0 and not eracle_pending:

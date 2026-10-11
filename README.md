@@ -20,7 +20,7 @@ Dalla schermata iniziale si può scegliere tra:
 
 - **Giocatore Singolo** — una partita vera, in solitaria, contro 1–3 avversari controllati dal computer (i "Mecha-"), con tre livelli di difficoltà: Facile, Normale e Difficile.
 - **Multigiocatore** — si crea una lobby e si ottiene un codice da condividere con gli amici, che lo usano per unirsi. In Sala d'Attesa il creatore può riempire i posti liberi con dei Bot, sceglierne la difficoltà e decidere l'ordine dei posti al tavolo (che determina quali Bastioni confinano); al momento della creazione si può anche attivare un timer per turno.
-- **Tutorial** — sei brevi partite guidate che insegnano il gioco mossa per mossa, contro un Manichino che si limita a fare da bersaglio.
+- **Tutorial** — una breve partita guidata contro il Manichino, giocata con le Maghe: si impara facendo, e le carte nuove si spiegano la prima volta che le tocchi.
 - **Catalogo Carte** — tutte le carte del gioco, da sfogliare con calma.
 
 Il gioco è pensato sia per desktop che per telefono, con due interfacce dedicate.
@@ -42,7 +42,7 @@ Entrando con il nome `Test` o `Test2`, le carte elencate in `data/test_cards.jso
 
 ## Come si Gioca
 
-Ecco una breve introduzione al gioco e alle sue meccaniche principali. Per il regolamento completo, consigliamo comunque di vedere [`assets/rules.md`](assets/rules.md), oppure di giocare i tutorial.
+Ecco una breve introduzione al gioco e alle sue meccaniche principali. Per il regolamento completo, consigliamo comunque di vedere [`assets/rules.md`](assets/rules.md), oppure di giocare il tutorial.
 
 ### Campo di Gioco
 
