@@ -3,10 +3,14 @@
  * desktop e mobile.
  *
  * Disegna dentro il pannello del tutorial lo schema descritto dal server
- * (step.diagram, vedi engine/tutorial.py): i valori dei due lati con la carta
- * da cui vengono, gli scontri (ATT contro DIF, GIT contro GIT) con quanto
- * passa, e il risultato su Danni, Muri e Vite. I rombi riprendono quelli delle
- * Caratteristiche sulle carte. Lo stile è nel CSS di ciascun client (.bd-*).
+ * (step.battle_diagram, vedi engine/tutorial.py), in ordine cronologico, ogni parte
+ * con prima la sua regola e poi l'esempio:
+ * 1. il Danno: i valori dei due lati (i più alti di ciascuno) con la carta da
+ *    cui vengono, gli scontri
+ *    (ATT contro DIF, GIT contro GIT) con quanto passa, e la somma;
+ * 2. dove va il Danno: prima i Muri, poi la Vita.
+ * I rombi riprendono quelli delle Caratteristiche sulle carte. Lo stile è nel
+ * CSS di ciascun client (.bd-*).
  */
 
 const TutorialDiagram = (() => {
@@ -42,34 +46,42 @@ const TutorialDiagram = (() => {
   function render(diagram) {
     const root = _el('div', 'bd');
 
+    // 1. Il Danno
+    root.appendChild(_el('div', 'bd-head', '1 · Il Danno'));
     const sides = _el('div', 'bd-sides');
     diagram.sides.forEach(side => sides.appendChild(_side(side)));
     root.appendChild(sides);
 
-    // Scontri: valore contro valore, e quanto passa come Danno
-    const clashes = _el('div', 'bd-clashes');
+    const clashes = _el('div', 'bd-rows');
     diagram.clashes.forEach(([a, av, d, dv, pass]) => {
-      const row = _el('div', 'bd-clash');
-      row.appendChild(_el('span', 'bd-vs-side', `${a} ${av}`));
+      const row = _el('div', 'bd-row');
+      row.appendChild(_el('span', '', `${a} ${av}`));
       row.appendChild(_el('span', 'bd-vs', 'contro'));
-      row.appendChild(_el('span', 'bd-vs-side', `${d} ${dv}`));
+      row.appendChild(_el('span', '', `${d} ${dv}`));
       row.appendChild(_el('span', 'bd-arrow', '→'));
       row.appendChild(_el('span', `bd-pass${pass > 0 ? '' : ' none'}`, pass > 0 ? `passa ${pass}` : 'fermato'));
       clashes.appendChild(row);
     });
     root.appendChild(clashes);
 
-    // Risultato: Danni contro Muri e Vite
-    const result = _el('div', 'bd-result');
-    diagram.result.forEach(([label, value], i) => {
-      if (i > 0) result.appendChild(_el('span', 'bd-arrow', '→'));
-      const cell = _el('span', 'bd-cell');
-      cell.appendChild(_dia(value, i === 0 ? 'gold' : ''));
-      cell.appendChild(_el('span', 'bd-cell-label', label));
-      result.appendChild(cell);
+    const total = _el('div', 'bd-total');
+    total.appendChild(_el('span', '', `${diagram.clashes.map(c => c[4]).join(' + ')} =`));
+    total.appendChild(_dia(diagram.damage, 'gold'));
+    total.appendChild(_el('span', '', 'Danni'));
+    root.appendChild(total);
+
+    // 2. Dove va il Danno: prima i Muri, poi la Vita
+    root.appendChild(_el('div', 'bd-head', '2 · Dove va il Danno'));
+    root.appendChild(_el('div', 'bd-sub', diagram.split_rule));
+    const split = _el('div', 'bd-rows');
+    diagram.split.forEach(([from, to]) => {
+      const row = _el('div', 'bd-row');
+      row.appendChild(_el('span', '', from));
+      row.appendChild(_el('span', 'bd-arrow', '→'));
+      row.appendChild(_el('span', 'bd-pass', to));
+      split.appendChild(row);
     });
-    root.appendChild(result);
-    root.appendChild(_el('div', 'bd-outcome', diagram.outcome));
+    root.appendChild(split);
     return root;
   }
 

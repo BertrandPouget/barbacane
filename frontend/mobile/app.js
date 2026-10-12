@@ -307,6 +307,8 @@ const Mob = (() => {
     $('tutorial-panel-exit').addEventListener('click', exitTutorial);
     $('tutorial-panel-prev').addEventListener('click', (e) => {
       haptic();
+      // Schema della Battaglia aperto: si torna al passo senza attaccare
+      if (tutorialBattlePreview) { tutorialBattlePreview = null; updateTutorialUI(currentState); return; }
       // Disabilitato fino al passo successivo: un doppio tocco tornerebbe indietro due volte.
       e.currentTarget.disabled = true;
       sendAction('tutorial_prev', {});
@@ -318,6 +320,14 @@ const Mob = (() => {
       if (tutorialCompletedShown) { exitTutorial(); return; }
       // Disabilitato fino al passo successivo: un doppio tocco salterebbe un passo.
       e.currentTarget.disabled = true;
+      // Schema della Battaglia aperto: «Attacca →» manda l'attacco scelto
+      if (tutorialBattlePreview) {
+        const params = tutorialBattlePreview;
+        tutorialBattlePreview = null;
+        tutorialBattleConfirmed = true;
+        sendAction('battle', params);
+        return;
+      }
       sendAction('tutorial_next', {});
     });
 
@@ -426,11 +436,8 @@ const Mob = (() => {
     const text = $('tutorial-panel-text');
     text.textContent = step.goals.length ? '' : (step.text || '');
     text.hidden = !text.textContent;
-    // Schema (Battaglia finale): disegnato nel pannello
-    const diagram = $('tutorial-panel-diagram');
-    diagram.innerHTML = '';
-    if (step.diagram) diagram.appendChild(TutorialDiagram.render(step.diagram));
-    diagram.hidden = !step.diagram;
+    // Lo schema della Battaglia compare solo all'attacco (_previewTutorialBattle)
+    $('tutorial-panel-diagram').hidden = true;
     const goals = $('tutorial-panel-goals');
     goals.innerHTML = '';
     const current = step.goals.findIndex(g => !g.done);
@@ -587,11 +594,45 @@ const Mob = (() => {
       }
       return;
     }
-    // Durante la lettura di una carta il pannello resta nascosto
-    if (stopCardReading) return;
+    // Durante la lettura di una carta il pannello resta nascosto, e lo schema
+    // della Battaglia resta finché non si conferma o si torna indietro
+    if (stopCardReading || tutorialBattlePreview) return;
     // Mentre si scelgono i Muri lo schermo serve tutto al vassoio
     if (wallMode) { hideTutorialStep(); return; }
     showTutorialStep(state);
+  }
+
+  // Schema della Battaglia nel tutorial (step.battle_diagram): quando il
+  // giocatore sceglie di attaccare il Bastione indicato, prima di mandare
+  // l'attacco il pannello mostra come si calcola; «Attacca →» lo conferma,
+  // «← Indietro» torna al passo senza attaccare.
+  let tutorialBattlePreview = null;   // parametri dell'attacco in attesa di conferma
+  let tutorialBattleConfirmed = false;
+
+  function _previewTutorialBattle(params) {
+    if (tutorialBattleConfirmed) { tutorialBattleConfirmed = false; return false; }
+    const step = isTutorial && currentState && currentState.tutorial && currentState.tutorial.step;
+    const diagram = step && step.battle_diagram;
+    if (!diagram || params.defender_bastion_side !== diagram.side) return false;
+    tutorialBattlePreview = params;
+    const panel = $('tutorial-panel');
+    $('tutorial-panel-title').textContent = diagram.title;
+    $('tutorial-panel-text').hidden = true;
+    $('tutorial-panel-goals').hidden = true;
+    const box = $('tutorial-panel-diagram');
+    box.innerHTML = '';
+    box.appendChild(TutorialDiagram.render(diagram));
+    box.hidden = false;
+    const nextBtn = $('tutorial-panel-next');
+    nextBtn.textContent = 'Attacca →';
+    nextBtn.hidden = false;
+    nextBtn.disabled = false;
+    $('tutorial-panel-prev').hidden = false;
+    $('tutorial-panel-prev').disabled = false;
+    panel.classList.remove('tut-panel-top');
+    panel.hidden = false;
+    Spotlight.show([], panel);
+    return true;
   }
 
   // ---------------------------------------------------------------------------
@@ -3261,6 +3302,8 @@ const Mob = (() => {
   // ---------------------------------------------------------------------------
 
   async function sendAction(action, params = {}) {
+    // Nel tutorial l'attacco può passare prima dallo schema della Battaglia
+    if (action === 'battle' && _previewTutorialBattle(params)) return;
     if (recastPending && action === 'play_spell') {
       const { instance_id, ...rest } = params;
       action = 'recast_spell';

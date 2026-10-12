@@ -320,14 +320,13 @@ button.home-resume.menu-frame:hover { --frame-fill: rgba(251, 196, 2, 0.2); }
 .art-patrizio { height: calc(269 * var(--art-u)); transform: translate(-10.2%, calc(20 * var(--art-u))); }  /* abbassato: le orecchie toccherebbero il bordo superiore */
 .art-faust    { height: calc(230 * var(--art-u)); transform: translateX(0.6%); }
 .art-orfeo    { height: calc(295 * var(--art-u) * 0.9); transform: translateX(-13.1%); }
-/* Evelyn eterea: tinta d'oro tenue e semitrasparente come il banner. I
-   capelli e il vento escono dal riquadro dell'illustrazione (overflow
-   visibile, sotto il testo) per non essere tagliati. */
-.home-resume .home-mode-art { overflow: visible; min-width: 0; }  /* min-width: senza, il riquadro si allargherebbe alla figura */
-.home-resume .home-mode-text { position: relative; z-index: 1; }
-.art-evelyn {
-  height: calc(219 * var(--art-u));
-  transform: translateX(-0.4%);
+/* Evelyn (Tutorial): capelli e vento escono dal riquadro dell'illustrazione
+   (overflow visibile, sotto il testo) per non essere tagliati. */
+#btn-tutorial .home-mode-art { overflow: visible; min-width: 0; }  /* min-width: senza, il riquadro si allargherebbe alla figura */
+#btn-tutorial .home-mode-text { position: relative; z-index: 1; }
+.art-evelyn { height: calc(219 * var(--art-u)); transform: translateX(-0.4%); }
+/* Riprendi: la figura è eterea, tinta d'oro tenue e semitrasparente come il banner */
+.home-resume .home-mode-art img {
   filter: grayscale(1) contrast(0.5) brightness(1.35) sepia(0.6) hue-rotate(12deg) saturate(1.6)
           drop-shadow(0 0 6px rgba(251, 196, 2, 0.4));
   opacity: 0.55;
@@ -3153,8 +3152,9 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 .bd-dia b { transform: rotate(-45deg); color: var(--card-cream); font-size: 0.95rem; }
 .bd-dia.gold { background: var(--gold); }
 .bd-dia.gold b { color: var(--card-ink); }
-.bd-clashes { display: flex; flex-direction: column; gap: 0.35rem; }
-.bd-clash {
+.bd-head { color: var(--gold-light); font-size: 0.78rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+.bd-rows { display: flex; flex-direction: column; gap: 0.35rem; }
+.bd-row {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3163,14 +3163,19 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   font-weight: bold;
   font-size: 0.95rem;
 }
+.bd-total {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  color: var(--card-cream);
+  font-weight: bold;
+  font-size: 0.95rem;
+}
 .bd-vs { color: var(--text-dim); font-weight: normal; font-style: italic; }
 .bd-arrow { color: var(--gold); }
 .bd-pass { color: var(--gold-light); }
 .bd-pass.none { color: var(--text-dim); font-style: italic; font-weight: normal; }
-.bd-result { display: flex; align-items: center; justify-content: center; gap: 0.7rem; }
-.bd-cell { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
-.bd-cell-label { color: var(--text-dim); font-size: 0.78rem; }
-.bd-outcome { text-align: center; color: var(--text); font-style: italic; font-size: 0.95rem; }
 
 #tutorial-panel.spotlight-panel-placed {
   transition: left 0.38s ease, top 0.38s ease;

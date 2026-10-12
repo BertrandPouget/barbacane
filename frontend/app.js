@@ -275,6 +275,8 @@ const App = (() => {
     document.getElementById('btn-tutorial').addEventListener('click', startTutorial);
     document.getElementById('tutorial-panel-exit').addEventListener('click', exitTutorial);
     document.getElementById('tutorial-panel-prev').addEventListener('click', (e) => {
+      // Schema della Battaglia aperto: si torna al passo senza attaccare
+      if (tutorialBattlePreview) { tutorialBattlePreview = null; updateTutorialUI(currentState); return; }
       // Disabilitato fino al passo successivo: un doppio click tornerebbe indietro due volte.
       e.currentTarget.disabled = true;
       sendAction('tutorial_prev', {});
@@ -285,6 +287,14 @@ const App = (() => {
       if (tutorialCompletedShown) { exitTutorial(); return; }
       // Disabilitato fino al passo successivo: un doppio click salterebbe un passo.
       e.currentTarget.disabled = true;
+      // Schema della Battaglia aperto: «Attacca →» manda l'attacco scelto
+      if (tutorialBattlePreview) {
+        const params = tutorialBattlePreview;
+        tutorialBattlePreview = null;
+        tutorialBattleConfirmed = true;
+        sendAction('battle', params);
+        return;
+      }
       sendAction('tutorial_next', {});
     });
 
@@ -401,12 +411,9 @@ const App = (() => {
     const text = document.getElementById('tutorial-panel-text');
     text.textContent = step.goals.length ? '' : (step.text || '');
     text.classList.toggle('hidden', !text.textContent);
-    // Schema (Battaglia finale): disegnato nel pannello, che si allarga
-    const diagram = document.getElementById('tutorial-panel-diagram');
-    diagram.innerHTML = '';
-    if (step.diagram) diagram.appendChild(TutorialDiagram.render(step.diagram));
-    diagram.classList.toggle('hidden', !step.diagram);
-    panel.classList.toggle('tut-panel-wide', !!step.diagram);
+    // Lo schema della Battaglia compare solo all'attacco (_previewTutorialBattle)
+    document.getElementById('tutorial-panel-diagram').classList.add('hidden');
+    panel.classList.remove('tut-panel-wide');
     const goals = document.getElementById('tutorial-panel-goals');
     goals.innerHTML = '';
     const current = step.goals.findIndex(g => !g.done);
@@ -571,9 +578,44 @@ const App = (() => {
       }
       return;
     }
-    // Durante la lettura di una carta il pannello resta nascosto
-    if (stopCardReading) return;
+    // Durante la lettura di una carta il pannello resta nascosto, e lo schema
+    // della Battaglia resta finché non si conferma o si torna indietro
+    if (stopCardReading || tutorialBattlePreview) return;
     showTutorialStep(state);
+  }
+
+  // Schema della Battaglia nel tutorial (step.battle_diagram): quando il
+  // giocatore sceglie di attaccare il Bastione indicato, prima di mandare
+  // l'attacco il pannello mostra come si calcola; «Attacca →» lo conferma,
+  // «← Indietro» torna al passo senza attaccare.
+  let tutorialBattlePreview = null;   // parametri dell'attacco in attesa di conferma
+  let tutorialBattleConfirmed = false;
+
+  function _previewTutorialBattle(params) {
+    if (tutorialBattleConfirmed) { tutorialBattleConfirmed = false; return false; }
+    const step = isTutorial && currentState && currentState.tutorial && currentState.tutorial.step;
+    const diagram = step && step.battle_diagram;
+    if (!diagram || params.defender_bastion_side !== diagram.side) return false;
+    tutorialBattlePreview = params;
+    const panel = document.getElementById('tutorial-panel');
+    document.getElementById('tutorial-panel-title').textContent = diagram.title;
+    document.getElementById('tutorial-panel-text').classList.add('hidden');
+    document.getElementById('tutorial-panel-goals').classList.add('hidden');
+    const box = document.getElementById('tutorial-panel-diagram');
+    box.innerHTML = '';
+    box.appendChild(TutorialDiagram.render(diagram));
+    box.classList.remove('hidden');
+    const nextBtn = document.getElementById('tutorial-panel-next');
+    nextBtn.textContent = 'Attacca →';
+    nextBtn.classList.remove('hidden');
+    nextBtn.disabled = false;
+    const prevBtn = document.getElementById('tutorial-panel-prev');
+    prevBtn.classList.remove('hidden');
+    prevBtn.disabled = false;
+    panel.classList.add('tut-panel-wide');
+    panel.classList.remove('hidden');
+    Spotlight.show([], panel);
+    return true;
   }
 
   // ---------------------------------------------------------------------------
@@ -2792,6 +2834,8 @@ const App = (() => {
   // ---------------------------------------------------------------------------
 
   async function sendAction(action, params = {}) {
+    // Nel tutorial l'attacco può passare prima dallo schema della Battaglia
+    if (action === 'battle' && _previewTutorialBattle(params)) return;
     if (recastPending && action === 'play_spell') {
       const { instance_id, ...rest } = params;
       action = 'recast_spell';
