@@ -392,10 +392,7 @@ const App = (() => {
   // già pronto dal server (state.tutorial.step).
   function showTutorialStep(state) {
     const step = state.tutorial.step;
-    const dummy = state.players.find(p => p.id !== myPlayerId);
     const panel = document.getElementById('tutorial-panel');
-    document.getElementById('tutorial-panel-progress').textContent =
-      dummy ? `${step.chapter} · Vite del Manichino: ${dummy.lives}` : step.chapter;
     document.getElementById('tutorial-panel-title').textContent = step.title || '';
     // Passo di spiegazione: solo il testo. Passo con obiettivi: la lista, e
     // sotto l'obiettivo da fare ora il suo testo (all'inizio quello del passo,
@@ -404,6 +401,12 @@ const App = (() => {
     const text = document.getElementById('tutorial-panel-text');
     text.textContent = step.goals.length ? '' : (step.text || '');
     text.classList.toggle('hidden', !text.textContent);
+    // Schema (Battaglia finale): disegnato nel pannello, che si allarga
+    const diagram = document.getElementById('tutorial-panel-diagram');
+    diagram.innerHTML = '';
+    if (step.diagram) diagram.appendChild(TutorialDiagram.render(step.diagram));
+    diagram.classList.toggle('hidden', !step.diagram);
+    panel.classList.toggle('tut-panel-wide', !!step.diagram);
     const goals = document.getElementById('tutorial-panel-goals');
     goals.innerHTML = '';
     const current = step.goals.findIndex(g => !g.done);
@@ -439,7 +442,6 @@ const App = (() => {
   // Fine tutorial: stesso pannello, centrato a schermo spento, con un solo
   // pulsante per tornare al menu.
   function showTutorialCompleted(outro) {
-    document.getElementById('tutorial-panel-progress').textContent = 'Tutorial completato';
     document.getElementById('tutorial-panel-title').textContent = (outro && outro.title) || 'Tutorial completato!';
     document.getElementById('tutorial-panel-text').textContent = (outro && outro.text) || '';
     document.getElementById('tutorial-panel-text').classList.remove('hidden');
@@ -447,8 +449,9 @@ const App = (() => {
     nextBtn.textContent = 'Torna al menu →';
     nextBtn.classList.remove('hidden');
     nextBtn.disabled = false;
-    ['tutorial-panel-exit', 'tutorial-panel-prev', 'tutorial-panel-goals']
+    ['tutorial-panel-exit', 'tutorial-panel-prev', 'tutorial-panel-goals', 'tutorial-panel-diagram']
       .forEach(id => document.getElementById(id).classList.add('hidden'));
+    document.getElementById('tutorial-panel').classList.remove('tut-panel-wide');
     const panel = document.getElementById('tutorial-panel');
     panel.classList.remove('hidden');
     Spotlight.show([], panel);

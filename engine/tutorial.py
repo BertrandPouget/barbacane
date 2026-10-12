@@ -85,6 +85,7 @@ class TutorialStep:
         goals: Optional[List[Goal]] = None,
         setup: Optional[Callable[[GameState], None]] = None,
         panel_center: bool = False,
+        diagram: Optional[Dict[str, Any]] = None,
     ):
         self.step_id = step_id
         self.chapter = chapter            # es. "Turno 1 di 4"
@@ -95,6 +96,8 @@ class TutorialStep:
         self.setup = setup
         # Pannello al centro anche con zone evidenziate, per non farlo saltare
         self.panel_center = panel_center
+        # Schema da disegnare nel pannello (frontend/tutorial_diagram.js)
+        self.diagram = diagram
 
 
 # Il frontend mobile usa ID DOM diversi (layout a tasselli invece che regioni
@@ -112,6 +115,8 @@ _MOBILE_HIGHLIGHT_MAP: Dict[str, Union[str, List[str]]] = {
     "my-village": "tw-village",
     # Solo Mana e Azioni: nella statusbar mobile ci sono anche Vite ed Effetti.
     "my-stats": ["st-mana", "st-actions"],
+    "my-mana": "st-mana",
+    "my-actions": "st-actions",
     "action-panel": "dock",
     "banner-btn-wall": "dock-wall",
     "banner-btn-play": ">hand",
@@ -300,8 +305,9 @@ def _give_hand(state: GameState, ids: List[str]) -> None:
 #     Sortilegio) scarta 2 dei 4 Muri del Bastione sinistro. Niente Battaglia.
 #   Manichino: passa.
 #   Turno 2 (turno 5, 3 Mana): Araminta (2 Mana) → Cuordipietra (2 Maghe) in
-#     Prodigio grazie ad Araminta (Anatema): Reinhold, il difensore del
-#     Bastione sinistro, diventa un tuo Muro. Niente Battaglia.
+#     Prodigio grazie ad Araminta (Anatema): Reinhold, il difensore più forte
+#     del Bastione sinistro, diventa un tuo Muro (resta Patrizio). Niente
+#     Battaglia.
 #   Manichino: schiera Joseph (DIF 3) a difesa del Bastione sinistro.
 #   Turno 3 (turno 6, 3 Mana): Madeleine (2 Mana) → 3 Maghe per Velocemento,
 #     in Prodigio grazie a Evelyn (Sortilegio) → Catapulta giocata e completata
@@ -309,8 +315,8 @@ def _give_hand(state: GameState, ids: List[str]) -> None:
 #   Manichino: Orfeo (ATT 3) sfonda il tuo Bastione destro (al massimo 2 Muri,
 #     sguarnito dopo lo spostamento di Madeleine): perdi 1 Vita.
 #   Turno 4 (turno 7, 4 Mana): The Pyric (2 Mana) + Muri → Battaglia:
-#     ATT 4 contro DIF 3 passa 1, GIT 1+2 contro 0 passa 3: 4 Danni contro
-#     2 Muri, il Manichino perde la sua unica Vita.
+#     ATT 4 contro la DIF 3 di Joseph passa 1, GIT 1+2 contro la GIT 1 di
+#     Patrizio passa 2: 3 Danni contro 2 Muri, il Manichino perde la sua Vita.
 
 _START_TURN = 4
 
@@ -319,14 +325,14 @@ def _setup_start(state: GameState) -> None:
     me = _human(state)
     _set_bastion(me, "left", wall_ids=["joseph_1", "joseph_2"])
     _set_bastion(me, "right", wall_ids=["joseph_3"])
-    me.hand = ["evelyn_1", "ardolancio_1"]
-    me.life_cards = ["decimo_1", "eracle_1", "patrizio_1"]
+    me.hand = ["evelyn_1", "ardolancio_1", "catapulta_1"]
+    me.life_cards = ["decimo_1", "eracle_1", "faust_2"]
     me.mana_remaining = state.mana_for_turn(state.turn)
     me.actions_remaining = 2
 
     dummy = _dummy(state)
     dummy.field.vanguard = [make_warrior_instance("orfeo_1")]
-    _set_bastion(dummy, "left", warrior_ids=["reinhold_1"],
+    _set_bastion(dummy, "left", warrior_ids=["reinhold_1", "patrizio_1"],
                  wall_ids=["joseph_4", "joseph_5", "giulio_1", "giulio_2"])
     _set_bastion(dummy, "right",
                  wall_ids=["cardo_1", "cardo_2", "cardo_3", "giulio_3", "giulio_4", "joseph_6"])
@@ -350,7 +356,7 @@ def _dummy_turn(state: GameState, defender: Optional[str] = None, attack_side: O
 
 
 def _setup_dummy_turn_1(state: GameState) -> None:
-    _give_hand(state, ["araminta_1", "cuordipietra_1"])
+    _give_hand(state, ["araminta_1", "cuordipietra_1", "catapulta_1"])
     _dummy_turn(state)
 
 
@@ -375,17 +381,6 @@ def _to_phase(phase: str, label: str, feedback: Optional[str] = None, after: Opt
         hint=f"{label} con il pulsante evidenziato.",
         after=[after] if after else [],
         highlight=["btn-next-phase"],
-        feedback=feedback,
-    )
-
-
-def _attack_left(after: str, feedback: Optional[str] = None) -> Goal:
-    return Goal(
-        "battle", "Attacca il Bastione sinistro", "battle",
-        match={"defender_player_index": 1, "defender_bastion_side": "left"},
-        hint="Attacca il Bastione sinistro del Manichino.",
-        after=[after],
-        highlight=["btn-battle", "top-opponents"],
         feedback=feedback,
     )
 
@@ -422,9 +417,9 @@ TUTORIAL_PARTITA = TutorialDef(
             setup=_setup_start,
         ),
         TutorialStep(
-            "goal", "Benvenuto", "L'obiettivo",
-            "Ogni giocatore ha delle Vite: proteggi le tue e togli quelle degli avversari. Vince l'ultimo che ne "
-            "ha ancora almeno una.",
+            "goal", "Benvenuto", "Le Vite",
+            "Ogni giocatore ha delle Vite, carte coperte che conosce solo lui: proteggi le tue e togli quelle degli "
+            "avversari. Vince l'ultimo che ne ha ancora almeno una.",
             highlight=["my-life-deck"],
             panel_center=True,
         ),
@@ -435,15 +430,33 @@ TUTORIAL_PARTITA = TutorialDef(
             highlight=["my-field"],
         ),
         TutorialStep(
-            "intro", "Si comincia", "La tua prima partita",
+            "intro", "Si comincia", "Il tuo obiettivo",
             "Il Manichino ha una sola Vita: il tuo obiettivo è togliergliela.",
             highlight=["top-opponents"],
         ),
         # --- Turno 1 ---
         TutorialStep(
+            "cards", "Turno 1 di 4", "Le carte",
+            "Le carte sono di tre tipi, e il colore della cornice li distingue. I Guerrieri (rossi), come Evelyn, "
+            "combattono per te; le Magie (blu), come Ardolancio, hanno un effetto immediato; le Costruzioni "
+            "(verdi), come la Catapulta, ti danno vantaggi che durano. Le vedrai tutte in azione.",
+            highlight=[">hand-cards"],
+        ),
+        TutorialStep(
+            "mana", "Turno 1 di 4", "Il Mana",
+            "Il Mana serve a giocare Guerrieri e Costruzioni, e a completare le Costruzioni. Lo ricevi all'inizio di ogni turno, e più la partita va "
+            "avanti più ne ricevi. Ora ne hai 2.",
+            highlight=["my-mana"],
+        ),
+        TutorialStep(
+            "actions", "Turno 1 di 4", "Le Azioni",
+            "A ogni turno hai anche 2 Azioni. Un'Azione può essere giocare una carta, completare una Costruzione o "
+            "aggiungere fino a 3 Muri: le proverai tutte durante la partita.",
+            highlight=["my-actions"],
+        ),
+        TutorialStep(
             "t1_actions", "Turno 1 di 4", "Le prime carte",
-            "Tocca Evelyn per scoprire cosa fa, poi giocala. Costa 2 Mana, quelli che hai, e come ogni carta "
-            "giocata un'Azione: ne hai 2 per turno.",
+            "Tocca Evelyn per scoprire cosa fa, poi giocala in Avanscoperta: userai 2 Mana e un'Azione.",
             goals=[
                 Goal(
                     "evelyn", "Gioca Evelyn in Avanscoperta", "play_warrior",
@@ -467,11 +480,13 @@ TUTORIAL_PARTITA = TutorialDef(
         ),
         TutorialStep(
             "t1_end", "Turno 1 di 4", "Fine del turno",
-            "2 Muri giù. Per ora non attacchi: avanza fino alla Battaglia, l'ultima fase, e lì termina il turno.",
+            "2 Muri giù. Dopo le Azioni il turno prosegue con lo Schieramento e la Battaglia: avanza fino alla "
+            "Battaglia.",
             goals=[
                 _to_phase(
                     "battaglia", "Passa alla Battaglia",
-                    feedback="In Battaglia potresti attaccare il Manichino, ma per ora non serve: termina il turno.",
+                    feedback="In Battaglia puoi attaccare, ma non sei obbligato. In questo tutorial attaccherai una "
+                             "volta sola, all'ultimo turno, quando avrai preparato tutto: ora termina il turno.",
                 ),
                 _end_turn("to_battaglia"),
             ],
@@ -494,7 +509,7 @@ TUTORIAL_PARTITA = TutorialDef(
                     match={"instance_id": "araminta_1", "region": "vanguard"},
                     hint="Gioca Araminta dalla mano in Avanscoperta.",
                     highlight=[">hand-cards", "my-vanguard"],
-                    feedback="Reinhold (DIF 3) difende il Bastione sinistro: toglilo di mezzo. Cuordipietra "
+                    feedback="Reinhold (DIF 3) è il difensore più forte del Bastione sinistro: toglilo di mezzo. Cuordipietra "
                              "richiede 2 Maghe, e Araminta è della sua stessa Scuola, Anatema: uscirà in Prodigio.",
                 ),
                 Goal(
@@ -515,14 +530,14 @@ TUTORIAL_PARTITA = TutorialDef(
             goals=[
                 _to_phase(
                     "battaglia", "Passa alla Battaglia",
-                    feedback="Anche questa volta niente attacco: termina il turno.",
+                    feedback="Anche questa volta tieni l'attacco per l'ultimo turno: termina il turno.",
                 ),
                 _end_turn("to_battaglia"),
             ],
         ),
         TutorialStep(
             "dummy_2", "Turno del Manichino", "Un nuovo difensore",
-            "Il Manichino ha schierato Joseph (DIF 3) a difesa del Bastione sinistro.",
+            "Il Manichino ha schierato Joseph (DIF 3) nel Bastione sinistro: ora lo difende insieme a Patrizio.",
             highlight=["top-opponents"],
             setup=_setup_dummy_turn_2,
         ),
@@ -592,19 +607,18 @@ TUTORIAL_PARTITA = TutorialDef(
                     after=["reposition"],
                     highlight=["btn-horde", "my-vanguard"],
                     feedback="Orda attiva: resta così finché le tre Maghe stanno insieme. Se ne sposti via una si "
-                             "scioglie, e se scegli un altro effetto il vecchio si spegne. Attaccherai al prossimo "
-                             "turno: passa alla Battaglia e termina questo.",
+                             "scioglie, e se scegli un altro effetto il vecchio si spegne. Passa alla Battaglia e "
+                             "termina il turno: l'attacco è per il prossimo.",
                 ),
                 _to_phase("battaglia", "Passa alla Battaglia", after="horde",
-                          feedback="Termina il turno: l'attacco arriva al prossimo."),
+                          feedback="Termina il turno: al prossimo avrai tutto pronto per attaccare."),
                 _end_turn("to_battaglia"),
             ],
         ),
         TutorialStep(
             "dummy_3", "Turno del Manichino", "Il contrattacco",
             "Il Manichino ha attaccato con Orfeo (ATT 3) il tuo Bastione destro: senza più Madeleine a "
-            "difenderlo, i Muri non sono bastati e hai perso una Vita. Le tue Vite sono carte coperte che "
-            "conosci solo tu: a zero sei eliminato.",
+            "difenderlo, i Muri non sono bastati e hai perso una Vita.",
             highlight=["my-bastion-right", "my-life-deck", "top-opponents"],
             setup=_setup_dummy_turn_3,
         ),
@@ -638,16 +652,36 @@ TUTORIAL_PARTITA = TutorialDef(
             "Ora attacchi: usi l'ATT più alto e la GIT più alta dei tuoi Guerrieri in Avanscoperta, anche presi "
             "da carte diverse. Puoi colpire solo i Bastioni che confinano con i tuoi: in una partita a due li hai "
             "tutti a portata.",
+            goals=[_to_phase("battaglia", "Passa alla Battaglia")],
+        ),
+        TutorialStep(
+            "t4_diagram", "Turno 4 di 4", "La Battaglia: come si calcola",
+            "Prima dei Muri, il tuo attacco si scontra con i Guerrieri del Bastione: di ATT e GIT passa come "
+            "Danno solo quanto supera la loro DIF e la loro GIT. Ogni Danno distrugge un Muro; finiti i Muri, il "
+            "difensore perde una Vita.",
+            panel_center=True,
+            diagram={
+                "sides": [
+                    {"title": "Il tuo attacco", "sub": "i valori più alti in Avanscoperta",
+                     "stats": [["ATT", 4, "The Pyric"], ["GIT", 3, "The Pyric, +2 della Catapulta"]]},
+                    {"title": "Bastione sinistro", "sub": "i valori più alti dei suoi Guerrieri",
+                     "stats": [["DIF", 3, "Joseph"], ["GIT", 1, "Patrizio"]]},
+                ],
+                "clashes": [["ATT", 4, "DIF", 3, 1], ["GIT", 3, "GIT", 1, 2]],
+                "result": [["Danni", 3], ["Muri", 2], ["Vite", 1]],
+                "outcome": "3 Danni: cadono i 2 Muri, e il Manichino perde la sua Vita.",
+            },
+        ),
+        TutorialStep(
+            "t4_attack", "Turno 4 di 4", "Sfonda!",
+            "Attacca il Bastione sinistro del Manichino.",
             goals=[
-                _to_phase(
-                    "battaglia", "Passa alla Battaglia",
-                    feedback="Prima dei Muri il tuo attacco si scontra con i Guerrieri del Bastione: la loro DIF "
-                             "più alta contro il tuo ATT, la loro GIT più alta contro la tua GIT, e passa come "
-                             "Danno solo quanto li supera. Ogni Danno distrugge un Muro; finiti i Muri, il "
-                             "difensore perde una Vita. Qui ATT 4 (The Pyric) contro la DIF 3 di Joseph passa 1, "
-                             "GIT 3 (1, +2 della Catapulta) contro 0 passa tutta: 4 Danni contro 2 Muri.",
+                Goal(
+                    "battle", "Attacca il Bastione sinistro", "battle",
+                    match={"defender_player_index": 1, "defender_bastion_side": "left"},
+                    hint="Attacca il Bastione sinistro del Manichino.",
+                    highlight=["btn-battle", "top-opponents"],
                 ),
-                _attack_left("to_battaglia"),
             ],
         ),
     ],
@@ -904,5 +938,6 @@ def public_view(state: GameState) -> Optional[dict]:
         "highlight": highlight,
         "highlight_mobile": _mobile_ids(highlight),
         "panel_center": step.panel_center,
+        "diagram": step.diagram,
     }
     return view

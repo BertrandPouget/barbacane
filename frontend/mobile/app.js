@@ -417,10 +417,7 @@ const Mob = (() => {
   // già pronto dal server (state.tutorial.step).
   function showTutorialStep(state) {
     const step = state.tutorial.step;
-    const dummy = state.players.find(p => p.id !== myPlayerId);
     const panel = $('tutorial-panel');
-    $('tutorial-panel-progress').textContent =
-      dummy ? `${step.chapter} · Vite del Manichino: ${dummy.lives}` : step.chapter;
     $('tutorial-panel-title').textContent = step.title || '';
     // Passo di spiegazione: solo il testo. Passo con obiettivi: la lista, e
     // sotto l'obiettivo da fare ora il suo testo (all'inizio quello del passo,
@@ -429,6 +426,11 @@ const Mob = (() => {
     const text = $('tutorial-panel-text');
     text.textContent = step.goals.length ? '' : (step.text || '');
     text.hidden = !text.textContent;
+    // Schema (Battaglia finale): disegnato nel pannello
+    const diagram = $('tutorial-panel-diagram');
+    diagram.innerHTML = '';
+    if (step.diagram) diagram.appendChild(TutorialDiagram.render(step.diagram));
+    diagram.hidden = !step.diagram;
     const goals = $('tutorial-panel-goals');
     goals.innerHTML = '';
     const current = step.goals.findIndex(g => !g.done);
@@ -463,7 +465,6 @@ const Mob = (() => {
   // Fine tutorial: stesso pannello, centrato a schermo spento, con un solo
   // pulsante per tornare al menu.
   function showTutorialCompleted(outro) {
-    $('tutorial-panel-progress').textContent = 'Tutorial completato';
     $('tutorial-panel-title').textContent = (outro && outro.title) || 'Tutorial completato!';
     $('tutorial-panel-text').textContent = (outro && outro.text) || '';
     $('tutorial-panel-text').hidden = false;
@@ -471,7 +472,8 @@ const Mob = (() => {
     nextBtn.textContent = 'Torna al menu →';
     nextBtn.hidden = false;
     nextBtn.disabled = false;
-    ['tutorial-panel-exit', 'tutorial-panel-prev', 'tutorial-panel-goals'].forEach(id => { $(id).hidden = true; });
+    ['tutorial-panel-exit', 'tutorial-panel-prev', 'tutorial-panel-goals', 'tutorial-panel-diagram']
+      .forEach(id => { $(id).hidden = true; });
     $('tutorial-panel').classList.remove('tut-panel-top');
     const panel = $('tutorial-panel');
     panel.hidden = false;
