@@ -20,7 +20,7 @@ const BgMusic = (() => {
     btn = document.getElementById('btn-music-toggle');
     if (!audioEl || !btn) return;
 
-    audioEl.volume = 0.5;
+    audioEl.volume = 0.05;
     audioEl.muted = false;
 
     audioEl.addEventListener('playing', () => { playing = true; });

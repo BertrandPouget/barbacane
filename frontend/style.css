@@ -689,7 +689,7 @@ input:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.4rem 1rem;
+  padding: 0.65rem 1.4rem;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -697,17 +697,18 @@ input:focus {
 
 .header-left, .header-right {
   display: flex;
-  gap: 1rem;
+  gap: 1.3rem;
   align-items: center;
-  font-size: 0.85rem;
+  font-size: 1.05rem;
   color: var(--text);
 }
+#game-header .btn-small { padding: 0.4rem 0.9rem; font-size: 0.98rem; }
 
 .header-center {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 1rem;
+  font-size: 1.35rem;
   color: var(--gold);
   font-weight: bold;
   pointer-events: none;
@@ -719,7 +720,7 @@ input:focus {
   padding: 0.2rem 0.7rem;
   border-radius: 4px;
   font-weight: bold;
-  font-size: 1rem;
+  font-size: 1.15rem;
 }
 
 .timer.warning { background: var(--red-light); animation: pulse 1s infinite; }
@@ -2742,7 +2743,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   .btn-danger, .btn-warning { flex: 1; min-width: 80px; }
 
   #hdr-phase, #hdr-deck { display: none; }
-  #game-header { padding: 0.3rem 0.6rem; }
+  #game-header { padding: 0.45rem 0.8rem; }
 
 }
 
