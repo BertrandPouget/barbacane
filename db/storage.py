@@ -47,8 +47,16 @@ def _q(sql: str) -> str:
     return sql.replace("?", "%s") if IS_POSTGRES else sql
 
 
+# Neon si sospende dopo 5 minuti senza query e fa pagare il tempo in cui resta
+# acceso: un controllo periodico che lo interroga sempre lo terrebbe sveglio
+# 24 ore su 24. Questo flag dice se dall'ultima pulizia c'e' stato traffico.
+_activity_since_cleanup = True
+
+
 @contextmanager
 def get_conn():
+    global _activity_since_cleanup
+    _activity_since_cleanup = True
     if IS_POSTGRES:
         conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
     else:
@@ -157,6 +165,21 @@ def init_db() -> None:
                 PRIMARY KEY (game_id, player_id)
             )
         """)
+        # Storico per lo sviluppatore (non compare nel gioco): una riga piccola
+        # per partita, che resta anche dopo che lo state viene cancellato.
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS match_history (
+                game_id        TEXT PRIMARY KEY,
+                mode           TEXT,
+                started_at     TEXT,
+                ended_at       TEXT,
+                turns          INTEGER,
+                winner         TEXT,
+                bot_difficulty TEXT,
+                turn_timer     INTEGER,
+                players        TEXT
+            )
+        """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_games_lobby ON games(lobby_code)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_players_game ON players(game_id)")
 
@@ -171,13 +194,43 @@ def init_db() -> None:
         logger.error("[db] Migrazione della chiave di players fallita: %s", e)
 
 
+def _record_match(conn, state: GameState, started_at: Optional[str], ended_at: Optional[str]) -> None:
+    """Scrive la riga di `match_history` (una sola per partita; i tutorial no).
+
+    Per le partite mai concluse la scrive la pulizia, con `winner` vuoto.
+    """
+    from engine.game import game_mode
+    mode = game_mode(state)
+    if mode == "tutorial":
+        return
+    eliminated = {e["player_id"]: e for e in state.eliminations}
+    players = [{
+        "name": p.name,
+        "bot": state.is_bot(p.id),
+        "lives": p.lives,
+        "eliminated_turn": eliminated.get(p.id, {}).get("turn"),
+        "abandoned": eliminated.get(p.id, {}).get("abandoned", False),
+        "stats": state.match_stats.get(p.id, {}),
+    } for p in state.players]
+    winner = state.get_player(state.winner_id) if state.winner_id else None
+    conn.execute(
+        _q("INSERT INTO match_history (game_id, mode, started_at, ended_at, turns, winner,"
+           " bot_difficulty, turn_timer, players) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+           " ON CONFLICT (game_id) DO NOTHING"),
+        (state.game_id, mode, started_at, ended_at, state.turn,
+         winner.name if winner else None,
+         state.bot_difficulty if state.bot_player_ids else None,
+         state.turn_timer, json.dumps(players, ensure_ascii=False)),
+    )
+
+
 def save_game(state: GameState, lobby_code: Optional[str] = None, status: str = "playing") -> None:
     """Serializza e salva lo stato di gioco."""
     state_json = state.model_dump_json()
     now = _now()
     with get_conn() as conn:
         existing = conn.execute(
-            _q("SELECT game_id FROM games WHERE game_id = ?"), (state.game_id,)
+            _q("SELECT status, created_at FROM games WHERE game_id = ?"), (state.game_id,)
         ).fetchone()
 
         if existing:
@@ -185,6 +238,8 @@ def save_game(state: GameState, lobby_code: Optional[str] = None, status: str = 
                 _q("UPDATE games SET state = ?, status = ?, updated_at = ? WHERE game_id = ?"),
                 (state_json, status, now, state.game_id),
             )
+            if status == "finished" and existing["status"] != "finished":
+                _record_match(conn, state, existing["created_at"], now)
         else:
             conn.execute(
                 _q("INSERT INTO games (game_id, lobby_code, state, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"),
@@ -237,31 +292,40 @@ def delete_game(game_id: str) -> None:
         conn.execute(_q("DELETE FROM games WHERE game_id = ?"), (game_id,))
 
 
-def cleanup_games(finished_grace_minutes: int = 5, stale_hours: float = 1) -> int:
+def cleanup_games(stale_days: float = 7) -> int:
     """
-    Elimina le partite concluse da più di `finished_grace_minutes` e quelle
-    abbandonate (nessun aggiornamento da `stale_hours` ore).
-    Ritorna il numero di partite eliminate.
+    Elimina le partite, finite o no, ferme da più di `stale_days` giorni.
+    Quelle mai concluse finiscono prima in `match_history` (le altre ci sono
+    gia' da quando sono finite). Ritorna il numero di partite eliminate.
     I timestamp ISO 8601 UTC si confrontano correttamente come stringhe.
+
+    Senza traffico dall'ultima pulizia non tocca il database, cosi' Neon puo'
+    sospendersi: le partite rimaste vengono eliminate alla prossima attivita'.
     """
-    now = datetime.now(timezone.utc)
-    finished_cutoff = (now - timedelta(minutes=finished_grace_minutes)).isoformat()
-    stale_cutoff = (now - timedelta(hours=stale_hours)).isoformat()
+    global _activity_since_cleanup
+    if not _activity_since_cleanup:
+        return 0
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=stale_days)).isoformat()
     with get_conn() as conn:
         rows = conn.execute(
-            _q("""
-                SELECT game_id FROM games
-                WHERE (status = 'finished' AND updated_at < ?)
-                   OR updated_at < ?
-                   OR updated_at IS NULL
-            """),
-            (finished_cutoff, stale_cutoff),
+            _q("SELECT game_id, status, state, created_at, updated_at FROM games"
+               " WHERE updated_at < ? OR updated_at IS NULL"),
+            (cutoff,),
         ).fetchall()
         game_ids = [r["game_id"] for r in rows]
+        for r in rows:
+            if r["status"] == "finished":
+                continue
+            try:
+                state = GameState.model_validate_json(r["state"])
+                _record_match(conn, state, r["created_at"], r["updated_at"])
+            except Exception as e:
+                logger.error("[cleanup] Storico non scritto per %s: %s", r["game_id"], e)
         for gid in game_ids:
             conn.execute(_q("DELETE FROM players WHERE game_id = ?"), (gid,))
             conn.execute(_q("DELETE FROM games WHERE game_id = ?"), (gid,))
-        return len(game_ids)
+    _activity_since_cleanup = False
+    return len(game_ids)
 
 
 def save_player(game_id: str, player_id: str, name: str, session_token: str) -> None:

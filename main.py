@@ -27,7 +27,7 @@ _CLEANUP_INTERVAL_SECONDS = 5 * 60
 
 
 async def _cleanup_loop():
-    """Elimina periodicamente le partite finite/abbandonate dal database."""
+    """Elimina periodicamente le partite ferme da giorni (vedi cleanup_games)."""
     while True:
         try:
             deleted = await asyncio.to_thread(cleanup_games)

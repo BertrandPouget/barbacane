@@ -97,7 +97,8 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 
 - Ogni azione ricarica lo stato dal DB e lo risalva: lo stato in memoria non è mai la fonte di verità di una partita avviata.
 - **Prima `save_game`, poi `save_player`** (FK su Postgres). Placeholder `?` convertiti da `_q()`.
-- `cleanup_games` elimina le partite finite da 5 min e quelle ferme da 1 ora.
+- `cleanup_games` elimina le partite ferme da 7 giorni (finite o no), solo se c'è stato traffico sul DB dall'ultima volta. Lo storico per lo sviluppatore (niente UI) è `match_history`, una riga per partita escluso il tutorial: la scrive `save_game` al passaggio a `finished`, o la pulizia per le partite mai concluse.
+- **Mai interrogare il DB a intervalli fissi**: il server non dorme mai e Neon, che si sospende dopo 5 min senza query, resterebbe acceso 24 ore su 24 (consuma le ore di compute gratuite).
 - Render è tenuto sveglio da un cron-job esterno (+ ping `/health` del client ogni 4 min).
 - Un nuovo file JS/CSS va referenziato con percorso relativo negli `index.html`, altrimenti sfugge al cache busting.
 
