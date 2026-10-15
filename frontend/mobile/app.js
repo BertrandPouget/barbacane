@@ -25,7 +25,7 @@ const Mob = (() => {
 
   // Modalità muri
   let wallMode = false;
-  let wallsSelected = [];   // [{instanceId, bastion: 'left'|'right'}]
+  let wallsSelected = [];   // [{instanceId, bastion: null|'left'|'right'}]: null = girata, da posare
 
   // Timer
   let timerInterval = null;
@@ -74,6 +74,7 @@ const Mob = (() => {
     await loadCardDefs();
     bindLobbyUI();
     bindGameChrome();
+    Spotlight.keepVisible(['tb-leave']);  // nel tutorial «Abbandona» resta scoperto
     bindSplashUI();
     ['in-create-name', 'in-join-name'].forEach(id => { $(id).value = PlayerName.get(); });
     const resumed = await tryResume();
@@ -304,7 +305,6 @@ const Mob = (() => {
 
     // Tutorial
     $('btn-tutorial').addEventListener('click', startTutorial);
-    $('tutorial-panel-exit').addEventListener('click', exitTutorial);
     $('tutorial-panel-prev').addEventListener('click', (e) => {
       haptic();
       // Schema della Battaglia aperto: si torna al passo senza attaccare
@@ -406,7 +406,6 @@ const Mob = (() => {
     Sheet.close(true);
     hideTutorialStep();
     if (stopCardReading) stopCardReading();
-    $('tb-leave').hidden = false;
     clearSession();
     leavingGame = false;
     currentState = null;
@@ -425,9 +424,22 @@ const Mob = (() => {
   // (spotlight.js); il pannello si piazza accanto e mostra il testo del passo,
   // il commento all'ultima mossa e la lista degli obiettivi. Il passo arriva
   // già pronto dal server (state.tutorial.step).
+  // Testo sotto l'obiettivo corrente già mostrato: la lista si ricostruisce a
+  // ogni aggiornamento (es. «Avanza Fase» premuto due volte), e il testo si
+  // anima solo quando cambia, altrimenti sembra nuovo e da rileggere
+  let lastGoalText = null;
+
+  function goalText(lead) {
+    const p = el('div', { className: 'tut-goal-text' }, [lead]);
+    if (lead === lastGoalText) p.style.animation = 'none';
+    lastGoalText = lead;
+    return p;
+  }
+
   function showTutorialStep(state) {
     const step = state.tutorial.step;
     const panel = $('tutorial-panel');
+    $('tutorial-panel-progress').textContent = step.number ? `${step.number} di ${step.total}` : '';
     $('tutorial-panel-title').textContent = step.title || '';
     // Passo di spiegazione: solo il testo. Passo con obiettivi: la lista, e
     // sotto l'obiettivo da fare ora il suo testo (all'inizio quello del passo,
@@ -446,14 +458,14 @@ const Mob = (() => {
       className: g.done ? 'done' : i === current ? 'current' : 'todo',
     }, [
       el('span', {}, [g.label]),
-      i === current && lead ? el('div', { className: 'tut-goal-text' }, [lead]) : null,
+      i === current && lead ? goalText(lead) : null,
     ])));
     goals.hidden = !step.goals.length;
     const nextBtn = $('tutorial-panel-next');
-    nextBtn.textContent = 'Avanti →';
+    nextBtn.textContent = '›';
+    nextBtn.classList.add('tut-arrow');
     nextBtn.hidden = step.goals.length > 0;
     nextBtn.disabled = false;
-    $('tutorial-panel-exit').hidden = false;
     // «← Indietro» solo verso un passo di spiegazione, mai a prima di una mossa giocata
     $('tutorial-panel-prev').hidden = !state.tutorial.can_go_back;
     $('tutorial-panel-prev').disabled = false;
@@ -463,7 +475,8 @@ const Mob = (() => {
     // degli avversari quando la mossa riguarda loro (così resta visibile)
     const acting = step.goals.length > 0;
     const ids = step.highlight_mobile && step.highlight_mobile.length ? step.highlight_mobile : step.highlight;
-    const top = acting && ((ids || []).includes('opp-rail') ? 'opp-rail' : 'topbar');
+    const top = acting && (step.show_opponents || (ids || []).some(id => id.replace('>', '') === 'opp-rail')
+      ? 'opp-rail' : 'topbar');
     panel.classList.toggle('tut-panel-top', acting);
     panel.hidden = false;
     Spotlight.show(ids || [], panel, { center: !!step.panel_center, top });
@@ -472,14 +485,16 @@ const Mob = (() => {
   // Fine tutorial: stesso pannello, centrato a schermo spento, con un solo
   // pulsante per tornare al menu.
   function showTutorialCompleted(outro) {
+    $('tutorial-panel-progress').textContent = '';
     $('tutorial-panel-title').textContent = (outro && outro.title) || 'Tutorial completato!';
     $('tutorial-panel-text').textContent = (outro && outro.text) || '';
     $('tutorial-panel-text').hidden = false;
     const nextBtn = $('tutorial-panel-next');
-    nextBtn.textContent = 'Torna al menu →';
+    nextBtn.textContent = 'Torna al menu ›';
+    nextBtn.classList.remove('tut-arrow');
     nextBtn.hidden = false;
     nextBtn.disabled = false;
-    ['tutorial-panel-exit', 'tutorial-panel-prev', 'tutorial-panel-goals', 'tutorial-panel-diagram']
+    ['tutorial-panel-prev', 'tutorial-panel-goals', 'tutorial-panel-diagram']
       .forEach(id => { $(id).hidden = true; });
     $('tutorial-panel').classList.remove('tut-panel-top');
     const panel = $('tutorial-panel');
@@ -499,52 +514,42 @@ const Mob = (() => {
   // chiude e i suoi pulsanti (Gioca, Chiudi…) restano spenti. rect è in %.
   let stopCardReading = null;   // chiude la lettura in corso, se c'è
 
-  function maybeReadCard(iid, openSheet) {
+  // Nel tutorial, la prima volta che si tocca una carta da spiegare: la lettura,
+  // sezione per sezione (vedi _startCardReading)
+  function maybeReadCard(iid) {
     const reads = isTutorial && currentState && currentState.tutorial && currentState.tutorial.card_reads;
     const def = getCardDef(iid);
     const sections = reads && def && reads[def.id];
     if (!sections || tutorialCardsRead.has(def.id)) return false;
-    // Solo quando tocca al giocatore agire: nei passi di spiegazione si apre il
-    // dettaglio normale e la carta resta da leggere per dopo
+    // Solo quando tocca al giocatore agire: nei passi di spiegazione la carta
+    // resta da leggere per dopo
     const step = currentState.tutorial.step;
     if (!step || !step.goals.length) return false;
     tutorialCardsRead.add(def.id);
     hideTutorialStep();
-    openSheet();
     _startCardReading(def, sections);
     return true;
   }
 
+  // Lettura di una carta: strato a schermo intero con la carta grande, un
+  // riquadro dorato che si sposta sulla sezione spiegata e, sotto, il pannello
+  // con la spiegazione (stesso aspetto dei passi del tutorial)
   function _startCardReading(def, sections) {
-    const body = $('sheet-body');
-    const buttons = [...$('sheet-foot').querySelectorAll('button'), ...body.querySelectorAll('.card-nav button')];
-    const wasDisabled = buttons.map(b => b.disabled);
-    buttons.forEach(b => { b.disabled = true; });
-    Sheet.lock(true);
+    const img = el('img', { alt: def.name, draggable: 'false' });
+    CardArt.showFull(img, def.id);
+    const box = el('div', { className: 'card-read-focus' });
+    const card = el('div', { className: 'card-read-card' }, [img, box]);
 
-    const prevBtn = el('button', { className: 'mbtn' }, ['← Indietro']);
-    const nextBtn = el('button', { className: 'mbtn mbtn-gold' }, ['Avanti →']);
+    const prevBtn = el('button', { className: 'mbtn tut-arrow', 'aria-label': 'Indietro' }, ['‹']);
+    const nextBtn = el('button', { className: 'mbtn mbtn-gold', 'aria-label': 'Avanti' }, ['›']);
     const progress = el('div', { className: 'tut-panel-progress' });
     const title = el('div', { className: 'tut-panel-title' });
     const text = el('div', { className: 'tut-panel-text' });
-    const panel = el('div', { className: 'tut-panel card-read' }, [
+    const panel = el('div', { className: 'tut-panel card-read menu-frame menu-frame-small' }, [
       progress, title, text, el('div', { className: 'tut-panel-actions' }, [prevBtn, nextBtn]),
     ]);
-    const cardview = body.querySelector('.cardview');
-    if (cardview) cardview.after(panel); else body.prepend(panel);
-    body.scrollTop = 0;
-
-    // L'immagine può arrivare dopo (vedi cardViewNode): il riquadro si aggancia
-    // alla faccia anteriore appena c'è
-    const box = el('div', { className: 'card-read-focus' });
-    let tries = 0;
-    const attach = () => {
-      if (!panel.isConnected) return;
-      const front = body.querySelector('.flip .flip-face:not(.flip-back)');
-      if (front) { front.appendChild(box); front.closest('.flip').classList.add('reading'); }
-      else if (++tries < 180) requestAnimationFrame(attach);
-    };
-    attach();
+    const overlay = el('div', { className: 'card-read-overlay' }, [card, panel]);
+    document.body.appendChild(overlay);
 
     let i = 0;
     const render = () => {
@@ -554,26 +559,19 @@ const Mob = (() => {
       progress.textContent = `${def.name} · ${i + 1} di ${sections.length}`;
       title.textContent = s.title;
       text.textContent = s.text;
-      nextBtn.textContent = i < sections.length - 1 ? 'Avanti →' : 'Ho capito';
+      nextBtn.textContent = i < sections.length - 1 ? '›' : 'Ho capito';
+      nextBtn.classList.toggle('tut-arrow', i < sections.length - 1);
       prevBtn.classList.toggle('invisible', i === 0);
     };
-    // Se lo sheet viene ricostruito (aggiornamento di stato) la lettura finisce
-    const watcher = new MutationObserver(() => { if (!panel.isConnected && stopCardReading) stopCardReading(); });
-    watcher.observe(body, { childList: true });
     stopCardReading = () => {
       stopCardReading = null;
-      watcher.disconnect();
-      box.remove();
-      const flip = body.querySelector('.flip.reading');
-      if (flip) flip.classList.remove('reading');
-      panel.remove();
-      buttons.forEach((b, k) => { b.disabled = wasDisabled[k]; });
-      Sheet.lock(false);
+      overlay.remove();
     };
     prevBtn.addEventListener('click', () => { haptic(); if (i > 0) { i--; render(); } });
     nextBtn.addEventListener('click', () => {
       haptic();
       if (++i < sections.length) { render(); return; }
+      // Letta la carta si torna al tavolo: si gioca trascinandola
       stopCardReading();
       updateTutorialUI(currentState);
     });
@@ -624,7 +622,8 @@ const Mob = (() => {
     box.appendChild(TutorialDiagram.render(diagram));
     box.hidden = false;
     const nextBtn = $('tutorial-panel-next');
-    nextBtn.textContent = 'Attacca →';
+    nextBtn.textContent = 'Attacca ›';
+    nextBtn.classList.remove('tut-arrow');
     nextBtn.hidden = false;
     nextBtn.disabled = false;
     $('tutorial-panel-prev').hidden = false;
@@ -975,6 +974,7 @@ const Mob = (() => {
       if (currentState && currentState.winner_id) updateRematchUI(currentState);
     });
     WS.on('error', (msg) => {
+      DragPlay.reject();
       Toast.show(msg.message || 'Errore', 'error');
       // Blocco dovuto a un'interazione in attesa: riapre gli sheet pendenti
       // nell'ordine giusto (prima la ricerca, poi Biblioteca & co.)
@@ -1013,7 +1013,6 @@ const Mob = (() => {
     saveSession();
     connectGameWS();
     Screens.show('game');
-    $('tb-leave').hidden = isTutorial;
     _lastTurnPlayer = state.current_player_id;
     Render.game(state, myPlayerId);
     refreshDock();
@@ -1025,6 +1024,12 @@ const Mob = (() => {
   }
 
   function confirmLeaveGame() {
+    // Nel tutorial si torna al menu (l'avversario è il Manichino)
+    if (isTutorial) {
+      Sheet.confirm('Abbandonare il tutorial?', 'Tornerai al menu.', exitTutorial,
+        { yesLabel: 'Abbandona', danger: true });
+      return;
+    }
     Sheet.confirm(
       'Abbandonare la partita?',
       'Verrai eliminato dalla partita e non potrai rientrare.',
@@ -1208,17 +1213,136 @@ const Mob = (() => {
 
   function bindGameChrome() {
     $('fld-vanguard').addEventListener('click', () => { haptic(); openVanguardSheet(); });
-    $('tw-left').addEventListener('click', () => { haptic(); openBastionSheet('left'); });
-    $('tw-right').addEventListener('click', () => { haptic(); openBastionSheet('right'); });
+    $('tw-left').addEventListener('click', () => onBastionTileTap('left'));
+    $('tw-right').addEventListener('click', () => onBastionTileTap('right'));
     $('tw-village').addEventListener('click', () => { haptic(); openVillageSheet(); });
     $('st-lives').addEventListener('click', () => { haptic(); openLivesSheet(); });
     $('st-fx').addEventListener('click', () => { haptic(); openActiveFxSheet(); });
-    $('tb-log').addEventListener('click', () => { haptic(); openLogSheet(); });
     $('tb-leave').addEventListener('click', () => { haptic(); confirmLeaveGame(); });
     $('ticker').addEventListener('click', () => { haptic(); openLogSheet(); });
 
-    $('tray-cancel').addEventListener('click', () => exitWallMode());
-    $('tray-confirm').addEventListener('click', confirmWalls);
+    bindCardPeek();
+  }
+
+  // Carta intera al centro dello schermo con il dito sulla mano: compare se il
+  // dito resta fermo un attimo o appena si muove; scorrendo sulle altre carte
+  // cambia, sollevandolo sparisce. Il tocco breve non fa nulla (onHandTap).
+  // Portando il dito fuori dalla mano verso l'alto la carta si trascina in campo
+  // per giocarla (drag.js). La mano non scorre (touch-action: none in mobile.css).
+  function bindCardPeek() {
+    const hand = $('hand');
+    const HOLD_MS = 220;
+    let holdTimer = null, peeking = false, suppressClick = false, dragging = false;
+    let dragRefused = false;  // trascinamento non partito: non si riprova a ogni movimento del dito
+    let startX = 0, startY = 0, startCard = null, current = null, img = null;
+
+    function startPeek(card) {
+      clearTimeout(holdTimer);
+      holdTimer = null;
+      peeking = true;
+      haptic();
+      show(card);
+    }
+
+    function show(card) {
+      if (!card || card === current) return;
+      const def = getCardDef(card.dataset.instanceId);
+      if (!def) return;
+      // In mano si alza la carta sotto il dito, come al passaggio del mouse sul desktop
+      if (current) current.classList.remove('peeked');
+      card.classList.add('peeked');
+      hand.classList.add('peeking');
+      current = card;
+      if (!img) {
+        img = document.createElement('img');
+        img.className = 'card-peek';
+        img.alt = '';
+        document.body.appendChild(img);
+      }
+      CardArt.showFull(img, def.id);
+      img.alt = def.name;
+      img.hidden = false;
+    }
+
+    function end() {
+      clearTimeout(holdTimer);
+      holdTimer = null;
+      if (peeking) {
+        peeking = false;
+        // Sollevando il dito il browser può generare il click: non deve aprire lo sheet
+        suppressClick = true;
+        setTimeout(() => { suppressClick = false; }, 400);
+      }
+      if (current) current.classList.remove('peeked');
+      hand.classList.remove('peeking');
+      current = null;
+      if (img) img.hidden = true;
+    }
+
+    hand.addEventListener('touchstart', e => {
+      if (e.touches.length !== 1) { end(); return; }
+      const card = e.target.closest('.card.has-art');
+      if (!card) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startCard = card;
+      dragRefused = false;
+      clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => startPeek(card), HOLD_MS);
+    }, { passive: true });
+
+    hand.addEventListener('touchmove', e => {
+      const t = e.touches[0];
+      if (dragging) { DragPlay.move(t.clientX, t.clientY); return; }
+      // Il dito esce dalla mano verso l'alto: si trascina la carta che mostrava
+      if (!dragRefused && t.clientY < hand.getBoundingClientRect().top - 12) {
+        const card = current || startCard;
+        // Scelta dei Muri: si trascinano solo le carte girate, nei Bastioni
+        if (card && card.isConnected && wallMode && isUnplacedWall(card.dataset.instanceId)) {
+          dragRefused = !startWallDrag(card, t.clientX, t.clientY);
+        } else if (card && card.isConnected && canDragFromHand()) {
+          dragRefused = !startHandDrag(card, t.clientX, t.clientY);
+        }
+        if (DragPlay.active()) {
+          clearTimeout(holdTimer);
+          holdTimer = null;
+          dragging = true;
+          peeking = true;  // al rilascio il click non deve aprire lo sheet
+          if (current) current.classList.remove('peeked');
+          current = null;
+          if (img) img.hidden = true;
+          return;
+        }
+      }
+      const under = document.elementFromPoint(t.clientX, t.clientY);
+      const card = under && under.closest('#hand .card.has-art');
+      if (holdTimer) {
+        // Il dito si muove prima della pressione prolungata: si sfoglia subito
+        if (Math.hypot(t.clientX - startX, t.clientY - startY) > 8) startPeek(card);
+        return;
+      }
+      if (peeking) show(card);
+    }, { passive: true });
+
+    hand.addEventListener('touchend', e => {
+      if (dragging) {
+        dragging = false;
+        const t = e.changedTouches[0];
+        DragPlay.end(t.clientX, t.clientY);
+      }
+      end();
+    });
+    hand.addEventListener('touchcancel', () => {
+      if (dragging) { dragging = false; DragPlay.cancel(); }
+      end();
+    });
+    hand.addEventListener('contextmenu', e => e.preventDefault());
+    hand.addEventListener('click', e => {
+      if (!suppressClick) return;
+      suppressClick = false;
+      e.stopPropagation();
+      e.preventDefault();
+    }, true);
   }
 
   function me() {
@@ -1280,19 +1404,28 @@ const Mob = (() => {
 
     const phase = currentState.phase;
 
+    // Scelta dei Muri: una sola riga, ✕ per annullare, conteggio e «Conferma»
     if (wallMode) {
-      dock.appendChild(hint('Tocca le carte in mano da usare come Muri.'));
+      const n = wallsSelected.length;
+      const toPlace = wallsSelected.filter(w => !w.bastion).length;
+      const cancel = mkBtn('✕', 'mbtn-compact', () => exitWallMode());
+      cancel.setAttribute('aria-label', 'Annulla');
+      dock.appendChild(cancel);
+      dock.appendChild(hint(`🧱 ${n}/3 · ` + (!n ? 'tocca le carte per girarle'
+        : toPlace ? 'trascinale nei Bastioni' : 'pronte da alzare')));
+      dock.appendChild(mkBtn('Conferma', 'mbtn-gold mbtn-compact', confirmWalls, !n || toPlace > 0, 'dock-wall-confirm'));
       return;
     }
 
     if (phase === 'action') {
       const acts = my ? (my.actions_remaining ?? 0) : 0;
       const hasCards = my && my.hand && my.hand.length > 0;
-      const hasIncomplete = my && (my.field.village.buildings || []).some(b => !b.completed);
+      // «Completa» spento se nessuna Costruzione si può completare ora (Mana, Azioni)
+      const hasIncomplete = my && completableBuildings(my).length > 0;
       const hasEthereal = my && my.ethereal_card;
 
       if (acts > 0) {
-        dock.appendChild(hint(hasCards ? 'Tocca una carta per giocarla' : 'Nessuna carta in mano'));
+        dock.appendChild(hint(hasCards ? 'Trascina una carta per giocarla' : 'Nessuna carta in mano'));
         dock.appendChild(mkBtn('🏗️', '', openCompleteSheet, !hasIncomplete, 'dock-complete'));
         dock.appendChild(mkBtn('🧱', '', enterWallMode, !hasCards, 'dock-wall'));
         dock.appendChild(mkBtn('›', '', () => sendAction('next_phase', {}), false, 'dock-next'));
@@ -1300,7 +1433,7 @@ const Mob = (() => {
         // Azioni finite: restano le giocate che non consumano Azioni (Orde, eterea,
         // Decumano); le carte non giocabili gratis si spengono
         const freePlays = my && hasFreePlays(my);
-        const freeCompletes = my && hasFreeCompletes(my);
+        const freeCompletes = my && completableBuildings(my).length > 0;
         if (freePlays) {
           document.querySelectorAll('#hand .card').forEach(c => {
             c.classList.toggle('unplayable', !isFreePlay(my, c.dataset.instanceId));
@@ -1344,78 +1477,112 @@ const Mob = (() => {
   // ---------------------------------------------------------------------------
 
   function onHandTap(iid) {
-    if (wallMode) { toggleWallCard(iid); return; }
-    // Nel tutorial, la prima volta che si tocca una carta da spiegare, prima la lettura
-    if (maybeReadCard(iid, () => openHandCardSheet(iid))) return;
-    openHandCardSheet(iid);
+    if (wallMode) { haptic(); toggleWallCard(iid); return; }
+    // Le carte in mano si giocano trascinandole e si guardano tenendoci sopra il
+    // dito: il tocco breve apre solo, nel tutorial, la lettura di una carta da
+    // spiegare (una volta sola; a lettura finita la scheda si chiude)
+    if (maybeReadCard(iid)) haptic();
   }
 
-  function openHandCardSheet(iid) {
+  // -- Giocare le carte trascinandole dalla mano al campo (drag.js) -----------
+
+  const DROP_ZONE_IDS = {
+    bastion_left: 'tw-left', vanguard: 'fld-vanguard',
+    bastion_right: 'tw-right', village: 'tw-village',
+  };
+
+  // Nel mio turno, in fase Azioni
+  function canDragFromHand() {
+    return !!me() && !wallMode && isMyTurn() && currentState.phase === 'action';
+  }
+
+  // Perché la carta ora non si può giocare (o null). Si trascina lo stesso, verso
+  // il campo come una Magia, e al rilascio torna in mano con l'errore.
+  function dragRefusal(iid, def, my, keys) {
+    if (!(my.actions_remaining > 0 || isFreePlay(my, iid))) return 'Azioni esaurite per questo turno.';
+    const err = playError(iid);
+    if (err) return err;
+    if (keys.length) return null;
+    return def && def.type === 'warrior'
+      ? `Nessuna Recluta compatibile in campo per evolvere ${def.name}.`
+      : 'Non hai nessun Guerriero in campo a cui assegnare il Trono.';
+  }
+
+  function startHandDrag(card, x, y) {
+    const iid = card.dataset.instanceId;
+    // Tutorial: una carta da spiegare non ancora letta apre la lettura invece di partire
+    if (maybeReadCard(iid)) return false;
     const def = getCardDef(iid);
-    const my = me();
-    const hand = (my && my.hand) || [];
-    const idx = hand.indexOf(iid);
-    const isEthereal = my && my.ethereal_card === iid;
-    const canAct = isMyTurn() && currentState.phase === 'action' &&
-      my && (my.actions_remaining > 0 || isFreePlay(my, iid));
-
-    const footer = [];
-    footer.push({
-      label: isEthereal ? '✧ Gioca gratis' : 'Gioca',
-      className: 'mbtn-gold',
-      disabled: !canAct,
-      onClick: () => { Sheet.close(true); showPlayOptions(iid, def); },
-    });
-
-    let subtitle = '';
-    if (!isMyTurn()) subtitle = 'Non è il tuo turno.';
-    else if (currentState.phase !== 'action') subtitle = 'Le carte si giocano nella fase Azioni.';
-    else if (!canAct) subtitle = 'Azioni esaurite per questo turno.';
-    else if (isEthereal) subtitle = 'Carta eterea: gratis e senza consumare Azioni.';
-
-    preloadCardImages([hand[idx - 1], hand[idx + 1]]);
-    showCardNavSheet({
-      title: def ? def.name : iid,
-      subtitle,
-      def,
-      ctx: { instanceId: iid },
-      pos: idx >= 0 ? { idx, total: hand.length } : null,
-      onPrev: idx > 0 ? () => openHandCardSheet(hand[idx - 1]) : null,
-      onNext: idx >= 0 && idx < hand.length - 1 ? () => openHandCardSheet(hand[idx + 1]) : null,
-      footer,
-      refresh: () => { if ((me().hand || []).includes(iid)) openHandCardSheet(iid); },
-    });
-  }
-
-  function showPlayOptions(iid, def) {
-    if (!def) return;
-    if (def.type === 'warrior') {
-      if (def.subtype === 'hero') showHeroPlayOptions(iid, def);
-      else {
-        pickRegion({
-          title: `Gioca ${def.name}`,
-          subtitle: 'Scegli dove schierarlo',
-          note: (z) => z === 'vanguard' ? 'Attacca in Battaglia' : 'Difende questo Bastione',
-          onPick: (region) => sendAction('play_warrior', { instance_id: iid, region }),
-        });
-      }
-    } else if (def.type === 'spell') {
-      showSpellOptions(iid, def);
-    } else if (def.type === 'building') {
-      if (def.id === 'trono') {
-        showTronoPlayOptions(iid, def);
-        return;
-      }
-      const my = me();
-      const cost = my && my.ethereal_card === iid ? 0 : costLabel(def.cost, my ? reinholdDiscount(my) : 0);
-      Sheet.confirm(
-        `Costruisci ${def.name}`,
-        `Costo: <b>${cost} Mana</b><br>${def.base_effect || ''}`,
-        () => sendAction('play_building', { instance_id: iid }),
-        { yesLabel: '🏗️ Costruisci' },
-      );
+    const keys = DragPlay.zonesFor(def, me(), getCardDef);
+    // Verso il campo: oltre un po' sotto la metà dei riquadri del mio campo
+    // Verso il campo: la carta circa a metà schermo, in una fascia (sopra, sugli
+    // avversari, non vale: le Magie con bersaglio si giocano come le altre)
+    const towardField = (px, py) => py > window.innerHeight * 0.3 && py < window.innerHeight * 0.65;
+    const refusal = dragRefusal(iid, def, me(), keys);
+    if (refusal) {
+      DragPlay.start(card, x, y, {
+        zones: [], fieldTest: towardField, noGlow: true, lift: 0.5,
+        onDrop: () => { Toast.show(refusal, 'error'); return false; },
+      });
+      return true;
     }
+    // Magie, Trono ed Eroi: basta portarli un po' sopra la mano, verso il campo.
+    // Il Guerriero del Trono e la Recluta dell'Eroe si scelgono dopo: i riquadri
+    // delle Regioni non mostrano le singole carte.
+    const asSpell = def.type === 'spell' || def.id === 'trono' || def.subtype === 'hero';
+    const zones = asSpell ? [] : keys.filter(k => DROP_ZONE_IDS[k])
+      .map(k => ({ key: k, el: $(DROP_ZONE_IDS[k]) }))
+      .filter(z => z.el);
+    const fieldTest = asSpell ? towardField : null;
+    // La carta sta sopra il dito, che altrimenti la coprirebbe
+    DragPlay.start(card, x, y, {
+      zones, fieldTest, lift: 0.5, onDrop: key => playDropped(iid, def, key),
+      choiceOpen: () => Sheet.isOpen(),
+    });
+    return true;
   }
+
+  // Ritorna true se l'azione è già partita (la carta resta dove è stata lasciata)
+  function playDropped(iid, def, key) {
+    const my = me();
+    if (def.type === 'spell') return showSpellOptions(iid, def, { direct: true }) === true;
+    if (def.id === 'trono') {
+      const ws = DragPlay.warriorsOf(my);
+      if (ws.length === 1) {
+        sendAction('play_building', { instance_id: iid, target_warrior_iid: ws[0].instance_id });
+        return true;
+      }
+      showTronoPlayOptions(iid, def);
+      return false;
+    }
+    if (def.type === 'building') {
+      sendAction('play_building', { instance_id: iid });
+      return true;
+    }
+    if (def.subtype !== 'hero') {
+      sendAction('play_warrior', { instance_id: iid, region: key });
+      return true;
+    }
+    // Eroe: se in campo c'è una sola Recluta che evolve in lui si gioca subito,
+    // altrimenti si sceglie quale
+    const recruits = DragPlay.warriorsOf(my).filter(w => {
+      const d = getCardDef(w.instance_id);
+      return d && d.evolves_into === def.id;
+    });
+    if (recruits.length === 1) {
+      sendAction('evolve', { recruit_instance_id: recruits[0].instance_id, hero_instance_id: iid });
+      return true;
+    }
+    showHeroPlayOptions(iid, def);
+    return false;
+  }
+
+  // Perché la carta in mano ora non si può giocare (Mana/Maghe, dal server), o null
+  function playError(iid) {
+    const my = me();
+    return (my && my.play_errors && my.play_errors[iid]) || null;
+  }
+
 
   // Trono: richiede la scelta immediata del Guerriero a cui assegnarlo
   function showTronoPlayOptions(iid, def) {
@@ -1476,10 +1643,6 @@ const Mob = (() => {
     return (player.hand || []).some(iid => isFreePlay(player, iid));
   }
 
-  function hasFreeCompletes(player) {
-    return (player.field.village.buildings || []).some(b => !b.completed && isFreeComplete(player, b));
-  }
-
   function computeSpellProdigy(def) {
     const my = me();
     if (!my || !def) return false;
@@ -1497,7 +1660,9 @@ const Mob = (() => {
     ];
   }
 
-  function showSpellOptions(iid, def) {
+  // opts.direct: la Magia è stata trascinata in campo, quindi senza bersagli si
+  // lancia subito, senza conferma (e la funzione ritorna true)
+  function showSpellOptions(iid, def, opts = {}) {
     const opponents = currentState.players.filter(p => p.id !== myPlayerId && p.lives > 0);
     const prodigy = computeSpellProdigy(def);
 
@@ -1586,8 +1751,12 @@ const Mob = (() => {
 
     const spellsNeedingTarget = ['ardolancio', 'incendifesa'];
     if (!spellsNeedingTarget.includes(def.id) || opponents.length === 0) {
+      if (opts.direct) {
+        sendAction('play_spell', { instance_id: iid });
+        return true;
+      }
       const effText = prodigy && def.prodigy_effect
-        ? (def.prodigy_is_additive ? `${def.base_effect}<br><b style="color:var(--gold)">✨ Prodigio:</b> ${def.prodigy_effect}` : `<b style="color:var(--gold)">✨ Prodigio:</b> ${def.prodigy_effect}`)
+        ? (def.prodigy_is_additive ? `${def.base_effect}<br><b style="color:var(--gold-light)">✨ Prodigio:</b> ${def.prodigy_effect}` : `<b style="color:var(--gold-light)">✨ Prodigio:</b> ${def.prodigy_effect}`)
         : (def.base_effect || '');
       Sheet.confirm(`Lancia ${def.name}`, `Costo: <b>${def.cost} Maghe</b><br>${effText}`,
         () => sendAction('play_spell', { instance_id: iid }),
@@ -1820,11 +1989,11 @@ const Mob = (() => {
     if (onPrev || onNext) {
       const nav = el('div', { className: 'card-nav', style: 'justify-content:center' });
       // ︎ forza la resa testuale 2D (come ❤︎): i glifi ⮜⮞ non esistono nei font iOS
-      const prevBtn = el('button', { className: 'nav-btn' }, ['◀︎']);
+      const prevBtn = el('button', { className: 'nav-btn' }, ['‹']);
       prevBtn.disabled = !onPrev;
       prevBtn.addEventListener('click', () => { haptic(); onPrev && onPrev(); });
       const posEl = el('span', { className: 'nav-pos' }, [pos ? `${pos.idx + 1} / ${pos.total}` : '']);
-      const nextBtn = el('button', { className: 'nav-btn' }, ['▶︎']);
+      const nextBtn = el('button', { className: 'nav-btn' }, ['›']);
       nextBtn.disabled = !onNext;
       nextBtn.addEventListener('click', () => { haptic(); onNext && onNext(); });
       nav.append(prevBtn, posEl, nextBtn);
@@ -1841,65 +2010,85 @@ const Mob = (() => {
     if (!isMyTurn()) return;
     wallMode = true;
     wallsSelected = [];
-    $('wall-tray').hidden = false;
-    renderWallTray();
     refreshDock();
     // Nel tutorial pannello e occhio di bue lasciano tutto lo schermo al vassoio
     if (isTutorial) hideTutorialStep();
   }
 
   function exitWallMode(silent = false) {
-    if (!wallMode && wallsSelected.length === 0) {
-      $('wall-tray').hidden = true;
-      return;
-    }
+    if (!wallMode && wallsSelected.length === 0) return;
     wallMode = false;
     wallsSelected = [];
-    $('wall-tray').hidden = true;
-    Render.markWallPicks(new Set());
+    updateWallMarks();
     if (!silent) refreshDock();
     if (isTutorial && currentState) updateTutorialUI(currentState);
   }
 
+  // Muri: il tocco su una carta in mano la gira (scelta come Muro, max 3) o la
+  // rigira; portando il dito fuori dalla mano una carta girata si trascina su un
+  // Bastione (startWallDrag), dove sparisce dalla mano e compare una pila «+N»
+  // (toccandola tornano in mano). «Conferma» quando sono tutte posate.
   function toggleWallCard(iid) {
     const idx = wallsSelected.findIndex(w => w.instanceId === iid);
     if (idx >= 0) wallsSelected.splice(idx, 1);
     else {
       if (wallsSelected.length >= 3) { Toast.show('Massimo 3 muri per azione', 'error'); return; }
-      wallsSelected.push({ instanceId: iid, bastion: 'left' });
-      haptic();
+      wallsSelected.push({ instanceId: iid, bastion: null });
     }
-    renderWallTray();
-    Render.markWallPicks(new Set(wallsSelected.map(w => w.instanceId)));
+    updateWallMarks();
   }
 
-  function renderWallTray() {
-    $('tray-count').textContent = wallsSelected.length;
-    $('tray-confirm').disabled = wallsSelected.length === 0;
-    const list = $('tray-list');
-    list.innerHTML = '';
-    wallsSelected.forEach(w => {
-      const def = getCardDef(w.instanceId);
-      const row = el('div', { className: 'tray-row' });
-      row.appendChild(el('span', { className: 'tr-name' }, [def ? def.name : w.instanceId]));
+  const isUnplacedWall = iid => wallsSelected.some(w => w.instanceId === iid && !w.bastion);
 
-      const sideToggle = el('span', { className: 'tray-side' });
-      const btnL = el('button', { className: w.bastion === 'left' ? 'on' : '' }, ['Sin']);
-      const btnR = el('button', { className: w.bastion === 'right' ? 'on' : '' }, ['Des']);
-      btnL.addEventListener('click', () => { haptic(); w.bastion = 'left'; renderWallTray(); });
-      btnR.addEventListener('click', () => { haptic(); w.bastion = 'right'; renderWallTray(); });
-      sideToggle.append(btnL, btnR);
-      row.appendChild(sideToggle);
-
-      const x = el('button', { className: 'tray-x' }, ['✕']);
-      x.addEventListener('click', () => toggleWallCard(w.instanceId));
-      row.appendChild(x);
-      list.appendChild(row);
+  function updateWallMarks() {
+    document.querySelectorAll('#hand .card').forEach(card => {
+      const w = wallsSelected.find(x => x.instanceId === card.dataset.instanceId);
+      CardArt.flipWall(card, !!w);
+      card.classList.toggle('wall-placed', !!(w && w.bastion));
     });
+    Render.fanHand();
+    renderWallPending();
+    if (wallMode) refreshDock();
+  }
+
+  // Muri posati (non ancora confermati): contati nel riquadro del Bastione, col
+  // numero in giallo finché l'Azione non è confermata. Toccando il riquadro
+  // tornano in mano (vedi onBastionTileTap)
+  function renderWallPending() {
+    const my = me();
+    if (!my) return;
+    ['left', 'right'].forEach(side =>
+      Render.bastionTile(my, side, wallsSelected.filter(w => w.bastion === side).length));
+  }
+
+  function onBastionTileTap(side) {
+    haptic();
+    if (wallMode && wallsSelected.some(w => w.bastion === side)) {
+      wallsSelected.forEach(w => { if (w.bastion === side) w.bastion = null; });
+      updateWallMarks();
+      return;
+    }
+    openBastionSheet(side);
+  }
+
+  function startWallDrag(card, x, y) {
+    const iid = card.dataset.instanceId;
+    const zones = [['left', 'tw-left'], ['right', 'tw-right']].map(([side, id]) => ({ key: side, el: $(id) }));
+    DragPlay.start(card, x, y, {
+      zones, lift: 0.5,
+      onDrop: side => {
+        const w = wallsSelected.find(x2 => x2.instanceId === iid);
+        if (w) w.bastion = side;
+        haptic();
+        updateWallMarks();
+        return 'land';
+      },
+    });
+    return true;
   }
 
   function confirmWalls() {
-    if (wallsSelected.length === 0) return;
+    if (wallsSelected.length === 0 || wallsSelected.some(w => !w.bastion)) return;
     const walls = wallsSelected.map(w => ({ instance_id: w.instanceId, bastion: w.bastion }));
     sendAction('add_wall', { walls });
     exitWallMode(true);
@@ -1921,16 +2110,22 @@ const Mob = (() => {
     return eff !== cost ? `${cost}→${eff}` : `${cost}`;
   }
 
+  // Costruzioni del Villaggio che ora si possono completare (dal server:
+  // complete_errors, null = completabile)
+  function completableBuildings(player) {
+    const errs = (player && player.complete_errors) || {};
+    return Object.keys(errs).filter(iid => !errs[iid]);
+  }
+
   function openCompleteSheet() {
     const my = me();
-    const buildings = (my.field.village.buildings || []).filter(b => !b.completed);
-    if (buildings.length === 0) return;
-    const noActions = (my.actions_remaining ?? 0) <= 0;
+    const completable = new Set(completableBuildings(my));
+    if (completable.size === 0) return;
     pickBuilding({
       title: 'Completa una Costruzione',
       players: [my],
-      // Senza Azioni restano solo i completamenti gratuiti (Orda di Joseph, Decumano, Velocemento)
-      filter: (b) => !b.completed && (!noActions || isFreeComplete(my, b)),
+      // Solo quelle completabili ora (Mana, Azioni: vedi complete_errors)
+      filter: (b) => completable.has(b.instance_id),
       meta: (b) => {
         if (my.ethereal_complete === b.instance_id) return 'Gratis (Velocemento)';
         const def = getCardDef(b.instance_id);
@@ -1962,20 +2157,16 @@ const Mob = (() => {
       body.push(el('div', { className: 'sheet-note' }, ['Bastione vuoto. Aggiungi Muri o schiera Guerrieri qui.']));
     }
 
-    if (walls.length > 0) {
-      body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' }, [`🧱 Muri (${walls.length})`]));
+    // Come per gli avversari: prima la pila dei Muri, poi i Guerrieri. I miei
+    // Muri si possono guardare: toccando la pila se ne apre l'elenco
+    if (walls.length > 0 || warriors.length > 0) {
       const row = el('div', { className: 'sheet-cards' });
-      walls.forEach((iid, i) => {
-        const mini = Render.wallMini(iid);
-        mini.addEventListener('click', () => { haptic(); showMyWallSheet(walls, side, i); });
-        row.appendChild(mini);
-      });
-      body.push(row);
-    }
-
-    if (warriors.length > 0) {
-      body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' }, [`🗡️ Guerrieri (${warriors.length})`]));
-      const row = el('div', { className: 'sheet-cards' });
+      if (walls.length > 0) {
+        const deck = Render.deckNode('wall', walls.length);
+        deck.classList.add('clickable');
+        deck.addEventListener('click', () => { haptic(); showMyWallSheet(walls, side, 0); });
+        row.appendChild(deck);
+      }
       warriors.forEach(w => {
         const mini = Render.warriorMini(w);
         mini.addEventListener('click', () => { haptic(); openFieldWarriorSheet(w.instance_id); });
@@ -2674,7 +2865,7 @@ const Mob = (() => {
 
     Sheet.open({
       title: p.name,
-      subtitle: `❤︎ ${p.lives} Vite · 🃏 ${p.hand_count} carte in mano` +
+      subtitle: `❤︎ ${p.lives} Vite` +
         (p.id === currentState.current_player_id ? ' · sta giocando' : ''),
       body,
       footer: [{ label: 'Chiudi', onClick: () => Sheet.close() }],
@@ -3302,6 +3493,7 @@ const Mob = (() => {
   // ---------------------------------------------------------------------------
 
   async function sendAction(action, params = {}) {
+    DragPlay.sent();
     // Nel tutorial l'attacco può passare prima dallo schema della Battaglia
     if (action === 'battle' && _previewTutorialBattle(params)) return;
     if (recastPending && action === 'play_spell') {
@@ -3320,6 +3512,7 @@ const Mob = (() => {
       });
       onStateUpdate(res.state, action, res.result);
     } catch (e) {
+      DragPlay.reject();
       Toast.show(e.message || 'Errore', 'error');
     }
   }

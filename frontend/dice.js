@@ -233,7 +233,7 @@ const Dice = (() => {
     root.className = 'dice-overlay';
     root.hidden = true;
     root.innerHTML = `
-      <div class="dice-panel" role="dialog" aria-live="polite">
+      <div class="dice-panel menu-frame frame-solid" role="dialog" aria-live="polite">
         <div class="dice-title"></div>
         <div class="dice-reason"></div>
         <canvas class="dice-canvas" aria-hidden="true"></canvas>

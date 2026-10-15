@@ -99,11 +99,22 @@ function placeMusicToggle(name) {
 // Toast
 // ---------------------------------------------------------------------------
 
+// Un messaggio uguale a uno ancora visibile non si ripete: si allunga la sua durata
 const Toast = {
+  _shown: new Map(),  // testo -> { el, timer }
   show(message, type = '') {
+    const key = `${type}|${message}`;
+    const prev = this._shown.get(key);
+    if (prev && prev.el.isConnected) {
+      clearTimeout(prev.timer);
+      prev.timer = setTimeout(() => { prev.el.remove(); this._shown.delete(key); }, 3400);
+      return;
+    }
     const t = el('div', { className: `toast${type ? ' ' + type : ''}` }, [message]);
     $('toasts').appendChild(t);
-    setTimeout(() => t.remove(), 3400);
+    const entry = { el: t, timer: null };
+    entry.timer = setTimeout(() => { t.remove(); this._shown.delete(key); }, 3400);
+    this._shown.set(key, entry);
   },
 };
 
@@ -145,33 +156,66 @@ const Sheet = (() => {
   let _sig = '';
 
   // -- drag-to-dismiss ------------------------------------------------------
+  // Si trascina giù da qualsiasi punto dello sheet: dal corpo solo se è già in
+  // cima e il dito scende, altrimenti il corpo scorre normalmente. Un tocco
+  // senza movimento resta un tocco (pulsanti, carte).
   let dragStartY = null;
   let dragDelta = 0;
+  let dragging = false;
+  let dragFromBody = false;
 
   function _bindDrag() {
-    const grab = $('sheet-grab');
     const sheet = sheetEl();
+    const body = () => $('sheet-body');
 
-    grab.addEventListener('touchstart', (e) => {
+    const start = (y, target) => {
       if (_locked) return;
-      dragStartY = e.touches[0].clientY;
+      dragFromBody = body().contains(target);
+      if (dragFromBody && body().scrollTop > 0) return;
+      dragStartY = y;
       dragDelta = 0;
-      sheet.classList.add('dragging');
-    }, { passive: true });
-
-    grab.addEventListener('touchmove', (e) => {
-      if (dragStartY === null) return;
-      dragDelta = Math.max(0, e.touches[0].clientY - dragStartY);
+      dragging = false;
+    };
+    // Ritorna true se il gesto è un trascinamento dello sheet
+    const move = (y) => {
+      if (dragStartY === null) return false;
+      const d = y - dragStartY;
+      if (!dragging) {
+        // Dal corpo, un dito che sale vuol dire scorrere: niente trascinamento
+        if (d < 0 && dragFromBody) { dragStartY = null; return false; }
+        if (d < 8) return false;
+        dragging = true;
+        sheet.classList.add('dragging');
+      }
+      dragDelta = Math.max(0, d);
       sheet.style.transform = `translateY(${dragDelta}px)`;
-    }, { passive: true });
-
-    grab.addEventListener('touchend', () => {
+      return true;
+    };
+    const end = () => {
       if (dragStartY === null) return;
+      dragStartY = null;
+      if (!dragging) return;
+      dragging = false;
       sheet.classList.remove('dragging');
       sheet.style.transform = '';
       if (dragDelta > 90) close();
-      dragStartY = null;
-    });
+    };
+
+    // Dito
+    sheet.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) start(e.touches[0].clientY, e.target);
+    }, { passive: true });
+    // Non passivo: durante il trascinamento il gesto non deve scorrere la pagina
+    // (Safari su iPhone altrimenti se lo prende e lo sheet non segue il dito)
+    sheet.addEventListener('touchmove', (e) => {
+      if (move(e.touches[0].clientY) && e.cancelable) e.preventDefault();
+    }, { passive: false });
+    sheet.addEventListener('touchend', end);
+    sheet.addEventListener('touchcancel', end);
+    // Mouse (la versione mobile aperta da computer)
+    sheet.addEventListener('mousedown', (e) => { if (e.button === 0) start(e.clientY, e.target); });
+    window.addEventListener('mousemove', (e) => move(e.clientY));
+    window.addEventListener('mouseup', end);
 
     scrimEl().addEventListener('click', () => { if (!_locked) close(); });
   }

@@ -18,7 +18,7 @@ const Renderer = (() => {
     _lastState = state;
 
     document.getElementById('hdr-turn').textContent = `Turno ${state.turn}`;
-    document.getElementById('hdr-phase').textContent = `Fase: ${phaseLabel(state.phase)}`;
+    renderPhaseBar(state.phase);
     document.getElementById('hdr-current-player').textContent =
       `Il turno di: ${getPlayerName(state, state.current_player_id)}`;
     document.getElementById('hdr-deck').textContent = `Mazzo: ${state.deck_count}`;
@@ -125,6 +125,7 @@ const Renderer = (() => {
     }
     column.classList.remove('fitting');
     _panelHeight = _measurePanel();
+    fanHand();
   }
 
   // Il pannello azioni si riempie dopo il primo disegno (app.js) e può andare
@@ -427,7 +428,7 @@ const Renderer = (() => {
       subtitle = `${_plural(bs.length, 'Costruzione', 'Costruzioni')} · ${_plural(done, 'completa', 'complete')}`;
       cards = bs.map(b => {
         const card = renderBuildingCard(b, false, null);
-        card.style.cursor = 'pointer';
+        if (App.cardHasDetail(b.instance_id, 'opponent')) card.style.cursor = 'pointer';
         card.addEventListener('click', () => App.onCardClick(b.instance_id, 'opponent'));
         return card;
       });
@@ -661,7 +662,7 @@ const Renderer = (() => {
       let node;
       if (prev && prev.ethereal === ethereal && prev.node.dataset.instanceId === iid) {
         node = prev.node;
-        node.classList.remove('wall-marked');  // la modalità Muri la riapplica se serve
+        node.classList.remove('wall-marked', 'wall-placed');  // la modalità Muri li riapplica se serve
         node.style.opacity = '';
         // La fascia della minicarta può cambiare anche se la carta resta (es. Prodigio)
         const def = App.getCardDef ? App.getCardDef(iid) : null;
@@ -674,6 +675,30 @@ const Renderer = (() => {
     });
     container.replaceChildren(...nodes);
     _handNodes = next;
+    fanHand(nodes);
+  }
+
+  // Mano a ventaglio: ogni carta ruota attorno al proprio fondo e quelle ai lati
+  // scendono un poco, lungo un arco. Rotate/translate stanno in proprietà CSS
+  // separate da transform, che resta libero per hover e animazioni (motion.js,
+  // che legge l'inclinazione per i fantasmi). Le carte si sovrappongono di più
+  // se non ci stanno in larghezza: va ricalcolato quando cambia la loro misura.
+  function fanHand(nodes = Array.from(document.querySelectorAll('#hand-cards .card'))) {
+    nodes = nodes.filter(nd => !nd.classList.contains('wall-placed'));  // Muri già posati nei Bastioni
+    const n = nodes.length;
+    if (!n) return;
+    const step = n > 1 ? Math.min(4, 14 / (n - 1)) : 0;  // apertura totale massima 14°
+    const cardW = nodes[0].offsetWidth;
+    const avail = document.getElementById('hand-cards').clientWidth - 24;
+    let shown = cardW * 0.74;  // parte di ogni carta non coperta dalla successiva
+    if (n > 1 && cardW + (n - 1) * shown > avail) shown = Math.max(cardW * 0.3, (avail - cardW) / (n - 1));
+    nodes.forEach((node, i) => {
+      const rot = (i - (n - 1) / 2) * step;
+      node.style.setProperty('--fan-rot', `${rot.toFixed(2)}deg`);
+      // Discesa delle carte ai lati: ruotando sul fondo l'angolo esterno sale, va compensato
+      node.style.setProperty('--fan-y', `calc(var(--card-h-hand) * ${(rot * rot * 0.0025).toFixed(4)})`);
+      node.style.marginLeft = i ? `${(shown - cardW).toFixed(1)}px` : '';
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -682,7 +707,7 @@ const Renderer = (() => {
 
   function renderHandCard(iid, etherealCard, prodigyReady) {
     const isEthereal = etherealCard === iid;
-    const div = el('div', { className: isEthereal ? 'card ethereal' : 'card', dataset: { instanceId: iid } });
+    const div = el('div', { className: isEthereal ? 'card hand-card ethereal' : 'card hand-card', dataset: { instanceId: iid } });
 
     const def = App.getCardDef ? App.getCardDef(iid) : null;
     if (def) {
@@ -728,61 +753,68 @@ const Renderer = (() => {
     return div;
   }
 
-  // Anteprima della carta intera al passaggio del mouse sulle minicarte (mano e
-  // campo). Vive in un livello fisso: le righe delle carte scorrono in orizzontale
-  // e taglierebbero una carta ingrandita sul posto.
+  // Carta intera al centro dello schermo al passaggio del mouse sulle minicarte
+  // (mano e campo). Passando da una carta all'altra cambia senza sparire: l'uscita
+  // aspetta un attimo, e se si entra in un'altra carta viene annullata.
   const CardPreview = (() => {
-    const WIDTH = 230;
-    const GAP = 12;
-    let timer = null;
     let node = null;
+    let hideTimer = null;
 
     function hide() {
-      clearTimeout(timer);
-      timer = null;
+      clearTimeout(hideTimer);
+      hideTimer = null;
       if (node) node.hidden = true;
     }
 
-    function schedule(cardEl, def) {
-      hide();
+    function show(cardEl, def) {
       if (!window.matchMedia || !matchMedia('(hover: hover)').matches) return;
-      timer = setTimeout(() => show(cardEl, def), 280);
+      if (!cardEl.isConnected || !cardEl.classList.contains('has-art')) return;
+      clearTimeout(hideTimer);
+      hideTimer = null;
+      if (!node) {
+        node = el('img', { className: 'hand-preview', alt: '' });
+        node.hidden = true;
+        document.body.appendChild(node);
+      }
+      CardArt.showFull(node, def.id);
+      node.alt = def.name;
+      node.hidden = false;
+      place(cardEl);
+    }
+
+    // Carte in mano: al centro dello schermo. Carte in campo: accanto a quella
+    // sotto il mouse, a destra, o a sinistra se a destra non c'è spazio; in
+    // altezza centrata sulla carta, dentro lo schermo
+    function place(cardEl) {
+      const GAP = 14, EDGE = 12;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const w = node.offsetWidth, h = w * 1040 / 744;  // l'immagine può non essere ancora caricata
+      const r = cardEl.getBoundingClientRect();
+      const centerTop = (vh - h) / 2;
+      if (cardEl.closest('#hand-cards') && r.top > centerTop + h + GAP) {
+        node.style.left = `${Math.round((vw - w) / 2)}px`;
+        node.style.top = `${Math.round(centerTop)}px`;
+        return;
+      }
+      const roomRight = vw - EDGE - (r.right + GAP), roomLeft = r.left - GAP - EDGE;
+      const left = roomRight >= w || roomRight >= roomLeft
+        ? Math.min(r.right + GAP, vw - EDGE - w)
+        : Math.max(EDGE, r.left - GAP - w);
+      const top = Math.max(EDGE, Math.min(vh - h - EDGE, r.top + r.height / 2 - h / 2));
+      node.style.left = `${Math.round(left)}px`;
+      node.style.top = `${Math.round(top)}px`;
     }
 
     function bind(cardEl, def) {
-      cardEl.addEventListener('mouseenter', () => schedule(cardEl, def));
-      cardEl.addEventListener('mouseleave', hide);
+      cardEl.addEventListener('mouseenter', () => show(cardEl, def));
+      cardEl.addEventListener('mouseleave', () => {
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(hide, 80);
+      });
       cardEl.addEventListener('click', hide);
     }
 
-    function show(cardEl, def) {
-      if (!cardEl.isConnected || !cardEl.classList.contains('has-art')) return;
-      const r = cardEl.getBoundingClientRect();
-      const height = Math.round(WIDTH * 1040 / 744);
-      const vw = window.innerWidth, vh = window.innerHeight;
-      // Sopra la carta se c'è spazio, altrimenti sotto, altrimenti di fianco
-      let left = Math.max(8, Math.min(vw - WIDTH - 8, r.left + r.width / 2 - WIDTH / 2));
-      let top;
-      if (r.top - height - GAP >= 0) top = r.top - height - GAP;
-      else if (r.bottom + GAP + height <= vh) top = r.bottom + GAP;
-      else {
-        top = Math.max(8, Math.min(vh - height - 8, r.top + r.height / 2 - height / 2));
-        left = r.right + GAP + WIDTH <= vw ? r.right + GAP : r.left - GAP - WIDTH;
-        if (left < 0) return;
-      }
-      if (!node) {
-        node = el('img', { className: 'hand-preview', alt: '' });
-        document.body.appendChild(node);
-      }
-      node.src = CardArt.previewUrl(def.id);
-      node.alt = def.name;
-      node.style.width = `${WIDTH}px`;
-      node.style.left = `${left}px`;
-      node.style.top = `${top}px`;
-      node.hidden = false;
-    }
-
-    return { schedule, bind, hide };
+    return { bind, hide };
   })();
 
   function renderWarriorCard(warrior, inField, interactive) {
@@ -809,10 +841,11 @@ const Renderer = (() => {
     // Minicarta con le Caratteristiche correnti, sopra la versione testuale
     const def = App.getCardDef ? App.getCardDef(warrior.instance_id) : null;
     CardArt.attach(div, def, warrior);
+    CardArt.attachAssigned(div, warrior.assigned_cards, iid => (App.getCardDef ? App.getCardDef(iid) : null));
     if (def) CardPreview.bind(div, def);
 
     if (interactive) {
-      div.style.cursor = 'pointer';
+      if (App.cardHasDetail(warrior.instance_id, 'field')) div.style.cursor = 'pointer';
       div.addEventListener('click', () => App.onCardClick(warrior.instance_id, 'field'));
     }
     return div;
@@ -841,7 +874,7 @@ const Renderer = (() => {
     if (def) CardPreview.bind(div, def);
 
     if (inField) {
-      div.style.cursor = 'pointer';
+      if (App.cardHasDetail(building.instance_id, 'village')) div.style.cursor = 'pointer';
       div.addEventListener('click', () => App.onCardClick(building.instance_id, 'village'));
     }
     return div;
@@ -850,7 +883,7 @@ const Renderer = (() => {
   function renderCardSmall(warrior, interactive) {
     const div = renderWarriorCard(warrior, true, interactive);
     if (!interactive) {
-      div.style.cursor = 'pointer';
+      if (App.cardHasDetail(warrior.instance_id, 'opponent')) div.style.cursor = 'pointer';
       div.addEventListener('click', (e) => {
         e.stopPropagation();
         App.onCardClick(warrior.instance_id, 'opponent');
@@ -865,7 +898,7 @@ const Renderer = (() => {
       dataset: { type: 'building', instanceId: b.instance_id }
     });
     div.appendChild(el('div', { className: 'card-name' }, [b.name || b.base_card_id]));
-    div.style.cursor = 'pointer';
+    if (App.cardHasDetail(b.instance_id, 'opponent')) div.style.cursor = 'pointer';
     div.addEventListener('click', (e) => {
       e.stopPropagation();
       App.onCardClick(b.instance_id, 'opponent');
@@ -1675,12 +1708,15 @@ const Renderer = (() => {
     return livesText(lives);
   }
 
-  function phaseLabel(phase) {
-    const map = {
-      action: 'Azioni', reposition: 'Schieramento', schieramento: 'Schieramento',
-      horde: 'Orda', battle: 'Battaglia', battaglia: 'Battaglia', draw: 'Pesca', end: 'Fine'
-    };
-    return map[phase] || phase;
+  // Fasi del turno nell'intestazione: quella in corso evidenziata, le precedenti
+  // barrate (a partita finita nessuna è in corso)
+  const PHASES = ['action', 'schieramento', 'battaglia'];
+  function renderPhaseBar(phase) {
+    const current = PHASES.indexOf(phase);
+    PHASES.forEach((p, i) => {
+      document.getElementById(`pstep-${p}`).className =
+        `phase-step${i === current ? ' active' : (current >= 0 && i < current ? ' done' : '')}`;
+    });
   }
 
   function getPlayerName(state, pid) {
@@ -1704,6 +1740,7 @@ const Renderer = (() => {
     showCardDetail,
     afterCardShown,
     closeCardDetail,
+    fanHand,
     motionCardNode,
     motionBackNode,
     toast,

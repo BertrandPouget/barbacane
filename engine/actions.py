@@ -533,6 +533,46 @@ def play_spell(
 # 4. Gioca Costruzione
 # ---------------------------------------------------------------------------
 
+def hand_play_error(state: GameState, player: Player, instance_id: str) -> Optional[str]:
+    """Perché ora non si può giocare questa carta dalla mano, a prescindere dai
+    bersagli (Mana o Maghe insufficienti, Vitalflusso senza Sorgive), o None.
+    Stessi controlli di play_warrior/evolve_warrior/play_building/play_spell,
+    senza consumare nulla: i client la usano per fermare la giocata prima di far
+    scegliere i bersagli (public_state → play_errors)."""
+    card = get_card(get_base_card_id(instance_id))
+    is_ethereal = player.ethereal_card == instance_id
+    mana = player.mana_remaining
+    if isinstance(card, WarriorCard):
+        # L'evoluzione non tiene conto dell'eterea (vedi evolve_warrior)
+        cost = 0 if is_ethereal and card.subtype != "hero" else card.cost
+        return f"Mana insufficiente: {mana}/{cost}." if mana < cost else None
+    if isinstance(card, BuildingCard):
+        cost = 0 if is_ethereal else building_play_cost(player, card)
+        return f"Mana insufficiente: {mana}/{cost}." if mana < cost else None
+    if not isinstance(card, SpellCard):
+        return None
+    mages_count = len(player.mages_in_field())
+    free = is_ethereal or any(
+        e.get("type") == "spell_free" and e.get("school") == card.school and e.get("uses", 0) > 0
+        for e in player.active_effects
+    )
+    cost_to_pay = 0 if free else max(0, card.cost - player.spell_cost_reductions.get(card.school, 0))
+    if mages_count < cost_to_pay:
+        return f"Maghe insufficienti: {mages_count} disponibili, {cost_to_pay} richieste."
+    if card.id == "vitalflusso":
+        prodigy = _prodigy_active(player, card.school, card.cost if is_ethereal else cost_to_pay)
+        if not any(b.base_card_id == "sorgiva" and b.completed for b in player.field.village.buildings):
+            if not prodigy:
+                return "Non hai nessuna Sorgiva completa in campo."
+            if not any(
+                b.base_card_id == "sorgiva"
+                for p in state.players if p.id != player.id and p.is_alive
+                for b in p.field.village.buildings
+            ):
+                return "Non hai nessuna Sorgiva completa in campo e nessun avversario ha Sorgive."
+    return None
+
+
 def play_building(
     state: GameState,
     player_id: str,
@@ -617,6 +657,34 @@ def _place_building(
 # ---------------------------------------------------------------------------
 # 5. Completa Costruzione
 # ---------------------------------------------------------------------------
+
+def building_complete_error(player: Player, building_instance_id: str) -> Optional[str]:
+    """Perché ora non si può completare questa Costruzione del Villaggio (Azioni
+    o Mana), o None. Stessi controlli di complete_building senza consumare nulla:
+    i client accendono solo le Costruzioni completabili (public_state →
+    complete_errors)."""
+    b_inst = next((b for b in player.field.village.buildings if b.instance_id == building_instance_id), None)
+    if b_inst is None:
+        return f"Costruzione {building_instance_id} non trovata nel Villaggio."
+    if b_inst.completed:
+        return f"Costruzione {building_instance_id} già completata."
+    base_id = get_base_card_id(building_instance_id)
+    card = get_card(base_id)
+    if not isinstance(card, BuildingCard):
+        return "Carta non valida."
+    is_ethereal_complete = player.ethereal_complete == building_instance_id
+    is_decumano_free = (
+        base_id == "cardo"
+        and any(b.base_card_id == "decumano" for b in player.field.village.buildings)
+    )
+    uses_action = not is_ethereal_complete and not is_decumano_free and not _joseph_free_action(player)
+    if uses_action and player.actions_remaining < 1:
+        return f"Azioni rimanenti insufficienti: {player.actions_remaining}."
+    cost = 0 if is_ethereal_complete or is_decumano_free else building_completion_cost(player, card)
+    if player.mana_remaining < cost:
+        return f"Mana insufficiente per completamento: {player.mana_remaining}/{cost}."
+    return None
+
 
 def complete_building(
     state: GameState,

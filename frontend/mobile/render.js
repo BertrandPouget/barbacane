@@ -100,6 +100,7 @@ const Render = (() => {
     div.appendChild(stats);
     // Minicarta con le Caratteristiche correnti
     CardArt.attach(div, Mob.getCardDef(w.instance_id), w);
+    CardArt.attachAssigned(div, w.assigned_cards, Mob.getCardDef);
     return div;
   }
 
@@ -115,17 +116,6 @@ const Render = (() => {
     return div;
   }
 
-  // Un mio Muro: la carta scoperta, così so cosa c'è nel Bastione
-  function wallMini(iid) {
-    const def = Mob.getCardDef(iid);
-    const div = el('div', {
-      className: 'card card-sm in-field',
-      dataset: { type: def ? def.type : 'wall', instanceId: iid },
-    });
-    div.appendChild(el('div', { className: 'card-name' }, [def ? def.name : iid]));
-    CardArt.attach(div, def, CardArt.handInfo(def, iid, []));
-    return div;
-  }
 
   // Mazzo coperto (es. i Muri di un Bastione avversario): il dorso della carta
   // con, sotto la scritta, un riquadro marrone e il numero di carte dentro un
@@ -189,12 +179,16 @@ const Render = (() => {
     return wrap;
   }
 
-  function bastionSummary(bastion) {
-    const wallCount = bastion.wall_count ?? (bastion.walls || []).length;
+  // pending: Muri posati e non ancora confermati (scelta dei Muri): si contano,
+  // e il numero è giallo finché l'Azione non è confermata
+  function bastionSummary(bastion, pending = 0) {
+    const wallCount = (bastion.wall_count ?? (bastion.walls || []).length) + pending;
     const warriors = bastion.warriors || [];
+    const walls = _statBlock(wallCount, wallCount === 1 ? 'Muro' : 'Muri');
+    if (pending) walls.classList.add('pending');
     const wrap = el('div', { className: 'rg-summary' }, [
       _statRow(
-        _statBlock(wallCount, wallCount === 1 ? 'Muro' : 'Muri'),
+        walls,
         _statBlock(warriors.length, warriors.length === 1 ? 'Difensore' : 'Difensori'),
       ),
     ]);
@@ -297,13 +291,12 @@ const Render = (() => {
         className: `opp-chip${isTurn ? ' turn' : ''}${dead ? ' dead' : ''}`,
         dataset: { playerId: p.id },
       }, [
+        // Niente carte in mano (inutile, e la riga toglierebbe spazio ai Bastioni):
+        // gli effetti attivi stanno accanto alle Vite
         el('span', { className: 'opp-top' }, [
           el('span', { className: 'opp-name' }, [p.name]),
-          el('span', { className: 'opp-lives' }, [_livesStr(p.lives ?? 0)]),
-        ]),
-        el('span', { className: 'opp-sub' }, [
-          el('span', {}, ['🃏 ', el('b', {}, [String(p.hand_count ?? 0)])]),
           fxCount > 0 ? el('span', { className: 'opp-fx-badge' }, [`✨${fxCount}`]) : null,
+          el('span', { className: 'opp-lives' }, [_livesStr(p.lives ?? 0)]),
         ]),
         _oppGrid(p, canHitLeft, canHitRight),
       ]);
@@ -349,17 +342,24 @@ const Render = (() => {
     $('tw-left-threat').textContent = leftNb && leftNb.id !== myId ? `Esposto a ${leftNb.name}` : '';
     $('tw-right-threat').textContent = rightNb && rightNb.id !== myId ? `Esposto a ${rightNb.name}` : '';
 
-    [['left', 'bl-cards', 'tw-left'], ['right', 'br-cards', 'tw-right']].forEach(([side, wrapId, tileId]) => {
-      const bastion = side === 'left' ? me.field.bastion_left : me.field.bastion_right;
-      const wrap = $(wrapId);
-      wrap.innerHTML = '';
-      const wallCount = bastion.wall_count ?? (bastion.walls || []).length;
-      const warriors = bastion.warriors || [];
-      $(tileId).classList.toggle('hot', canMove && warriors.length > 0);
-      wrap.appendChild(wallCount === 0 && warriors.length === 0
-        ? el('div', { className: 'rg-empty' }, ['Vuoto'])
-        : bastionSummary(bastion));
+    ['left', 'right'].forEach(side => {
+      const warriors = (side === 'left' ? me.field.bastion_left : me.field.bastion_right).warriors || [];
+      $(side === 'left' ? 'tw-left' : 'tw-right').classList.toggle('hot', canMove && warriors.length > 0);
+      bastionTile(me, side);
     });
+  }
+
+  // Riepilogo nel riquadro di un mio Bastione; pending = Muri posati in attesa
+  // di conferma (app.js, renderWallPending)
+  function bastionTile(me, side, pending = 0) {
+    const bastion = side === 'left' ? me.field.bastion_left : me.field.bastion_right;
+    const wrap = $(side === 'left' ? 'bl-cards' : 'br-cards');
+    wrap.innerHTML = '';
+    const wallCount = bastion.wall_count ?? (bastion.walls || []).length;
+    const warriors = bastion.warriors || [];
+    wrap.appendChild(wallCount + pending === 0 && warriors.length === 0
+      ? el('div', { className: 'rg-empty' }, ['Vuoto'])
+      : bastionSummary(bastion, pending));
   }
 
   // ---------------------------------------------------------------------------
@@ -440,7 +440,7 @@ const Render = (() => {
       let node;
       if (prev && prev.ethereal === ethereal) {
         node = prev.node;
-        node.classList.remove('wall-marked');  // la modalità Muri la riapplica se serve
+        node.classList.remove('wall-marked', 'wall-placed');  // la modalità Muri li riapplica se serve
         node.style.opacity = '';
         // La fascia della minicarta può cambiare anche se la carta resta (es. Prodigio)
         const def = Mob.getCardDef(iid);
@@ -453,11 +453,35 @@ const Render = (() => {
     });
     wrap.replaceChildren(...nodes);
     _handNodes = next;
+    fanHand(nodes);
+  }
+
+  // Mano a ventaglio: ogni carta ruota attorno al proprio fondo e quelle ai lati
+  // scendono un poco, lungo un arco. Rotate/translate stanno in proprietà CSS
+  // separate da transform, che resta libero per :active e animazioni (motion.js,
+  // che legge l'inclinazione per i fantasmi). La mano non scorre: se le carte non
+  // ci stanno in larghezza si sovrappongono quanto serve.
+  function fanHand(nodes = [...document.querySelectorAll('#hand .card')]) {
+    nodes = nodes.filter(nd => !nd.classList.contains('wall-placed'));  // Muri già posati nei Bastioni
+    const n = nodes.length;
+    if (!n) return;
+    const step = n > 1 ? Math.min(4, 14 / (n - 1)) : 0;  // apertura totale massima 14°
+    const cardW = nodes[0].offsetWidth;
+    const avail = $('hand').clientWidth - 24;
+    let shown = cardW * 0.76;  // parte di ogni carta non coperta dalla successiva
+    if (n > 1 && cardW + (n - 1) * shown > avail) shown = Math.max(4, (avail - cardW) / (n - 1));
+    nodes.forEach((node, i) => {
+      const rot = (i - (n - 1) / 2) * step;
+      node.style.setProperty('--fan-rot', `${rot.toFixed(2)}deg`);
+      // Discesa delle carte ai lati: ruotando sul fondo l'angolo esterno sale, va compensato
+      node.style.setProperty('--fan-y', `calc(var(--card-h-hand) * ${(rot * rot * 0.0025).toFixed(4)})`);
+      node.style.marginLeft = i ? `${(shown - cardW).toFixed(1)}px` : '';
+    });
   }
 
   function handCard(iid, etherealCard, prodigyReady) {
     const isEthereal = etherealCard === iid;
-    const div = el('div', { className: isEthereal ? 'card ethereal' : 'card', dataset: { instanceId: iid } });
+    const div = el('div', { className: isEthereal ? 'card hand-card ethereal' : 'card hand-card', dataset: { instanceId: iid } });
 
     const def = Mob.getCardDef(iid);
     if (def) {
@@ -498,15 +522,10 @@ const Render = (() => {
       div.appendChild(el('div', { className: 'card-name' }, [iid]));
     }
 
-    div.addEventListener('click', () => { haptic(); Mob.onHandTap(iid); });
+    div.addEventListener('click', () => Mob.onHandTap(iid));
     return div;
   }
 
-  function markWallPicks(selectedIds) {
-    document.querySelectorAll('#hand .card').forEach(c => {
-      c.classList.toggle('wall-marked', selectedIds.has(c.dataset.instanceId));
-    });
-  }
 
   // ---------------------------------------------------------------------------
   // Flashcard testuale di una carta (corpo condiviso da tutti gli sheet)
@@ -539,7 +558,7 @@ const Render = (() => {
 
     } else if (def.type === 'building') {
       const statusStr = ctx.completed === undefined ? ''
-        : ctx.completed ? ' · <span style="color:var(--gold)">✓ Completata</span>'
+        : ctx.completed ? ' · <span style="color:var(--gold-light)">✓ Completata</span>'
         : ' · <span style="color:var(--text-faint)">Incompleta</span>';
       const baseCls = ctx.completed === false ? ' ct-active' : '';
       const complCls = ctx.completed === true ? ' ct-active' : '';
@@ -641,10 +660,10 @@ const Render = (() => {
     field,
     statusbar,
     hand,
-    markWallPicks,
+    fanHand,
+    bastionTile,
     warriorMini,
     buildingMini,
-    wallMini,
     deckNode,
     activeEffectItems,
     cardTextHTML,

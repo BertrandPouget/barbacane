@@ -38,6 +38,8 @@ from engine.actions import (
     activate_horde,
     evolve_warrior,
     spell_prodigy_ready,
+    hand_play_error,
+    building_complete_error,
 )
 from engine.effects import _apply_scrigno_bonus, _d10_event
 from engine import chronicle
@@ -713,6 +715,19 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
             # Magie in mano che ora attiverebbero il Prodigio (stella piena sulla minicarta)
             "prodigy_ready": (
                 [iid for iid in p.hand if spell_prodigy_ready(p, iid)]
+                if p.id == viewer_player_id else None
+            ),
+            # Carte in mano che ora non si possono giocare, col motivo: i client
+            # fermano la giocata prima di far scegliere i bersagli
+            "play_errors": (
+                {iid: err for iid in p.hand if (err := hand_play_error(state, p, iid))}
+                if p.id == viewer_player_id else None
+            ),
+            # Costruzioni incomplete del Villaggio → perché ora non si possono
+            # completare (null se si può): i client accendono solo le completabili
+            "complete_errors": (
+                {b.instance_id: building_complete_error(p, b.instance_id)
+                 for b in p.field.village.buildings if not b.completed}
                 if p.id == viewer_player_id else None
             ),
             "field": {

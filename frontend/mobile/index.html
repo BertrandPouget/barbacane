@@ -69,7 +69,7 @@
 <!-- ═══════════ SCHERMATA: MULTIGIOCATORE (crea / unisciti) ═══════════ -->
 <section id="scr-multi" class="scr">
   <header id="multi-head" class="glass">
-    <button id="multi-back" class="tb-btn" aria-label="Torna alla home">←</button>
+    <button id="multi-back" class="tb-btn" aria-label="Torna alla home">‹</button>
     <span class="cat-title">Gioca</span>
   </header>
   <div id="multi-scroll">
@@ -110,7 +110,7 @@
 <!-- ═══════════ SCHERMATA: SFIDA UN BOT (scelta difficoltà) ═══════════ -->
 <section id="scr-bot-difficulty" class="scr">
   <header id="bot-diff-head" class="glass">
-    <button id="bot-diff-back" class="tb-btn" aria-label="Torna alla lobby">←</button>
+    <button id="bot-diff-back" class="tb-btn" aria-label="Torna alla lobby">‹</button>
     <span class="cat-title">Giocatore singolo</span>
   </header>
   <div id="bot-diff-scroll">
@@ -141,7 +141,7 @@
 <!-- ═══════════ SCHERMATA: CATALOGO CARTE ═══════════ -->
 <section id="scr-catalog" class="scr">
   <header id="cat-head" class="glass">
-    <button id="cat-back" class="tb-btn" aria-label="Torna alla lobby">←</button>
+    <button id="cat-back" class="tb-btn" aria-label="Torna alla lobby">‹</button>
     <span class="cat-title">Catalogo</span>
   </header>
   <div id="cat-scroll">
@@ -152,7 +152,7 @@
 <!-- ═══════════ SCHERMATA: SALA D'ATTESA ═══════════ -->
 <section id="scr-wait" class="scr">
   <header id="wait-head" class="glass">
-    <button id="wait-back" class="tb-btn" aria-label="Esci dalla sala d'attesa">←</button>
+    <button id="wait-back" class="tb-btn" aria-label="Esci dalla sala d'attesa">‹</button>
     <span class="cat-title">Sala d'attesa</span>
   </header>
   <div class="wait-wrap">
@@ -200,22 +200,21 @@
         <svg viewBox="0 0 36 36"><circle class="ring-bg" cx="18" cy="18" r="15.5"/><circle id="timer-ring" class="ring-fg" cx="18" cy="18" r="15.5"/></svg>
         <span id="tb-timer-num">—</span>
       </div>
-      <button id="tb-log" class="tb-btn" aria-label="Cronaca della partita">📜</button>
-      <button id="tb-leave" class="tb-btn tb-leave" aria-label="Abbandona la partita">Esci</button>
+      <button id="tb-leave" class="tb-btn tb-leave" aria-label="Abbandona la partita">Abbandona</button>
     </div>
   </header>
 
   <!-- Pannello del Tutorial: si piazza accanto alla zona evidenziata (spotlight.js) -->
-  <div id="tutorial-panel" class="tut-panel" hidden>
+  <div id="tutorial-panel" class="tut-panel menu-frame menu-frame-small" hidden>
+    <div id="tutorial-panel-progress" class="tut-panel-progress"></div>
     <div id="tutorial-panel-title" class="tut-panel-title"></div>
     <div id="tutorial-panel-text" class="tut-panel-text"></div>
     <div id="tutorial-panel-diagram" hidden></div>
     <ul id="tutorial-panel-goals" class="tut-goals" hidden></ul>
     <div class="tut-panel-actions">
-      <button id="tutorial-panel-exit" class="mbtn">Abbandona</button>
       <div class="tut-panel-nav">
-        <button id="tutorial-panel-prev" class="mbtn" hidden>← Indietro</button>
-        <button id="tutorial-panel-next" class="mbtn mbtn-gold">Avanti →</button>
+        <button id="tutorial-panel-prev" class="mbtn tut-arrow" hidden aria-label="Indietro">‹</button>
+        <button id="tutorial-panel-next" class="mbtn mbtn-gold" aria-label="Avanti">›</button>
       </div>
     </div>
   </div>
@@ -258,21 +257,13 @@
   <!-- Stato personale -->
   <div id="statusbar">
     <button id="st-lives" class="st-chip" aria-label="Le tue vite">❤︎ —</button>
-    <div id="st-mana" class="st-chip" aria-label="Mana">Mana: —</div>
     <div id="st-actions" class="st-chip" aria-label="Azioni">Azioni: —</div>
+    <div id="st-mana" class="st-chip" aria-label="Mana">Mana: —</div>
     <button id="st-fx" class="st-chip st-fx" hidden aria-label="Effetti attivi">✨ 0</button>
   </div>
 
   <!-- Dock azioni contestuale -->
   <div id="dock-wrap">
-    <div id="wall-tray" class="glass" hidden>
-      <div class="tray-head">🧱 Muri <b id="tray-count">0</b>/3 <span class="tray-hint">tocca le carte in mano</span></div>
-      <div id="tray-list"></div>
-      <div class="tray-actions">
-        <button id="tray-cancel" class="mbtn">Annulla</button>
-        <button id="tray-confirm" class="mbtn mbtn-gold" disabled>Conferma</button>
-      </div>
-    </div>
     <div id="dock" class="glass"></div>
   </div>
 
@@ -323,6 +314,7 @@
 <script src="/session.js"></script>
 <script src="/cardart.js"></script>
 <script src="/motion.js"></script>
+<script src="/drag.js"></script>
 <script src="/mobile/ui.js"></script>
 <script src="/mobile/render.js"></script>
 <script src="/mobile/app.js"></script>

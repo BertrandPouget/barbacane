@@ -46,7 +46,8 @@ server/
   ws_manager.py    Connessioni, broadcast, timer turno
 db/storage.py      Postgres (DATABASE_URL) o SQLite
 frontend/          Desktop (app.js, renderer.js) + moduli condivisi col mobile: ws, spotlight, sparks,
-                   audio, chronicle, session, cardart (minicarte), motion (transizioni)
+                   audio, chronicle, session, cardart (minicarte), motion (transizioni),
+                   drag (giocare le carte trascinandole in campo)
 frontend/mobile/   Client mobile (modulo Mob), ui.js (sheet, toast)
 card_factory/      Grafica carte (vedi suo README) → output/full, output/preview, output/mini, serviti su /card_images
 ```
@@ -81,7 +82,7 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 
 - `@register_effect("<effect_id>")` in `effects.py`. Firme: Magie `(state, player, prodigy=False, **targeting)`, Costruzioni `(state, player, completed=False, **kw)`, Orde `(state, player, warrior_iid=None, **kw)`.
 - **Passive** (Ariete, Catapulta, Fossato, Fucina…): l'effetto ritorna `{"passive": True}`, la logica vera è in `battle.py`/`actions.py`/`game.py`.
-- **Pre-validazione**: le condizioni per giocare una Magia/Costruzione vanno in `actions.py` (`play_spell`/`play_building`/`complete_building`) **prima** che la carta lasci la mano: un errore dall'effetto arriva quando la carta è già consumata.
+- **Pre-validazione**: le condizioni per giocare una Magia/Costruzione vanno in `actions.py` (`play_spell`/`play_building`/`complete_building`) **prima** che la carta lasci la mano: un errore dall'effetto arriva quando la carta è già consumata. Le condizioni indipendenti dai bersagli vanno anche in `hand_play_error` (→ `play_errors`), con cui i client fermano la giocata prima dei selettori; per i completamenti in `building_complete_error` (→ `complete_errors`).
 - Non esistono scarto libero né recupero di Muri. Eroe scartato → torna la Recluta con le assegnate; Recluta scartata → anche le assegnate negli scarti. D10: tira con `_roll_d10()` e registra con `_d10_event()` (dà il `roll_id` che serve a `frontend/dice.js` per mostrare il dado; testo dell'esito in `OUTCOMES` lì).
 
 **Checklist per una carta nuova o cambiata:**
@@ -111,7 +112,8 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 - Nessun salto turno automatico per disconnessione: solo con timer di lobby (`turn_timer > 0`).
 - Partite `vs-…` e tutorial hanno una sola riga in `players` (`player_1`).
 - **Transizioni** (`motion.js`): i client ridisegnano tutto a ogni `state_update`; si anima solo ciò che ha `data-instance-id`. Gli avversari sul desktop sono riassunti senza carte: le loro animazioni sono in `_animateOpponents`.
-- **Minicarte** (`cardart.js`, classi `.mc-*` in entrambi i CSS): sopra una carta `.has-art` il CSS nasconde tutto tranne minicarta e badge del costo; ciò che deve restare visibile va marcato `card-keep`. Il corpo del nome è tarato sul nome più lungo: se arriva un nome più lungo, usa `mini_name`.
+- **Trascinamento** (`drag.js`): le zone valide per carta sono in `DragPlay.zonesFor`; la giocata al rilascio è in `_playDropped`/`playDropped` dei due client. Una carta con un nuovo modo di essere giocata va gestita anche lì.
+- **Minicarte** (`cardart.js`, classi `.mc-*` in entrambi i CSS): sopra una carta `.has-art` il CSS nasconde tutto tranne minicarta e badge del costo; ciò che deve restare visibile va marcato `card-keep`. Il corpo del nome è tarato sul nome più lungo: se arriva un nome più lungo, usa `mini_name`. Le carte assegnate a un Guerriero si disegnano sotto di lui in `CardArt.attachAssigned` (un nuovo tipo assegnabile va gestito lì).
 - **Tavolo desktop**: la dimensione delle carte la calcola `fitCards()` (`renderer.js`); con altezza ≤ 1000px alcune zone hanno `zoom`, quindi si misurano con `getBoundingClientRect`.
 - **Sheet mobile** di sola consultazione: passare `refresh` a `Sheet.open`, altrimenti si chiude al cambio turno.
 - `game.py` contiene ancora un bot casuale (`random_bot_turn`) per `simulate_game`: non è il Bot delle partite reali.

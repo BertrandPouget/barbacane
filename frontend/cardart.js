@@ -9,7 +9,7 @@
  *   Costruzione, stella del Prodigio). Le immagini (illustrazione
  *   ridotta, pergamena) sono in /card_images/mini/, generate da card_factory.
  * - Anteprima (/card_images/preview/<id>.webp, ~30 KB): la carta intera
- *   rimpicciolita, per l'anteprima al passaggio del mouse e il catalogo.
+ *   rimpicciolita, per il catalogo e in attesa del PNG pieno (showFull).
  * Le viste ingrandite continuano a usare il PNG pieno (/card_images/full/<id>.png).
  */
 
@@ -29,6 +29,25 @@ const CardArt = (() => {
 
   function miniUrl(baseId) {
     return `/card_images/mini/${encodeURIComponent(baseId)}.webp`;
+  }
+
+  /**
+   * Mostra in `img` la carta vera (PNG pieno, ~1,2 MB). Se non è ancora stata
+   * scaricata, intanto mostra l'anteprima (già in cache) e la sostituisce quando
+   * il PNG arriva, purché `img` mostri ancora la stessa carta.
+   */
+  const fullLoaded = new Set();
+  function showFull(img, baseId) {
+    const full = `/card_images/full/${encodeURIComponent(baseId)}.png`;
+    img.dataset.cardId = baseId;
+    if (fullLoaded.has(full)) { img.src = full; return; }
+    img.src = previewUrl(baseId);
+    const probe = new Image();
+    probe.onload = () => {
+      fullLoaded.add(full);
+      if (img.dataset.cardId === baseId) img.src = full;
+    };
+    probe.src = full;
   }
 
   // Simboli delle carte stampate (card.html): torre delle Costruzioni e stella
@@ -151,6 +170,73 @@ const CardArt = (() => {
     cardEl.appendChild(_band(def, info));
   }
 
+  /**
+   * Carte assegnate a un Guerriero (assigned_cards dal server: Trono, Muri di
+   * Arrampicarta…), disegnate come se stesse sotto la carta, da cui sbuca solo il
+   * bordo in alto: una Costruzione è la sua minicarta, dritta; un Muro il dorso,
+   * storto (alternato a destra e a sinistra se sono più d'uno). Un nuovo tipo di
+   * carta assegnabile va disegnato qui, così vale per desktop e mobile.
+   * getDef(instanceId) → definizione della carta.
+   */
+  function attachAssigned(cardEl, assigned, getDef) {
+    if (!cardEl) return;
+    cardEl.querySelectorAll(':scope > .mc-under').forEach(n => n.remove());
+    (assigned || []).forEach((ac, i) => {
+      const under = _el('div', 'mc-under');
+      under.style.setProperty('--i', i);
+      // Non data-instance-id: Motion animerebbe la carta sotto come una carta a sé
+      if (ac.instance_id) under.dataset.assignedId = ac.instance_id;
+      const def = ac.type !== 'wall' && ac.instance_id ? getDef(ac.instance_id) : null;
+      if (def) {
+        under.classList.add('mc-under-card');
+        under.appendChild(_mini(def));
+      } else {
+        under.classList.add('mc-under-wall');
+        under.style.setProperty('--tilt', i % 2 ? -1 : 1);
+        const img = document.createElement('img');
+        img.alt = '';
+        img.draggable = false;
+        img.src = miniUrl('retro');
+        under.appendChild(img);
+      }
+      // Prima figlia: le carte successive sono disegnate sopra
+      cardEl.insertBefore(under, cardEl.firstChild);
+    });
+  }
+
+  /**
+   * Carta in mano scelta come Muro: si gira e mostra il dorso (classe
+   * wall-marked), con un mezzo giro in 3D come la carta del catalogo, in piccolo.
+   */
+  function flipWall(cardEl, on) {
+    if (!cardEl || cardEl.classList.contains('wall-marked') === on) return;
+    if (!cardEl.querySelector(':scope > .mc-back')) {
+      const back = document.createElement('img');
+      back.className = 'mc-back';
+      back.alt = '';
+      back.draggable = false;
+      back.src = miniUrl('retro');
+      cardEl.appendChild(back);
+    }
+    const apply = () => cardEl.classList.toggle('wall-marked', on);
+    const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (still || !cardEl.animate) { apply(); return; }
+    // Il costo sporge dalla carta e girando si vedrebbe troncare: sparisce prima
+    // del giro e, se la carta torna di fronte, ricompare solo a giro finito
+    cardEl.classList.add('flipping');
+    // Fino a taglio, si cambia faccia, e di nuovo di fronte
+    const P = 'perspective(500px) ';
+    const half = cardEl.animate([{ transform: P + 'rotateY(0deg)' }, { transform: P + 'rotateY(90deg)' }],
+      { duration: 130, easing: 'ease-in' });
+    half.onfinish = () => {
+      apply();
+      const back = cardEl.animate([{ transform: P + 'rotateY(-90deg)' }, { transform: P + 'rotateY(0deg)' }],
+        { duration: 130, easing: 'ease-out' });
+      back.onfinish = back.oncancel = () => cardEl.classList.remove('flipping');
+    };
+    half.oncancel = () => cardEl.classList.remove('flipping');
+  }
+
   /** Ridisegna solo la fascia di una minicarta già costruita (es. carta in mano riusata). */
   function update(cardEl, def, info) {
     if (!cardEl || !def) return;
@@ -197,5 +283,5 @@ const CardArt = (() => {
     idle(next);
   }
 
-  return { previewUrl, miniUrl, attach, update, handInfo, preload };
+  return { previewUrl, miniUrl, showFull, attach, attachAssigned, flipWall, update, handInfo, preload };
 })();

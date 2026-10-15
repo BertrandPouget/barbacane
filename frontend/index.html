@@ -79,7 +79,7 @@
 <!-- ===== SCHERMATA: MULTIGIOCATORE (crea / unisciti) ===== -->
 <div id="screen-multiplayer" class="screen">
   <div id="multiplayer-header">
-    <button id="btn-multiplayer-back" class="btn btn-secondary btn-small">← Indietro</button>
+    <button id="btn-multiplayer-back" class="btn btn-secondary btn-small">‹ Indietro</button>
     <h2>Gioca</h2>
   </div>
     <div class="lobby-panels">
@@ -112,7 +112,7 @@
 <!-- ===== SCHERMATA: CATALOGO CARTE ===== -->
 <div id="screen-catalog" class="screen">
   <div id="catalog-header">
-    <button id="btn-catalog-back" class="btn btn-secondary btn-small">← Indietro</button>
+    <button id="btn-catalog-back" class="btn btn-secondary btn-small">‹ Indietro</button>
     <h2>Catalogo</h2>
   </div>
   <div id="catalog-scroll">
@@ -124,7 +124,7 @@
 <!-- ===== SCHERMATA: SFIDA UN BOT (scelta difficoltà) ===== -->
 <div id="screen-bot-difficulty" class="screen">
   <div id="bot-difficulty-header">
-    <button id="btn-bot-difficulty-back" class="btn btn-secondary btn-small">← Indietro</button>
+    <button id="btn-bot-difficulty-back" class="btn btn-secondary btn-small">‹ Indietro</button>
     <h2>Giocatore singolo</h2>
   </div>
   <div id="bot-difficulty-grid">
@@ -155,7 +155,7 @@
 <!-- ===== SCHERMATA: SALA D'ATTESA ===== -->
 <div id="screen-waiting" class="screen">
   <div id="waiting-header">
-    <button id="btn-waiting-leave" class="btn btn-secondary btn-small" title="Esci dalla sala d'attesa">← Esci</button>
+    <button id="btn-waiting-leave" class="btn btn-secondary btn-small" title="Esci dalla sala d'attesa">‹ Esci</button>
     <h2>Sala d'Attesa</h2>
   </div>
   <div class="waiting-container menu-frame">
@@ -189,7 +189,14 @@
   <div id="game-header">
     <div class="header-left">
       <span id="hdr-turn">Turno 1</span>
-      <span id="hdr-phase">Fase: Azione</span>
+      <!-- Fasi del turno: in corso evidenziata, già fatte barrate (renderer.js) -->
+      <div id="phase-bar">
+        <span class="phase-step" id="pstep-action">1 Azioni</span>
+        <span class="phase-sep">›</span>
+        <span class="phase-step" id="pstep-schieramento">2 Schieramento</span>
+        <span class="phase-sep">›</span>
+        <span class="phase-step" id="pstep-battaglia">3 Battaglia</span>
+      </div>
     </div>
     <div class="header-center">
       <span id="hdr-current-player">Il turno di: —</span>
@@ -198,7 +205,7 @@
       <span id="hdr-deck">Mazzo: —</span>
       <div id="turn-timer-display" class="timer hidden"></div>
       <button id="btn-chronicle" class="btn btn-small btn-chronicle" title="Tutto quello che è successo nella partita">Cronaca</button>
-      <button id="btn-abandon" class="btn btn-small btn-abandon">Esci</button>
+      <button id="btn-abandon" class="btn btn-small btn-abandon">Abbandona</button>
     </div>
   </div>
 
@@ -233,15 +240,8 @@
           </button>
           <h3>Azioni</h3>
 
-          <!-- Indicatore fase turno -->
-          <div id="phase-bar" class="hidden">
-            <span class="phase-step" id="pstep-action">1 Azioni</span>
-            <span class="phase-sep">›</span>
-            <span class="phase-step" id="pstep-schieramento">2 Schieramento</span>
-            <span class="phase-sep">›</span>
-            <span class="phase-step" id="pstep-battaglia">3 Battaglia</span>
-          </div>
-
+          <!-- Tre colonne: comandi a sinistra, Mana e Azioni al centro, pulsanti a destra -->
+          <div class="ap-left">
           <!-- Banner: scegli tipo di azione (fase Azioni) -->
           <div id="action-banner" class="hidden">
             <div id="banner-turn-label" class="banner-label">Azione 1 di 2</div>
@@ -256,20 +256,25 @@
           <!-- Selezione muri -->
           <div id="wall-staging" class="hidden">
             <div class="wall-stage-header">Muri: <span id="wall-count">0</span>/3</div>
-            <div id="wall-selected-list"></div>
-            <div class="hint">Clicca carte dalla mano</div>
+            <div id="wall-hint" class="hint"></div>
             <button id="wall-confirm-btn" class="btn btn-primary btn-small" disabled>Conferma muri</button>
           </div>
 
           <div id="action-hint" class="hint"></div>
           <div id="selection-info" class="selection-box hidden"></div>
+          </div>
 
-          <div style="flex:1"></div>
+          <div id="my-stats" class="player-stats">
+            <span id="my-actions">Azioni: 2</span>
+            <span id="my-mana">Mana: 0</span>
+          </div>
 
+          <div class="ap-right">
           <button id="btn-horde"      class="btn btn-warning hidden">Orda</button>
-          <button id="btn-next-phase" class="btn btn-secondary hidden">Avanza Fase →</button>
+          <button id="btn-next-phase" class="btn btn-secondary hidden">Avanza Fase ›</button>
           <button id="btn-battle"     class="btn btn-warning hidden">Attacca</button>
           <button id="btn-end-turn"   class="btn btn-danger hidden">Fine Turno</button>
+          </div>
         </div>
 
         <div id="my-field">
@@ -286,10 +291,6 @@
           <div id="my-life-deck" class="region life-deck" data-label="Vite"></div>
           <div id="my-active-cards" class="region active-cards" data-label="Carte Attive" style="display:none"></div>
           <div id="my-right-panel">
-            <div id="my-stats" class="player-stats">
-              <span id="my-mana">Mana: 0</span>
-              <span id="my-actions">Azioni: 2</span>
-            </div>
             <div id="hand-area">
               <div id="hand-cards"></div>
               <div class="hand-label">Mano (<span id="hand-count">0</span>)</div>
@@ -306,16 +307,16 @@
   </div><!-- /game-table -->
 
   <!-- Pannello del Tutorial: si piazza accanto alla zona evidenziata (spotlight.js) -->
-  <div id="tutorial-panel" class="tut-panel hidden">
+  <div id="tutorial-panel" class="tut-panel menu-frame hidden">
+    <div id="tutorial-panel-progress" class="tut-panel-progress"></div>
     <div id="tutorial-panel-title" class="tut-panel-title"></div>
     <div id="tutorial-panel-text" class="tut-panel-text"></div>
     <div id="tutorial-panel-diagram" class="hidden"></div>
     <ul id="tutorial-panel-goals" class="tut-goals hidden"></ul>
     <div class="tut-panel-actions">
-      <button id="tutorial-panel-exit" class="btn btn-secondary">Abbandona</button>
       <div class="tut-panel-nav">
-        <button id="tutorial-panel-prev" class="btn btn-secondary hidden">← Indietro</button>
-        <button id="tutorial-panel-next" class="btn btn-primary">Avanti →</button>
+        <button id="tutorial-panel-prev" class="btn btn-secondary tut-arrow hidden" title="Indietro" aria-label="Indietro">‹</button>
+        <button id="tutorial-panel-next" class="btn btn-primary" title="Avanti" aria-label="Avanti">›</button>
       </div>
     </div>
   </div>
@@ -323,7 +324,7 @@
 
   <!-- Modale conferma azione / targeting -->
   <div id="modal-overlay" class="hidden">
-    <div id="modal-box">
+    <div id="modal-box" class="menu-frame frame-solid">
       <div id="modal-title"></div>
       <div id="modal-body"></div>
       <div id="modal-actions">
@@ -354,32 +355,32 @@
     </div>
     <div class="card-flip-hint">clicca la carta per girarla</div>
     <div id="card-image-footer">
-      <button id="card-img-prev"    class="btn btn-secondary card-nav-btn" style="visibility:hidden">◀</button>
+      <button id="card-img-prev"    class="btn btn-secondary card-nav-btn" style="visibility:hidden">‹</button>
       <div id="card-img-center">
         <div id="card-img-extra-btns"></div>
         <button id="card-img-action"  class="btn btn-primary hidden"></button>
         <button id="card-img-discard" class="btn btn-danger hidden">Scarta</button>
         <button id="card-img-close"   class="btn btn-secondary">Chiudi</button>
       </div>
-      <button id="card-img-next"    class="btn btn-secondary card-nav-btn" style="visibility:hidden">▶</button>
+      <button id="card-img-next"    class="btn btn-secondary card-nav-btn" style="visibility:hidden">›</button>
     </div>
   </div>
 
   <!-- Modalità testo (flashcard) -->
-  <div id="card-detail-box" class="hidden">
+  <div id="card-detail-box" class="menu-frame frame-solid hidden">
     <div class="card-detail-header">
       <div id="card-detail-title" class="card-detail-title"></div>
     </div>
     <div id="card-detail-body" class="card-detail-body"></div>
     <div id="card-detail-footer">
-      <button id="card-nav-prev"           class="btn btn-secondary btn-small card-nav-btn" style="visibility:hidden">◀</button>
+      <button id="card-nav-prev"           class="btn btn-secondary btn-small card-nav-btn" style="visibility:hidden">‹</button>
       <div class="card-footer-center">
         <div id="card-detail-extra-btns"></div>
         <button id="card-detail-action-btn"  class="btn btn-primary hidden"></button>
         <button id="card-detail-discard-btn" class="btn btn-danger hidden">Scarta</button>
         <button id="card-detail-close"       class="btn btn-secondary">Chiudi</button>
       </div>
-      <button id="card-nav-next"           class="btn btn-secondary btn-small card-nav-btn" style="visibility:hidden">▶</button>
+      <button id="card-nav-next"           class="btn btn-secondary btn-small card-nav-btn" style="visibility:hidden">›</button>
     </div>
   </div>
 
@@ -396,7 +397,7 @@
 
 <!-- ===== SCHERMATA: FINE PARTITA ===== -->
 <div id="screen-gameover" class="screen">
-  <div class="gameover-container">
+  <div class="gameover-container menu-frame frame-solid">
     <h1 id="gameover-title">Fine Partita</h1>
     <p id="gameover-winner"></p>
     <div id="gameover-scores"></div>
@@ -419,6 +420,7 @@
 <script src="session.js"></script>
 <script src="cardart.js"></script>
 <script src="motion.js"></script>
+<script src="drag.js"></script>
 <script src="renderer.js"></script>
 <script src="app.js"></script>
 </body>

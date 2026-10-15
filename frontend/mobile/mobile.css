@@ -33,7 +33,7 @@
   --card-brown: #4a2c15;
   --card-gold:  #b98a3e;
   --card-cream: #f4dea0;
-  /* Esagono del costo, come sulle carte stampate (card_factory/assets/esagono.png) */
+  /* Gemma del costo (un ottagono), come sulle carte stampate (card_factory/assets/esagono.png) */
   --hex-mana:   radial-gradient(closest-side, #fe8c16 0%, #fe9c1c 55%, #fed222 86%, #fee822 100%);
   --hex-maga:   radial-gradient(closest-side, #8fcde4 0%, #a3d7ed 60%, #d4eef8 100%);
   --hex-border: #5a3518;
@@ -165,7 +165,7 @@ input {
   border-radius: 50%;
   border: 1px solid var(--border-gold);
   background: var(--bg-medium);
-  color: var(--gold);
+  color: var(--gold-light);
   font-size: 1.1rem;
   line-height: 1;
   display: flex;
@@ -176,7 +176,7 @@ input {
 .music-toggle.muted { color: var(--brown-light); }
 .music-toggle[hidden] { display: none; }
 
-/* In partita si inserisce nella barra superiore, accanto a "Esci" */
+/* In partita si inserisce nella barra superiore, accanto a "Abbandona" */
 .music-toggle.in-header {
   position: static;
   z-index: auto;
@@ -240,7 +240,7 @@ input {
   font-size: clamp(1.8rem, 9vw, 2.6rem);
   letter-spacing: 0.28em;
   padding-left: 0.28em; /* compensa il tracking */
-  color: var(--gold);
+  color: var(--gold-light);
   text-shadow: 0 0 20px rgba(200, 168, 75, 0.5);
 }
 .splash-title-fallback.show { display: block; }
@@ -295,7 +295,7 @@ input {
   letter-spacing: 0.28em;
   margin-top: 10px;
   padding-left: 0.28em; /* compensa il tracking */
-  color: var(--gold);
+  color: var(--gold-light);
   text-shadow: 0 0 20px rgba(200, 168, 75, 0.5);
 }
 
@@ -459,7 +459,7 @@ input {
   --frame-fill: rgba(251, 196, 2, 0.12);
 }
 button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
-.home-resume .home-mode-title { color: var(--gold); }
+.home-resume .home-mode-title { color: var(--gold-light); }
 
 /* ═══════════════════════ MULTIGIOCATORE ═══════════════════════ */
 
@@ -719,7 +719,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   color: var(--text-dim);
   white-space: nowrap;
 }
-#tb-turn { color: var(--gold); }
+#tb-turn { color: var(--gold-light); }
 
 /* Fasi del turno */
 .tb-phase {
@@ -752,7 +752,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   background: var(--gold);
   border-color: var(--gold-light);
 }
-.ph-dot.on em { color: var(--gold); font-weight: 700; }
+.ph-dot.on em { color: var(--gold-light); font-weight: 700; }
 .ph-dot.done i { background: var(--border-gold); border-color: var(--border); }
 .ph-dot.done em { text-decoration: line-through; opacity: 0.5; }
 .tb-phase.dimmed { opacity: 0.35; }
@@ -764,6 +764,8 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   border-radius: var(--r-sm);
   border: 1px solid transparent;
 }
+/* Pulsanti «indietro» delle schermate, solo freccia: ‹ in Caudex è piccola */
+#multi-back, #bot-diff-back, #cat-back, #wait-back { font-size: 1.7rem; line-height: 1; padding: 0 10px 4px; }
 .tb-btn:active { border-color: var(--border); }
 .tb-leave {
   font-size: 0.7rem;
@@ -841,23 +843,14 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .opp-name {
   font-weight: bold;
   font-size: 0.85rem;
-  color: var(--gold);
+  color: var(--gold-light);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
 }
 .opp-lives { font-size: 0.68rem; letter-spacing: 1px; color: var(--red-light); white-space: nowrap; }
-.opp-sub {
-  display: flex;
-  gap: 8px;
-  margin-top: 3px;
-  font-size: 0.68rem;
-  color: var(--text-dim);
-  align-items: center;
-}
-.opp-sub b { color: var(--text); font-weight: 700; }
-.opp-fx-badge { color: var(--gold); }
+.opp-fx-badge { color: var(--gold-light); font-size: 0.68rem; flex: 0 0 auto; }
 
 /* Mini-griglia delle 4 regioni dell'avversario */
 .opp-grid {
@@ -880,7 +873,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 }
 .og-cell i {
   font-style: italic;
-  color: var(--gold);
+  color: var(--gold-light);
   font-size: 0.54rem;
   white-space: nowrap;
   overflow: hidden;
@@ -953,7 +946,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   display: block;
   width: 100%;
   font-size: 0.65rem;
-  color: var(--gold);
+  color: var(--gold-light);
   text-align: center;
   padding-bottom: 2px;
   pointer-events: none;
@@ -970,13 +963,13 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 }
 .rg-title-main {
   font-size: 0.65rem;
-  color: var(--gold);
+  color: var(--gold-light);
   font-style: italic;
   text-align: center;
 }
 .rg-title-sub {
   font-size: 0.62rem;
-  color: var(--gold);
+  color: var(--gold-light);
   font-style: italic;
   text-align: center;
   white-space: nowrap;
@@ -1101,9 +1094,9 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   text-overflow: ellipsis;
 }
 #st-lives { color: var(--red-light); flex: 0 0 auto; padding: 7px 11px; }
-#st-mana { color: var(--blue-light); }
-#st-actions { color: var(--gold); }
-.st-fx { color: var(--gold); flex: 0 0 auto; padding: 7px 13px; }
+#st-mana { color: var(--gold-light); }
+#st-actions { color: #8fcde4; }  /* l'azzurro della stella delle Maghe (--hex-maga) */
+.st-fx { color: var(--gold-light); flex: 0 0 auto; padding: 7px 13px; }
 .st-chip.bump { animation: chip-bump 0.5s var(--ease-out); }
 @keyframes chip-bump {
   0%   { transform: none; }
@@ -1131,6 +1124,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 }
 #dock .dock-hint { min-width: 0; flex-basis: 120px; }
 #dock .mbtn { flex: 1 0 auto; }
+#dock .mbtn.mbtn-compact { flex: 0 0 auto; }  /* scelta dei Muri: ✕ e «Conferma» ai lati */
 .dock-wait {
   flex: 1;
   text-align: center;
@@ -1194,42 +1188,6 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 
 /* ── Vassoio muri ── */
 
-#wall-tray {
-  border-radius: var(--r-md);
-  padding: 10px 12px;
-  animation: scr-in 0.3s var(--ease-out);
-}
-.tray-head { font-size: 0.8rem; font-weight: 700; }
-.tray-head b { color: var(--gold); }
-.tray-hint { font-weight: 400; color: var(--text-faint); font-size: 0.7rem; margin-left: 6px; font-style: italic; }
-#tray-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
-.tray-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--bg-dark);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  padding: 7px 10px;
-  font-size: 0.8rem;
-}
-.tray-row .tr-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tray-side {
-  display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  overflow: hidden;
-}
-.tray-side button {
-  padding: 4px 10px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--text-dim);
-}
-.tray-side button.on { background: var(--gold); color: var(--bg-dark); }
-.tray-x { color: var(--danger); font-size: 1rem; padding: 2px 6px; }
-.tray-actions { display: flex; gap: 8px; }
-.tray-actions .mbtn { flex: 1; }
 
 /* ═══════════════════════ CARTE (identiche al desktop) ═══════════════════ */
 
@@ -1263,10 +1221,42 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.45);
 }
 
-/* Guerriero con una o più carte assegnate (es. Trono) */
-.card.has-assigned {
-  border-color: var(--orange) !important;
+
+/* Carte assegnate a un Guerriero (CardArt.attachAssigned): sotto la carta, ne
+   sbuca solo il bordo in alto; ognuna in più sporge un po' di più. La carta fa
+   da contesto di impilamento, così z-index -1 resta sotto di lei ma sopra la
+   Regione. */
+.card.has-assigned { isolation: isolate; }
+/* Bordo e ombra della carta (evidenziazione al passaggio del mouse, bagliore
+   dello Schieramento, del bersaglio del Trono…) sono disegnati sotto le carte
+   assegnate: li si ripete in un livello sopra */
+.card.has-assigned::before {
+  content: '';
+  position: absolute;
+  inset: -1px;  /* il bordo della carta */
+  border-style: solid;
+  border-width: inherit;
+  border-color: inherit;
+  border-radius: inherit;
+  box-shadow: inherit;
+  pointer-events: none;
+  z-index: 1;
 }
+.card.has-art > .mc-under {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  translate: 0 calc(-4px - var(--i, 0) * 3px);
+}
+.mc-under-wall {
+  rotate: calc(var(--tilt, 1) * 4deg);
+  border-radius: 5.7cqw;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.mc-under-wall img { display: block; width: 100%; height: 100%; object-fit: fill; }
 
 /* Carta piccola (per campo) */
 .card-sm {
@@ -1282,10 +1272,19 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .sheet-cards {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 6px 6px 10px;
+  justify-content: center;
+  gap: 8px 6px;  /* in verticale un po' di più: le carte assegnate sporgono in alto */
+  padding: 8px 4px 10px;
 }
 .sheet-cards .card { cursor: pointer; }
+/* Minicarte dei riassunti (Villaggio, Bastioni, avversari): più grandi delle
+   carte del campo, sempre almeno 4 per riga */
+.sheet-cards .card-sm {
+  width: min(84px, calc((100vw - 60px) / 4));
+  min-width: 0;
+  height: auto;
+  aspect-ratio: 7 / 10;
+}
 
 /* Carta in campo: nascondi descrizione, ingrandisci stats */
 .card-sm.in-field .card-effect { display: none; }
@@ -1396,18 +1395,18 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   font-size: 0.68rem;
 }
 
-/* Badge costo: l'esagono della carta stampata (giallo e arancio, con un bordino
+/* Badge costo: la gemma ottagonale della carta stampata (giallo e arancio, con un bordino
    marrone), fuori dalla carta in alto a destra. La minicarta non riporta il
    costo: è solo qui. Il costo in Maghe sta in una stella azzurra (come sulle
    Magie stampate); bianco = carta eterea (gratis).
-   Il bordo è il fondo dell'esagono, il colore uno strato interno (::before):
+   Il bordo è il fondo della gemma, il colore uno strato interno (::before):
    con clip-path un border vero verrebbe tagliato. */
 .card-cost-badge {
   position: absolute;
   top: -9px;    /* sull'angolo della carta, un po' dentro */
   right: -7px;
-  min-width: 23px;
-  height: 26px;
+  min-width: 25px;  /* ottagono regolare: largo quanto alto */
+  height: 25px;
   padding: 0 5px;
   clip-path: var(--badge-shape);
   display: flex;
@@ -1429,8 +1428,8 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   clip-path: var(--badge-shape);
   background: var(--hex-fill, var(--hex-mana));
 }
-.card-cost-badge { --badge-shape: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
-/* Stella: più grande dell'esagono, perché il numero sta nella parte centrale */
+.card-cost-badge { --badge-shape: polygon(29.3% 0, 70.7% 0, 100% 29.3%, 100% 70.7%, 70.7% 100%, 29.3% 100%, 0 70.7%, 0 29.3%); }  /* ottagono, come la gemma della carta */
+/* Stella: più grande della gemma, perché il numero sta nella parte centrale */
 .card-cost-badge.star {
   --badge-shape: polygon(50% 4%, 65.9% 32.2%, 97.6% 38.5%, 75.7% 62.3%, 79.4% 94.5%, 50% 81%, 20.6% 94.5%, 24.3% 62.3%, 2.4% 38.5%, 34.1% 32.2%);
   top: -12px;
@@ -1442,14 +1441,15 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 }
 .card-cost-badge.star::before { inset: 2px; }
 .card-cost-badge.maga { --hex-fill: var(--hex-maga); }
-.card-cost-badge.ethereal { --hex-fill: #ffffff; color: #241608; }
+/* Eterea: gemma bianca sfumata di grigio, come le altre sono sfumate */
+.card-cost-badge.ethereal { --hex-fill: radial-gradient(closest-side, #b4b4b4 0%, #cfcfcf 55%, #ececec 86%, #ffffff 100%); color: #241608; }
 
 .stat { color: var(--text-dim); }
 .stat-att { color: var(--red-light); }
 .stat-git { color: #aaa; }
 .stat-dif { color: var(--green-light); }
 .stat-cost { color: var(--blue-light); }
-.stat-mana { color: var(--gold); }
+.stat-mana { color: var(--gold-light); }
 
 .card-effect {
   font-size: 0.6rem;
@@ -1469,13 +1469,12 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   font-size: 0.7rem;
 }
 
-/* Carta selezionata come muro (in mano) */
-.card.wall-marked {
-  border-color: #8a6a20;
-  box-shadow: 0 0 6px rgba(138, 106, 32, 0.7);
-  background: #2a1f0f;
-  transform: translateY(-3px);
-}
+/* Muro già posato in un Bastione (in attesa di conferma): non sta più in mano */
+#hand .card.wall-placed { display: none; }
+
+/* Muri posati in attesa di conferma (app.js, renderWallPending): contati nel
+   riquadro del Bastione, numero in giallo */
+.rg-stat.pending .rg-stat-num { color: var(--gold-light); }
 
 /* Specie colori (come desktop) */
 .species-elfo   { color: #7aaa55; }
@@ -1495,13 +1494,19 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 }
 #hand {
   display: flex;
-  gap: 8px;  /* spazio per il badge del costo, che sporge a destra */
+  gap: 0;  /* a ventaglio le carte si sovrappongono (margini negativi da fanHand) */
   flex-wrap: nowrap;
-  overflow-x: auto;
-  padding: 14px 12px calc(var(--sab) + 10px);  /* sopra: spazio per il badge del costo */
-  scrollbar-width: none;
+  align-items: flex-start;
+  justify-content: center;
+  /* La mano non scorre: fanHand sovrappone le carte quanto serve per starci tutte */
+  overflow: hidden;
+  touch-action: none;  /* il dito sulla mano sfoglia le carte (bindCardPeek) */
+  padding: 24px 12px 0;  /* sopra: badge del costo (la stella sporge di più) anche con la carta sollevata */
+  /* Altezza della mano calcolata su --card-h-hand: le carte sono più grandi e
+     la loro parte bassa esce dal fondo dello schermo (qui viene tagliata). */
+  box-sizing: border-box;
+  height: calc(var(--card-h-hand) + var(--sab) + 40px);
 }
-#hand::-webkit-scrollbar { display: none; }
 
 /* Carte in mano con le proporzioni della minicarta (280×400): l'altezza è
    quella della mano, la larghezza ne deriva. */
@@ -1512,10 +1517,30 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   aspect-ratio: 7 / 10;
   flex: 0 0 auto;
 }
+/* Ventaglio (fanHand in render.js): ogni carta copre il lato destro della
+   precedente, quindi il badge del costo sta a sinistra per restare visibile. */
+#hand .card {
+  height: calc(var(--card-h-hand) * 1.2);
+  rotate: var(--fan-rot, 0deg);
+  translate: 0 var(--fan-y, 0px);
+  transform-origin: 50% 100%;
+}
+/* Classe e non #hand: vale anche per i fantasmi delle animazioni */
+.hand-card .card-cost-badge { right: auto; left: -7px; }
+.hand-card .card-cost-badge.star { left: -9px; }
 #hand .card .card-name { font-size: 0.74rem; }
 #hand .card .card-species { font-size: 0.6rem; }
+/* Carta sotto il dito mentre si sfoglia la mano (bindCardPeek in app.js) */
+#hand .card.peeked {
+  translate: 0 calc(var(--fan-y, 0px) - 10px);
+  z-index: 10;
+  border-color: var(--gold);
+}
+/* Mentre si sfoglia, la carta toccata per prima resta :active per tutto il tocco */
+#hand.peeking .card:active:not(.peeked) { transform: none; border-color: transparent; }
 #hand .card:active {
   transform: translateY(-4px);
+  z-index: 10;
   border-color: var(--gold);
 }
 #hand .card.wall-marked:active { border-color: #8a6a20; }
@@ -1547,8 +1572,8 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 /* Sulla minicarta nessun bordo spesso dei tipi (es. Costruzione completata):
    tutte le carte hanno la stessa misura */
 .card.has-art[data-type] { border-width: 1px; }
-.card.has-art:not(:active):not(.selected):not(.wall-marked) { border-color: transparent; }
-.card.has-art > :not(.card-art):not(.card-cost-badge):not(.card-keep) { display: none; }
+.card.has-art:not(:active):not(.selected):not(.peeked) { border-color: transparent; }
+.card.has-art > :not(.card-art):not(.card-cost-badge):not(.card-keep):not(.mc-under):not(.mc-back) { display: none; }
 /* La minicarta (.mc), disegnata in HTML: posizioni in % della carta (la
    minicarta è progettata a 280×400 con cornice di 13), testi in cqw (larghezza
    della carta), così è identica a ogni dimensione. */
@@ -1697,30 +1722,30 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   color: var(--card-brown);
 }
 .mc-sym svg { display: block; width: 100%; height: 100%; }
-/* Costo per completare la Costruzione (finché non è completata), nell'esagono
+/* Costo per completare la Costruzione (finché non è completata), nella gemma
    della carta stampata */
 .mc-gem {
   position: relative;
   isolation: isolate;
-  width: 25cqw;
-  height: 28cqw;
+  width: 26cqw;
+  height: 26cqw;
   display: flex;
   align-items: center;
   justify-content: center;
-  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  clip-path: polygon(29.3% 0, 70.7% 0, 100% 29.3%, 100% 70.7%, 70.7% 100%, 29.3% 100%, 0 70.7%, 0 29.3%);
   background: var(--hex-border);
   color: var(--hex-ink);
   font-weight: 800;
   font-size: 16cqw;
   line-height: 1;
-  padding-top: 1cqw;  /* le cifre di Caudex stanno alte: così cadono al centro dell'esagono */
+  padding-top: 1cqw;  /* le cifre di Caudex stanno alte: così cadono al centro della gemma */
 }
 .mc-gem::before {
   content: '';
   position: absolute;
   inset: max(1px, 0.8cqw);
   z-index: -1;
-  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  clip-path: polygon(29.3% 0, 70.7% 0, 100% 29.3%, 100% 70.7%, 70.7% 100%, 29.3% 100%, 0 70.7%, 0 29.3%);
   background: var(--hex-mana);
 }
 
@@ -1738,18 +1763,21 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   z-index: 3;
 }
 
-/* Selezionata come Muro: la carta si scurisce e mostra il segno del Muro */
-.card.has-art.wall-marked .card-art { filter: brightness(0.45) sepia(0.6); }
-.card.has-art.wall-marked .mc-band { opacity: 0.4; }
-.card.has-art.wall-marked::after {
-  content: '🧱';
+/* Scelta come Muro: la carta è girata e mostra il dorso (CardArt.flipWall) */
+.card.has-art > .mc-back {
+  display: none;
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.6rem;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  border-radius: 5.7cqw;
+  z-index: 3;
+  pointer-events: none;
 }
+.card.has-art.wall-marked > .mc-back { display: block; }
+.card.wall-marked .card-cost-badge,
+.card.flipping .card-cost-badge { visibility: hidden; }
 
 /* Transizioni delle carte (motion.js): i "fantasmi" volano sopra l'interfaccia */
 .motion-layer {
@@ -1810,10 +1838,11 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   border-radius: var(--r-sm);
   background: var(--border-gold);
 }
-.sheet.locked .sheet-grab span { background: var(--red); }
+/* Sheet bloccato (non si chiude trascinando, es. la lettura delle carte nel
+   tutorial): niente lineetta, che inviterebbe a trascinarlo */
+.sheet.locked .sheet-grab span { visibility: hidden; }
 
 .sheet-head { padding: 2px 22px 10px; }
-.sheet-title { font-size: 1.05rem; font-weight: bold; color: var(--gold); }
 .sheet-sub { font-size: 0.78rem; color: var(--text-dim); margin-top: 3px; line-height: 1.35; }
 .sheet-sub:empty { display: none; }
 
@@ -1858,7 +1887,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .opt-chevron { color: var(--text-faint); font-size: 0.9rem; }
 .opt-row.danger .opt-label { color: var(--danger); }
 .opt-row.gold { border-color: var(--border-gold); }
-.opt-row.gold .opt-label { color: var(--gold); }
+.opt-row.gold .opt-label { color: var(--gold-light); }
 .opt-row.has-assigned { border-color: var(--orange); }
 
 /* Selettore di Guerrieri (pickWarrior): sezioni per giocatore, sottosezioni per
@@ -1876,7 +1905,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   align-items: center;
   gap: 6px;
   font-size: 0.76rem;
-  color: var(--gold);
+  color: var(--gold-light);
   font-style: italic;
   margin: 4px 0 6px;
 }
@@ -1908,7 +1937,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .wpick-row:active { border-color: var(--gold); background: var(--bg-dark); }
 .wpick-row.disabled { opacity: 0.45; }
 .wpick-row.disabled:active { border-color: var(--border); background: var(--bg-light); }
-.wpick-row-icon { flex: 0 0 auto; font-size: 1.1rem; color: var(--gold); display: inline-flex; }
+.wpick-row-icon { flex: 0 0 auto; font-size: 1.1rem; color: var(--gold-light); display: inline-flex; }
 .region-svg { display: inline-flex; align-items: center; }
 .region-svg svg { display: block; }
 .wpick-main .wpick-tag { margin-left: 0; }
@@ -1928,7 +1957,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 /* Etichetta di zona negli sheet */
 .zone-label {
   font-size: 0.72rem;
-  color: var(--gold);
+  color: var(--gold-light);
   font-style: italic;
 }
 
@@ -2007,7 +2036,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   border-radius: var(--r-sm);
   padding: 8px 10px;
 }
-.ct-section strong { color: var(--gold); font-size: 0.74rem; }
+.ct-section strong { color: var(--gold-light); font-size: 0.74rem; }
 .ct-dim { color: var(--text-dim); font-size: 0.74rem; margin-top: 7px; font-style: italic; }
 .ct-active { color: var(--ok); }
 
@@ -2021,7 +2050,9 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   border-radius: 50%;
   background: var(--bg-light);
   border: 1px solid var(--border-gold);
-  font-size: 1rem;
+  font-size: 1.7rem;  /* ‹ › in Caudex sono piccole */
+  line-height: 1;
+  padding-bottom: 4px;
   display: grid;
   place-items: center;
 }
@@ -2032,7 +2063,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .c-att { color: var(--red-light); }
 .c-git { color: #aaa; }
 .c-dif { color: var(--green-light); }
-.c-mana { color: var(--gold); }
+.c-mana { color: var(--gold-light); }
 
 .sp-elfo  { --sp: var(--elfo); }
 .sp-nano  { --sp: var(--nano); }
@@ -2059,7 +2090,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   opacity: 0.5;
 }
 .deck-row.match {
-  color: var(--gold);
+  color: var(--gold-light);
   background: var(--bg-light);
   border-color: var(--gold);
   opacity: 1;
@@ -2178,7 +2209,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   -webkit-overflow-scrolling: touch;
 }
 .over-wrap > * { flex: 0 0 auto; }
-#over-title { font-size: 2rem; color: var(--gold); }
+#over-title { font-size: 2rem; color: var(--gold-light); }
 #over-winner { color: var(--text); font-size: 1.12rem; }
 /* Riepilogo: la classifica in un pannello unico (posto, nome, esito); un
    tocco apre le statistiche complete in tabella (openStatsSheet) */
@@ -2251,7 +2282,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .over-table thead th { vertical-align: bottom; border-bottom-color: var(--border-gold); }
 .over-table thead th .chr-player { display: block; font-size: 0.85rem; word-break: break-word; }
 .over-table thead th .over-you { display: block; }
-.ost-place { display: block; color: var(--gold); font-size: 0.78rem; }
+.ost-place { display: block; color: var(--gold-light); font-size: 0.78rem; }
 .over-table tbody th {
   text-align: left;
   font-weight: normal;
@@ -2532,13 +2563,15 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 /* ═══════════════════════ TUTORIAL ═══════════════════════ */
 
 /* Pannello del tutorial: stesso aspetto sul campo e nella spiegazione delle carte */
+/* Cornice a bastione piccola (.menu-frame-small, in fondo al file): il bordo
+   della cornice occupa già spazio, il padding è ridotto di conseguenza */
 .tut-panel {
-  background: linear-gradient(160deg, var(--bg-medium), var(--bg-light));
-  border: 2px solid var(--gold);
-  border-radius: var(--r-lg);
-  padding: 14px 16px;
-  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.8);
+  padding: 0 4px;
+  filter: drop-shadow(0 10px 26px rgba(0, 0, 0, 0.75));
 }
+/* Quasi pieno: sta sopra il tavolo; cornice un po' più grande della piccola
+   dei menu, così il bordo è più spesso (più specifico di .menu-frame-small) */
+.tut-panel.menu-frame { --frame-fill: rgba(44, 24, 0, 0.96); --frame-size: 25px; }
 
 .tut-panel-progress {
   color: var(--text-faint);
@@ -2546,12 +2579,16 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   margin-bottom: 4px;
 }
 
-.tut-panel-title {
+/* Titolo delle finestre con la cornice a bastione: un solo stile per tutte
+   (tutorial, sheet, dado) */
+.tut-panel-title,
+.sheet-title,
+.dice-title {
   color: var(--gold-light);
   font-weight: 700;
   font-size: 1.08rem;
-  margin-bottom: 6px;
 }
+.tut-panel-title { margin-bottom: 6px; }
 
 .tut-panel-text {
   color: var(--text);
@@ -2618,7 +2655,10 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .tut-panel-nav {
   display: flex;
   gap: 8px;
+  margin-left: auto;  /* a destra anche da sola */
 }
+/* Riga senza pulsanti visibili (passo con obiettivi, senza «Indietro»): niente spazio vuoto */
+#tutorial-panel .tut-panel-actions:not(:has(button:not([hidden]))) { display: none; }
 
 /* «Indietro» alla prima sezione della carta: nascosto ma tiene il posto */
 .tut-panel-actions .invisible { visibility: hidden; }
@@ -2631,6 +2671,11 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 }
 
 #tutorial-panel[hidden] { display: none !important; }
+
+/* Mentre si trascina una carta (drag.js) il pannello del tutorial sparisce:
+   starebbe in mezzo. Ricompare al rilascio */
+#tutorial-panel { transition: opacity 0.15s; }
+body.dragging-card #tutorial-panel { opacity: 0; pointer-events: none; }
 
 /* Schema della Battaglia nel tutorial (tutorial_diagram.js): i due lati con i
    loro valori, gli scontri e il risultato. I rombi riprendono le
@@ -2685,13 +2730,13 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   font-size: 0.85rem;
 }
 .bd-vs { color: var(--text-faint); font-weight: normal; font-style: italic; }
-.bd-arrow { color: var(--gold); }
+.bd-arrow { color: var(--gold-light); }
 .bd-pass { color: var(--gold-light); }
 .bd-pass.none { color: var(--text-faint); font-style: italic; font-weight: normal; }
 
 /* In cima allo schermo, quando c'è una mossa da fare: compatto, senza gli
    obiettivi già fatti, per coprire il meno possibile del campo */
-#tutorial-panel.tut-panel-top { padding: 10px 14px; }
+#tutorial-panel.tut-panel-top { padding: 0 4px; }
 #tutorial-panel.tut-panel-top .tut-panel-title { font-size: 0.98rem; margin-bottom: 4px; }
 #tutorial-panel.tut-panel-top .tut-goals { margin-top: 4px; }
 #tutorial-panel.tut-panel-top .tut-goals li.done { display: none; }
@@ -2720,17 +2765,39 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   pointer-events: none;
 }
 
-.flip.reading { pointer-events: none; width: min(48vw, 200px); }
-.flip.reading + .flip-hint { display: none; }
+/* Frecce ‹ › dei pannelli del tutorial: in Caudex sono piccole, si ingrandiscono
+   (classe messa da app.js solo quando il pulsante contiene una freccia) */
+.tut-arrow { font-size: 1.6em; line-height: 1; min-width: 2.6em; padding-top: 4px; padding-bottom: 8px; }
 
-/* Spiegazione ancorata in fondo allo sheet: carta (rimpicciolita) e testo
-   restano visibili insieme, senza scorrere su e giù */
-.card-read {
-  position: sticky;
-  bottom: 0;
-  z-index: 3;
-  margin: 4px 2px 6px;
+
+/* Strato della lettura (app.js, _startCardReading): la carta grande e sotto
+   il pannello della spiegazione, sopra tutto il tavolo */
+.card-read-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(10, 5, 0, 0.88);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: calc(env(safe-area-inset-top) + 12px) 12px calc(env(safe-area-inset-bottom) + 12px);
+  animation: tutorial-panel-in 0.25s ease-out;
 }
+/* La carta: larga fin quasi allo schermo, ma lascia l'altezza per il pannello.
+   overflow hidden: l'ombra del riquadro dorato scurisce solo la carta */
+.card-read-card {
+  position: relative;
+  flex: 0 0 auto;
+  width: min(86vw, calc((100dvh - 330px) * 744 / 1040));
+  aspect-ratio: 744 / 1040;
+  border-radius: 4.5% / 3.2%;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+}
+.card-read-card img { display: block; width: 100%; height: 100%; }
+.card-read { width: min(100%, 440px); flex: 0 0 auto; }
 
 /* ═══════════════════════ LANCIO DEL D10 ═══════════════════════ */
 /* Finestra di dice.js: nome della carta, motivo del lancio, dado 3D (canvas)
@@ -2754,20 +2821,10 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   flex-direction: column;
   align-items: center;
   gap: 0.35rem;
-  background: var(--bg-medium);
-  border: 2px solid var(--border-gold);
-  border-radius: 14px;
-  padding: 1.1rem 1rem 0.9rem;
+  padding: 0.3rem 0.4rem 0.2rem;  /* cornice a bastione (.menu-frame) */
   text-align: center;
   font-family: 'Caudex', Georgia, serif;
   animation: dice-pop 0.28s cubic-bezier(.2, 1.4, .4, 1);
-}
-.dice-title {
-  color: var(--gold);
-  font-size: 1.45rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
 }
 .dice-reason {
   color: var(--text);
@@ -2878,3 +2935,57 @@ button.menu-frame:active {
   margin: 6px auto 0;
   background: url('/assets/frames/fregio.svg') center / contain no-repeat;
 }
+
+/* Carta intera al centro dello schermo tenendo il dito su una carta della mano
+   (bindCardPeek in app.js). */
+.card-peek {
+  position: fixed;
+  left: 50%;
+  /* Appena sopra la mano (stessa altezza di #hand), un po' sotto il dito */
+  bottom: calc(var(--card-h-hand) + var(--sab) + 40px - 10px);
+  translate: -50% 0;
+  width: min(74vw, 290px, calc((100vh - var(--card-h-hand) - var(--sab) - 40px) * 744 / 1040));
+  height: auto;
+  z-index: 300;
+  border-radius: 12px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  animation: card-peek-in 0.14s ease-out;
+}
+@keyframes card-peek-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: none; }
+}
+#hand .card { -webkit-touch-callout: none; }
+
+/* Carte giocate trascinandole dalla mano (drag.js): la copia che segue il
+   puntatore, che si illumina sopra un posto valido, e le zone dove si può
+   lasciare (illuminate appena, di più quando la carta ci è sopra). */
+.motion-ghost.drag-ghost {
+  z-index: 330;
+  rotate: 0deg;
+  translate: none;
+  scale: 1.06;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
+  transition: box-shadow 0.12s;
+}
+.motion-ghost.drag-ghost.drop-ok {
+  box-shadow: 0 0 0 2px rgba(251, 196, 2, 0.95), 0 0 24px 6px rgba(251, 196, 2, 0.55);
+}
+/* In attesa di una scelta: sotto lo sheet (#scrim 40) */
+.motion-ghost.drag-ghost.drag-held { z-index: 35; }
+.card.drag-source { opacity: 0.35; }
+.card.drag-pending { opacity: 0; }
+body.dragging-card { user-select: none; -webkit-user-select: none; }
+.drop-zone {
+  box-shadow: inset 0 0 0 2px rgba(251, 196, 2, 0.35), inset 0 0 18px rgba(251, 196, 2, 0.12);
+  transition: box-shadow 0.12s, background-color 0.12s;
+}
+.drop-over {
+  box-shadow: inset 0 0 0 2px rgba(251, 196, 2, 0.9), inset 0 0 26px rgba(251, 196, 2, 0.35);
+  background-color: rgba(251, 196, 2, 0.08);
+}
+
+/* Finestre di gioco con la cornice (dado): riempimento quasi pieno, stanno
+   sopra il tavolo */
+.menu-frame.frame-solid { --frame-fill: rgba(44, 24, 0, 0.96); }

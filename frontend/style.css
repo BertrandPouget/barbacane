@@ -34,7 +34,7 @@
   --nano:  #b85a3a;
   --maga:  #9966cc;
   --umano: #5599cc;
-  /* Esagono del costo, come sulle carte stampate (card_factory/assets/esagono.png) */
+  /* Gemma del costo (un ottagono), come sulle carte stampate (card_factory/assets/esagono.png) */
   --hex-mana:   radial-gradient(closest-side, #fe8c16 0%, #fe9c1c 55%, #fed222 86%, #fee822 100%);
   --hex-maga:   radial-gradient(closest-side, #8fcde4 0%, #a3d7ed 60%, #d4eef8 100%);
   --hex-border: #5a3518;
@@ -105,7 +105,7 @@ body::before {
   border-radius: 50%;
   border: 1px solid var(--border-gold);
   background: var(--bg-medium);
-  color: var(--gold);
+  color: var(--gold-light);
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
@@ -119,7 +119,7 @@ body::before {
 .music-toggle.muted { color: var(--brown-light); }
 .music-toggle[hidden] { display: none; }
 
-/* In partita il pulsante si inserisce nella barra dell'header, a destra di "Esci" */
+/* In partita il pulsante si inserisce nella barra dell'header, a destra di "Abbandona" */
 .music-toggle.in-header {
   position: static;
   z-index: auto;
@@ -240,7 +240,7 @@ body::before {
   --frame-fill: rgba(251, 196, 2, 0.12);
 }
 button.home-resume.menu-frame:hover { --frame-fill: rgba(251, 196, 2, 0.2); }
-.home-resume .home-mode-title { color: var(--gold); }
+.home-resume .home-mode-title { color: var(--gold-light); }
 
 /* ==================== HOME ==================== */
 
@@ -351,7 +351,7 @@ button.home-resume.menu-frame:hover { --frame-fill: rgba(251, 196, 2, 0.2); }
 
 .game-title {
   font-size: 3.5rem;
-  color: var(--gold);
+  color: var(--gold-light);
   text-shadow: 0 0 20px rgba(200, 168, 75, 0.5);
   letter-spacing: 0.2em;
   display: none;
@@ -564,7 +564,7 @@ input:focus {
   font-size: 0.75rem;
   font-family: inherit;
 }
-.seat-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+.seat-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold-light); }
 .seat-btn:disabled { opacity: 0.3; cursor: default; }
 
 /* Posto libero: esagono vuoto e filetto sottile, senza barra colorata */
@@ -709,7 +709,7 @@ input:focus {
   left: 50%;
   transform: translateX(-50%);
   font-size: 1.35rem;
-  color: var(--gold);
+  color: var(--gold-light);
   font-weight: bold;
   pointer-events: none;
 }
@@ -836,10 +836,10 @@ input:focus {
   border-bottom: 1px solid var(--border);
 }
 
-.opp-name { font-weight: bold; font-size: 0.92rem; color: var(--gold); }
+.opp-name { font-weight: bold; font-size: 1.05rem; color: var(--gold-light); }
 .opp-column .opp-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.opp-lives { font-size: 0.82rem; color: var(--red-light); }
-.opp-hand-count { font-size: 0.78rem; color: var(--text-dim); }
+.opp-lives { font-size: 0.95rem; color: var(--red-light); }
+.opp-hand-count { font-size: 0.9rem; color: var(--text-dim); }
 .opp-row .opp-hand-count { margin-left: auto; }
 
 .opp-active-effects {
@@ -848,7 +848,7 @@ input:focus {
   flex-wrap: wrap;
 }
 .opp-active-badge {
-  font-size: 0.63rem;
+  font-size: 0.72rem;
   padding: 1px 6px;
   border-radius: 10px;
   border: 1px solid rgba(74, 158, 255, 0.45);
@@ -896,15 +896,13 @@ input:focus {
   pointer-events: none;
 }
 .opp-tile-label {
-  font-size: 0.75rem;
-  color: var(--gold);
-  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--gold-light);
 }
 .opp-tile-sub {
-  padding: 0 0.2em;  /* l'ultima lettera in corsivo non viene tagliata */
-  font-size: 0.6rem;
-  color: var(--gold);
-  font-style: italic;
+  padding: 0 0.2em;
+  font-size: 0.72rem;
+  color: var(--gold-light);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -916,8 +914,7 @@ input:focus {
   margin: auto 0;
   text-align: center;
   color: var(--text-dim);
-  font-size: 0.75rem;
-  font-style: italic;
+  font-size: 0.85rem;
 }
 .rg-summary {
   flex: 1;
@@ -943,13 +940,13 @@ input:focus {
   min-width: 0;
 }
 .rg-stat-num {
-  font-size: 1.25rem;
+  font-size: 1.4rem;
   font-weight: 800;
   color: var(--gold-light);
   line-height: 1.1;
 }
 .rg-stat-label {
-  font-size: 0.58rem;
+  font-size: 0.7rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--text);
@@ -957,9 +954,9 @@ input:focus {
   white-space: nowrap;
 }
 .rg-stat.zero .rg-stat-num { color: var(--text-dim); }
-.opp-column .rg-stat-label { font-size: 0.52rem; letter-spacing: 0.02em; }
+.opp-column .rg-stat-label { font-size: 0.62rem; letter-spacing: 0.02em; }
 .rg-summary-sub {
-  font-size: 0.66rem;
+  font-size: 0.76rem;
   color: var(--text);
   border-top: 1px solid rgba(122, 68, 24, 0.4);
   padding-top: 3px;
@@ -982,7 +979,7 @@ input:focus {
 .rg-dot.sp-nano  { background: var(--nano); }
 .rg-dot.sp-maga  { background: var(--maga); }
 .rg-dot.sp-umano { background: var(--umano); }
-.rg-dots-more { font-size: 0.58rem; color: var(--text-dim); }
+.rg-dots-more { font-size: 0.68rem; color: var(--text-dim); }
 
 /* Campo di un avversario carta per carta (Renderer.showOpponentField) */
 #modal-box:has(.oppf) { max-width: min(820px, 92vw); }
@@ -1005,7 +1002,7 @@ input:focus {
   min-width: var(--card-w-field);
   height: var(--card-h-field);
 }
-.oppf-empty { font-size: 0.8rem; color: var(--text-dim); font-style: italic; }
+.oppf-empty { font-size: 0.8rem; color: var(--text-dim); }
 
 /* ==================== LANE SEPARATOR ==================== */
 
@@ -1119,7 +1116,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   padding: 0.7rem 0.9rem;
   border-bottom: 1px solid rgba(160, 104, 32, 0.5);
 }
-.chronicle-head h3 { color: var(--gold); font-size: 1.05rem; margin-right: auto; }
+.chronicle-head h3 { color: var(--gold-light); font-size: 1.05rem; margin-right: auto; }
 /* ✕ e pulsante musica: due tondi gemelli, allineati sulla stessa riga */
 #chronicle-close {
   width: 28px;
@@ -1219,11 +1216,10 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   display: block;
   width: 100%;
   font-size: 0.8rem;
-  color: var(--gold);
+  color: var(--gold-light);
   text-align: center;
   padding-bottom: 2px;
   pointer-events: none;
-  font-style: italic;
   white-space: pre-line;
   order: -2;
 }
@@ -1239,12 +1235,11 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   min-height: 1.2em;
   line-height: 1.2;
   font-size: 0.6rem;
-  color: var(--gold);
+  color: var(--gold-light);
   text-align: center;
   margin-top: -4px;
   padding-bottom: 4px;
   pointer-events: none;
-  font-style: italic;
   order: -1;
 }
 
@@ -1284,12 +1279,17 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   overflow-x: auto;
   overflow-y: hidden;
   /* in alto e ai lati c'è posto per ciò che sporge dalle carte: la sagoma delle
-     carte assegnate (-8px) e il tondo dell'Orda (-6px), altrimenti l'overflow li taglia */
-  padding: 10px 6px 0;
-  margin: -6px -2px 0;
+     carte assegnate (-8px) e il tondo dell'Orda (-6px), altrimenti l'overflow li taglia;
+     sotto per il bagliore dei Guerrieri trascinabili (il margine negativo lo compensa) */
+  padding: 10px 6px 6px;
+  margin: -6px -2px -6px;
 }
 
 .region-cards > * { flex-shrink: 0; }
+/* Carte centrate nella Regione: margini automatici e non justify-content, che
+   quando la riga scorre renderebbe irraggiungibile la prima carta */
+.region-cards > :first-child { margin-left: auto; }
+.region-cards > :last-child { margin-right: auto; }
 
 .region.vanguard    { flex: 2; min-width: 120px; }
 .region.bastion     { flex: 1; min-width: 80px; cursor: pointer; }
@@ -1327,8 +1327,10 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   align-self: center;
 }
 
-#my-mana    { color: var(--blue-light); }
-#my-actions { color: var(--gold); }
+/* Nella barra delle azioni: stessa misura dei pulsanti (.btn, .banner-btn) */
+#my-stats { font-size: 0.95rem; }
+#my-mana    { color: var(--gold-light); }
+#my-actions { color: #8fcde4; }  /* l'azzurro della stella delle Maghe (--hex-maga) */
 
 /* Mazzo vite */
 .region.life-deck {
@@ -1370,15 +1372,18 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 
 #hand-cards {
   display: flex;
-  gap: 8px;  /* spazio per il badge del costo, che sporge a destra */
+  gap: 0;  /* a ventaglio le carte si sovrappongono (margini negativi da fanHand) */
   flex-wrap: nowrap;
-  overflow-x: auto;
-  padding-top: 14px;  /* spazio per il badge del costo, che sporge sopra */
-  padding-bottom: 4px;
+  align-items: flex-start;
+  /* sopra: il badge del costo (la stella delle Magie sporge di più) anche con la
+     carta sollevata dal passaggio del mouse */
+  padding: 28px 12px 14px;
   justify-content: center;
-  /* Altezza fissa anche a mano vuota: altrimenti la zona in basso si
-     accorcia, il campo scende e il mazzo delle Vite viene tagliato. */
-  min-height: calc(var(--card-h-hand) + 20px);
+  /* Altezza fissa (anche a mano vuota, altrimenti il campo scende e il mazzo
+     delle Vite viene tagliato), calcolata sulle carte del campo: quelle in
+     mano sono più grandi e la loro parte bassa esce dal fondo dello schermo. */
+  height: calc(var(--card-h-hand) + 42px);
+  overflow: visible;
 }
 
 /* ==================== CARTA ==================== */
@@ -1423,35 +1428,55 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 }
 .ethereal-cost { color: #ffffff; font-weight: bold; }
 
-/* Guerriero con una o più carte assegnate (es. Trono, Muri): una piccola
-   sagoma di carta "sbuca" da sopra, larga quanto il lato corto della carta,
-   staccata da un minimo spazio di separazione (invece di un bordo colorato) */
+
+/* Carte assegnate a un Guerriero (CardArt.attachAssigned): sotto la carta, ne
+   sbuca solo il bordo in alto; ognuna in più sporge un po' di più. La carta fa
+   da contesto di impilamento, così z-index -1 resta sotto di lei ma sopra la
+   Regione. */
+.card.has-assigned { isolation: isolate; }
+/* Bordo e ombra della carta (evidenziazione al passaggio del mouse, bagliore
+   dello Schieramento, del bersaglio del Trono…) sono disegnati sotto le carte
+   assegnate: li si ripete in un livello sopra */
 .card.has-assigned::before {
   content: '';
   position: absolute;
-  left: 0;
-  right: 0;
-  top: -8px;
-  height: 6px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--orange);
-  border-radius: 3px;
+  inset: -1px;  /* il bordo della carta */
+  border-style: solid;
+  border-width: inherit;
+  border-color: inherit;
+  border-radius: inherit;
+  box-shadow: inherit;
   pointer-events: none;
+  z-index: 1;
 }
+.card.has-art > .mc-under {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  translate: 0 calc(-4px - var(--i, 0) * 3px);
+}
+.mc-under-wall {
+  rotate: calc(var(--tilt, 1) * 4deg);
+  border-radius: 5.7cqw;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.mc-under-wall img { display: block; width: 100%; height: 100%; object-fit: fill; }
 
-/* Badge costo: l'esagono della carta stampata (giallo e arancio, con un bordino
+/* Badge costo: la gemma ottagonale della carta stampata (giallo e arancio, con un bordino
    marrone), fuori dalla carta in alto a destra. La minicarta non riporta il
    costo: è solo qui. Il costo in Maghe sta in una stella azzurra (come sulle
    Magie stampate); bianco = carta eterea (gratis).
-   Il bordo è il fondo dell'esagono, il colore uno strato interno (::before):
+   Il bordo è il fondo della gemma, il colore uno strato interno (::before):
    con clip-path un border vero verrebbe tagliato. */
 .card-cost-badge {
   position: absolute;
   top: -9px;    /* sull'angolo della carta, un po' dentro */
   right: -7px;
-  min-width: 23px;
-  height: 26px;
+  min-width: 25px;  /* ottagono regolare: largo quanto alto */
+  height: 25px;
   padding: 0 5px;
   clip-path: var(--badge-shape);
   display: flex;
@@ -1473,8 +1498,8 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   clip-path: var(--badge-shape);
   background: var(--hex-fill, var(--hex-mana));
 }
-.card-cost-badge { --badge-shape: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
-/* Stella: più grande dell'esagono, perché il numero sta nella parte centrale */
+.card-cost-badge { --badge-shape: polygon(29.3% 0, 70.7% 0, 100% 29.3%, 100% 70.7%, 70.7% 100%, 29.3% 100%, 0 70.7%, 0 29.3%); }  /* ottagono, come la gemma della carta */
+/* Stella: più grande della gemma, perché il numero sta nella parte centrale */
 .card-cost-badge.star {
   --badge-shape: polygon(50% 4%, 65.9% 32.2%, 97.6% 38.5%, 75.7% 62.3%, 79.4% 94.5%, 50% 81%, 20.6% 94.5%, 24.3% 62.3%, 2.4% 38.5%, 34.1% 32.2%);
   top: -12px;
@@ -1486,7 +1511,8 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 }
 .card-cost-badge.star::before { inset: 2px; }
 .card-cost-badge.maga { --hex-fill: var(--hex-maga); }
-.card-cost-badge.ethereal { --hex-fill: #ffffff; color: #241608; }
+/* Eterea: gemma bianca sfumata di grigio, come le altre sono sfumate */
+.card-cost-badge.ethereal { --hex-fill: radial-gradient(closest-side, #b4b4b4 0%, #cfcfcf 55%, #ececec 86%, #ffffff 100%); color: #241608; }
 
 /* Carta piccola (per campo) */
 .card-sm {
@@ -1575,6 +1601,25 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   aspect-ratio: 7 / 10;
   flex-shrink: 0;
 }
+/* Ventaglio (fanHand in renderer.js): ogni carta copre il lato destro della
+   precedente, quindi il badge del costo sta a sinistra per restare visibile. */
+#hand-cards .card {
+  height: calc(var(--card-h-hand) * 1.2);
+  cursor: grab;  /* si giocano trascinandole (il clic non apre il dettaglio) */
+  rotate: var(--fan-rot, 0deg);
+  translate: 0 var(--fan-y, 0px);
+  transform-origin: 50% 100%;
+  transition: transform 0.15s, translate 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+#hand-cards .card:hover,
+#hand-cards .card.selected {
+  transform: none;
+  translate: 0 calc(var(--fan-y, 0px) - 10px);
+  z-index: 10;
+}
+/* Classe e non #hand-cards: vale anche per i fantasmi delle animazioni */
+.hand-card .card-cost-badge { right: auto; left: -7px; scale: 1.2; }  /* in mano un po' più grandi */
+.hand-card .card-cost-badge.star { left: -9px; }
 #hand-cards .card .card-name { font-size: 0.82rem; }
 #hand-cards .card .card-species { font-size: 0.72rem; }
 
@@ -1592,12 +1637,12 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 /* Sulla minicarta nessun bordo spesso dei tipi (es. Costruzione completata):
    tutte le carte hanno la stessa misura */
 .card.has-art[data-type] { border-width: 1px; }
-.card.has-art:not(:hover):not(.selected):not(.wall-marked) { border-color: transparent; }
+.card.has-art:not(:hover):not(.selected) { border-color: transparent; }
 /* Cornice oro uniforme: senza questa regola il bordo sinistro manterrebbe il
    colore del tipo (.card[data-type], più specifica di .card:hover) */
 .card.has-art[data-type]:hover { border-color: var(--gold); }
 .card.has-art[data-type].selected { border-color: var(--gold-light); }
-.card.has-art > :not(.card-art):not(.card-cost-badge):not(.card-keep) { display: none; }
+.card.has-art > :not(.card-art):not(.card-cost-badge):not(.card-keep):not(.mc-under):not(.mc-back) { display: none; }
 /* La minicarta (.mc), disegnata in HTML: posizioni in % della carta (la
    minicarta è progettata a 280×400 con cornice di 13), testi in cqw (larghezza
    della carta), così è identica a ogni dimensione. */
@@ -1692,18 +1737,21 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 .mc-sp-nano  { --mc-sp: var(--nano); }
 .mc-sp-maga  { --mc-sp: var(--maga); }
 .mc-sp-umano { --mc-sp: var(--umano); }
-/* Selezionata come Muro: la carta si scurisce e mostra il segno del Muro */
-.card.has-art.wall-marked .card-art { filter: brightness(0.45) sepia(0.6); }
-.card.has-art.wall-marked .mc-band { opacity: 0.4; }
-.card.has-art.wall-marked::after {
-  content: '🧱';
+/* Scelta come Muro: la carta è girata e mostra il dorso (CardArt.flipWall) */
+.card.has-art > .mc-back {
+  display: none;
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.8rem;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  border-radius: 5.7cqw;
+  z-index: 3;
+  pointer-events: none;
 }
+.card.has-art.wall-marked > .mc-back { display: block; }
+.card.wall-marked .card-cost-badge,
+.card.flipping .card-cost-badge { visibility: hidden; }
 
 /* Fascia della minicarta (cardart.js → _band), sotto l'illustrazione (dal
    66% al 95% dell'altezza): le informazioni che cambiano durante la
@@ -1759,30 +1807,30 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   color: var(--card-brown);
 }
 .mc-sym svg { display: block; width: 100%; height: 100%; }
-/* Costo per completare la Costruzione (finché non è completata), nell'esagono
+/* Costo per completare la Costruzione (finché non è completata), nella gemma
    della carta stampata */
 .mc-gem {
   position: relative;
   isolation: isolate;
-  width: 25cqw;
-  height: 28cqw;
+  width: 26cqw;
+  height: 26cqw;
   display: flex;
   align-items: center;
   justify-content: center;
-  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  clip-path: polygon(29.3% 0, 70.7% 0, 100% 29.3%, 100% 70.7%, 70.7% 100%, 29.3% 100%, 0 70.7%, 0 29.3%);
   background: var(--hex-border);
   color: var(--hex-ink);
   font-weight: 800;
   font-size: 16cqw;
   line-height: 1;
-  padding-top: 1cqw;  /* le cifre di Caudex stanno alte: così cadono al centro dell'esagono */
+  padding-top: 1cqw;  /* le cifre di Caudex stanno alte: così cadono al centro della gemma */
 }
 .mc-gem::before {
   content: '';
   position: absolute;
   inset: max(1px, 0.8cqw);
   z-index: -1;
-  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  clip-path: polygon(29.3% 0, 70.7% 0, 100% 29.3%, 100% 70.7%, 70.7% 100%, 29.3% 100%, 0 70.7%, 0 29.3%);
   background: var(--hex-mana);
 }
 
@@ -1800,19 +1848,22 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   z-index: 3;
 }
 
-/* Anteprima ingrandita della carta in mano (al passaggio del mouse) */
+/* Carta intera al centro dello schermo (al passaggio del mouse su una minicarta):
+   il PNG pieno, 744×1040 (CardArt.showFull). */
+/* Posizione calcolata in renderer.js (CardPreview.place): al centro per le
+   carte in mano, accanto alla carta (a destra o a sinistra) per quelle in campo */
 .hand-preview {
   position: fixed;
+  width: min(400px, calc(62vh * 744 / 1040), 90vw);
   z-index: 220;  /* sopra le modali (200), sotto il dettaglio della carta (250) */
   height: auto;
-  border-radius: 10px;
-  border: 1px solid var(--border-gold);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7);
   pointer-events: none;
-  animation: hand-preview-in 0.16s ease-out;
+  animation: hand-preview-in 0.14s ease-out;
 }
 @keyframes hand-preview-in {
-  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  from { opacity: 0; transform: scale(0.94); }
   to   { opacity: 1; transform: none; }
 }
 
@@ -1846,7 +1897,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 .stat-git { color: #aaa; }
 .stat-dif { color: var(--green-light); }
 .stat-cost { color: var(--blue-light); }
-.stat-mana { color: var(--gold); }
+.stat-mana { color: var(--gold-light); }
 
 .card-effect {
   font-size: 0.7rem;
@@ -1943,8 +1994,11 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 
 /* ==================== PANNELLO AZIONI ==================== */
 
+/* Tre colonne, le laterali larghe uguali: Mana e Azioni (#my-stats) stanno
+   esattamente al centro */
 #action-panel {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   flex-direction: row;
   align-items: center;
   flex-wrap: wrap;
@@ -1958,8 +2012,17 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 }
 
 #action-panel h3 { display: none; }
+.ap-left, .ap-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.ap-right { justify-content: flex-end; }
 /* Pulsanti del pannello più bassi di quelli dei menu: lo spazio va alle carte */
-#action-panel > .btn { padding: 0.4rem 1rem; }
+.ap-left > .btn, .ap-right > .btn { padding: 0.4rem 1rem; }
+#action-hint { font-size: 0.95rem; }
 
 .hint {
   font-size: 0.75rem;
@@ -1992,23 +2055,18 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 
 #modal-overlay.hidden { display: none !important; }
 
+/* Cornice a bastione (.menu-frame): sfondo e bordo li dà lei, e una regola con
+   #id qui li scavalcherebbe. Il bordo della cornice occupa spazio: padding ridotto */
 #modal-box {
-  background: var(--bg-medium);
-  border: 2px solid var(--border-gold);
-  border-radius: 8px;
-  padding: 1.5rem;
-  min-width: 320px;
-  max-width: 480px;
+  padding: 0.6rem 0.8rem;
+  /* Larghezze di prima più i due bordi della cornice (2 × 28px) */
+  min-width: 376px;
+  max-width: min(536px, 94vw);
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-#modal-title {
-  font-size: 1.1rem;
-  color: var(--gold);
-  font-weight: bold;
-}
 
 #modal-body { font-size: 0.9rem; color: var(--text); line-height: 1.4; }
 
@@ -2057,7 +2115,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   align-items: center;
   gap: 0.4rem;
   font-size: 0.78rem;
-  color: var(--gold);
+  color: var(--gold-light);
   font-style: italic;
 }
 .wpick-zone-icon { font-style: normal; }
@@ -2089,7 +2147,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 .wpick-row.disabled { opacity: 0.45; cursor: default; }
 .wpick-row.disabled:hover { border-color: var(--border); background: var(--bg-light); }
 .wpick-row .wpick-tag { margin-left: 0; }
-.wpick-row-icon { color: var(--gold); }
+.wpick-row-icon { color: var(--gold-light); }
 .wpick-name { font-weight: bold; font-size: 0.88rem; }
 .wpick-stats { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; margin-left: auto; }
 .wpick-note { flex-basis: 100%; font-size: 0.74rem; color: var(--card-cream); font-style: italic; margin-top: 0.15rem; }
@@ -2097,7 +2155,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 /* Ricerca nel mazzo */
 .search-summary {
   font-size: 0.85rem;
-  color: var(--gold);
+  color: var(--gold-light);
   margin-bottom: 0.6rem;
 }
 
@@ -2122,7 +2180,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 .search-match {
   background: var(--bg-light);
   border-color: var(--gold);
-  color: var(--gold);
+  color: var(--gold-light);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -2147,7 +2205,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 
 .search-page-btn { padding: 0.25rem 0.7rem; font-size: 0.85rem; }
 .search-page-btn:disabled { opacity: 0.35; cursor: default; }
-.search-page-info { font-size: 0.85rem; color: var(--gold); min-width: 3rem; text-align: center; }
+.search-page-info { font-size: 0.85rem; color: var(--gold-light); min-width: 3rem; text-align: center; }
 
 .search-exit-row { display: flex; justify-content: center; margin-top: 1rem; }
 
@@ -2234,15 +2292,11 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   justify-content: center;
 }
 
+/* Cornice a bastione (.menu-frame); scorre la tabella, non il riquadro */
 .gameover-container {
-  background: var(--bg-medium);
-  border: 2px solid var(--border-gold);
-  border-radius: 8px;
-  padding: 2.2rem 2rem;
+  padding: 1.2rem 1.4rem;
   min-width: 320px;
   max-width: min(920px, 94vw);
-  max-height: 92vh;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2250,9 +2304,8 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   text-align: center;
 }
 
-#gameover-title { font-size: 2.5rem; color: var(--gold); }
 #gameover-winner { font-size: 1.4rem; }
-#gameover-scores { font-size: 1rem; color: var(--text-dim); max-width: 100%; overflow-x: auto; }
+#gameover-scores { font-size: 1rem; color: var(--text-dim); max-width: 100%; max-height: 55vh; overflow: auto; }
 
 /* Riepilogo: classifica e statistiche */
 .gameover-table { border-collapse: collapse; font-size: 0.9rem; }
@@ -2267,7 +2320,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 }
 .gameover-table td { padding: 0.45rem 0.55rem; border-bottom: 1px solid rgba(106, 48, 16, 0.6); color: var(--text); }
 .gameover-table tr.winner td { background: rgba(251, 196, 2, 0.08); }
-.gameover-table .go-place { color: var(--gold); font-weight: bold; }
+.gameover-table .go-place { color: var(--gold-light); font-weight: bold; }
 .gameover-table .go-name { text-align: left; white-space: nowrap; }
 .gameover-table .go-you { color: var(--text-dim); font-size: 0.8rem; }
 .gameover-table .go-outcome { color: var(--text-dim); font-size: 0.78rem; }
@@ -2321,16 +2374,14 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 
 /* --- Modalità testo (flashcard) --- */
 
+/* Cornice a bastione (.menu-frame): vedi #modal-box. Scorre il corpo, non il
+   riquadro: lo scorrimento taglierebbe il riempimento delle punte */
 #card-detail-box {
-  background: var(--bg-medium);
-  border: 2px solid var(--border-gold);
-  border-radius: 10px;
-  padding: 1.5rem;
+  padding: 0.6rem 0.8rem;
   min-width: 300px;
   max-width: 440px;
   width: 90%;
   max-height: 80vh;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
@@ -2342,15 +2393,12 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   margin-bottom: 0.2rem;
 }
 
-.card-detail-title {
-  font-size: 1.3rem;
-  color: var(--gold-light);
-  font-weight: bold;
-}
 
 .card-detail-body {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
   gap: 0.6rem;
   font-size: 0.9rem;
   color: var(--text);
@@ -2410,8 +2458,8 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 
 .card-nav-btn {
   flex-shrink: 0;
-  padding: 0.2rem 0.6rem;
-  font-size: 1rem;
+  padding: 0.1rem 0.7rem 0.3rem;
+  font-size: 1.6rem;  /* ‹ › in Caudex sono piccole */
   line-height: 1;
 }
 
@@ -2494,18 +2542,14 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 
 /* ==================== PHASE BAR ==================== */
 
+/* Nell'intestazione, accanto al numero del turno */
 #phase-bar {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.35rem 0.5rem;
-  background: var(--bg-dark);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-size: 0.72rem;
+  gap: 0.45rem;
+  font-size: 1.05rem;
   flex-wrap: nowrap;
-  overflow: hidden;
 }
 
 .phase-step {
@@ -2517,7 +2561,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 }
 
 .phase-step.active {
-  color: var(--gold);
+  color: var(--gold-light);
   font-weight: 700;
 }
 
@@ -2529,7 +2573,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 
 .phase-sep {
   color: var(--border-gold);
-  font-size: 0.65rem;
+  font-size: 0.95rem;
 }
 
 /* ==================== BANNER AZIONE ==================== */
@@ -2542,8 +2586,8 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 }
 
 .banner-label {
-  font-size: 0.7rem;
-  color: var(--gold);
+  font-size: 0.9rem;
+  color: var(--gold-light);
   font-weight: bold;
   letter-spacing: 0.05em;
   white-space: nowrap;
@@ -2557,7 +2601,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   border-radius: 4px;
   color: var(--text);
   font-family: inherit;
-  font-size: 0.8rem;
+  font-size: 0.95rem;  /* come i pulsanti .btn a destra della barra */
   cursor: pointer;
   white-space: nowrap;
   transition: border-color 0.15s, background 0.15s, transform 0.1s;
@@ -2593,57 +2637,19 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 
 .wall-stage-header {
   font-size: 0.75rem;
-  color: var(--gold);
+  color: var(--gold-light);
   font-weight: bold;
   white-space: nowrap;
 }
 
-/* Muri scelti in fila, uno accanto all'altro: nome | Sin. Des. | × */
-#wall-selected-list {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 0.35rem;
-}
-
-.wall-entry {
-  background: var(--bg-medium);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.15rem 0.2rem 0.15rem 0.45rem;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.wall-entry-name {
-  font-size: 0.72rem;
-  color: var(--gold-light);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 7.5rem;
-}
-
-.wall-entry-btns {
-  display: flex;
-  gap: 2px;
-}
-
-.wall-entry-btns .btn-small {
-  padding: 0.15rem 0.4rem;
-  font-size: 0.65rem;
-  line-height: 1.2;
-  text-align: center;
-}
-
 /* Carta selezionata come muro (in mano) */
-.card.wall-marked {
-  border-color: #8a6a20;
-  box-shadow: 0 0 6px rgba(138, 106, 32, 0.7);
-  background: #2a1f0f;
-  transform: translateY(-3px);
-}
+/* Muro già posato in un Bastione (in attesa di conferma): non sta più in mano */
+#hand-cards .card.wall-placed { display: none; }
+
+/* Pila dei Muri con Muri posati in attesa di conferma (app.js,
+   _renderWallPending): numero in giallo; cliccandola tornano in mano */
+.deck-wall.wall-pending { cursor: pointer; }
+.deck-wall.wall-pending .deck-count span { color: var(--gold-light); }
 
 /* Carta non giocabile ora (Azioni esaurite) */
 .card.unplayable { opacity: 0.4; filter: grayscale(0.6); }
@@ -2654,7 +2660,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
    schermo da renderer.js (fitCards), che sovrascrive --card-*-hand/-field */
 
 /* Schermi non alti: tutto ciò che sta attorno alle mie carte (intestazione,
-   avversari, cronaca, pannello azioni, Mana/Azioni) al 90%, come lo zoom del
+   avversari, cronaca, pannello azioni con Mana/Azioni) al 90%, come lo zoom del
    browser; lo spazio guadagnato lo prendono le carte (fitCards) */
 @media (max-height: 1000px) {
   #game-header,
@@ -2662,8 +2668,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   #left-strip,
   #right-strip,
   #center-bar,
-  #action-panel,
-  #my-stats { zoom: 0.9; }
+  #action-panel { zoom: 0.9; }
 }
 
 @media (max-width: 900px) {
@@ -2693,6 +2698,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   #top-opponents { max-height: 35vh; overflow-y: auto; }
 
   #action-panel {
+    display: flex;  /* niente tre colonne: il pannello va a capo */
     position: fixed;
     left: 0; right: 0;
     bottom: 0; top: auto;
@@ -2722,7 +2728,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
     padding: 0.55rem 0;
     background: transparent;
     border: none;
-    color: var(--gold);
+    color: var(--gold-light);
     font-size: 0.88rem;
     font-family: inherit;
     cursor: pointer;
@@ -2742,7 +2748,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   .banner-btn { padding: 0.4rem 0.3rem; font-size: 0.78rem; }
   .btn-danger, .btn-warning { flex: 1; min-width: 80px; }
 
-  #hdr-phase, #hdr-deck { display: none; }
+  #phase-bar, #hdr-deck { display: none; }
   #game-header { padding: 0.45rem 0.8rem; }
 
 }
@@ -3018,13 +3024,15 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 }
 
 /* Pannello del tutorial: stesso aspetto sul campo e nella spiegazione delle carte */
+/* Cornice a bastione (.menu-frame, in fondo al file): il bordo della cornice
+   occupa già spazio, il padding è ridotto di conseguenza */
 .tut-panel {
-  background: linear-gradient(160deg, var(--bg-medium), var(--bg-light));
-  border: 2px solid var(--gold);
-  border-radius: 10px;
-  padding: 1.4rem 1.6rem;
-  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.8);
+  padding: 0.3rem 0.6rem;
+  filter: drop-shadow(0 10px 26px rgba(0, 0, 0, 0.75));
 }
+/* Quasi pieno: sta sopra il tavolo; cornice un po' più grande di quella dei
+   menu, così il bordo è più spesso (più specifico di .menu-frame, che viene dopo) */
+.tut-panel.menu-frame { --frame-fill: rgba(44, 24, 0, 0.96); --frame-size: 34px; }
 
 .tut-panel-progress {
   color: var(--text-dim);
@@ -3032,12 +3040,18 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   margin-bottom: 0.4rem;
 }
 
-.tut-panel-title {
+/* Titolo delle finestre con la cornice a bastione: un solo stile per tutte
+   (tutorial, finestre e selettori, dettaglio carta, dado, fine partita) */
+.tut-panel-title,
+#modal-title,
+.card-detail-title,
+.dice-title,
+#gameover-title {
   color: var(--gold-light);
   font-weight: bold;
   font-size: 1.3rem;
-  margin-bottom: 0.6rem;
 }
+.tut-panel-title { margin-bottom: 0.6rem; }
 
 .tut-panel-text {
   color: var(--text);
@@ -3104,7 +3118,10 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 .tut-panel-nav {
   display: flex;
   gap: 0.6rem;
+  margin-left: auto;  /* a destra anche da sola */
 }
+/* Riga senza pulsanti visibili (passo con obiettivi, senza «Indietro»): niente spazio vuoto */
+#tutorial-panel .tut-panel-actions:not(:has(button:not(.hidden))) { display: none; }
 
 /* «Indietro» alla prima sezione della carta: nascosto ma tiene il posto */
 .tut-panel-actions .invisible { visibility: hidden; }
@@ -3117,6 +3134,11 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 }
 
 #tutorial-panel.hidden { display: none !important; }
+
+/* Mentre si trascina una carta (drag.js) il pannello del tutorial sparisce:
+   starebbe in mezzo. Ricompare al rilascio */
+#tutorial-panel { transition: opacity 0.15s; }
+body.dragging-card #tutorial-panel { opacity: 0; pointer-events: none; }
 
 /* Più largo quando contiene lo schema della Battaglia */
 #tutorial-panel.tut-panel-wide { width: min(560px, calc(100vw - 24px)); }
@@ -3174,7 +3196,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   font-size: 0.95rem;
 }
 .bd-vs { color: var(--text-dim); font-weight: normal; font-style: italic; }
-.bd-arrow { color: var(--gold); }
+.bd-arrow { color: var(--gold-light); }
 .bd-pass { color: var(--gold-light); }
 .bd-pass.none { color: var(--text-dim); font-style: italic; font-weight: normal; }
 
@@ -3204,12 +3226,20 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 .card-flip.reading { pointer-events: none; }
 .card-flip.reading .card-flip-inner { overflow: hidden; border-radius: 18px; }
 
-#card-detail-overlay.reading #card-image-footer button,
-#card-detail-overlay.reading #card-detail-footer button {
-  opacity: 0.35;
+/* Durante la lettura niente «Gioca», «Chiudi» e frecce: si esce con «Ho capito».
+   visibility e non display, così la carta non si sposta sotto il pannello */
+#card-detail-overlay.reading #card-image-footer,
+#card-detail-overlay.reading #card-detail-footer {
+  visibility: hidden;
   pointer-events: none;
 }
 #card-detail-overlay.reading .card-flip-hint { visibility: hidden; }
+/* Le frecce tra le carte hanno visibility inline (renderer.js): vincerebbe sulla barra nascosta */
+#card-detail-overlay.reading .card-nav-btn { visibility: hidden !important; }
+/* Frecce ‹ › dei pannelli del tutorial: in Caudex sono piccole, si ingrandiscono
+   (classe messa da app.js solo quando il pulsante contiene una freccia) */
+.tut-arrow { font-size: 1.6em; line-height: 1; padding-top: 0.15rem; padding-bottom: 0.3rem; min-width: 2.6em; }
+
 
 /* Posizione calcolata in app.js: accanto alla carta, o sotto se non c'è spazio */
 #card-read {
@@ -3240,20 +3270,10 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   flex-direction: column;
   align-items: center;
   gap: 0.35rem;
-  background: var(--bg-medium);
-  border: 2px solid var(--border-gold);
-  border-radius: 8px;
-  padding: 1.1rem 1rem 0.9rem;
+  padding: 0.4rem 0.5rem 0.3rem;  /* cornice a bastione (.menu-frame) */
   text-align: center;
   font-family: 'Caudex', Georgia, serif;
   animation: dice-pop 0.28s cubic-bezier(.2, 1.4, .4, 1);
-}
-.dice-title {
-  color: var(--gold);
-  font-size: 1.45rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
 }
 .dice-reason {
   color: var(--text);
@@ -3374,3 +3394,69 @@ button.menu-frame:hover,
   margin: 0.45rem auto 0;
   background: url('/assets/frames/fregio.svg') center / contain no-repeat;
 }
+
+/* Carte giocate trascinandole dalla mano (drag.js): la copia che segue il
+   puntatore, che si illumina sopra un posto valido, e le zone dove si può
+   lasciare (illuminate appena, di più quando la carta ci è sopra). */
+.motion-ghost.drag-ghost {
+  z-index: 330;
+  rotate: 0deg;
+  translate: none;
+  scale: 1.06;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
+  transition: box-shadow 0.12s;
+}
+.motion-ghost.drag-ghost.drop-ok {
+  box-shadow: 0 0 0 2px rgba(251, 196, 2, 0.95), 0 0 24px 6px rgba(251, 196, 2, 0.55);
+}
+/* Schieramento: i miei Guerrieri si possono prendere e spostare (app.js, bindFieldDrag) */
+#my-field.can-reposition .card.in-field[data-type="warrior"] {
+  cursor: grab;
+  box-shadow: 0 0 0 1px rgba(251, 196, 2, 0.45), 0 0 5px rgba(251, 196, 2, 0.35);
+}
+#my-field.can-reposition .card.in-field[data-type="warrior"]:hover {
+  box-shadow: 0 0 0 2px rgba(251, 196, 2, 0.8), 0 0 6px rgba(251, 196, 2, 0.5);
+}
+/* «Completa»: le Costruzioni completabili si accendono e si cliccano (app.js) */
+#my-village .card.completable {
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(251, 196, 2, 0.6), 0 0 5px rgba(251, 196, 2, 0.4);
+}
+#my-village .card.completable:hover {
+  box-shadow: 0 0 0 2px rgba(251, 196, 2, 0.9), 0 0 6px rgba(251, 196, 2, 0.55);
+}
+/* Costruzione assegnata (Trono) completabile: si accende la carta che sbuca
+   sotto il Guerriero, che si clicca */
+#my-field .card.completable-host { cursor: pointer; }
+#my-field .mc-under.completable {
+  border-radius: 5.7cqw;
+  box-shadow: 0 0 0 1px rgba(251, 196, 2, 0.6), 0 0 5px rgba(251, 196, 2, 0.4);
+}
+#my-field .card.completable-host:hover > .mc-under.completable {
+  box-shadow: 0 0 0 2px rgba(251, 196, 2, 0.9), 0 0 6px rgba(251, 196, 2, 0.55);
+}
+/* In attesa di una scelta: sotto i selettori (modal-overlay 200) */
+.motion-ghost.drag-ghost.drag-held { z-index: 190; }
+.card.drag-source { opacity: 0.35; }
+.card.drag-pending { opacity: 0; }
+body.dragging-card { user-select: none; -webkit-user-select: none; }
+.drop-zone {
+  box-shadow: inset 0 0 0 2px rgba(251, 196, 2, 0.35), inset 0 0 18px rgba(251, 196, 2, 0.12);
+  transition: box-shadow 0.12s, background-color 0.12s;
+}
+.drop-over {
+  box-shadow: inset 0 0 0 2px rgba(251, 196, 2, 0.9), inset 0 0 26px rgba(251, 196, 2, 0.35);
+  background-color: rgba(251, 196, 2, 0.08);
+}
+body.dragging-card { cursor: grabbing; }
+body.dragging-card .hand-preview { display: none !important; }
+/* Guerriero su cui si sta per lasciare il Trono: l'immagine coprirebbe
+   l'ombra interna delle zone, quindi bagliore esterno */
+.card.drop-over {
+  border-color: rgba(251, 196, 2, 0.95);
+  box-shadow: 0 0 0 2px rgba(251, 196, 2, 0.9), 0 0 6px 1px rgba(251, 196, 2, 0.55);
+}
+
+/* Finestre di gioco con la cornice (finestre, dettaglio carta, dado, fine
+   partita): riempimento quasi pieno, stanno sopra il tavolo */
+.menu-frame.frame-solid { --frame-fill: rgba(44, 24, 0, 0.96); }

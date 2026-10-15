@@ -10,6 +10,9 @@
  *
  * Tutto lo strato è "click-through" (pointer-events: none): il campo resta
  * giocabile sotto. Lo stile (colori, z-index) è nel CSS di ciascun client.
+ *
+ * keepVisible(ids): elementi sempre scoperti (es. «Abbandona»), con un buco
+ * fermo e senza anello: non sono parte del passo, restano solo usabili.
  */
 
 const Spotlight = (() => {
@@ -20,8 +23,9 @@ const Spotlight = (() => {
   const EDGE = 12;        // margine minimo del pannello dal bordo schermo
   const DURATION = 380;   // durata dello scivolamento, ms
 
-  let root = null, maskGroup = null, ringLayer = null;
+  let root = null, maskGroup = null, keepGroup = null, ringLayer = null;
   let targets = [];       // id degli elementi DOM da evidenziare
+  let keepIds = [];       // id degli elementi sempre scoperti (keepVisible)
   let panel = null;       // pannello da posizionare accanto
   let centered = false;   // pannello fermo al centro anche con zone evidenziate
   let atTop = false;      // pannello in cima (true) o subito sotto l'elemento con quell'id
@@ -41,12 +45,14 @@ const Spotlight = (() => {
         <defs><mask id="spotlight-mask" maskUnits="userSpaceOnUse">
           <rect x="0" y="0" width="100%" height="100%" fill="white"></rect>
           <g></g>
+          <g class="spotlight-keep"></g>
         </mask></defs>
         <rect x="0" y="0" width="100%" height="100%" mask="url(#spotlight-mask)"></rect>
       </svg>
       <div class="spotlight-rings"></div>`;
     document.body.appendChild(root);
-    maskGroup = root.querySelector('mask g');
+    maskGroup = root.querySelector('mask g:not(.spotlight-keep)');
+    keepGroup = root.querySelector('mask g.spotlight-keep');
     ringLayer = root.querySelector('.spotlight-rings');
     window.addEventListener('resize', () => refresh(true));
     document.addEventListener('scroll', () => refresh(true), true);
@@ -128,6 +134,29 @@ const Spotlight = (() => {
         display: 'block', left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px`,
       });
     });
+  }
+
+  // Buchi fermi per gli elementi sempre scoperti (keepVisible), senza anello
+  function drawKeep() {
+    if (!keepGroup) return;
+    const rects = keepIds.map(id => document.getElementById(id))
+      .filter(Boolean).map(el => el.getBoundingClientRect())
+      .filter(r => r.width > 0 && r.height > 0);
+    keepGroup.replaceChildren(...rects.map(r => {
+      const hole = document.createElementNS(SVG_NS, 'rect');
+      hole.setAttribute('fill', 'black');
+      hole.setAttribute('rx', '6');
+      hole.setAttribute('x', r.left - 3);
+      hole.setAttribute('y', r.top - 3);
+      hole.setAttribute('width', r.width + 6);
+      hole.setAttribute('height', r.height + 6);
+      return hole;
+    }));
+  }
+
+  function keepVisible(ids) {
+    keepIds = (ids || []).filter(Boolean);
+    if (visible) drawKeep();
   }
 
   // Anima da `current` a `next`. Un buco nuovo nasce dall'ultimo buco già
@@ -233,6 +262,7 @@ const Spotlight = (() => {
     if (!visible) return;
     const next = measure();
     if (!same(next, goal)) animateTo(next, instant ? 0 : DURATION);
+    drawKeep();
     placePanel(next);
   }
 
@@ -254,6 +284,7 @@ const Spotlight = (() => {
     if (!wasVisible) { current = []; goal = []; }
     const next = measure();
     animateTo(next, DURATION);
+    drawKeep();
     placePanel(next);
     // La transizione CSS del pannello parte solo dopo il primo piazzamento,
     // così non "vola" dall'angolo in alto a sinistra quando appare.
@@ -276,5 +307,5 @@ const Spotlight = (() => {
     }
   }
 
-  return { show, hide, refresh: () => refresh(false) };
+  return { show, hide, keepVisible, refresh: () => refresh(false) };
 })();

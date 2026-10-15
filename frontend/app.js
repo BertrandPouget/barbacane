@@ -20,7 +20,7 @@ const App = (() => {
 
   // Macchina a stati per le azioni del turno
   let actionMode = null;    // null | 'play_card' | 'complete_building' | 'add_walls'
-  let wallsSelected = [];   // [{instanceId, bastion: 'left'|'right'}]
+  let wallsSelected = [];   // [{instanceId, bastion: null|'left'|'right'}]: null = girata, da posare
 
   // Orda di Evelyn: base_card_id della Magia da rigiocare una seconda volta.
   // Finché è valorizzato, le sendAction('play_spell') vengono convertite in
@@ -68,6 +68,10 @@ const App = (() => {
     await loadCardDefs();
     bindLobbyUI();
     bindSplashUI();
+    bindHandDrag();
+    bindFieldDrag();
+    _bindWallPendingClick();
+    Spotlight.keepVisible(['btn-abandon']);  // nel tutorial «Abbandona» resta scoperto
     ['create-name', 'join-name'].forEach(id => { document.getElementById(id).value = PlayerName.get(); });
     // Pagina ricaricata durante una partita: si torna subito al tavolo
     if (await resumeGame(SavedGame.load(false))) return;
@@ -273,7 +277,6 @@ const App = (() => {
 
     // Tutorial
     document.getElementById('btn-tutorial').addEventListener('click', startTutorial);
-    document.getElementById('tutorial-panel-exit').addEventListener('click', exitTutorial);
     document.getElementById('tutorial-panel-prev').addEventListener('click', (e) => {
       // Schema della Battaglia aperto: si torna al passo senza attaccare
       if (tutorialBattlePreview) { tutorialBattlePreview = null; updateTutorialUI(currentState); return; }
@@ -356,9 +359,6 @@ const App = (() => {
       tutorialCompletedShown = false;
       tutorialCardsRead = new Set();
       enterGame(res.state);
-      // Nel tutorial l'abbandono normale non ha senso (c'è il "Manichino" come
-      // avversario fittizio): nascondi il pulsante "Esci" della testata.
-      document.getElementById('btn-abandon').classList.add('hidden');
     } catch (e) {
       Renderer.toast(e.message, 'error');
     }
@@ -379,7 +379,6 @@ const App = (() => {
     _clearPendingUI();
     hideTutorialStep();
     if (stopCardReading) stopCardReading();
-    document.getElementById('btn-abandon').classList.remove('hidden');
     leavingGame = false;
     selectedCard = null;
     actionMode = null;
@@ -400,9 +399,15 @@ const App = (() => {
   // (spotlight.js); il pannello si piazza accanto e mostra il testo del passo,
   // il commento all'ultima mossa e la lista degli obiettivi. Il passo arriva
   // già pronto dal server (state.tutorial.step).
+  // Testo sotto l'obiettivo corrente già mostrato: la lista si ricostruisce a
+  // ogni aggiornamento (es. «Avanza Fase» premuto due volte), e il testo si
+  // anima solo quando cambia, altrimenti sembra nuovo e da rileggere
+  let _lastGoalText = null;
+
   function showTutorialStep(state) {
     const step = state.tutorial.step;
     const panel = document.getElementById('tutorial-panel');
+    document.getElementById('tutorial-panel-progress').textContent = step.number ? `${step.number} di ${step.total}` : '';
     document.getElementById('tutorial-panel-title').textContent = step.title || '';
     // Passo di spiegazione: solo il testo. Passo con obiettivi: la lista, e
     // sotto l'obiettivo da fare ora il suo testo (all'inizio quello del passo,
@@ -428,16 +433,18 @@ const App = (() => {
         const p = document.createElement('div');
         p.className = 'tut-goal-text';
         p.textContent = lead;
+        if (lead === _lastGoalText) p.style.animation = 'none';
+        _lastGoalText = lead;
         li.appendChild(p);
       }
       goals.appendChild(li);
     });
     goals.classList.toggle('hidden', !step.goals.length);
     const nextBtn = document.getElementById('tutorial-panel-next');
-    nextBtn.textContent = 'Avanti →';
+    nextBtn.textContent = '›';
+    nextBtn.classList.add('tut-arrow');
     nextBtn.classList.toggle('hidden', step.goals.length > 0);
     nextBtn.disabled = false;
-    document.getElementById('tutorial-panel-exit').classList.remove('hidden');
     // «← Indietro» solo verso un passo di spiegazione, mai a prima di una mossa giocata
     const prevBtn = document.getElementById('tutorial-panel-prev');
     prevBtn.classList.toggle('hidden', !state.tutorial.can_go_back);
@@ -449,14 +456,16 @@ const App = (() => {
   // Fine tutorial: stesso pannello, centrato a schermo spento, con un solo
   // pulsante per tornare al menu.
   function showTutorialCompleted(outro) {
+    document.getElementById('tutorial-panel-progress').textContent = '';
     document.getElementById('tutorial-panel-title').textContent = (outro && outro.title) || 'Tutorial completato!';
     document.getElementById('tutorial-panel-text').textContent = (outro && outro.text) || '';
     document.getElementById('tutorial-panel-text').classList.remove('hidden');
     const nextBtn = document.getElementById('tutorial-panel-next');
-    nextBtn.textContent = 'Torna al menu →';
+    nextBtn.textContent = 'Torna al menu ›';
+    nextBtn.classList.remove('tut-arrow');
     nextBtn.classList.remove('hidden');
     nextBtn.disabled = false;
-    ['tutorial-panel-exit', 'tutorial-panel-prev', 'tutorial-panel-goals', 'tutorial-panel-diagram']
+    ['tutorial-panel-prev', 'tutorial-panel-goals', 'tutorial-panel-diagram']
       .forEach(id => document.getElementById(id).classList.add('hidden'));
     document.getElementById('tutorial-panel').classList.remove('tut-panel-wide');
     const panel = document.getElementById('tutorial-panel');
@@ -501,14 +510,14 @@ const App = (() => {
 
     const panel = document.createElement('div');
     panel.id = 'card-read';
-    panel.className = 'tut-panel';
+    panel.className = 'tut-panel menu-frame';
     panel.innerHTML = `
       <div class="tut-panel-progress"></div>
       <div class="tut-panel-title"></div>
       <div class="tut-panel-text"></div>
       <div class="tut-panel-actions">
-        <button class="btn btn-secondary">← Indietro</button>
-        <button class="btn btn-primary">Avanti →</button>
+        <button class="btn btn-secondary tut-arrow" title="Indietro" aria-label="Indietro">‹</button>
+        <button class="btn btn-primary" title="Avanti" aria-label="Avanti">›</button>
       </div>`;
     overlay.appendChild(panel);
     const [prevBtn, nextBtn] = panel.querySelectorAll('button');
@@ -541,7 +550,8 @@ const App = (() => {
       panel.querySelector('.tut-panel-progress').textContent = `${def.name} · ${i + 1} di ${sections.length}`;
       panel.querySelector('.tut-panel-title').textContent = s.title;
       panel.querySelector('.tut-panel-text').textContent = s.text;
-      nextBtn.textContent = i < sections.length - 1 ? 'Avanti →' : 'Ho capito';
+      nextBtn.textContent = i < sections.length - 1 ? '›' : 'Ho capito';
+      nextBtn.classList.toggle('tut-arrow', i < sections.length - 1);
       prevBtn.classList.toggle('invisible', i === 0);
       place();
     };
@@ -558,7 +568,9 @@ const App = (() => {
     nextBtn.onclick = (e) => {
       e.stopPropagation();
       if (++i < sections.length) { render(); return; }
+      // Letta la carta si torna al tavolo: si gioca trascinandola
       stopCardReading();
+      Renderer.closeCardDetail();
       updateTutorialUI(currentState);
     };
     render();
@@ -606,7 +618,8 @@ const App = (() => {
     box.appendChild(TutorialDiagram.render(diagram));
     box.classList.remove('hidden');
     const nextBtn = document.getElementById('tutorial-panel-next');
-    nextBtn.textContent = 'Attacca →';
+    nextBtn.textContent = 'Attacca ›';
+    nextBtn.classList.remove('tut-arrow');
     nextBtn.classList.remove('hidden');
     nextBtn.disabled = false;
     const prevBtn = document.getElementById('tutorial-panel-prev');
@@ -955,6 +968,7 @@ const App = (() => {
       if (currentState && currentState.winner_id) updateRematchUI(currentState);
     });
     WS.on('error', (msg) => {
+      DragPlay.reject();
       Renderer.toast(msg.message || 'Errore', 'error');
       // Se il blocco è dovuto a un'interazione Biblioteca in attesa, mostra il modale
       // (una ricerca in sospeso ha la precedenza: in quel caso si riapre quella)
@@ -1366,6 +1380,8 @@ const App = (() => {
   // ---------------------------------------------------------------------------
 
   function _refreshActionUI() {
+    // Guerrieri trascinabili (illuminati appena) durante il mio Schieramento
+    document.getElementById('my-field').classList.toggle('can-reposition', _canReposition());
     // Resetta lo stato azione dopo ogni aggiornamento server
     actionMode = null;
     wallsSelected = [];
@@ -1374,12 +1390,13 @@ const App = (() => {
     document.getElementById('wall-staging').classList.add('hidden');
     document.getElementById('btn-cancel-action').classList.add('hidden');
     document.getElementById('selection-info').classList.add('hidden');
-    document.querySelectorAll('#hand-cards .card.wall-marked').forEach(c => c.classList.remove('wall-marked'));
+    document.querySelectorAll('#hand-cards .card.wall-marked, #hand-cards .card.wall-placed')
+      .forEach(c => c.classList.remove('wall-marked', 'wall-placed'));
+    _renderWallPending();
 
     const hide = id => document.getElementById(id).classList.add('hidden');
     const show = id => document.getElementById(id).classList.remove('hidden');
 
-    hide('phase-bar');
     hide('action-banner');
     hide('btn-horde');
     hide('btn-next-phase');
@@ -1436,18 +1453,6 @@ const App = (() => {
 
     const phase = currentState.phase;
 
-    // Aggiorna indicatore fase
-    show('phase-bar');
-    ['action', 'schieramento', 'battaglia'].forEach((p, i) => {
-      const el = document.getElementById(`pstep-${p}`);
-      if (p === phase) { el.className = 'phase-step active'; }
-      else if (['action', 'schieramento', 'battaglia'].indexOf(p) < ['action', 'schieramento', 'battaglia'].indexOf(phase)) {
-        el.className = 'phase-step done';
-      } else {
-        el.className = 'phase-step';
-      }
-    });
-
     if (phase === 'action') {
       if (player && (player.actions_remaining > 0 || _hasFreeActions(player))) {
         _showBanner(player);
@@ -1455,14 +1460,14 @@ const App = (() => {
         document.getElementById('action-hint').textContent = 'Nessuna azione rimasta.';
       }
       show('btn-next-phase');
-      document.getElementById('btn-next-phase').textContent = 'Schieramento →';
+      document.getElementById('btn-next-phase').textContent = 'Schieramento ›';
 
     } else if (phase === 'schieramento') {
       document.getElementById('action-hint').textContent = 'Sposta i Guerrieri e attiva le Orde.';
       const hasHorde = player && player.available_hordes && player.available_hordes.length > 0;
       if (hasHorde) show('btn-horde');
       show('btn-next-phase');
-      document.getElementById('btn-next-phase').textContent = 'Battaglia →';
+      document.getElementById('btn-next-phase').textContent = 'Battaglia ›';
 
     } else if (phase === 'battaglia') {
       document.getElementById('action-hint').textContent = 'Attacca un avversario o termina il turno.';
@@ -1527,10 +1532,10 @@ const App = (() => {
       : `Azione ${actNum} · ${player.actions_remaining} rimast${player.actions_remaining === 1 ? 'a' : 'e'}`;
 
     const hasCards = player.hand && player.hand.length > 0;
-    const hasIncomplete = (player.field.village.buildings || []).some(b => !b.completed);
 
     document.getElementById('banner-btn-play').disabled     = !hasCards || (noActions && !_hasFreePlays(player));
-    document.getElementById('banner-btn-complete').disabled = !hasIncomplete || (noActions && !_hasFreeCompletes(player));
+    // Spento se nessuna Costruzione si può completare ora (tutte complete, Mana o Azioni)
+    document.getElementById('banner-btn-complete').disabled = _completableBuildings(player).length === 0;
     document.getElementById('banner-btn-wall').disabled     = noActions || !hasCards;
 
     document.getElementById('action-banner').classList.remove('hidden');
@@ -1557,37 +1562,72 @@ const App = (() => {
     });
   }
 
+  // Costruzioni del Villaggio che ora si possono completare (dal server:
+  // complete_errors, null = completabile)
+  function _completableBuildings(player) {
+    const errs = (player && player.complete_errors) || {};
+    return Object.keys(errs).filter(iid => !errs[iid]);
+  }
+
+  // «Completa»: si accendono le Costruzioni completabili; cliccandone una si
+  // conferma (vedi onCardClick → _askCompleteBuilding)
   function enterCompleteBuildingMode() {
     if (!currentState || currentState.current_player_id !== myPlayerId) return;
     const player = currentState.players.find(p => p.id === myPlayerId);
-    const buildings = (player.field.village.buildings || []).filter(b => !b.completed);
-    if (buildings.length === 0) return;
+    const completable = _completableBuildings(player);
+    if (completable.length === 0) return;
 
     actionMode = 'complete_building';
     document.getElementById('action-banner').classList.add('hidden');
     document.getElementById('btn-cancel-action').classList.remove('hidden');
-    document.getElementById('action-hint').textContent = 'Scegli la costruzione da completare.';
+    document.getElementById('action-hint').textContent = 'Clicca la Costruzione da completare.';
+    _markCompletable(completable);
+  }
 
-    const myPlayer = currentState.players.find(p => p.id === myPlayerId);
-    const noActions = myPlayer.actions_remaining <= 0;
-
-    Renderer.showBuildingPicker(currentState, {
-      title: 'Completa una Costruzione',
-      players: [myPlayer],
-      // Senza Azioni restano solo i completamenti gratuiti (Orda di Joseph, Decumano, Velocemento)
-      filter: (b) => !b.completed && (!noActions || _isFreeComplete(myPlayer, b)),
-      meta: (b) => {
-        if (myPlayer.ethereal_complete === b.instance_id) return 'Gratis (Velocemento)';
-        const def = getCardDef(b.instance_id);
-        const cost = def ? _costLabel(def.completion_cost, _reinholdDiscount(myPlayer)) : '?';
-        return `${cost} Mana${_isFreeComplete(myPlayer, b) ? ' · senza Azione' : ''}`;
-      },
-      note: (b) => {
-        const def = getCardDef(b.instance_id);
-        return def && def.complete_effect ? def.complete_effect.replace(/^&\s*/, '') : null;
-      },
-      onPick: (b) => sendAction('complete_building', { building_instance_id: b.instance_id }),
+  // Le Costruzioni assegnate (Trono) non stanno nel Villaggio: si accende la
+  // carta che sbuca sotto il Guerriero, e si clicca il Guerriero
+  function _markCompletable(iids) {
+    document.querySelectorAll('#my-village .card.completable, #my-field .mc-under.completable')
+      .forEach(c => c.classList.remove('completable'));
+    document.querySelectorAll('#my-field .card.completable-host').forEach(c => c.classList.remove('completable-host'));
+    (iids || []).forEach(iid => {
+      const sel = CSS.escape(iid);
+      const el = document.querySelector(`#my-village .card[data-instance-id="${sel}"]`);
+      if (el) { el.classList.add('completable'); return; }
+      const under = document.querySelector(`#my-field .mc-under[data-assigned-id="${sel}"]`);
+      if (under) {
+        under.classList.add('completable');
+        under.parentElement.classList.add('completable-host');
+      }
     });
+  }
+
+  // Costruzione assegnata a un mio Guerriero ancora da completare (es. Trono), o null
+  function _incompleteAssignedOf(warriorIid) {
+    const me = currentState.players.find(p => p.id === myPlayerId);
+    const errs = (me && me.complete_errors) || {};
+    const w = me && _getAllWarriors(me).find(x => x.instance_id === warriorIid);
+    const ac = w && (w.assigned_cards || []).find(a => a.instance_id && a.instance_id in errs);
+    return ac ? ac.instance_id : null;
+  }
+
+  function _askCompleteBuilding(instanceId) {
+    const me = currentState.players.find(p => p.id === myPlayerId);
+    const errs = (me && me.complete_errors) || {};
+    if (!(instanceId in errs)) return;  // già completa
+    if (errs[instanceId]) { Renderer.toast(errs[instanceId], 'error'); return; }
+    const b = (me.field.village.buildings || []).find(x => x.instance_id === instanceId);
+    const def = getCardDef(instanceId);
+    const name = def ? def.name : instanceId;
+    const free = b && _isFreeComplete(me, b);
+    const cost = me.ethereal_complete === instanceId ? 'Gratis (Velocemento)'
+      : `${def ? _costLabel(def.completion_cost, _reinholdDiscount(me)) : '?'} Mana`;
+    const effect = def && def.complete_effect ? def.complete_effect.replace(/^&\s*/, '') : '';
+    Renderer.showModal(
+      `Completa ${name}`,
+      `Costo: <strong>${cost}</strong>${free ? ' · senza Azione' : ''}${effect ? `<br>${effect}` : ''}`,
+      () => sendAction('complete_building', { building_instance_id: instanceId }),
+    );
   }
 
   function enterAddWallsMode() {
@@ -1597,19 +1637,20 @@ const App = (() => {
     document.getElementById('action-banner').classList.add('hidden');
     document.getElementById('btn-cancel-action').classList.remove('hidden');
     document.getElementById('wall-staging').classList.remove('hidden');
-    document.getElementById('action-hint').textContent = 'Clicca carte dalla mano (max 3).';
+    document.getElementById('action-hint').textContent = 'Clicca le carte da usare come Muri (max 3), poi trascinale nei Bastioni.';
     renderWallStaging();
   }
 
   function cancelActionMode() {
+    _markCompletable([]);
     actionMode = null;
     wallsSelected = [];
+    _updateWallMarkings();
     selectedCard = null;
     document.getElementById('wall-staging').classList.add('hidden');
     document.getElementById('btn-cancel-action').classList.add('hidden');
     document.getElementById('action-hint').textContent = '';
     document.getElementById('selection-info').classList.add('hidden');
-    document.querySelectorAll('#hand-cards .card.wall-marked').forEach(c => c.classList.remove('wall-marked'));
     document.querySelectorAll('#hand-cards .card.unplayable').forEach(c => c.classList.remove('unplayable'));
 
     if (!currentState || currentState.current_player_id !== myPlayerId) return;
@@ -1622,6 +1663,10 @@ const App = (() => {
   // Selezione muri
   // ---------------------------------------------------------------------------
 
+  // Muri: il clic su una carta in mano la gira (scelta come Muro, max 3) o la
+  // rigira; le carte girate si trascinano in un Bastione (_startWallDrag), dove
+  // spariscono dalla mano e compare una pila «+N» (cliccandola tornano in mano).
+  // «Conferma» quando sono tutte posate.
   function toggleWallCard(instanceId) {
     const idx = wallsSelected.findIndex(w => w.instanceId === instanceId);
     if (idx >= 0) {
@@ -1631,63 +1676,102 @@ const App = (() => {
         Renderer.toast('Massimo 3 muri per azione', 'error');
         return;
       }
-      wallsSelected.push({ instanceId, bastion: 'left' });
+      wallsSelected.push({ instanceId, bastion: null });
     }
-    renderWallStaging();
     _updateWallMarkings();
   }
 
+  const _isUnplacedWall = iid => wallsSelected.some(w => w.instanceId === iid && !w.bastion);
+
   function _updateWallMarkings() {
     document.querySelectorAll('#hand-cards .card').forEach(card => {
-      card.classList.toggle('wall-marked', !!wallsSelected.find(w => w.instanceId === card.dataset.instanceId));
+      const w = wallsSelected.find(x => x.instanceId === card.dataset.instanceId);
+      CardArt.flipWall(card, !!w);
+      card.classList.toggle('wall-placed', !!(w && w.bastion));
     });
+    Renderer.fanHand();
+    _renderWallPending();
+    renderWallStaging();
+  }
+
+  // Muri posati (non ancora confermati): si aggiungono alla pila dei Muri del
+  // Bastione, col numero in giallo finché l'Azione non è confermata (la pila si
+  // crea se il Bastione non ne ha). Cliccandola tornano in mano.
+  function _renderWallPending() {
+    ['left', 'right'].forEach(side => {
+      const region = document.getElementById(`my-bastion-${side}`);
+      if (!region) return;
+      const n = wallsSelected.filter(w => w.bastion === side).length;
+      let deck = region.querySelector('.deck-wall');
+      // Ripristina la pila com'era
+      if (deck && deck.dataset.baseCount !== undefined) {
+        if (deck.dataset.temp) { deck.remove(); deck = null; }
+        else {
+          deck.querySelector('.deck-count span').textContent = deck.dataset.baseCount;
+          deck.classList.remove('wall-pending');
+          delete deck.dataset.baseCount;
+        }
+      }
+      if (!n) return;
+      if (!deck) {
+        deck = document.createElement('div');
+        deck.className = 'card card-sm in-field deck deck-wall';
+        deck.dataset.temp = '1';
+        deck.innerHTML = `<img class="deck-back" alt="" draggable="false" src="${CardArt.miniUrl('retro')}">` +
+          '<div class="deck-count"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="3"/></svg><span>0</span></div>';
+        const row = region.querySelector('.region-cards') || region;
+        row.insertBefore(deck, row.firstChild);
+      }
+      const span = deck.querySelector('.deck-count span');
+      deck.dataset.baseCount = deck.dataset.temp ? '0' : span.textContent;
+      span.textContent = String(Number(deck.dataset.baseCount) + n);
+      deck.classList.add('wall-pending');
+      deck.title = 'Muri da confermare: clicca per riprenderli';
+    });
+  }
+
+  // Clic sulla pila con Muri in attesa: tornano in mano (prima del clic della
+  // pila, che aprirebbe l'elenco dei Muri)
+  function _bindWallPendingClick() {
+    document.getElementById('my-field').addEventListener('click', (e) => {
+      const deck = e.target.closest('.deck-wall.wall-pending');
+      if (!deck) return;
+      e.stopPropagation();
+      const side = deck.closest('#my-bastion-left') ? 'left' : 'right';
+      wallsSelected.forEach(w => { if (w.bastion === side) w.bastion = null; });
+      _updateWallMarkings();
+    }, true);
+  }
+
+  function _startWallDrag(card, x, y) {
+    const iid = card.dataset.instanceId;
+    const zones = ['left', 'right'].map(side => ({ key: side, el: document.getElementById(`my-bastion-${side}`) }));
+    DragPlay.start(card, x, y, {
+      zones,
+      onDrop: side => {
+        const w = wallsSelected.find(x2 => x2.instanceId === iid);
+        if (w) w.bastion = side;
+        _updateWallMarkings();
+        return 'land';
+      },
+    });
+    return true;
   }
 
   function renderWallStaging() {
-    const list       = document.getElementById('wall-selected-list');
     const countEl    = document.getElementById('wall-count');
     const confirmBtn = document.getElementById('wall-confirm-btn');
-
+    const hintEl     = document.getElementById('wall-hint');
+    const toPlace = wallsSelected.filter(w => !w.bastion).length;
     countEl.textContent = wallsSelected.length;
-    confirmBtn.disabled = wallsSelected.length === 0;
-    list.innerHTML = '';
-
-    wallsSelected.forEach(w => {
-      const def = getCardDef(w.instanceId);
-      const row = document.createElement('div');
-      row.className = 'wall-entry';
-
-      const nameEl = document.createElement('div');
-      nameEl.className = 'wall-entry-name';
-      nameEl.textContent = (def ? def.name : w.instanceId).substring(0, 14);
-      row.appendChild(nameEl);
-
-      const btns = document.createElement('div');
-      btns.className = 'wall-entry-btns';
-
-      const btnL = document.createElement('button');
-      btnL.textContent = 'Sin.';
-      btnL.className = `btn btn-small ${w.bastion === 'left' ? 'btn-primary' : 'btn-secondary'}`;
-      btnL.onclick = () => { w.bastion = 'left'; renderWallStaging(); };
-
-      const btnR = document.createElement('button');
-      btnR.textContent = 'Des.';
-      btnR.className = `btn btn-small ${w.bastion === 'right' ? 'btn-primary' : 'btn-secondary'}`;
-      btnR.onclick = () => { w.bastion = 'right'; renderWallStaging(); };
-
-      const btnX = document.createElement('button');
-      btnX.textContent = '×';
-      btnX.className = 'btn btn-small btn-danger';
-      btnX.onclick = () => { toggleWallCard(w.instanceId); };
-
-      btns.append(btnL, btnR, btnX);
-      row.appendChild(btns);
-      list.appendChild(row);
-    });
+    confirmBtn.disabled = wallsSelected.length === 0 || toPlace > 0;
+    hintEl.textContent = !wallsSelected.length ? 'Clicca le carte in mano per girarle'
+      : toPlace ? 'Trascina i Muri nei Bastioni'
+      : 'Conferma per alzare i Muri';
   }
 
   function confirmWalls() {
-    if (wallsSelected.length === 0) return;
+    if (wallsSelected.length === 0 || wallsSelected.some(w => !w.bastion)) return;
     const walls = wallsSelected.map(w => ({ instance_id: w.instanceId, bastion: w.bastion }));
     sendAction('add_wall', { walls });
   }
@@ -1705,12 +1789,226 @@ const App = (() => {
       toggleWallCard(instanceId);
       return;
     }
+    // Dopo «Completa», il click su una Costruzione del Villaggio la completa (o
+    // su un Guerriero, la Costruzione assegnata a lui: il Trono)
+    if (actionMode === 'complete_building' && (source === 'village' || source === 'field')) {
+      const target = source === 'village' ? instanceId : _incompleteAssignedOf(instanceId);
+      if (target) { _askCompleteBuilding(target); return; }
+      if (source === 'village') return;
+    }
 
-    // In tutti gli altri casi: mostra il dettaglio della carta (nel tutorial,
-    // la prima volta che si tocca in mano una carta da spiegare, prima la lettura)
+    if (['hand', 'field', 'village', 'opponent'].includes(source) && !cardHasDetail(instanceId, source)) return;
+
+    // Nel tutorial, il clic su una carta in mano da spiegare apre la lettura
+    // (una volta sola): mostra il dettaglio e lo chiude a lettura finita
     const detail = () => showCardDetail(instanceId, source === 'life_card' ? 'life_card' : source);
-    if (source === 'hand' && maybeReadCard(instanceId, detail)) return;
+    if (source === 'hand') { maybeReadCard(instanceId, detail); return; }
     detail();
+  }
+
+  // Le carte si giocano e si spostano trascinandole, e si guardano passandoci
+  // sopra: il clic apre il dettaglio solo dove ha pulsanti propri (Attiva Arena,
+  // Completa, carte assegnate, Recluta sotto l'Eroe). Nella mano solo il tutorial lo usa,
+  // per la lettura delle carte (onCardClick). I mazzi (Vite, Muri…) hanno i loro clic.
+  function cardHasDetail(instanceId, source) {
+    if (source === 'hand') return isTutorial;
+    if (!currentState) return false;
+    const def = getCardDef(instanceId);
+    if (def && def.type === 'building') {
+      if (source !== 'village') return false;
+      // Arena (Attiva) e Costruzioni incomplete (Completa, dal dettaglio)
+      const me = currentState.players.find(p => p.id === myPlayerId);
+      const b = me && (me.field.village.buildings || []).find(x => x.instance_id === instanceId);
+      return def.id === 'arena' || !!(b && !b.completed);
+    }
+    for (const p of currentState.players) {
+      const w = _getAllWarriors(p).find(x => x.instance_id === instanceId);
+      if (w) return (w.assigned_cards || []).length > 0 || !!w.evolved_from;
+    }
+    return false;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Giocare le carte trascinandole dalla mano al campo (drag.js)
+  // ---------------------------------------------------------------------------
+
+  const _DROP_ZONE_IDS = {
+    bastion_left: 'my-bastion-left', vanguard: 'my-vanguard',
+    bastion_right: 'my-bastion-right', village: 'my-village',
+  };
+
+  // Nel mio turno, in fase Azioni
+  function _canDragFromHand() {
+    if (!currentState) return false;
+    if (currentState.current_player_id !== myPlayerId || currentState.phase !== 'action') return false;
+    return actionMode !== 'add_walls' && actionMode !== 'complete_building';
+  }
+
+  // Perché la carta ora non si può giocare (o null). Si trascina lo stesso, verso
+  // il centro del tavolo come una Magia, e al rilascio torna in mano con l'errore.
+  function _dragRefusal(iid, def, me, keys) {
+    if (!(me.actions_remaining > 0 || _isFreePlay(me, iid))) return 'Azioni esaurite per questo turno.';
+    const err = _playError(iid);
+    if (err) return err;
+    if (keys.length) return null;
+    return def && def.type === 'warrior'
+      ? `Nessuna Recluta compatibile in campo per evolvere ${def.name}.`
+      : 'Non hai nessun Guerriero in campo a cui assegnare il Trono.';
+  }
+
+  // Pressione del mouse su una carta di `container` (pick(target) → la carta, o
+  // null): oltre qualche pixel di movimento parte il trascinamento (start(card,
+  // x, y) → false se non si può), e il click che segue il rilascio non apre il
+  // dettaglio.
+  function _bindPressDrag(container, pick, start) {
+    let press = null;
+    let suppressClick = false;
+
+    container.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      const card = pick(e.target);
+      if (card) press = { card, x: e.clientX, y: e.clientY, dragging: false };
+    });
+    window.addEventListener('pointermove', e => {
+      if (!press) return;
+      if (!press.dragging) {
+        if (Math.hypot(e.clientX - press.x, e.clientY - press.y) < 6) return;
+        if (!start(press.card, e.clientX, e.clientY)) { press = null; return; }
+        press.dragging = true;
+      }
+      DragPlay.move(e.clientX, e.clientY);
+    });
+    window.addEventListener('pointerup', e => {
+      if (!press) return;
+      if (press.dragging) {
+        DragPlay.end(e.clientX, e.clientY);
+        suppressClick = true;
+        setTimeout(() => { suppressClick = false; }, 0);
+      }
+      press = null;
+    });
+    window.addEventListener('pointercancel', () => {
+      if (press && press.dragging) DragPlay.cancel();
+      press = null;
+    });
+    container.addEventListener('click', e => {
+      if (!suppressClick) return;
+      suppressClick = false;
+      e.stopPropagation();
+    }, true);
+  }
+
+  function bindHandDrag() {
+    _bindPressDrag(document.getElementById('hand-cards'),
+      t => {
+        // Scelta dei Muri: si trascinano solo le carte girate, nei Bastioni
+        if (actionMode === 'add_walls') {
+          const c = t.closest('.card');
+          return c && _isUnplacedWall(c.dataset.instanceId) ? c : null;
+        }
+        return _canDragFromHand() ? t.closest('.card') : null;
+      },
+      (card, x, y) => (actionMode === 'add_walls' ? _startWallDrag(card, x, y) : _startHandDrag(card, x, y)));
+  }
+
+  // -- Schieramento: i miei Guerrieri si trascinano su un'altra Regione --------
+
+  function _canReposition() {
+    return !!currentState && currentState.current_player_id === myPlayerId
+      && currentState.phase === 'schieramento';
+  }
+
+  // Regione (chiave) di un mio Guerriero in campo, dal suo elemento
+  function _regionOfFieldCard(card) {
+    const region = card.closest('.region');
+    return region && Object.keys(_DROP_ZONE_IDS).find(k => k !== 'village' && _DROP_ZONE_IDS[k] === region.id);
+  }
+
+  function bindFieldDrag() {
+    _bindPressDrag(document.getElementById('my-field'), t => {
+      if (!_canReposition()) return null;
+      const card = t.closest('.card.in-field[data-type="warrior"]');
+      return card && _regionOfFieldCard(card) ? card : null;
+    }, (card, x, y) => {
+      const iid = card.dataset.instanceId;
+      const from = _regionOfFieldCard(card);
+      const zones = ['bastion_left', 'vanguard', 'bastion_right'].filter(k => k !== from)
+        .map(k => ({ key: k, el: document.getElementById(_DROP_ZONE_IDS[k]) }));
+      DragPlay.start(card, x, y, {
+        zones,
+        onDrop: dest => {
+          sendAction('reposition', { warrior_instance_id: iid, destination: dest });
+          return true;
+        },
+      });
+      return true;
+    });
+  }
+
+  function _startHandDrag(card, x, y) {
+    const iid = card.dataset.instanceId;
+    // Tutorial: una carta da spiegare non ancora letta apre la lettura invece di partire
+    if (maybeReadCard(iid, () => showCardDetail(iid, 'hand'))) return false;
+    const def = getCardDef(iid);
+    const me = currentState.players.find(p => p.id === myPlayerId);
+    const keys = DragPlay.zonesFor(def, me, getCardDef);
+    // Verso il campo: oltre un po' sotto la metà del mio campo (Magie e carte
+    // che non si possono giocare)
+    const towardField = (px, py) => {
+      const r = document.getElementById('my-field').getBoundingClientRect();
+      return py < r.top + r.height * 0.6;
+    };
+    const refusal = _dragRefusal(iid, def, me, keys);
+    if (refusal) {
+      DragPlay.start(card, x, y, {
+        zones: [], fieldTest: towardField, noGlow: true,
+        onDrop: () => { Renderer.toast(refusal, 'error'); return false; },
+      });
+      return true;
+    }
+    const isHero = def.type === 'warrior' && def.subtype === 'hero';
+    const zones = isHero ? [] : keys.filter(k => _DROP_ZONE_IDS[k])
+      .map(k => ({ key: k, el: document.getElementById(_DROP_ZONE_IDS[k]) }))
+      .filter(z => z.el);
+    // Trono ed Eroi: si lasciano sul Guerriero (per l'Eroe, una Recluta che evolve
+    // in lui), che si illumina solo quando ci si è sopra
+    if (keys.includes('warriors') || isHero) {
+      DragPlay.warriorsOf(me).forEach(w => {
+        if (isHero) {
+          const d = getCardDef(w.instance_id);
+          if (!d || d.evolves_into !== def.id) return;
+        }
+        const el = document.querySelector(`#my-field .card[data-instance-id="${CSS.escape(w.instance_id)}"]`);
+        if (el) zones.push({ key: `warrior:${w.instance_id}`, el, quiet: true });
+      });
+    }
+    // Magie: basta portarle sopra la mano, verso il campo
+    const fieldTest = keys.includes('field') ? towardField : null;
+    DragPlay.start(card, x, y, {
+      zones, fieldTest, onDrop: key => _playDropped(iid, def, key),
+      // Selettori e conferme (modal-overlay), scelta di un Muro (dettaglio carta)
+      choiceOpen: () => ['modal-overlay', 'card-detail-overlay']
+        .some(id => !document.getElementById(id).classList.contains('hidden')),
+    });
+    return true;
+  }
+
+  // Ritorna true se l'azione è già partita (la carta resta dove è stata lasciata)
+  function _playDropped(iid, def, key) {
+    const me = currentState.players.find(p => p.id === myPlayerId);
+    if (def.type === 'spell') return _showSpellOptions(iid, def, { direct: true }) === true;
+    if (key.startsWith('warrior:')) {  // Trono o Eroe lasciato su un Guerriero
+      const target = key.slice('warrior:'.length);
+      if (def.type === 'warrior') sendAction('evolve', { recruit_instance_id: target, hero_instance_id: iid });
+      else sendAction('play_building', { instance_id: iid, target_warrior_iid: target });
+      return true;
+    }
+    if (def.type === 'building') {
+      sendAction('play_building', { instance_id: iid });
+      return true;
+    }
+    sendAction('play_warrior', { instance_id: iid, region: key });
+    return true;
   }
 
   // ---------------------------------------------------------------------------
@@ -1818,7 +2116,7 @@ const App = (() => {
 
     } else if (def && def.type === 'building') {
       const completionStatus = fieldBuilding
-        ? (fieldBuilding.completed ? ' · <span style="color:var(--gold)">✓ Completata</span>' : ' · <span style="color:var(--text-dim)">Incompleta</span>')
+        ? (fieldBuilding.completed ? ' · <span style="color:var(--gold-light)">✓ Completata</span>' : ' · <span style="color:var(--text-dim)">Incompleta</span>')
         : '';
       const baseLabel = (fieldBuilding && !fieldBuilding.completed) ? 'Effetto Base <span style="color:var(--green-light)">(attivo)</span>'
         : (fieldBuilding && fieldBuilding.completed) ? 'Effetto Base <span style="color:var(--text-dim)">(non attivo)</span>'
@@ -1989,7 +2287,15 @@ const App = (() => {
     Renderer.showCardDetail(title, bodyHTML, actionLabel, onAction, onDiscard, extraButtons, navOptions, baseId, fallbackBaseId);
   }
 
+  // Perché la carta in mano ora non si può giocare (Mana/Maghe, dal server), o null
+  function _playError(instanceId) {
+    const me = currentState && currentState.players.find(p => p.id === myPlayerId);
+    return (me && me.play_errors && me.play_errors[instanceId]) || null;
+  }
+
   function showPlayOptions(instanceId, def) {
+    const err = _playError(instanceId);
+    if (err) { Renderer.toast(err, 'error'); return; }
     if (def.type === 'warrior') {
       if (def.subtype === 'hero') {
         _showHeroPlayOptions(instanceId, def);
@@ -2118,7 +2424,9 @@ const App = (() => {
     return mages.length >= def.cost && mages.some(d => d.school === def.school);
   }
 
-  function _showSpellOptions(instanceId, def) {
+  // opts.direct: la Magia è stata trascinata in campo, quindi senza bersagli si
+  // lancia subito, senza conferma (e la funzione ritorna true)
+  function _showSpellOptions(instanceId, def, opts = {}) {
     const opponents = currentState.players.filter(p => p.id !== myPlayerId && p.lives > 0);
 
     // Telecinesi: UI dedicata a 2 step (source bastion → dest bastion)
@@ -2263,6 +2571,10 @@ const App = (() => {
     ];
 
     if (!spellsNeedingTarget.includes(def.id) || opponents.length === 0) {
+      if (opts.direct) {
+        sendAction('play_spell', { instance_id: instanceId });
+        return true;
+      }
       Renderer.showModal(
         `${def.name}`,
         `Costo: <strong>${def.cost} Maghe</strong><br>${def.base_effect || ''}`,
@@ -2834,6 +3146,7 @@ const App = (() => {
   // ---------------------------------------------------------------------------
 
   async function sendAction(action, params = {}) {
+    DragPlay.sent();
     // Nel tutorial l'attacco può passare prima dallo schema della Battaglia
     if (action === 'battle' && _previewTutorialBattle(params)) return;
     if (recastPending && action === 'play_spell') {
@@ -2855,6 +3168,7 @@ const App = (() => {
       });
       onStateUpdate(res.state, action, res.result);
     } catch (e) {
+      DragPlay.reject();
       Renderer.toast(e.message || 'Errore', 'error');
     }
   }
@@ -2886,6 +3200,11 @@ const App = (() => {
   // ---------------------------------------------------------------------------
 
   function onAbandonClick() {
+    // Nel tutorial si torna al menu (l'avversario è il Manichino)
+    if (isTutorial) {
+      Renderer.showModal('Abbandona il tutorial', 'Sei sicuro? Tornerai al menu.', exitTutorial);
+      return;
+    }
     Renderer.showModal(
       'Abbandona la partita',
       'Sei sicuro? Verrai eliminato dalla partita e non potrai rientrare.',
@@ -3329,6 +3648,7 @@ const App = (() => {
     returnToLobby,
     getCardDef,
     onCardClick,
+    cardHasDetail,
     sendAction,
     showWallSlideshow,
     showLifeSlideshow,
