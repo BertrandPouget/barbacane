@@ -208,7 +208,7 @@ const CardArt = (() => {
    * Carta in mano scelta come Muro: si gira e mostra il dorso (classe
    * wall-marked), con un mezzo giro in 3D come la carta del catalogo, in piccolo.
    */
-  function flipWall(cardEl, on) {
+  function flipWall(cardEl, on, instant = false) {
     if (!cardEl || cardEl.classList.contains('wall-marked') === on) return;
     if (!cardEl.querySelector(':scope > .mc-back')) {
       const back = document.createElement('img');
@@ -220,7 +220,7 @@ const CardArt = (() => {
     }
     const apply = () => cardEl.classList.toggle('wall-marked', on);
     const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (still || !cardEl.animate) { apply(); return; }
+    if (instant || still || !cardEl.animate) { apply(); return; }
     // Il costo sporge dalla carta e girando si vedrebbe troncare: sparisce prima
     // del giro e, se la carta torna di fronte, ricompare solo a giro finito
     cardEl.classList.add('flipping');

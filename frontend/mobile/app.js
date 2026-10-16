@@ -24,8 +24,9 @@ const Mob = (() => {
   let instanceMap = {};
 
   // Modalità muri
-  let wallMode = false;
-  let wallsSelected = [];   // [{instanceId, bastion: null|'left'|'right'}]: null = girata, da posare
+  // Carte girate col doppio tocco: trascinate in un Bastione diventano Muri
+  // (ognuna subito, vedi startFlippedWallDrag)
+  const wallFlips = new Set();
 
   // Timer
   let timerInterval = null;
@@ -469,18 +470,24 @@ const Mob = (() => {
     // «← Indietro» solo verso un passo di spiegazione, mai a prima di una mossa giocata
     $('tutorial-panel-prev').hidden = !state.tutorial.can_go_back;
     $('tutorial-panel-prev').disabled = false;
-    // Quando c'è una mossa da fare il pannello sta in alto, compatto, così
-    // mano e dock restano liberi: subito sotto la barra superiore (che rispetta
-    // notch e barra di stato anche da webapp installata), oppure sotto la barra
-    // degli avversari quando la mossa riguarda loro (così resta visibile)
+    // Quando c'è una mossa da fare il pannello è compatto. Il posto lo sceglie
+    // spotlight.js: al centro, finché non copre le zone evidenziate né le
+    // informazioni importanti di TUTORIAL_AVOID
     const acting = step.goals.length > 0;
     const ids = step.highlight_mobile && step.highlight_mobile.length ? step.highlight_mobile : step.highlight;
-    const top = acting && (step.show_opponents || (ids || []).some(id => id.replace('>', '') === 'opp-rail')
-      ? 'opp-rail' : 'topbar');
     panel.classList.toggle('tut-panel-top', acting);
     panel.hidden = false;
-    Spotlight.show(ids || [], panel, { center: !!step.panel_center, top });
+    Spotlight.show(ids || [], panel, { center: !!step.panel_center, avoid: TUTORIAL_AVOID, preferCenter: true });
   }
+
+  // Cosa il pannello del tutorial evita di coprire, oltre alle zone evidenziate:
+  // avversari, cronaca e riquadri del campo; ancora di più la barra in alto, le
+  // carte in mano e, sopra tutto, Vite, Azioni, Mana e i pulsanti del dock
+  const TUTORIAL_AVOID = [
+    '#opp-rail > *', '#ticker', '#field-grid .rg-tile',
+    ['#topbar', 3], ['#hand .card', 3], ['#dock', 3],
+    ['#statusbar .st-chip', 20], ['#dock .mbtn', 20],
+  ];
 
   // Fine tutorial: stesso pannello, centrato a schermo spento, con un solo
   // pulsante per tornare al menu.
@@ -596,7 +603,6 @@ const Mob = (() => {
     // della Battaglia resta finché non si conferma o si torna indietro
     if (stopCardReading || tutorialBattlePreview) return;
     // Mentre si scelgono i Muri lo schermo serve tutto al vassoio
-    if (wallMode) { hideTutorialStep(); return; }
     showTutorialStep(state);
   }
 
@@ -1015,6 +1021,7 @@ const Mob = (() => {
     Screens.show('game');
     _lastTurnPlayer = state.current_player_id;
     Render.game(state, myPlayerId);
+    applyWallFlips();
     refreshDock();
     _openPendingSheets(state);
     if (state.winner_id && !isTutorial) showGameOver(state);
@@ -1056,11 +1063,11 @@ const Mob = (() => {
     currentState = state;
     _lastTurnPlayer = state.current_player_id;
 
-    exitWallMode(true);
     // Le carte si spostano con una transizione invece di ricomparire di colpo
     const screen = $('scr-game');
     const before = Motion.snapshot(screen);
     Render.game(state, myPlayerId);
+    applyWallFlips();
     Motion.play(before, screen, _motionOptions(state));
 
     // Banner al cambio turno. I miei tiri di D10: a inizio del mio turno
@@ -1297,9 +1304,9 @@ const Mob = (() => {
       // Il dito esce dalla mano verso l'alto: si trascina la carta che mostrava
       if (!dragRefused && t.clientY < hand.getBoundingClientRect().top - 12) {
         const card = current || startCard;
-        // Scelta dei Muri: si trascinano solo le carte girate, nei Bastioni
-        if (card && card.isConnected && wallMode && isUnplacedWall(card.dataset.instanceId)) {
-          dragRefused = !startWallDrag(card, t.clientX, t.clientY);
+        // Carte girate: si trascinano nei Bastioni, come Muri
+        if (card && card.isConnected && wallFlips.has(card.dataset.instanceId)) {
+          dragRefused = !startFlippedWallDrag(card, t.clientX, t.clientY);
         } else if (card && card.isConnected && canDragFromHand()) {
           dragRefused = !startHandDrag(card, t.clientX, t.clientY);
         }
@@ -1404,30 +1411,20 @@ const Mob = (() => {
 
     const phase = currentState.phase;
 
-    // Scelta dei Muri: una sola riga, ✕ per annullare, conteggio e «Conferma»
-    if (wallMode) {
-      const n = wallsSelected.length;
-      const toPlace = wallsSelected.filter(w => !w.bastion).length;
-      const cancel = mkBtn('✕', 'mbtn-compact', () => exitWallMode());
-      cancel.setAttribute('aria-label', 'Annulla');
-      dock.appendChild(cancel);
-      dock.appendChild(hint(`🧱 ${n}/3 · ` + (!n ? 'tocca le carte per girarle'
-        : toPlace ? 'trascinale nei Bastioni' : 'pronte da alzare')));
-      dock.appendChild(mkBtn('Conferma', 'mbtn-gold mbtn-compact', confirmWalls, !n || toPlace > 0, 'dock-wall-confirm'));
-      return;
-    }
-
     if (phase === 'action') {
       const acts = my ? (my.actions_remaining ?? 0) : 0;
       const hasCards = my && my.hand && my.hand.length > 0;
-      // «Completa» spento se nessuna Costruzione si può completare ora (Mana, Azioni)
-      const hasIncomplete = my && completableBuildings(my).length > 0;
       const hasEthereal = my && my.ethereal_card;
 
-      if (acts > 0) {
-        dock.appendChild(hint(hasCards ? 'Trascina una carta per giocarla' : 'Nessuna carta in mano'));
-        dock.appendChild(mkBtn('🏗️', '', openCompleteSheet, !hasIncomplete, 'dock-complete'));
-        dock.appendChild(mkBtn('🧱', '', enterWallMode, !hasCards, 'dock-wall'));
+      // Muri posati da poco: i successivi (fino a 3) rientrano nella stessa Azione
+      const slots = my ? (my.wall_slots || 0) : 0;
+      const actsLabel = `${acts} Azion${acts === 1 ? 'e' : 'i'}`;
+      if (acts > 0 || slots > 0) {
+        // Le carte si giocano trascinandole (girate col doppio tocco per i Muri)
+        // e le Costruzioni si completano dal Villaggio
+        dock.appendChild(hint(slots > 0 ? `🧱 Ancora ${slots} Mur${slots === 1 ? 'o' : 'i'} in quest'Azione · ${actsLabel}`
+          : !hasCards ? `Nessuna carta in mano · ${actsLabel}`
+          : `Trascina per giocare, doppio tocco per un Muro · ${actsLabel}`));
         dock.appendChild(mkBtn('›', '', () => sendAction('next_phase', {}), false, 'dock-next'));
       } else {
         // Azioni finite: restano le giocate che non consumano Azioni (Orde, eterea,
@@ -1445,7 +1442,6 @@ const Mob = (() => {
           : freePlays ? 'Puoi ancora giocare le carte accese'
           : freeCompletes ? 'Puoi ancora completare Costruzioni'
           : 'Azioni esaurite'));
-        if (freeCompletes) dock.appendChild(mkBtn('🏗️', '', openCompleteSheet, false, 'dock-complete'));
         dock.appendChild(mkBtn('Schieramento ›', 'mbtn-gold mbtn-pulse', () => sendAction('next_phase', {}), false, 'dock-next'));
       }
 
@@ -1476,8 +1472,21 @@ const Mob = (() => {
   // Mano → dettaglio carta → gioco
   // ---------------------------------------------------------------------------
 
+  let lastHandTap = null;  // {iid, t}: per il doppio tocco
+
   function onHandTap(iid) {
-    if (wallMode) { haptic(); toggleWallCard(iid); return; }
+    // Doppio tocco: la carta si gira per essere giocata come Muro, o torna di fronte
+    const now = Date.now();
+    if (lastHandTap && lastHandTap.iid === iid && now - lastHandTap.t < 400) {
+      lastHandTap = null;
+      haptic();
+      const on = !wallFlips.has(iid);
+      if (on) wallFlips.add(iid); else wallFlips.delete(iid);
+      const card = document.querySelector(`#hand .card[data-instance-id="${CSS.escape(iid)}"]`);
+      CardArt.flipWall(card, on);
+      return;
+    }
+    lastHandTap = { iid, t: now };
     // Le carte in mano si giocano trascinandole e si guardano tenendoci sopra il
     // dito: il tocco breve apre solo, nel tutorial, la lettura di una carta da
     // spiegare (una volta sola; a lettura finita la scheda si chiude)
@@ -1493,7 +1502,7 @@ const Mob = (() => {
 
   // Nel mio turno, in fase Azioni
   function canDragFromHand() {
-    return !!me() && !wallMode && isMyTurn() && currentState.phase === 'action';
+    return !!me() && isMyTurn() && currentState.phase === 'action';
   }
 
   // Perché la carta ora non si può giocare (o null). Si trascina lo stesso, verso
@@ -2003,95 +2012,45 @@ const Mob = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Modalità muri
+  // Muri
   // ---------------------------------------------------------------------------
-
-  function enterWallMode() {
-    if (!isMyTurn()) return;
-    wallMode = true;
-    wallsSelected = [];
-    refreshDock();
-    // Nel tutorial pannello e occhio di bue lasciano tutto lo schermo al vassoio
-    if (isTutorial) hideTutorialStep();
-  }
-
-  function exitWallMode(silent = false) {
-    if (!wallMode && wallsSelected.length === 0) return;
-    wallMode = false;
-    wallsSelected = [];
-    updateWallMarks();
-    if (!silent) refreshDock();
-    if (isTutorial && currentState) updateTutorialUI(currentState);
-  }
-
-  // Muri: il tocco su una carta in mano la gira (scelta come Muro, max 3) o la
-  // rigira; portando il dito fuori dalla mano una carta girata si trascina su un
-  // Bastione (startWallDrag), dove sparisce dalla mano e compare una pila «+N»
-  // (toccandola tornano in mano). «Conferma» quando sono tutte posate.
-  function toggleWallCard(iid) {
-    const idx = wallsSelected.findIndex(w => w.instanceId === iid);
-    if (idx >= 0) wallsSelected.splice(idx, 1);
-    else {
-      if (wallsSelected.length >= 3) { Toast.show('Massimo 3 muri per azione', 'error'); return; }
-      wallsSelected.push({ instanceId: iid, bastion: null });
-    }
-    updateWallMarks();
-  }
-
-  const isUnplacedWall = iid => wallsSelected.some(w => w.instanceId === iid && !w.bastion);
-
-  function updateWallMarks() {
-    document.querySelectorAll('#hand .card').forEach(card => {
-      const w = wallsSelected.find(x => x.instanceId === card.dataset.instanceId);
-      CardArt.flipWall(card, !!w);
-      card.classList.toggle('wall-placed', !!(w && w.bastion));
-    });
-    Render.fanHand();
-    renderWallPending();
-    if (wallMode) refreshDock();
-  }
-
-  // Muri posati (non ancora confermati): contati nel riquadro del Bastione, col
-  // numero in giallo finché l'Azione non è confermata. Toccando il riquadro
-  // tornano in mano (vedi onBastionTileTap)
-  function renderWallPending() {
-    const my = me();
-    if (!my) return;
-    ['left', 'right'].forEach(side =>
-      Render.bastionTile(my, side, wallsSelected.filter(w => w.bastion === side).length));
-  }
 
   function onBastionTileTap(side) {
     haptic();
-    if (wallMode && wallsSelected.some(w => w.bastion === side)) {
-      wallsSelected.forEach(w => { if (w.bastion === side) w.bastion = null; });
-      updateWallMarks();
-      return;
-    }
     openBastionSheet(side);
   }
 
-  function startWallDrag(card, x, y) {
+  // Dopo ogni ridisegno della mano: le carte girate restano girate (senza
+  // rifare il giro); quelle uscite dalla mano si dimenticano
+  function applyWallFlips() {
+    const inHand = new Set();
+    document.querySelectorAll('#hand .card').forEach(card => {
+      const iid = card.dataset.instanceId;
+      inHand.add(iid);
+      if (wallFlips.has(iid)) CardArt.flipWall(card, true, true);
+    });
+    [...wallFlips].forEach(iid => { if (!inHand.has(iid)) wallFlips.delete(iid); });
+  }
+
+  // Carta girata trascinata in un Bastione: diventa subito un Muro
+  function startFlippedWallDrag(card, x, y) {
+    const my = me();
+    const err = !isMyTurn() ? 'Non è il tuo turno.'
+      : currentState.phase !== 'action' ? 'I Muri si alzano nella fase Azioni.'
+      : !(my && (my.actions_remaining > 0 || my.wall_slots > 0)) ? 'Azioni esaurite per questo turno.'
+      : null;
+    if (err) { Toast.show(err, 'error'); return false; }
     const iid = card.dataset.instanceId;
     const zones = [['left', 'tw-left'], ['right', 'tw-right']].map(([side, id]) => ({ key: side, el: $(id) }));
     DragPlay.start(card, x, y, {
       zones, lift: 0.5,
       onDrop: side => {
-        const w = wallsSelected.find(x2 => x2.instanceId === iid);
-        if (w) w.bastion = side;
         haptic();
-        updateWallMarks();
-        return 'land';
+        sendAction('add_wall', { walls: [{ instance_id: iid, bastion: side }] });
+        return true;
       },
     });
     return true;
-  }
-
-  function confirmWalls() {
-    if (wallsSelected.length === 0 || wallsSelected.some(w => !w.bastion)) return;
-    const walls = wallsSelected.map(w => ({ instance_id: w.instanceId, bastion: w.bastion }));
-    sendAction('add_wall', { walls });
-    exitWallMode(true);
   }
 
   // ---------------------------------------------------------------------------
@@ -2115,29 +2074,6 @@ const Mob = (() => {
   function completableBuildings(player) {
     const errs = (player && player.complete_errors) || {};
     return Object.keys(errs).filter(iid => !errs[iid]);
-  }
-
-  function openCompleteSheet() {
-    const my = me();
-    const completable = new Set(completableBuildings(my));
-    if (completable.size === 0) return;
-    pickBuilding({
-      title: 'Completa una Costruzione',
-      players: [my],
-      // Solo quelle completabili ora (Mana, Azioni: vedi complete_errors)
-      filter: (b) => completable.has(b.instance_id),
-      meta: (b) => {
-        if (my.ethereal_complete === b.instance_id) return 'Gratis (Velocemento)';
-        const def = getCardDef(b.instance_id);
-        const cost = def ? costLabel(def.completion_cost, reinholdDiscount(my)) : '?';
-        return `${cost} Mana${isFreeComplete(my, b) ? ' · senza Azione' : ''}`;
-      },
-      note: (b) => {
-        const def = getCardDef(b.instance_id);
-        return def && def.complete_effect ? def.complete_effect.replace(/^&\s*/, '') : null;
-      },
-      onPick: (b) => sendAction('complete_building', { building_instance_id: b.instance_id }),
-    });
   }
 
   // ---------------------------------------------------------------------------

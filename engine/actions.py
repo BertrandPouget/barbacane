@@ -761,9 +761,13 @@ def add_wall(
     """
     Converte fino a 3 carte dalla mano in Muri, distribuibili tra i due Bastioni
     in qualsiasi combinazione. Consuma 1 Azione. Nessun costo Mana.
+    I Muri si possono posare anche a più riprese: finché non si fa altro, quelli
+    successivi rientrano nella stessa Azione fino a 3 (open_wall_slots).
     """
     player = _require_current_player(state, player_id)
-    _require_actions(player)
+    open_slots = open_wall_slots(state, player)
+    if len(walls or []) > open_slots:
+        _require_actions(player)
 
     if not walls or len(walls) > 3:
         raise ActionError("Devi specificare da 1 a 3 carte da convertire in Muro.")
@@ -778,7 +782,9 @@ def add_wall(
     if len(ids) != len(set(ids)):
         raise ActionError("Non puoi usare la stessa carta due volte.")
 
-    player.actions_remaining -= 1
+    if len(walls) > open_slots:
+        player.actions_remaining -= 1
+        open_slots = 3
 
     placed = []
     for entry in walls:
@@ -793,7 +799,17 @@ def add_wall(
         placed.append({"card": iid, "bastion": side})
 
     state.add_log(player_id, "add_wall", walls=placed)
+    player.wall_slots = open_slots - len(walls)
+    player.wall_slots_mark = len(state.log)
     return {"walls": placed}
+
+
+def open_wall_slots(state: GameState, player: Player) -> int:
+    """Muri che si possono ancora aggiungere senza Azione: quelli rimasti
+    dell'ultima Azione «aggiungi Muri», se da allora non è successo altro."""
+    if state.phase != "action" or state.current_player.id != player.id:
+        return 0
+    return player.wall_slots if player.wall_slots_mark == len(state.log) else 0
 
 
 # ---------------------------------------------------------------------------

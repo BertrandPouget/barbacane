@@ -109,6 +109,7 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 - **Massimo 2 Azioni** è scritto anche lato client (`maxActions` in `app.js`).
 - **Regola del Prodigio**: `_prodigy_active` in `actions.py` (usata anche da `bot.py`), ricopiata nei client per il targeting (`_computeSpellProdigy` desktop, `computeSpellProdigy` mobile). La stella delle minicarte usa invece `prodigy_ready` dal server.
 - **Giocate senza Azioni** (eterea, Orde di Madeleine/Faust/Joseph, Cardo+Decumano): regola in `actions.py`, ricopiata in `bot._is_free_action` e nei client (`_isFreePlay`/`_isFreeComplete` desktop, `isFreePlay`/`isFreeComplete` mobile), che con 0 Azioni lasciano attive solo quelle.
+- **Muri a riprese**: i client mandano un `add_wall` per carta (girata col doppio clic/tocco); i successivi, fino a 3, sono gratis finché `len(state.log)` non cambia (`open_wall_slots` in `actions.py`). Un'azione nuova che non scrive nel log lascerebbe aperta l'Azione dei Muri.
 - Nessun salto turno automatico per disconnessione: solo con timer di lobby (`turn_timer > 0`).
 - Partite `vs-…` e tutorial hanno una sola riga in `players` (`player_1`).
 - **Transizioni** (`motion.js`): i client ridisegnano tutto a ogni `state_update`; si anima solo ciò che ha `data-instance-id`. Gli avversari sul desktop sono riassunti senza carte: le loro animazioni sono in `_animateOpponents`.

@@ -1469,13 +1469,6 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   font-size: 0.7rem;
 }
 
-/* Muro già posato in un Bastione (in attesa di conferma): non sta più in mano */
-#hand .card.wall-placed { display: none; }
-
-/* Muri posati in attesa di conferma (app.js, renderWallPending): contati nel
-   riquadro del Bastione, numero in giallo */
-.rg-stat.pending .rg-stat-num { color: var(--gold-light); }
-
 /* Specie colori (come desktop) */
 .species-elfo   { color: #7aaa55; }
 .species-nano   { color: #b85a3a; }
@@ -2741,6 +2734,29 @@ body.dragging-card #tutorial-panel { opacity: 0; pointer-events: none; }
 #tutorial-panel.tut-panel-top .tut-goals { margin-top: 4px; }
 #tutorial-panel.tut-panel-top .tut-goals li.done { display: none; }
 #tutorial-panel.tut-panel-top .tut-panel-actions { margin-top: 8px; }
+/* Compatto con il solo «Indietro»: la freccia sale sulla riga di «N di 17»,
+   così il pannello non ha una riga in più solo per lei (e copre meno campo) */
+#tutorial-panel.tut-panel-top .tut-panel-actions:has(#tutorial-panel-next[hidden]) {
+  position: absolute;
+  top: 16px;
+  right: 22px;
+  margin: 0;
+}
+#tutorial-panel.tut-panel-top .tut-panel-actions:has(#tutorial-panel-next[hidden]) .tut-arrow {
+  font-size: 1.15em;
+  min-width: 2.4em;
+  padding-top: 2px;
+  padding-bottom: 5px;
+}
+
+/* Schermi bassi: il pannello compatto un po' più piccolo, così trova più spesso
+   un posto che non copre le zone evidenziate (spotlight.js) */
+@media (max-height: 720px) {
+  #tutorial-panel.tut-panel-top .tut-panel-title { font-size: 0.92rem; margin-bottom: 2px; }
+  #tutorial-panel.tut-panel-top .tut-goals li,
+  #tutorial-panel.tut-panel-top .tut-goal-text { font-size: 0.82rem; line-height: 1.35; }
+  #tutorial-panel.tut-panel-top .tut-goals li { padding-top: 1px; padding-bottom: 1px; }
+}
 
 #tutorial-panel.spotlight-panel-placed {
   transition: left 0.38s ease, top 0.38s ease;

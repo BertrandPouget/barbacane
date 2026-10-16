@@ -5,8 +5,9 @@
  * con un buco per ogni elemento (a differenza di un unico box-shadow, regge
  * più zone evidenziate insieme) e un anello dorato attorno a ciascuno. Quando
  * cambia il passo, buchi e anelli scivolano dalla vecchia alla nuova posizione.
- * Il pannello del tutorial viene piazzato accanto alla zona evidenziata, dal
- * lato con più spazio libero, e scivola anche lui.
+ * Il pannello del tutorial sta al centro, o dov'era, finché non copre le zone
+ * evidenziate né le informazioni utili indicate dal client (opts.avoid);
+ * altrimenti scivola nel posto libero più vicino (placePanel).
  *
  * Tutto lo strato è "click-through" (pointer-events: none): il campo resta
  * giocabile sotto. Lo stile (colori, z-index) è nel CSS di ciascun client.
@@ -22,6 +23,11 @@ const Spotlight = (() => {
   const GAP = 14;         // distanza tra zona evidenziata e pannello
   const EDGE = 12;        // margine minimo del pannello dal bordo schermo
   const DURATION = 380;   // durata dello scivolamento, ms
+  const GRID = 16;        // passo della griglia di posizioni provate per il pannello
+  const STAY_SLACK = 0.25; // quanto si accetta di coprire in più per tornare al centro, in pannelli
+  const IMPORTANT = 20;    // peso (opts.avoid) da cui un'informazione coperta fa spostare il pannello
+  const NEAR_MID = 80;     // entro questa distanza dal centro, il pannello conta come centrato
+  const MOVE_COST = 15;    // area (px², pesata) che vale un pixel di spostamento del pannello
 
   let root = null, maskGroup = null, keepGroup = null, ringLayer = null;
   let targets = [];       // id degli elementi DOM da evidenziare
@@ -29,6 +35,9 @@ const Spotlight = (() => {
   let panel = null;       // pannello da posizionare accanto
   let centered = false;   // pannello fermo al centro anche con zone evidenziate
   let atTop = false;      // pannello in cima (true) o subito sotto l'elemento con quell'id
+  let avoidSel = [];      // selettori delle informazioni da non coprire (opts.avoid)
+  let preferCenter = false; // torna al centro appena lì non copre l'importante (opts.preferCenter)
+  let placed = null;      // ultima posizione del pannello {left, top}: ci resta finché non copre le zone
   let current = [];       // rettangoli attualmente disegnati [{x,y,w,h}]
   let goal = [];          // rettangoli verso cui si sta animando
   let anim = null;
@@ -197,15 +206,31 @@ const Spotlight = (() => {
     anim = requestAnimationFrame(step);
   }
 
-  // Piazza il pannello dove non copre nessuna zona evidenziata. Si provano
-  // prima le posizioni sotto/sopra le zone (l'insieme, poi ciascuna: utile
-  // quando due zone lontane lasciano spazio in mezzo) con il pannello centrato
-  // nello schermo; poi le stesse allineate alla zona; poi ai lati; infine ai
-  // bordi dello schermo. Se nessun posto è libero, sceglie quello che copre
-  // meno. Senza zone evidenziate, o con `center`: al centro (così il
-  // pannello non salta tra passi di spiegazione consecutivi). Con `top`: in
-  // cima allo schermo, per lasciare libere mano e pulsanti in basso; se `top`
-  // è l'id di un elemento, subito sotto di esso (che resta visibile).
+  // Rettangoli delle informazioni da non coprire se si può (opts.avoid: un
+  // selettore, o [selettore, peso] per ciò che conta di più, come i pulsanti):
+  // nascosti e vuoti non contano
+  function measureAvoid() {
+    return avoidSel.flatMap(item => {
+      const [sel, weight] = Array.isArray(item) ? item : [item, 1];
+      return [...document.querySelectorAll(sel)]
+        .filter(el => el !== panel && !panel.contains(el))
+        .map(el => el.getBoundingClientRect())
+        .filter(r => r.width > 0 && r.height > 0)
+        .map(r => ({ x: r.left, y: r.top, w: r.width, h: r.height, k: weight }));
+    });
+  }
+
+  // Piazza il pannello. Le zone evidenziate non si coprono mai, se c'è un
+  // posto libero; le informazioni utili indicate dal client (opts.avoid: carte
+  // in campo, Mana e Azioni, pulsanti…) il meno possibile. Vince il centro se
+  // lì non copre nulla (con opts.preferCenter, se non copre zone evidenziate né
+  // informazioni importanti, o il posto così più vicino al centro); se no il
+  // pannello resta dov'era, finché non copre zone
+  // evidenziate o informazioni importanti; solo allora si sposta, nel posto
+  // che copre meno vicino a dov'era, o al centro se copre poco di più (freeSpot). Senza zone evidenziate, o con `center`: al centro
+  // (così il pannello non salta tra passi di spiegazione consecutivi). Con
+  // `top`: in cima allo schermo, per lasciare libere mano e pulsanti in basso;
+  // se `top` è l'id di un elemento, subito sotto di esso (che resta visibile).
   function placePanel(rects) {
     if (!panel) return;
     const vw = window.innerWidth, vh = window.innerHeight;
@@ -216,44 +241,73 @@ const Spotlight = (() => {
     const anchor = typeof atTop === 'string' && document.getElementById(atTop);
     if (anchor) topY = anchor.getBoundingClientRect().bottom + GAP;
     let best = { left: (vw - pw) / 2, top: atTop ? topY : (vh - ph) / 2 };
-    if (rects.length && !centered && !atTop) {
-      const u = rects.reduce((a, r) => ({
-        x: Math.min(a.x, r.x), y: Math.min(a.y, r.y),
-        r: Math.max(a.r, r.x + r.w), b: Math.max(a.b, r.y + r.h),
-      }), { x: Infinity, y: Infinity, r: -Infinity, b: -Infinity });
-      const zones = [
-        { l: u.x, t: u.y, r: u.r, b: u.b },
-        ...rects.map(r => ({ l: r.x, t: r.y, r: r.x + r.w, b: r.y + r.h })),
-      ];
-      const screenCx = (vw - pw) / 2;
-      const vertical = (z, left) => [
-        { left, top: z.b + GAP },
-        { left, top: z.t - GAP - ph },
-      ];
-      const candidates = [
-        ...zones.flatMap(z => vertical(z, screenCx)),
-        ...zones.flatMap(z => vertical(z, (z.l + z.r) / 2 - pw / 2)),
-        ...zones.flatMap(z => [
-          { left: z.r + GAP, top: (z.t + z.b) / 2 - ph / 2 },
-          { left: z.l - GAP - pw, top: (z.t + z.b) / 2 - ph / 2 },
-        ]),
-        { left: screenCx, top: vh - ph - EDGE },
-        { left: screenCx, top: EDGE },
-      ].map(c => ({ left: clampX(c.left), top: clampY(c.top) }));
-      const overlap = c => rects.reduce((sum, r) => {
-        const w = Math.min(c.left + pw, r.x + r.w) - Math.max(c.left, r.x);
-        const h = Math.min(c.top + ph, r.y + r.h) - Math.max(c.top, r.y);
-        return sum + (w > 0 && h > 0 ? w * h : 0);
-      }, 0);
-      let bestOverlap = Infinity;
-      for (const c of candidates) {
-        const o = overlap(c);
-        if (o < bestOverlap) { best = c; bestOverlap = o; }
-        if (o === 0) break;
-      }
+    // Già quasi al centro: resta dov'è, così non scatta quando cambia altezza
+    if (!atTop && placed && Math.hypot(clampX(placed.left) - clampX(best.left),
+      clampY(placed.top) - clampY(best.top)) < NEAR_MID) best = placed;
+    if (rects.length && !centered && !atTop) best = freeSpot(rects, measureAvoid(), pw, ph, clampX, clampY);
+    placed = { left: Math.round(clampX(best.left)), top: Math.round(clampY(best.top)) };
+    panel.style.left = `${placed.left}px`;
+    panel.style.top = `${placed.top}px`;
+  }
+
+  function freeSpot(rects, soft, pw, ph, clampX, clampY) {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    // Area coperta dal pannello in c, con un margine m attorno ai rettangoli
+    const area = (c, list, m) => list.reduce((sum, r) => {
+      const w = Math.min(c.left + pw, r.x + r.w + m) - Math.max(c.left, r.x - m);
+      const h = Math.min(c.top + ph, r.y + r.h + m) - Math.max(c.top, r.y - m);
+      return sum + (w > 0 && h > 0 ? w * h * (r.k || 1) : 0);
+    }, 0);
+    // Delle zone evidenziate conta la parte coperta di ciascuna, non l'area: un
+    // pulsante coperto tutto è peggio del bordo di un riquadro grande
+    const covered = c => rects.reduce((sum, r) => sum + area(c, [r], GAP / 2) / Math.max(1, r.w * r.h), 0);
+    const cost = c => covered(c) * 1e9 + area(c, soft, 4);
+    let mid = { left: clampX((vw - pw) / 2), top: clampY((vh - ph) / 2) };
+    const stay = placed && { left: clampX(placed.left), top: clampY(placed.top) };
+    // Già quasi al centro: il centro è dov'è (cambiando altezza non scatta)
+    if (stay && Math.hypot(stay.left - mid.left, stay.top - mid.top) < NEAR_MID) mid = stay;
+    // Informazioni importanti: peso IMPORTANT (es. Azioni, Mana, pulsanti)
+    const important = soft.filter(r => (r.k || 1) >= IMPORTANT);
+    const keeps = c => area(c, rects, GAP / 2) === 0 && area(c, important, 4) === 0;
+    const steps = (lo, hi) => {
+      const out = [];
+      for (let v = lo; v < hi; v += GRID) out.push(v);
+      out.push(Math.max(lo, hi));
+      return out;
+    };
+    const grid = [];
+    for (const top of steps(EDGE, vh - ph - EDGE)) {
+      for (const left of steps(EDGE, vw - pw - EDGE)) grid.push({ left: clampX(left), top: clampY(top) });
     }
-    panel.style.left = `${Math.round(clampX(best.left))}px`;
-    panel.style.top = `${Math.round(clampY(best.top))}px`;
+    const dist = (a, b) => Math.hypot(a.left - b.left, a.top - b.top);
+    // Con preferCenter il pannello tende al centro: il centro se non copre
+    // l'importante, se no il posto che non lo copre più vicino al centro (la
+    // posizione di prima, se è lì vicino, così non scatta)
+    if (preferCenter) {
+      if (keeps(mid)) return mid;
+      let near = null;
+      for (const c of grid) if (keeps(c) && (!near || dist(c, mid) < dist(near, mid))) near = c;
+      if (near) return stay && keeps(stay) && dist(stay, near) < NEAR_MID ? stay : near;
+    }
+    for (const c of [mid, stay]) if (c && cost(c) === 0) return c;
+    // La posizione di prima si tiene finché non copre zone evidenziate né
+    // informazioni importanti: il resto (carte, riquadri, avversari) non basta a
+    // far spostare il pannello
+    if (stay && keeps(stay)) return stay;
+    // Nessun posto pulito: quello che copre meno sulla griglia. Il tragitto pesa
+    // anche lui (MOVE_COST per pixel): tra posti quasi uguali si sceglie il più
+    // vicino, invece di attraversare lo schermo
+    const ref = stay || mid;
+    let best = ref, bestCost = Infinity, bestScore = Infinity;
+    for (const c of grid) {
+      const k = cost(c);
+      const score = k + MOVE_COST * dist(c, ref);
+      if (score < bestScore) { best = c; bestCost = k; bestScore = score; }
+    }
+    // Dovendo spostarsi, torna al centro se lì non copre zone evidenziate e copre
+    // poco più che nel posto migliore
+    if (area(mid, rects, GAP / 2) === 0 && cost(mid) <= bestCost * 3 + STAY_SLACK * pw * ph) return mid;
+    return best;
   }
 
   // Ricalcola le posizioni: il layout del campo cambia a ogni aggiornamento di
@@ -270,9 +324,14 @@ const Spotlight = (() => {
     build();
     centered = !!opts.center;
     atTop = opts.top || false;
+    avoidSel = opts.avoid || [];
+    preferCenter = !!opts.preferCenter;
     targets = (ids || []).filter(Boolean);
     const wasVisible = visible;
-    if (panel && panel !== panelEl) panel.classList.remove('spotlight-panel-placed');
+    if (panel && panel !== panelEl) {
+      panel.classList.remove('spotlight-panel-placed');
+      placed = null;
+    }
     panel = panelEl || null;
     // Il pannello deve stare sopra lo strato scuro: se vive dentro uno schermo
     // con un proprio contesto di sovrapposizione (z-index/transform), il suo

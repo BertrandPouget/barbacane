@@ -34,6 +34,7 @@ from engine.actions import (
     play_spell,
     complete_building,
     add_wall,
+    open_wall_slots,
     reposition_warrior,
     activate_horde,
     evolve_warrior,
@@ -697,6 +698,7 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
             "life_cards": p.life_cards if p.id == viewer_player_id else None,
             "mana_remaining": p.mana_remaining if p.id == viewer_player_id else None,
             "actions_remaining": p.actions_remaining if p.id == viewer_player_id else None,
+            "wall_slots": open_wall_slots(state, p) if p.id == viewer_player_id else None,
             "hordes_activated_this_turn": p.hordes_activated_this_turn if p.id == viewer_player_id else None,
             "available_hordes": _available_hordes(p) if p.id == viewer_player_id else None,
             "active_effects": p.active_effects if p.id == viewer_player_id else [

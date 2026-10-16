@@ -520,7 +520,8 @@ const Renderer = (() => {
       const card = renderWarriorCard(w, true, interactive);
       row.appendChild(card);
     });
-    if (kind === 'warrior' && (warriors || []).length > 0) {
+    // Riepilogo sempre visibile, anche a 0 senza Guerrieri
+    if (kind === 'warrior') {
       container.appendChild(el('div', { className: 'region-stats-recap' },
         [`ATT max ${_maxStat(warriors, 'att')} · GIT max ${_maxStat(warriors, 'git')}`]));
     }
@@ -543,10 +544,8 @@ const Renderer = (() => {
     (bastion.warriors || []).forEach(w => {
       row.appendChild(renderWarriorCard(w, true, interactive));
     });
-    if ((bastion.warriors || []).length > 0) {
-      container.appendChild(el('div', { className: 'region-stats-recap' },
-        [`DIF max ${_maxStat(bastion.warriors, 'dif')} · GIT max ${_maxStat(bastion.warriors, 'git')}`]));
-    }
+    container.appendChild(el('div', { className: 'region-stats-recap' },
+      [`DIF max ${_maxStat(bastion.warriors, 'dif')} · GIT max ${_maxStat(bastion.warriors, 'git')}`]));
   }
 
   // Mazzo coperto (Muri, Vite, Carte Attive): il dorso della carta e, sotto la
@@ -662,7 +661,7 @@ const Renderer = (() => {
       let node;
       if (prev && prev.ethereal === ethereal && prev.node.dataset.instanceId === iid) {
         node = prev.node;
-        node.classList.remove('wall-marked', 'wall-placed');  // la modalità Muri li riapplica se serve
+        node.classList.remove('wall-marked');  // le carte girate le rigira app.js (_applyWallFlips)
         node.style.opacity = '';
         // La fascia della minicarta può cambiare anche se la carta resta (es. Prodigio)
         const def = App.getCardDef ? App.getCardDef(iid) : null;
@@ -684,7 +683,6 @@ const Renderer = (() => {
   // che legge l'inclinazione per i fantasmi). Le carte si sovrappongono di più
   // se non ci stanno in larghezza: va ricalcolato quando cambia la loro misura.
   function fanHand(nodes = Array.from(document.querySelectorAll('#hand-cards .card'))) {
-    nodes = nodes.filter(nd => !nd.classList.contains('wall-placed'));  // Muri già posati nei Bastioni
     const n = nodes.length;
     if (!n) return;
     const step = n > 1 ? Math.min(4, 14 / (n - 1)) : 0;  // apertura totale massima 14°

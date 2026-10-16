@@ -124,10 +124,6 @@ _MOBILE_HIGHLIGHT_MAP: Dict[str, Union[str, List[str]]] = {
     "my-mana": "st-mana",
     "my-actions": "st-actions",
     "action-panel": "dock",
-    "banner-btn-wall": "dock-wall",
-    "banner-btn-play": ">hand",
-    "banner-btn-complete": "dock-complete",
-    "wall-staging": "dock",
     "btn-next-phase": "dock-next",
     "btn-horde": "dock-horde",
     "btn-battle": "dock-attack",
@@ -169,7 +165,9 @@ class TutorialDef:
 _RECT_NAME_TYPE = [16.3, 2.9, 67.5, 13.2]      # nastro del nome + riga del tipo
 _RECT_COST = [82.5, 2.7, 13.2, 9.4]            # gemma (Mana) / stella (Maghe)
 _RECT_RECRUIT_STATS = [30.9, 46.8, 38.2, 11.4]
-_RECT_RECRUIT_INFO = [10.6, 59.5, 78.9, 18.0]  # Specie (+ Scuola) + Evolve in
+_RECT_RECRUIT_SPECIES = [10.6, 59.5, 78.9, 6.3]  # righe Specie, Scuola, Evolve in (Recluta Maga)
+_RECT_RECRUIT_SCHOOL = [10.6, 65.8, 78.9, 6.0]
+_RECT_RECRUIT_EVOLVE = [10.6, 71.8, 78.9, 6.0]
 _RECT_RECRUIT_HORDE = [7.8, 79.0, 84.4, 16.6]
 _RECT_HERO_STATS = [30.9, 66.4, 38.2, 12.4]
 _RECT_HERO_INFO = [10.6, 79.3, 78.9, 17.2]     # Specie (+ Scuola) + Evolve da
@@ -186,48 +184,53 @@ def _sections(*items: tuple) -> List[Dict[str, Any]]:
 CARD_READS: Dict[str, List[Dict[str, Any]]] = {
     "evelyn": _sections(
         (_RECT_NAME_TYPE, "Nome e tipo",
-         "Cornice rossa: un Guerriero. Evelyn è una Recluta, la forma base: potrà evolvere in un Eroe."),
+         "Evelyn è un Guerriero, nello specifico una Recluta. È la forma base e potrà evolvere in un Eroe."),
         (_RECT_COST, "Il costo in Mana",
-         "La gemma è il costo in Mana: giocarla costa 2 Mana."),
+         "La gemma indica il costo in Mana. Giocare Evelyn costa 2 Mana."),
         (_RECT_RECRUIT_STATS, "Le Caratteristiche",
          "L'Attacco (ATT) conta quando attacchi dall'Avanscoperta, la Difesa (DIF) quando difendi un Bastione, "
          "la Gittata (GIT) in entrambi i casi."),
-        (_RECT_RECRUIT_INFO, "Specie, Scuola, Evoluzione",
-         "Specie: Evelyn è una Maga, e le Maghe in campo ti servono per lanciare le Magie; la Specie conta anche "
-         "per le Orde. Scuola: ce l'hanno solo le Maghe, come le Magie (qui Sortilegio). Evolve in: l'Eroe che "
-         "potrà prendere il suo posto."),
+        (_RECT_RECRUIT_SPECIES, "La Specie",
+         "Evelyn è una Maga, una delle quattro Specie con Umani, Elfi e Nani. Guerrieri della stessa Specie "
+         "possono formare un'Orda."),
+        (_RECT_RECRUIT_SCHOOL, "La Scuola",
+         "La Scuola ce l'hanno solo le Maghe e le Magie. Lanciando una Magia con in campo una Maga della stessa "
+         "Scuola si attiva il Prodigio, una versione potenziata dell'effetto."),
+        (_RECT_RECRUIT_EVOLVE, "L'Evoluzione",
+         "Ogni Recluta può evolvere in un Eroe, un Guerriero dalle Caratteristiche più potenti. Quello di Evelyn "
+         "è The Briny."),
         (_RECT_RECRUIT_HORDE, "L'effetto Orda",
          "Con 3 Guerrieri della stessa Specie nella stessa Regione formi un'Orda, e nello Schieramento ne "
          "attivi l'effetto."),
     ),
     "ardolancio": _sections(
         (_RECT_NAME_TYPE, "Una Magia",
-         "Cornice blu: una Magia. Agisce e va negli scarti; alcune durano di più, ma sempre per un tempo "
-         "limitato. Accanto a «Magia» c'è la Scuola, qui Anatema."),
+         "Una Magia produce il suo effetto e va negli scarti. Alcune durano di più, ma sempre per un tempo "
+         "limitato. Accanto a «Magia» c'è la Scuola, in questo caso Anatema."),
         (_RECT_COST, "Le Maghe richieste",
-         "Le Magie non costano Mana: la stella dice quante Maghe, di qualsiasi Scuola, devi avere in campo, qui "
-         "una. Lanciata la Magia, le Maghe restano in campo."),
+         "Le Magie non costano Mana. La stella indica quante Maghe, di qualsiasi Scuola, devi avere in campo, "
+         "in questo caso una. Lanciata la Magia, le Maghe restano in campo."),
         (_RECT_EFFECT_TOP, "Effetto Base",
-         "La stella vuota segna l'effetto Base: quello che ottieni senza Prodigio."),
+         "La stella vuota segna l'effetto Base, quello che ottieni senza Prodigio."),
         (_RECT_EFFECT_BOTTOM, "Effetto Prodigio",
-         "Se una tua Maga in campo è della stessa Scuola della Magia, scatta il Prodigio: ottieni questo effetto "
-         "invece del Base. Se però il testo inizia con «&», ottieni entrambi: il Base e questo."),
+         "Se una tua Maga in campo è della stessa Scuola della Magia, scatta il Prodigio e ottieni questo "
+         "effetto invece del Base. Se il testo inizia con «&», ottieni sia il Base che questo."),
     ),
     "catapulta": _sections(
         (_RECT_NAME_TYPE, "Una Costruzione",
-         "Cornice verde: una Costruzione. Si gioca nel Villaggio e il suo effetto dura turno dopo turno."),
+         "Una Costruzione si gioca nel Villaggio e il suo effetto resta nel tempo."),
         (_RECT_COST, "Il costo in Mana",
          "Come per i Guerrieri, la gemma è il costo in Mana."),
         (_RECT_EFFECT_TOP, "Effetto Base",
          "La torre vuota segna l'effetto Base, che vale finché la Costruzione non è completa."),
         (_RECT_EFFECT_BOTTOM, "Effetto Completo",
          "Con un'Azione e il Mana della piccola gemma la completi, e da allora vale questo effetto invece del "
-         "Base. Se però il testo inizia con «&», valgono entrambi."),
+         "Base. Se il testo inizia con «&», valgono entrambi."),
     ),
     "the_pyric": _sections(
         (_RECT_NAME_TYPE, "Un Eroe",
-         "The Pyric è l'Eroe di Araminta: non si gioca da solo, ma sopra la sua Recluta in campo, pagandone il "
-         "costo in Mana. Si chiama evolvere."),
+         "The Pyric è l'Eroe di Araminta. Non si gioca da solo, ma sopra la sua Recluta in campo, pagandone il "
+         "costo in Mana. Questo si chiama evolvere."),
         (_RECT_HERO_STATS, "Caratteristiche più alte",
          "ATT 4, GIT 1, DIF 3, contro i 2, 0 e 2 di Araminta."),
         (_RECT_HERO_INFO, "Evolve da",
@@ -395,7 +398,7 @@ def _end_turn(after: str) -> Goal:
         "end_turn", "Termina il turno", "end_turn",
         hint="Premi «Fine Turno».",
         after=[after],
-        wait_hint="«Fine Turno» si preme in Battaglia, l'ultima fase: prima passa alla Battaglia.",
+        wait_hint="«Fine Turno» si preme in Battaglia, l'ultima fase, quindi prima passa alla Battaglia.",
         highlight=["btn-end-turn"],
     )
 
@@ -405,14 +408,17 @@ def _match_walls(params: dict) -> bool:
     return 1 <= len(walls) <= 3 and all(w.get("instance_id") != "the_pyric_1" for w in walls)
 
 
+def _walls_raised(state: GameState) -> bool:
+    """I Muri si posano uno alla volta: l'obiettivo è fatto quando sono su tutti e 3."""
+    return not any(iid in _human(state).hand for iid in _WALL_FODDER)
+
+
 TUTORIAL_PARTITA = TutorialDef(
     tutorial_id="partita",
     title="La tua prima partita",
     outro={
         "title": "Vittoria!",
-        "text": "Hai tolto l'ultima Vita al Manichino. In partita puoi leggere ogni carta a schermo intero: "
-                "passaci sopra col mouse, o tienila premuta sul telefono. Ora sei pronto: da «Gioca» puoi "
-                "sfidare amici o Bot.",
+        "text": "Hai tolto l'ultima Vita al Manichino. Ora sei pronto. Da «Gioca» puoi sfidare amici o Bot.",
     },
     steps=[
         TutorialStep(
@@ -423,47 +429,46 @@ TUTORIAL_PARTITA = TutorialDef(
         ),
         TutorialStep(
             "goal", "Benvenuto", "Le Vite",
-            "Le Vite sono carte coperte, tenute da parte. Proteggi le tue e togli quelle degli avversari: vince "
+            "Le Vite sono carte coperte, tenute da parte. Proteggi le tue e togli quelle degli avversari. Vince "
             "l'ultimo a cui ne resta almeno una. In questo tutorial affronti un Manichino che ne ha una sola.",
             highlight=["my-life-deck"],
         ),
         TutorialStep(
             "field", "Benvenuto", "Il tuo campo",
-            "Il tuo campo ha 4 Regioni: l'Avanscoperta, da cui attacchi; i due Bastioni, difesi da Muri e "
-            "Guerrieri; il Villaggio, per le Costruzioni.",
+            "Il tuo campo ha 4 Regioni, ognuna con il suo scopo. Dall'Avanscoperta attacchi, i due Bastioni sono "
+            "difesi da Muri e Guerrieri e il Villaggio ospita le Costruzioni.",
             highlight=["my-field"],
         ),
         # --- Turno 1 ---
         TutorialStep(
             "cards", "Turno 1 di 4", "Le carte",
-            "Le carte sono di tre tipi, e la cornice te lo dice: rossa per i Guerrieri, blu per le Magie, verde "
-            "per le Costruzioni. Le vedrai tutte in azione.",
+            "Le carte sono di tre tipi e la cornice li distingue. È rossa per i Guerrieri, blu per le Magie e "
+            "verde per le Costruzioni. Le vedrai tutte in azione.",
             highlight=[">hand-cards"],
         ),
         TutorialStep(
             "actions", "Turno 1 di 4", "Le Azioni",
             "A ogni turno hai 2 Azioni. Un'Azione può essere giocare una carta, completare una Costruzione o "
-            "aggiungere fino a 3 Muri: le proverai tutte durante il tutorial.",
+            "aggiungere fino a 3 Muri. Le proverai tutte durante il tutorial.",
             highlight=["my-actions"],
         ),
         TutorialStep(
             "mana", "Turno 1 di 4", "Il Mana",
             "Il Mana serve a giocare Guerrieri e Costruzioni, e a completare le Costruzioni. Ne ricevi a ogni "
-            "turno, sempre di più: ora ne hai 2.",
+            "turno, sempre di più. Ora ne hai 2.",
             highlight=["my-mana"],
         ),
         TutorialStep(
             "t1_actions", "Turno 1 di 4", "Le prime carte",
-            "Tocca Evelyn per scoprire cosa fa, poi trascinala in Avanscoperta: userai 2 Mana e un'Azione.",
+            "Tocca Evelyn per scoprire cosa fa, poi trascinala in Avanscoperta. Userai 2 Mana e un'Azione.",
             goals=[
                 Goal(
                     "evelyn", "Gioca Evelyn in Avanscoperta", "play_warrior",
                     match={"instance_id": "evelyn_1", "region": "vanguard"},
                     hint="Trascina Evelyn dalla mano in Avanscoperta.",
                     highlight=[">hand-cards", "my-vanguard", "my-stats"],
-                    feedback="Le Maghe in campo servono per lanciare le Magie. Tocca Ardolancio per scoprire "
-                             "cosa fa, poi trascinalo verso il campo e scegli il Bastione sinistro del Manichino: "
-                             "indebolirlo ti servirà per l'attacco finale.",
+                    feedback="Tocca Ardolancio per scoprire cosa fa, poi trascinalo verso il campo e scegli il "
+                             "Bastione sinistro del Manichino. Indebolirlo ti servirà per l'attacco finale.",
                 ),
                 Goal(
                     "ardolancio", "Lancia Ardolancio sul Bastione sinistro", "play_spell",
@@ -471,19 +476,20 @@ TUTORIAL_PARTITA = TutorialDef(
                            "target_bastion_side": "left"},
                     hint="Trascina Ardolancio verso il campo e scegli il Bastione sinistro del Manichino.",
                     after=["evelyn"],
-                    wait_hint="Per lanciare una Magia ti serve almeno una Maga in campo: prima gioca Evelyn.",
+                    wait_hint="Per lanciare una Magia ti serve almeno una Maga in campo, quindi prima gioca Evelyn.",
                     highlight=[">hand-cards", "top-opponents"],
                 ),
             ],
         ),
         TutorialStep(
             "t1_end", "Turno 1 di 4", "Fine del turno",
-            "2 Muri giù. Dopo le Azioni vengono lo Schieramento e la Battaglia: avanza fino alla Battaglia.",
+            "2 Muri giù. Dopo le Azioni vengono lo Schieramento e la Battaglia, quindi avanza fino alla "
+            "Battaglia.",
             show_opponents=True,  # si vede che al Manichino sono rimasti meno Muri
             goals=[
                 _to_phase(
                     "battaglia", "Passa alla Battaglia",
-                    feedback="Attaccare non è obbligatorio: qui lo farai solo all'ultimo turno. Ora termina il "
+                    feedback="Attaccare non è obbligatorio e qui lo farai solo all'ultimo turno. Ora termina il "
                              "turno.",
                 ),
                 _end_turn("to_battaglia"),
@@ -506,9 +512,9 @@ TUTORIAL_PARTITA = TutorialDef(
                     match={"instance_id": "araminta_1", "region": "vanguard"},
                     hint="Trascina Araminta dalla mano in Avanscoperta.",
                     highlight=[">hand-cards", "my-vanguard"],
-                    feedback="Reinhold (DIF 3) è il difensore più forte del Bastione sinistro: toglilo di mezzo. "
-                             "Cuordipietra richiede 2 Maghe, e Araminta ne condivide la Scuola, Anatema: uscirà in "
-                             "Prodigio.",
+                    feedback="Reinhold è il difensore avversario più forte, quindi toglilo di mezzo. "
+                             "Cuordipietra richiede 2 Maghe e Araminta ne condivide la Scuola, Anatema, quindi "
+                             "uscirà in Prodigio.",
                 ),
                 Goal(
                     "cuordipietra", "Lancia Cuordipietra su Reinhold", "play_spell",
@@ -516,52 +522,52 @@ TUTORIAL_PARTITA = TutorialDef(
                            "target_warrior_iid": "reinhold_1"},
                     hint="Trascina Cuordipietra verso il campo e scegli Reinhold, il difensore del Manichino.",
                     after=["araminta"],
-                    wait_hint="Cuordipietra richiede 2 Maghe in campo: prima gioca Araminta.",
+                    wait_hint="Cuordipietra richiede 2 Maghe in campo, quindi prima gioca Araminta.",
                     highlight=[">hand-cards", "top-opponents"],
                 ),
             ],
         ),
         TutorialStep(
             "t2_end", "Turno 2 di 4", "Fine del turno",
-            "Reinhold ora è un tuo Muro: col Base sarebbe finito tra quelli del Manichino. Il Mana che avanza si "
+            "Reinhold ora è un tuo Muro. Col Base sarebbe finito tra quelli del Manichino. Il Mana che avanza si "
             "perde a fine turno.",
             goals=[
                 _to_phase(
                     "battaglia", "Passa alla Battaglia",
-                    feedback="Anche stavolta niente attacco: termina il turno.",
+                    feedback="Anche stavolta niente attacco. Termina il turno.",
                 ),
                 _end_turn("to_battaglia"),
             ],
         ),
         TutorialStep(
             "dummy_2", "Turno del Manichino", "Un nuovo difensore",
-            "Il Manichino ha schierato Joseph (DIF 3) nel Bastione sinistro: ora lo difende insieme a Patrizio.",
+            "Il Manichino ha schierato Joseph (DIF 3) nel Bastione sinistro, che ora è difeso anche da Patrizio.",
             highlight=["top-opponents"],
             setup=_setup_dummy_turn_2,
         ),
         # --- Turno 3 ---
         TutorialStep(
             "t3_actions", "Turno 3 di 4", "Tre Maghe",
-            "Velocemento chiede 3 Maghe: manca Madeleine. Orfeo, nell'Avanscoperta del Manichino, minaccia i "
-            "tuoi Bastioni: mettila a difesa del destro.",
+            "Velocemento chiede 3 Maghe. Orfeo, nell'Avanscoperta del Manichino, minaccia i tuoi Bastioni: "
+            "schiera Madeleine a difesa del destro.",
             goals=[
                 Goal(
-                    "madeleine", "Gioca Madeleine nel Bastione destro", "play_warrior",
+                    "madeleine", "Schiera Madeleine nel Bastione destro", "play_warrior",
                     match={"instance_id": "madeleine_1", "region": "bastion_right"},
                     hint="Trascina Madeleine dalla mano nel tuo Bastione destro.",
                     highlight=[">hand-cards", "my-bastion-right"],
-                    feedback="Tre Maghe in campo: ora puoi lanciare Velocemento.",
+                    feedback="Tre Maghe in campo. Ora puoi lanciare Velocemento.",
                 ),
                 Goal(
                     "velocemento", "Lancia Velocemento", "play_spell",
                     match={"instance_id": "velocemento_1"},
                     hint="Trascina Velocemento dalla mano verso il campo.",
                     after=["madeleine"],
-                    wait_hint="Velocemento richiede 3 Maghe in campo: prima gioca Madeleine.",
+                    wait_hint="Velocemento richiede 3 Maghe in campo, quindi prima schiera Madeleine.",
                     highlight=[">hand-cards"],
-                    feedback="La Catapulta ora è Eterea (bordo bianco): si gioca gratis e senza Azioni, ma "
-                             "svanisce alla prossima Azione, alla Battaglia o a fine turno. Tocca la Catapulta per "
-                             "scoprire cosa fa, poi trascinala nel Villaggio.",
+                    feedback="La Catapulta ora è Eterea (bordo bianco). Si gioca gratis e senza Azioni, ma "
+                             "va giocata subito, altrimenti l'effetto svanisce. Tocca la Catapulta per scoprire "
+                             "cosa fa, poi trascinala nel Villaggio.",
                 ),
                 Goal(
                     "play_catapulta", "Gioca la Catapulta", "play_building",
@@ -569,21 +575,21 @@ TUTORIAL_PARTITA = TutorialDef(
                     hint="Trascina la Catapulta Eterea nel Villaggio.",
                     after=["velocemento"],
                     highlight=[">hand-cards", "my-village"],
-                    feedback="Completare costa di solito un'Azione e il Mana della piccola gemma: il Prodigio "
-                             "di Velocemento lo rende gratis.",
+                    feedback="Completare costa di solito un'Azione e il Mana della piccola gemma, ma il Prodigio "
+                             "di Velocemento lo rende gratis. Tocca la Catapulta nel Villaggio e premi «Completa».",
                 ),
                 Goal(
                     "complete_catapulta", "Completa la Catapulta", "complete_building",
                     match={"building_instance_id": "catapulta_1"},
-                    hint="Premi «Completa» e scegli la Catapulta nel Villaggio.",
+                    hint="Tocca la Catapulta nel Villaggio e premi «Completa».",
                     after=["play_catapulta"],
-                    highlight=["banner-btn-complete", "my-village"],
+                    highlight=["my-village"],
                 ),
             ],
         ),
         TutorialStep(
             "t3_deploy", "Turno 3 di 4", "Lo Schieramento",
-            "Catapulta completa: in Battaglia i tuoi Guerrieri hanno +2 GIT.",
+            "Catapulta completa. In Battaglia i tuoi Guerrieri hanno +2 GIT.",
             goals=[
                 _to_phase(
                     "schieramento", "Passa allo Schieramento",
@@ -597,7 +603,7 @@ TUTORIAL_PARTITA = TutorialDef(
                     after=["to_schieramento"],
                     highlight=["my-bastion-right", "my-vanguard"],
                     feedback="Tre Guerrieri della stessa Specie nella stessa Regione, anche se carte diverse, "
-                             "formano un'Orda: come le tue tre Maghe. Ne attivi un effetto, a scelta tra quelli "
+                             "formano un'Orda, come le tue tre Maghe. Ne attivi un effetto, a scelta tra quelli "
                              "dei tre.",
                 ),
                 Goal(
@@ -605,18 +611,18 @@ TUTORIAL_PARTITA = TutorialDef(
                     hint="Premi «Orda» e scegli un effetto.",
                     after=["reposition"],
                     highlight=["btn-horde", "my-vanguard"],
-                    feedback="L'Orda resta attiva finché le tre Maghe stanno insieme; scegliendo un altro "
-                             "effetto, il vecchio si spegne. Passa alla Battaglia e termina il turno: l'attacco è "
+                    feedback="L'Orda resta attiva finché le tre Maghe stanno insieme, e scegliendo un altro "
+                             "effetto il vecchio si spegne. Passa alla Battaglia e termina il turno, l'attacco è "
                              "per il prossimo.",
                 ),
                 _to_phase("battaglia", "Passa alla Battaglia", after="horde",
-                          feedback="Termina il turno: al prossimo attacchi."),
+                          feedback="Termina il turno, al prossimo attacchi."),
                 _end_turn("to_battaglia"),
             ],
         ),
         TutorialStep(
             "dummy_3", "Turno del Manichino", "Il contrattacco",
-            "Orfeo (ATT 3) ha attaccato il tuo Bastione destro: senza Madeleine e con pochi Muri, hai perso una "
+            "Orfeo (ATT 3) ha attaccato il tuo Bastione destro. Senza Madeleine e con pochi Muri, hai perso una "
             "Vita.",
             highlight=["my-bastion-right", "my-life-deck", "top-opponents"],
             setup=_setup_dummy_turn_3,
@@ -624,19 +630,20 @@ TUTORIAL_PARTITA = TutorialDef(
         # --- Turno 4 ---
         TutorialStep(
             "t4_actions", "Turno 4 di 4", "Il colpo finale",
-            "Ogni Muro assorbe un Danno: alzane qualcuno. Qualsiasi carta può diventare un Muro: usa Polemarco, "
-            "Agilpesca e Fucina, e tieni The Pyric per l'attacco.",
+            "Ogni Muro assorbe un Danno e qualsiasi carta può diventarlo. Tocca rapidamente due volte una carta "
+            "per girarla, poi trascinala in un tuo Bastione. Usa Polemarco, Agilpesca e Fucina, e tieni The Pyric "
+            "per l'attacco.",
             goals=[
                 Goal(
-                    "walls", "Aggiungi fino a 3 Muri", "add_wall",
+                    "walls", "Alza 3 Muri", "add_wall",
                     match=_match_walls,
-                    hint="Gira Polemarco, Agilpesca e Fucina toccandole, poi trascinale nei Bastioni: The Pyric ti serve "
-                         "per evolvere.",
-                    highlight=["banner-btn-wall", "wall-staging", ">hand-cards", "my-bastion-left",
-                               "my-bastion-right"],
-                    feedback="Un'Azione, niente Mana, fino a 3 Muri anche in Bastioni diversi; una carta messa "
-                             "a Muro non serve ad altro. Ora tocca The Pyric per scoprire cosa fa, poi evolvi "
-                             "Araminta.",
+                    hint="Tocca rapidamente due volte Polemarco, Agilpesca e Fucina per girarle, poi trascinale "
+                         "nei Bastioni. The Pyric ti serve per evolvere.",
+                    done=_walls_raised,
+                    highlight=[">hand-cards", "my-bastion-left", "my-bastion-right"],
+                    feedback="Fino a 3 Muri alzati di seguito valgono una sola Azione, anche in Bastioni "
+                             "diversi, e non costano Mana. Una carta messa a Muro non serve ad altro. Ora tocca "
+                             "The Pyric per scoprire cosa fa, poi evolvi Araminta.",
                 ),
                 Goal(
                     "evolve", "Evolvi Araminta in The Pyric", "evolve",
@@ -651,11 +658,11 @@ TUTORIAL_PARTITA = TutorialDef(
         TutorialStep(
             "t4_battle", "Turno 4 di 4", "La Battaglia",
             "The Pyric ha ATT 4 e ha ereditato l'Orda di Araminta. Puoi attaccare solo i Bastioni che confinano "
-            "con i tuoi: in due li hai tutti a portata.",
+            "con i tuoi, e in due li hai tutti a portata.",
             goals=[
                 _to_phase(
                     "battaglia", "Passa alla Battaglia",
-                    feedback="Attacca il Bastione sinistro del Manichino: prima di confermare vedrai come si "
+                    feedback="Attacca il Bastione sinistro del Manichino. Prima di confermare vedrai come si "
                              "calcola la Battaglia.",
                 ),
                 Goal(
@@ -667,7 +674,7 @@ TUTORIAL_PARTITA = TutorialDef(
                 ),
             ],
             battle_diagram={
-                "title": "La Battaglia: come si calcola",
+                "title": "Come si calcola la Battaglia",
                 "side": "left",
                 "sides": [
                     {"title": "Il tuo attacco",

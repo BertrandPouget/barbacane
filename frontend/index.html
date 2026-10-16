@@ -191,11 +191,11 @@
       <span id="hdr-turn">Turno 1</span>
       <!-- Fasi del turno: in corso evidenziata, già fatte barrate (renderer.js) -->
       <div id="phase-bar">
-        <span class="phase-step" id="pstep-action">1 Azioni</span>
+        <span class="phase-step" id="pstep-action">I. Azioni</span>
         <span class="phase-sep">›</span>
-        <span class="phase-step" id="pstep-schieramento">2 Schieramento</span>
+        <span class="phase-step" id="pstep-schieramento">II. Schieramento</span>
         <span class="phase-sep">›</span>
-        <span class="phase-step" id="pstep-battaglia">3 Battaglia</span>
+        <span class="phase-step" id="pstep-battaglia">III. Battaglia</span>
       </div>
     </div>
     <div class="header-center">
@@ -233,7 +233,14 @@
           <div id="battle-log" title="Apri la cronaca della partita"></div>
         </div>
 
-        <!-- Barra azioni centrale -->
+        <!-- I Bastioni ai lati, alti quanto Avanscoperta e Villaggio insieme -->
+        <div id="my-field">
+          <div id="my-bastion-left"  class="region bastion" data-side="left"  data-label="Bastione S."></div>
+          <div id="my-vanguard"      class="region vanguard"                  data-label="Avanscoperta"></div>
+          <div id="my-bastion-right" class="region bastion" data-side="right" data-label="Bastione D."></div>
+          <div id="my-village"       class="region village"                   data-label="Villaggio"></div>
+        </div>
+        <!-- Barra azioni: sotto il Villaggio, sopra la mano -->
         <div id="action-panel">
           <button id="panel-toggle" aria-label="Apri/chiudi pannello azioni">
             <span id="panel-toggle-label">⚙ Azioni</span>
@@ -242,26 +249,13 @@
 
           <!-- Tre colonne: comandi a sinistra, Mana e Azioni al centro, pulsanti a destra -->
           <div class="ap-left">
-          <!-- Banner: scegli tipo di azione (fase Azioni) -->
+          <!-- Banner della fase Azioni: il conto delle Azioni (le carte si giocano
+               trascinandole, girate col doppio clic per i Muri) -->
           <div id="action-banner" class="hidden">
             <div id="banner-turn-label" class="banner-label">Azione 1 di 2</div>
-            <button id="banner-btn-play"     class="banner-btn">🃏 Gioca carta</button>
-            <button id="banner-btn-complete" class="banner-btn">🏗️ Completa</button>
-            <button id="banner-btn-wall"     class="banner-btn">🧱 Aggiungi muri</button>
-          </div>
-
-          <!-- Annulla azione corrente -->
-          <button id="btn-cancel-action" class="btn btn-secondary hidden">↩ Annulla</button>
-
-          <!-- Selezione muri -->
-          <div id="wall-staging" class="hidden">
-            <div class="wall-stage-header">Muri: <span id="wall-count">0</span>/3</div>
-            <div id="wall-hint" class="hint"></div>
-            <button id="wall-confirm-btn" class="btn btn-primary btn-small" disabled>Conferma muri</button>
           </div>
 
           <div id="action-hint" class="hint"></div>
-          <div id="selection-info" class="selection-box hidden"></div>
           </div>
 
           <div id="my-stats" class="player-stats">
@@ -277,16 +271,6 @@
           </div>
         </div>
 
-        <div id="my-field">
-          <div class="field-row" id="my-bastions-row">
-            <div id="my-bastion-left"  class="region bastion" data-side="left"  data-label="Bastione S."></div>
-            <div id="my-vanguard"      class="region vanguard"                  data-label="Avanscoperta"></div>
-            <div id="my-bastion-right" class="region bastion" data-side="right" data-label="Bastione D."></div>
-          </div>
-          <div class="field-row" id="my-village-row">
-            <div id="my-village" class="region village" data-label="Villaggio"></div>
-          </div>
-        </div>
         <div id="my-bottom-area">
           <div id="my-life-deck" class="region life-deck" data-label="Vite"></div>
           <div id="my-active-cards" class="region active-cards" data-label="Carte Attive" style="display:none"></div>

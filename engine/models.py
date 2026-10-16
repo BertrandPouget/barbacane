@@ -140,6 +140,10 @@ class Player(BaseModel):
     mana: int = 0
     mana_remaining: int = 0
     actions_remaining: int = 2
+    # Muri posati uno alla volta: l'Azione «aggiungi Muri» resta aperta per altri
+    # wall_slots Muri finché il log è lungo wall_slots_mark (nient'altro nel mezzo)
+    wall_slots: int = 0
+    wall_slots_mark: int = -1
     hand: List[str] = Field(default_factory=list)  # instance_ids
     field: PlayerField = Field(default_factory=PlayerField)
     active_effects: List[Dict[str, Any]] = Field(default_factory=list)

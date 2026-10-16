@@ -179,13 +179,10 @@ const Render = (() => {
     return wrap;
   }
 
-  // pending: Muri posati e non ancora confermati (scelta dei Muri): si contano,
-  // e il numero è giallo finché l'Azione non è confermata
-  function bastionSummary(bastion, pending = 0) {
-    const wallCount = (bastion.wall_count ?? (bastion.walls || []).length) + pending;
+  function bastionSummary(bastion) {
+    const wallCount = bastion.wall_count ?? (bastion.walls || []).length;
     const warriors = bastion.warriors || [];
     const walls = _statBlock(wallCount, wallCount === 1 ? 'Muro' : 'Muri');
-    if (pending) walls.classList.add('pending');
     const wrap = el('div', { className: 'rg-summary' }, [
       _statRow(
         walls,
@@ -349,17 +346,16 @@ const Render = (() => {
     });
   }
 
-  // Riepilogo nel riquadro di un mio Bastione; pending = Muri posati in attesa
-  // di conferma (app.js, renderWallPending)
-  function bastionTile(me, side, pending = 0) {
+  // Riepilogo nel riquadro di un mio Bastione
+  function bastionTile(me, side) {
     const bastion = side === 'left' ? me.field.bastion_left : me.field.bastion_right;
     const wrap = $(side === 'left' ? 'bl-cards' : 'br-cards');
     wrap.innerHTML = '';
     const wallCount = bastion.wall_count ?? (bastion.walls || []).length;
     const warriors = bastion.warriors || [];
-    wrap.appendChild(wallCount + pending === 0 && warriors.length === 0
+    wrap.appendChild(wallCount === 0 && warriors.length === 0
       ? el('div', { className: 'rg-empty' }, ['Vuoto'])
-      : bastionSummary(bastion, pending));
+      : bastionSummary(bastion));
   }
 
   // ---------------------------------------------------------------------------
@@ -440,7 +436,7 @@ const Render = (() => {
       let node;
       if (prev && prev.ethereal === ethereal) {
         node = prev.node;
-        node.classList.remove('wall-marked', 'wall-placed');  // la modalità Muri li riapplica se serve
+        node.classList.remove('wall-marked');  // le carte girate le rigira app.js (applyWallFlips)
         node.style.opacity = '';
         // La fascia della minicarta può cambiare anche se la carta resta (es. Prodigio)
         const def = Mob.getCardDef(iid);
@@ -462,7 +458,6 @@ const Render = (() => {
   // che legge l'inclinazione per i fantasmi). La mano non scorre: se le carte non
   // ci stanno in larghezza si sovrappongono quanto serve.
   function fanHand(nodes = [...document.querySelectorAll('#hand .card')]) {
-    nodes = nodes.filter(nd => !nd.classList.contains('wall-placed'));  // Muri già posati nei Bastioni
     const n = nodes.length;
     if (!n) return;
     const step = n > 1 ? Math.min(4, 14 / (n - 1)) : 0;  // apertura totale massima 14°
@@ -661,7 +656,6 @@ const Render = (() => {
     statusbar,
     hand,
     fanHand,
-    bastionTile,
     warriorMini,
     buildingMini,
     deckNode,

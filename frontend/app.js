@@ -16,11 +16,10 @@ const App = (() => {
   let currentState = null;
   let cardDefs = {};
   let instanceMap = {};
-  let selectedCard = null;
 
-  // Macchina a stati per le azioni del turno
-  let actionMode = null;    // null | 'play_card' | 'complete_building' | 'add_walls'
-  let wallsSelected = [];   // [{instanceId, bastion: null|'left'|'right'}]: null = girata, da posare
+  // Carte girate col doppio clic: trascinate in un Bastione diventano Muri
+  // (ognuna subito, vedi _startFlippedWallDrag)
+  const wallFlips = new Set();
 
   // Orda di Evelyn: base_card_id della Magia da rigiocare una seconda volta.
   // Finché è valorizzato, le sendAction('play_spell') vengono convertite in
@@ -69,8 +68,8 @@ const App = (() => {
     bindLobbyUI();
     bindSplashUI();
     bindHandDrag();
+    _bindWallFlip();
     bindFieldDrag();
-    _bindWallPendingClick();
     Spotlight.keepVisible(['btn-abandon']);  // nel tutorial «Abbandona» resta scoperto
     ['create-name', 'join-name'].forEach(id => { document.getElementById(id).value = PlayerName.get(); });
     // Pagina ricaricata durante una partita: si torna subito al tavolo
@@ -231,13 +230,6 @@ const App = (() => {
     document.getElementById('btn-abandon').addEventListener('click', onAbandonClick);
     bindBastionClickHandlers();
 
-    // Banner azione
-    document.getElementById('banner-btn-play').addEventListener('click', enterPlayCardMode);
-    document.getElementById('banner-btn-complete').addEventListener('click', enterCompleteBuildingMode);
-    document.getElementById('banner-btn-wall').addEventListener('click', enterAddWallsMode);
-    document.getElementById('btn-cancel-action').addEventListener('click', cancelActionMode);
-    document.getElementById('wall-confirm-btn').addEventListener('click', confirmWalls);
-
     // Toggle pannello mobile
     const panelToggle = document.getElementById('panel-toggle');
     if (panelToggle) {
@@ -380,9 +372,6 @@ const App = (() => {
     hideTutorialStep();
     if (stopCardReading) stopCardReading();
     leavingGame = false;
-    selectedCard = null;
-    actionMode = null;
-    wallsSelected = [];
     currentState = null;
     gameId = null;
     sessionToken = null;
@@ -450,8 +439,18 @@ const App = (() => {
     prevBtn.classList.toggle('hidden', !state.tutorial.can_go_back);
     prevBtn.disabled = false;
     panel.classList.remove('hidden');
-    Spotlight.show(step.highlight || [], panel, { center: !!step.panel_center });
+    Spotlight.show(step.highlight || [], panel, { center: !!step.panel_center, avoid: TUTORIAL_AVOID, preferCenter: true });
   }
+
+  // Cosa il pannello del tutorial evita di coprire, oltre alle zone evidenziate
+  // (spotlight.js): avversari, cronaca e carte; ancora di più Mana, Azioni e
+  // pulsanti. Le finestre di scelta no: passano sopra il pannello.
+  const TUTORIAL_AVOID = [
+    '#top-opponents', '#left-strip', '#right-strip', '#battle-log > *',
+    ['#phase-bar', 5], ['#game-header .btn', 5],
+    ['#my-field .card', 3], ['#hand-cards .card', 3], '#my-life-deck',
+    ['#banner-turn-label', 20], ['#my-stats', 20], ['#action-panel .ap-right .btn', 20],
+  ];
 
   // Fine tutorial: stesso pannello, centrato a schermo spento, con un solo
   // pulsante per tornare al menu.
@@ -1382,17 +1381,10 @@ const App = (() => {
   function _refreshActionUI() {
     // Guerrieri trascinabili (illuminati appena) durante il mio Schieramento
     document.getElementById('my-field').classList.toggle('can-reposition', _canReposition());
-    // Resetta lo stato azione dopo ogni aggiornamento server
-    actionMode = null;
-    wallsSelected = [];
-    selectedCard = null;
-
-    document.getElementById('wall-staging').classList.add('hidden');
-    document.getElementById('btn-cancel-action').classList.add('hidden');
-    document.getElementById('selection-info').classList.add('hidden');
-    document.querySelectorAll('#hand-cards .card.wall-marked, #hand-cards .card.wall-placed')
-      .forEach(c => c.classList.remove('wall-marked', 'wall-placed'));
-    _renderWallPending();
+    // Le carte della mano restano le stesse tra un disegno e l'altro: le spente
+    // si riaccendono, e _showBanner rispegne quelle da spegnere
+    document.querySelectorAll('#hand-cards .card.unplayable').forEach(c => c.classList.remove('unplayable'));
+    _applyWallFlips();
 
     const hide = id => document.getElementById(id).classList.add('hidden');
     const show = id => document.getElementById(id).classList.remove('hidden');
@@ -1454,7 +1446,7 @@ const App = (() => {
     const phase = currentState.phase;
 
     if (phase === 'action') {
-      if (player && (player.actions_remaining > 0 || _hasFreeActions(player))) {
+      if (player && (player.actions_remaining > 0 || player.wall_slots > 0 || _hasFreeActions(player))) {
         _showBanner(player);
       } else {
         document.getElementById('action-hint').textContent = 'Nessuna azione rimasta.';
@@ -1527,253 +1519,87 @@ const App = (() => {
     const actNum = maxActions - player.actions_remaining + 1;
     // Azioni finite: restano solo le giocate che non consumano Azioni (Orde, eterea, Decumano)
     const noActions = player.actions_remaining <= 0;
-    document.getElementById('banner-turn-label').textContent = noActions
+    const rem = player.actions_remaining;
+    // Muri posati da poco: i successivi (fino a 3) rientrano nella stessa Azione
+    const slots = player.wall_slots || 0;
+    document.getElementById('banner-turn-label').textContent = slots > 0
+      ? `Ancora ${slots} Mur${slots === 1 ? 'o' : 'i'} in quest'Azione · ${rem} Azion${rem === 1 ? 'e' : 'i'} rimast${rem === 1 ? 'a' : 'e'}`
+      : noActions
       ? `Azioni esaurite · ${_freeActionsLabel(player)}`
-      : `Azione ${actNum} · ${player.actions_remaining} rimast${player.actions_remaining === 1 ? 'a' : 'e'}`;
-
-    const hasCards = player.hand && player.hand.length > 0;
-
-    document.getElementById('banner-btn-play').disabled     = !hasCards || (noActions && !_hasFreePlays(player));
-    // Spento se nessuna Costruzione si può completare ora (tutte complete, Mana o Azioni)
-    document.getElementById('banner-btn-complete').disabled = _completableBuildings(player).length === 0;
-    document.getElementById('banner-btn-wall').disabled     = noActions || !hasCards;
+      : `Azione ${actNum} · ${rem} rimast${rem === 1 ? 'a' : 'e'}`;
 
     document.getElementById('action-banner').classList.remove('hidden');
     document.getElementById('action-hint').textContent = '';
+    _updatePlayableMarkings(player);
   }
 
-  function enterPlayCardMode() {
-    if (!currentState || currentState.current_player_id !== myPlayerId) return;
-    actionMode = 'play_card';
-    document.getElementById('action-banner').classList.add('hidden');
-    document.getElementById('btn-cancel-action').classList.remove('hidden');
-    document.getElementById('action-hint').textContent = 'Clicca una carta dalla mano.';
-    _updatePlayableMarkings();
-  }
-
-  // Senza Azioni restano "accese" solo le carte giocabili gratis (vedi _isFreePlay)
-  function _updatePlayableMarkings() {
-    const player = currentState && currentState.players.find(p => p.id === myPlayerId);
-    const dim = actionMode === 'play_card' && player && player.actions_remaining <= 0;
+  // Senza Azioni restano "accese" solo le carte giocabili gratis (vedi
+  // _isFreePlay) e, se l'Azione dei Muri è ancora aperta, quelle girate
+  function _updatePlayableMarkings(player) {
+    const dim = player.actions_remaining <= 0;
     document.querySelectorAll('#hand-cards .card').forEach(card => {
       const iid = card.dataset.instanceId;
-      const playable = !dim || _isFreePlay(player, iid);
+      const playable = !dim || _isFreePlay(player, iid) || (wallFlips.has(iid) && player.wall_slots > 0);
       card.classList.toggle('unplayable', !playable);
     });
   }
 
-  // Costruzioni del Villaggio che ora si possono completare (dal server:
-  // complete_errors, null = completabile)
-  function _completableBuildings(player) {
-    const errs = (player && player.complete_errors) || {};
-    return Object.keys(errs).filter(iid => !errs[iid]);
-  }
+  // ---------------------------------------------------------------------------
+  // Muri
+  // ---------------------------------------------------------------------------
 
-  // «Completa»: si accendono le Costruzioni completabili; cliccandone una si
-  // conferma (vedi onCardClick → _askCompleteBuilding)
-  function enterCompleteBuildingMode() {
-    if (!currentState || currentState.current_player_id !== myPlayerId) return;
-    const player = currentState.players.find(p => p.id === myPlayerId);
-    const completable = _completableBuildings(player);
-    if (completable.length === 0) return;
-
-    actionMode = 'complete_building';
-    document.getElementById('action-banner').classList.add('hidden');
-    document.getElementById('btn-cancel-action').classList.remove('hidden');
-    document.getElementById('action-hint').textContent = 'Clicca la Costruzione da completare.';
-    _markCompletable(completable);
-  }
-
-  // Le Costruzioni assegnate (Trono) non stanno nel Villaggio: si accende la
-  // carta che sbuca sotto il Guerriero, e si clicca il Guerriero
-  function _markCompletable(iids) {
-    document.querySelectorAll('#my-village .card.completable, #my-field .mc-under.completable')
-      .forEach(c => c.classList.remove('completable'));
-    document.querySelectorAll('#my-field .card.completable-host').forEach(c => c.classList.remove('completable-host'));
-    (iids || []).forEach(iid => {
-      const sel = CSS.escape(iid);
-      const el = document.querySelector(`#my-village .card[data-instance-id="${sel}"]`);
-      if (el) { el.classList.add('completable'); return; }
-      const under = document.querySelector(`#my-field .mc-under[data-assigned-id="${sel}"]`);
-      if (under) {
-        under.classList.add('completable');
-        under.parentElement.classList.add('completable-host');
+  // Doppio clic su una carta in mano: si gira per essere giocata come Muro, o
+  // torna di fronte
+  function _bindWallFlip() {
+    document.getElementById('hand-cards').addEventListener('dblclick', e => {
+      const card = e.target.closest('.card');
+      if (!card || !card.dataset.instanceId) return;
+      const iid = card.dataset.instanceId;
+      const on = !wallFlips.has(iid);
+      if (on) wallFlips.add(iid); else wallFlips.delete(iid);
+      CardArt.flipWall(card, on);
+      const me = currentState && currentState.players.find(p => p.id === myPlayerId);
+      if (me && currentState.current_player_id === myPlayerId && currentState.phase === 'action') {
+        _updatePlayableMarkings(me);
       }
     });
   }
 
-  // Costruzione assegnata a un mio Guerriero ancora da completare (es. Trono), o null
-  function _incompleteAssignedOf(warriorIid) {
-    const me = currentState.players.find(p => p.id === myPlayerId);
-    const errs = (me && me.complete_errors) || {};
-    const w = me && _getAllWarriors(me).find(x => x.instance_id === warriorIid);
-    const ac = w && (w.assigned_cards || []).find(a => a.instance_id && a.instance_id in errs);
-    return ac ? ac.instance_id : null;
-  }
-
-  function _askCompleteBuilding(instanceId) {
-    const me = currentState.players.find(p => p.id === myPlayerId);
-    const errs = (me && me.complete_errors) || {};
-    if (!(instanceId in errs)) return;  // già completa
-    if (errs[instanceId]) { Renderer.toast(errs[instanceId], 'error'); return; }
-    const b = (me.field.village.buildings || []).find(x => x.instance_id === instanceId);
-    const def = getCardDef(instanceId);
-    const name = def ? def.name : instanceId;
-    const free = b && _isFreeComplete(me, b);
-    const cost = me.ethereal_complete === instanceId ? 'Gratis (Velocemento)'
-      : `${def ? _costLabel(def.completion_cost, _reinholdDiscount(me)) : '?'} Mana`;
-    const effect = def && def.complete_effect ? def.complete_effect.replace(/^&\s*/, '') : '';
-    Renderer.showModal(
-      `Completa ${name}`,
-      `Costo: <strong>${cost}</strong>${free ? ' · senza Azione' : ''}${effect ? `<br>${effect}` : ''}`,
-      () => sendAction('complete_building', { building_instance_id: instanceId }),
-    );
-  }
-
-  function enterAddWallsMode() {
-    if (!currentState || currentState.current_player_id !== myPlayerId) return;
-    actionMode = 'add_walls';
-    wallsSelected = [];
-    document.getElementById('action-banner').classList.add('hidden');
-    document.getElementById('btn-cancel-action').classList.remove('hidden');
-    document.getElementById('wall-staging').classList.remove('hidden');
-    document.getElementById('action-hint').textContent = 'Clicca le carte da usare come Muri (max 3), poi trascinale nei Bastioni.';
-    renderWallStaging();
-  }
-
-  function cancelActionMode() {
-    _markCompletable([]);
-    actionMode = null;
-    wallsSelected = [];
-    _updateWallMarkings();
-    selectedCard = null;
-    document.getElementById('wall-staging').classList.add('hidden');
-    document.getElementById('btn-cancel-action').classList.add('hidden');
-    document.getElementById('action-hint').textContent = '';
-    document.getElementById('selection-info').classList.add('hidden');
-    document.querySelectorAll('#hand-cards .card.unplayable').forEach(c => c.classList.remove('unplayable'));
-
-    if (!currentState || currentState.current_player_id !== myPlayerId) return;
-    const player = currentState.players.find(p => p.id === myPlayerId);
-    if (player && currentState.phase === 'action' &&
-        (player.actions_remaining > 0 || _hasFreeActions(player))) _showBanner(player);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Selezione muri
-  // ---------------------------------------------------------------------------
-
-  // Muri: il clic su una carta in mano la gira (scelta come Muro, max 3) o la
-  // rigira; le carte girate si trascinano in un Bastione (_startWallDrag), dove
-  // spariscono dalla mano e compare una pila «+N» (cliccandola tornano in mano).
-  // «Conferma» quando sono tutte posate.
-  function toggleWallCard(instanceId) {
-    const idx = wallsSelected.findIndex(w => w.instanceId === instanceId);
-    if (idx >= 0) {
-      wallsSelected.splice(idx, 1);
-    } else {
-      if (wallsSelected.length >= 3) {
-        Renderer.toast('Massimo 3 muri per azione', 'error');
-        return;
-      }
-      wallsSelected.push({ instanceId, bastion: null });
-    }
-    _updateWallMarkings();
-  }
-
-  const _isUnplacedWall = iid => wallsSelected.some(w => w.instanceId === iid && !w.bastion);
-
-  function _updateWallMarkings() {
+  // Dopo ogni ridisegno della mano: le carte girate restano girate (senza
+  // rifare il giro); quelle uscite dalla mano si dimenticano
+  function _applyWallFlips() {
+    const inHand = new Set();
     document.querySelectorAll('#hand-cards .card').forEach(card => {
-      const w = wallsSelected.find(x => x.instanceId === card.dataset.instanceId);
-      CardArt.flipWall(card, !!w);
-      card.classList.toggle('wall-placed', !!(w && w.bastion));
+      const iid = card.dataset.instanceId;
+      inHand.add(iid);
+      if (wallFlips.has(iid)) CardArt.flipWall(card, true, true);
     });
-    Renderer.fanHand();
-    _renderWallPending();
-    renderWallStaging();
+    [...wallFlips].forEach(iid => { if (!inHand.has(iid)) wallFlips.delete(iid); });
   }
 
-  // Muri posati (non ancora confermati): si aggiungono alla pila dei Muri del
-  // Bastione, col numero in giallo finché l'Azione non è confermata (la pila si
-  // crea se il Bastione non ne ha). Cliccandola tornano in mano.
-  function _renderWallPending() {
-    ['left', 'right'].forEach(side => {
-      const region = document.getElementById(`my-bastion-${side}`);
-      if (!region) return;
-      const n = wallsSelected.filter(w => w.bastion === side).length;
-      let deck = region.querySelector('.deck-wall');
-      // Ripristina la pila com'era
-      if (deck && deck.dataset.baseCount !== undefined) {
-        if (deck.dataset.temp) { deck.remove(); deck = null; }
-        else {
-          deck.querySelector('.deck-count span').textContent = deck.dataset.baseCount;
-          deck.classList.remove('wall-pending');
-          delete deck.dataset.baseCount;
-        }
-      }
-      if (!n) return;
-      if (!deck) {
-        deck = document.createElement('div');
-        deck.className = 'card card-sm in-field deck deck-wall';
-        deck.dataset.temp = '1';
-        deck.innerHTML = `<img class="deck-back" alt="" draggable="false" src="${CardArt.miniUrl('retro')}">` +
-          '<div class="deck-count"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="3"/></svg><span>0</span></div>';
-        const row = region.querySelector('.region-cards') || region;
-        row.insertBefore(deck, row.firstChild);
-      }
-      const span = deck.querySelector('.deck-count span');
-      deck.dataset.baseCount = deck.dataset.temp ? '0' : span.textContent;
-      span.textContent = String(Number(deck.dataset.baseCount) + n);
-      deck.classList.add('wall-pending');
-      deck.title = 'Muri da confermare: clicca per riprenderli';
-    });
+  // Perché ora non si può alzare un Muro (o null)
+  function _wallRefusal() {
+    if (!currentState || currentState.current_player_id !== myPlayerId) return 'Non è il tuo turno.';
+    if (currentState.phase !== 'action') return 'I Muri si alzano nella fase Azioni.';
+    const me = currentState.players.find(p => p.id === myPlayerId);
+    if (!me || !(me.actions_remaining > 0 || me.wall_slots > 0)) return 'Azioni esaurite per questo turno.';
+    return null;
   }
 
-  // Clic sulla pila con Muri in attesa: tornano in mano (prima del clic della
-  // pila, che aprirebbe l'elenco dei Muri)
-  function _bindWallPendingClick() {
-    document.getElementById('my-field').addEventListener('click', (e) => {
-      const deck = e.target.closest('.deck-wall.wall-pending');
-      if (!deck) return;
-      e.stopPropagation();
-      const side = deck.closest('#my-bastion-left') ? 'left' : 'right';
-      wallsSelected.forEach(w => { if (w.bastion === side) w.bastion = null; });
-      _updateWallMarkings();
-    }, true);
-  }
-
-  function _startWallDrag(card, x, y) {
+  // Carta girata trascinata in un Bastione: diventa subito un Muro
+  function _startFlippedWallDrag(card, x, y) {
+    const err = _wallRefusal();
+    if (err) { Renderer.toast(err, 'error'); return false; }
     const iid = card.dataset.instanceId;
     const zones = ['left', 'right'].map(side => ({ key: side, el: document.getElementById(`my-bastion-${side}`) }));
     DragPlay.start(card, x, y, {
       zones,
       onDrop: side => {
-        const w = wallsSelected.find(x2 => x2.instanceId === iid);
-        if (w) w.bastion = side;
-        _updateWallMarkings();
-        return 'land';
+        sendAction('add_wall', { walls: [{ instance_id: iid, bastion: side }] });
+        return true;
       },
     });
     return true;
-  }
-
-  function renderWallStaging() {
-    const countEl    = document.getElementById('wall-count');
-    const confirmBtn = document.getElementById('wall-confirm-btn');
-    const hintEl     = document.getElementById('wall-hint');
-    const toPlace = wallsSelected.filter(w => !w.bastion).length;
-    countEl.textContent = wallsSelected.length;
-    confirmBtn.disabled = wallsSelected.length === 0 || toPlace > 0;
-    hintEl.textContent = !wallsSelected.length ? 'Clicca le carte in mano per girarle'
-      : toPlace ? 'Trascina i Muri nei Bastioni'
-      : 'Conferma per alzare i Muri';
-  }
-
-  function confirmWalls() {
-    if (wallsSelected.length === 0 || wallsSelected.some(w => !w.bastion)) return;
-    const walls = wallsSelected.map(w => ({ instance_id: w.instanceId, bastion: w.bastion }));
-    sendAction('add_wall', { walls });
   }
 
   // ---------------------------------------------------------------------------
@@ -1782,20 +1608,6 @@ const App = (() => {
 
   function onCardClick(instanceId, source) {
     if (!currentState) return;
-
-    // In modalità muro, il click sulla mano toglie/aggiunge la carta alla selezione
-    if (source === 'hand' && actionMode === 'add_walls') {
-      if (currentState.current_player_id !== myPlayerId) return;
-      toggleWallCard(instanceId);
-      return;
-    }
-    // Dopo «Completa», il click su una Costruzione del Villaggio la completa (o
-    // su un Guerriero, la Costruzione assegnata a lui: il Trono)
-    if (actionMode === 'complete_building' && (source === 'village' || source === 'field')) {
-      const target = source === 'village' ? instanceId : _incompleteAssignedOf(instanceId);
-      if (target) { _askCompleteBuilding(target); return; }
-      if (source === 'village') return;
-    }
 
     if (['hand', 'field', 'village', 'opponent'].includes(source) && !cardHasDetail(instanceId, source)) return;
 
@@ -1840,8 +1652,7 @@ const App = (() => {
   // Nel mio turno, in fase Azioni
   function _canDragFromHand() {
     if (!currentState) return false;
-    if (currentState.current_player_id !== myPlayerId || currentState.phase !== 'action') return false;
-    return actionMode !== 'add_walls' && actionMode !== 'complete_building';
+    return currentState.current_player_id === myPlayerId && currentState.phase === 'action';
   }
 
   // Perché la carta ora non si può giocare (o null). Si trascina lo stesso, verso
@@ -1901,14 +1712,13 @@ const App = (() => {
   function bindHandDrag() {
     _bindPressDrag(document.getElementById('hand-cards'),
       t => {
-        // Scelta dei Muri: si trascinano solo le carte girate, nei Bastioni
-        if (actionMode === 'add_walls') {
-          const c = t.closest('.card');
-          return c && _isUnplacedWall(c.dataset.instanceId) ? c : null;
-        }
-        return _canDragFromHand() ? t.closest('.card') : null;
+        // Carte girate (Muri): l'errore, se non si possono posare, al trascinamento
+        const c = t.closest('.card');
+        if (c && wallFlips.has(c.dataset.instanceId)) return c;
+        return _canDragFromHand() ? c : null;
       },
-      (card, x, y) => (actionMode === 'add_walls' ? _startWallDrag(card, x, y) : _startHandDrag(card, x, y)));
+      (card, x, y) => (wallFlips.has(card.dataset.instanceId) ? _startFlippedWallDrag(card, x, y)
+        : _startHandDrag(card, x, y)));
   }
 
   // -- Schieramento: i miei Guerrieri si trascinano su un'altra Regione --------
@@ -2170,12 +1980,10 @@ const App = (() => {
     const extraButtons = [];
 
     if (source === 'hand' && isMyTurn) {
-      if (actionMode === 'play_card' || actionMode === null) {
-        const player = currentState.players.find(p => p.id === myPlayerId);
-        if (player && (player.actions_remaining > 0 || _isFreePlay(player, instanceId))) {
-          actionLabel = 'Gioca';
-          onAction = () => { Renderer.closeCardDetail(); showPlayOptions(instanceId, def); };
-        }
+      const player = currentState.players.find(p => p.id === myPlayerId);
+      if (player && (player.actions_remaining > 0 || _isFreePlay(player, instanceId))) {
+        actionLabel = 'Gioca';
+        onAction = () => { Renderer.closeCardDetail(); showPlayOptions(instanceId, def); };
       }
     } else if (source === 'field' && isMyTurn && currentState.phase === 'schieramento') {
       actionLabel = 'Riposiziona';
@@ -3234,9 +3042,6 @@ const App = (() => {
     SavedGame.clear();
     rematchOffer = null;
     leavingGame = false;
-    selectedCard = null;
-    actionMode = null;
-    wallsSelected = [];
     currentState = null;
     gameId = null;
     lobbyCode = null;

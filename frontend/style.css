@@ -1158,13 +1158,17 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 .chr-entry.fresh { animation: chr-fresh 1.2s ease; }
 .chr-older { color: var(--text-dim); font-size: 0.8rem; font-style: italic; padding: 0.4rem 0; }
 
-/* Campo locale */
+/* Campo locale: i Bastioni ai lati occupano due righe, al centro Avanscoperta
+   sopra e Villaggio sotto. Le righe hanno altezza fissa, così le carte dei
+   Bastioni non le allungano ma scorrono in verticale. */
 #my-field {
   background: transparent;
   padding: 6px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) minmax(120px, 2fr) minmax(80px, 1fr);
+  grid-template-rows: calc(var(--card-h-field) + 70px) calc(var(--card-h-field) + 44px);
+  grid-template-areas: "bl vg br" "bl vi br";
+  gap: 6px;
   /* Con il campo pieno su uno schermo basso è il campo a scorrere in verticale:
      la mano sotto resta sempre intera */
   min-height: 0;
@@ -1224,11 +1228,9 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   order: -2;
 }
 
-/* Riga «Esposto a …» dei Bastioni: l'Avanscoperta la ha vuota, così le carte
-   della riga partono tutte alla stessa altezza (il Villaggio non ne ha bisogno) */
+/* Riga «Esposto a …» dei Bastioni */
 #my-bastion-left::after,
-#my-bastion-right::after,
-#my-vanguard::after {
+#my-bastion-right::after {
   content: attr(data-sub);
   display: block;
   width: 100%;
@@ -1296,20 +1298,38 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 .region.bastion:hover { border-color: var(--text-dim); }
 .region.village     { flex: 3; min-width: 160px; }
 
-/* Le 4 Regioni del mio campo hanno la stessa altezza fissa: etichetta in cima,
-   riga di carte, riepilogo (ATT/DIF max) in fondo */
+/* Regioni del mio campo, alte quanto la loro cella della griglia: etichetta in
+   cima, carte centrate nello spazio che resta, riepilogo (ATT/DIF max) in fondo */
 #my-field .region {
   flex-direction: column;
   flex-wrap: nowrap;
   align-items: stretch;
-  height: calc(var(--card-h-field) + 82px);
   min-height: 0;
+  min-width: 0;
 }
-#my-field .region > .region-cards { flex: 0 0 auto; }
-/* Il Villaggio non ha né la riga «Esposto a» né il riepilogo in fondo: meno
-   alto delle altre tre */
-#my-field #my-village { height: calc(var(--card-h-field) + 44px); }
-#my-field .region-stats-recap { margin-top: auto; }
+#my-field #my-bastion-left  { grid-area: bl; }
+#my-field #my-vanguard      { grid-area: vg; }
+#my-field #my-bastion-right { grid-area: br; }
+#my-field #my-village       { grid-area: vi; }
+#my-field .region > .region-cards {
+  flex: 0 1 auto;
+  min-height: 0;
+  margin-block: auto;
+}
+/* Bastioni: le carte vanno a capo (quante per riga dipende dalla larghezza) e
+   se sono troppe scorrono in verticale */
+#my-field .region.bastion > .region-cards {
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: flex-start;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+/* Riepilogo (ATT/DIF max) in fondo alla Regione: le carte, centrate coi margini
+   automatici, lo spingono giù */
+#my-field .region-stats-recap { flex: 0 0 auto; }
+#my-field .region.bastion > .region-cards > :first-child,
+#my-field .region.bastion > .region-cards > :last-child { margin-left: 0; margin-right: 0; }
 
 .region.drop-target {
   border-color: var(--gold);
@@ -1327,7 +1347,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   align-self: center;
 }
 
-/* Nella barra delle azioni: stessa misura dei pulsanti (.btn, .banner-btn) */
+/* Nella barra delle azioni: stessa misura dei pulsanti (.btn) */
 #my-stats { font-size: 0.95rem; }
 #my-mana    { color: var(--gold-light); }
 #my-actions { color: #8fcde4; }  /* l'azzurro della stella delle Maghe (--hex-maga) */
@@ -2031,15 +2051,6 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   font-style: italic;
 }
 
-.selection-box {
-  background: var(--bg-dark);
-  border: 1px solid var(--border-gold);
-  border-radius: 4px;
-  padding: 0.5rem;
-  font-size: 0.75rem;
-  color: var(--gold-light);
-}
-
 
 /* ==================== MODALE ==================== */
 
@@ -2593,64 +2604,6 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   white-space: nowrap;
 }
 
-.banner-btn {
-  width: auto;
-  padding: 0.35rem 0.6rem;
-  background: var(--bg-light);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text);
-  font-family: inherit;
-  font-size: 0.95rem;  /* come i pulsanti .btn a destra della barra */
-  cursor: pointer;
-  white-space: nowrap;
-  transition: border-color 0.15s, background 0.15s, transform 0.1s;
-}
-
-.banner-btn:hover:not(:disabled) {
-  border-color: var(--gold);
-  background: var(--bg-medium);
-  transform: translateY(-1px);
-}
-
-.banner-btn:active:not(:disabled) { transform: translateY(0); }
-
-.banner-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-/* ==================== WALL STAGING ==================== */
-
-#wall-staging {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.4rem;
-  background: var(--bg-dark);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 0.3rem 0.6rem;
-}
-
-#wall-staging .hint { display: none; }
-
-.wall-stage-header {
-  font-size: 0.75rem;
-  color: var(--gold-light);
-  font-weight: bold;
-  white-space: nowrap;
-}
-
-/* Carta selezionata come muro (in mano) */
-/* Muro già posato in un Bastione (in attesa di conferma): non sta più in mano */
-#hand-cards .card.wall-placed { display: none; }
-
-/* Pila dei Muri con Muri posati in attesa di conferma (app.js,
-   _renderWallPending): numero in giallo; cliccandola tornano in mano */
-.deck-wall.wall-pending { cursor: pointer; }
-.deck-wall.wall-pending .deck-count span { color: var(--gold-light); }
-
 /* Carta non giocabile ora (Azioni esaurite) */
 .card.unplayable { opacity: 0.4; filter: grayscale(0.6); }
 
@@ -2745,7 +2698,6 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
     margin-bottom: 46px;
   }
 
-  .banner-btn { padding: 0.4rem 0.3rem; font-size: 0.78rem; }
   .btn-danger, .btn-warning { flex: 1; min-width: 80px; }
 
   #phase-bar, #hdr-deck { display: none; }
