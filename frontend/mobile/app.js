@@ -1235,13 +1235,28 @@ const Mob = (() => {
   // dito resta fermo un attimo o appena si muove; scorrendo sulle altre carte
   // cambia, sollevandolo sparisce. Il tocco breve non fa nulla (onHandTap).
   // Portando il dito fuori dalla mano verso l'alto la carta si trascina in campo
-  // per giocarla (drag.js). La mano non scorre (touch-action: none in mobile.css).
+  // per giocarla (drag.js). Tenendo il dito su una carta girata, le altre girate
+  // le si impilano sotto e si posano insieme come Muri (wallStack).
+  // La mano non scorre (touch-action: none in mobile.css).
   function bindCardPeek() {
     const hand = $('hand');
     const HOLD_MS = 220;
     let holdTimer = null, peeking = false, suppressClick = false, dragging = false;
     let dragRefused = false;  // trascinamento non partito: non si riprova a ogni movimento del dito
     let startX = 0, startY = 0, startCard = null, current = null, img = null;
+    let lastX = 0, lastY = 0;
+
+    // Pressione prolungata su una carta girata con altre girate in mano: la pila
+    // parte subito sotto il dito, senza mostrare la carta
+    function startStack(card) {
+      const extras = wallStack(card);
+      if (!extras.length || !startFlippedWallDrag(card, lastX, lastY, extras)) return false;
+      holdTimer = null;
+      dragging = true;
+      peeking = true;  // al rilascio il click non deve aprire lo sheet
+      haptic();
+      return true;
+    }
 
     function startPeek(card) {
       clearTimeout(holdTimer);
@@ -1292,14 +1307,18 @@ const Mob = (() => {
       if (!card) return;
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
+      lastX = startX;
+      lastY = startY;
       startCard = card;
       dragRefused = false;
       clearTimeout(holdTimer);
-      holdTimer = setTimeout(() => startPeek(card), HOLD_MS);
+      holdTimer = setTimeout(() => { if (!startStack(card)) startPeek(card); }, HOLD_MS);
     }, { passive: true });
 
     hand.addEventListener('touchmove', e => {
       const t = e.touches[0];
+      lastX = t.clientX;
+      lastY = t.clientY;
       if (dragging) { DragPlay.move(t.clientX, t.clientY); return; }
       // Il dito esce dalla mano verso l'alto: si trascina la carta che mostrava
       if (!dragRefused && t.clientY < hand.getBoundingClientRect().top - 12) {
@@ -2043,21 +2062,37 @@ const Mob = (() => {
     [...wallFlips].forEach(iid => { if (!inHand.has(iid)) wallFlips.delete(iid); });
   }
 
-  // Carta girata trascinata in un Bastione: diventa subito un Muro
-  function startFlippedWallDrag(card, x, y) {
+  // Altre carte girate in mano, le più vicine, da impilare sotto `card` e posare con lei: quante
+  // ne restano nell'Azione dei Muri aperta, altrimenti fino a 3 con una nuova
+  function wallStack(card) {
+    const my = me();
+    if (!my || !isMyTurn() || currentState.phase !== 'action') return [];
+    const cap = my.wall_slots > 0 ? my.wall_slots : my.actions_remaining > 0 ? 3 : 0;
+    // Le più vicine in mano a quella premuta
+    const cx = c => { const r = c.getBoundingClientRect(); return r.left + r.width / 2; };
+    const x0 = cx(card);
+    return [...document.querySelectorAll('#hand .card')]
+      .filter(c => c !== card && wallFlips.has(c.dataset.instanceId))
+      .sort((c1, c2) => Math.abs(cx(c1) - x0) - Math.abs(cx(c2) - x0))
+      .slice(0, Math.max(0, cap - 1));
+  }
+
+  // Carta girata trascinata in un Bastione: diventa subito un Muro (con le
+  // carte impilate sotto, extras, tutte nello stesso Bastione)
+  function startFlippedWallDrag(card, x, y, extras = []) {
     const my = me();
     const err = !isMyTurn() ? 'Non è il tuo turno.'
       : currentState.phase !== 'action' ? 'I Muri si alzano nella fase Azioni.'
       : !(my && (my.actions_remaining > 0 || my.wall_slots > 0)) ? 'Azioni esaurite per questo turno.'
       : null;
     if (err) { Toast.show(err, 'error'); return false; }
-    const iid = card.dataset.instanceId;
+    const iids = [card, ...extras].map(c => c.dataset.instanceId);
     const zones = [['left', 'tw-left'], ['right', 'tw-right']].map(([side, id]) => ({ key: side, el: $(id) }));
     DragPlay.start(card, x, y, {
-      zones, lift: 0.5,
+      zones, lift: 0.5, extras,
       onDrop: side => {
         haptic();
-        sendAction('add_wall', { walls: [{ instance_id: iid, bastion: side }] });
+        sendAction('add_wall', { walls: iids.map(iid => ({ instance_id: iid, bastion: side })) });
         return true;
       },
     });

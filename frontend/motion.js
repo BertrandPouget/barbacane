@@ -84,8 +84,9 @@ const Motion = (() => {
   /** Fotografa posizione e aspetto delle carte dentro `root`. */
   function snapshot(root) {
     const items = new Map();
-    // Carta appena giocata trascinandola (drag.js): il volo parte da dove è stata lasciata
-    const drop = typeof DragPlay !== 'undefined' ? DragPlay.takeDrop() : null;
+    // Carte appena giocate trascinandole (drag.js): il volo parte da dove sono state lasciate
+    const drops = new Map(((typeof DragPlay !== 'undefined' && DragPlay.takeDrop()) || [])
+      .map(d => [d.iid, d.rect]));
     if (!root || reducedMotion()) return items;
     root.querySelectorAll('[data-instance-id]').forEach(el => {
       const iid = el.dataset.instanceId;
@@ -93,7 +94,7 @@ const Motion = (() => {
       if (!iid || !pose || items.has(iid)) return;
       const node = el.cloneNode(true);
       node.style.opacity = '';  // la carta può essere nascosta da un volo ancora in corso
-      if (drop && drop.iid === iid) items.set(iid, { rect: drop.rect, tilt: null, node });
+      if (drops.has(iid)) items.set(iid, { rect: drops.get(iid), tilt: null, node });
       else items.set(iid, { rect: pose.rect, tilt: pose.tilt, node });
     });
     return items;

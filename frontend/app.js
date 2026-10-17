@@ -1586,16 +1586,32 @@ const App = (() => {
     return null;
   }
 
-  // Carta girata trascinata in un Bastione: diventa subito un Muro
-  function _startFlippedWallDrag(card, x, y) {
+  // Altre carte girate in mano, le più vicine, da impilare sotto `card` e posare con lei: quante
+  // ne restano nell'Azione dei Muri aperta, altrimenti fino a 3 con una nuova
+  function _wallStack(card) {
+    if (_wallRefusal()) return [];
+    const me = currentState.players.find(p => p.id === myPlayerId);
+    const cap = me.wall_slots > 0 ? me.wall_slots : 3;
+    // Le più vicine in mano a quella premuta
+    const cx = c => { const r = c.getBoundingClientRect(); return r.left + r.width / 2; };
+    const x0 = cx(card);
+    return [...document.querySelectorAll('#hand-cards .card')]
+      .filter(c => c !== card && wallFlips.has(c.dataset.instanceId))
+      .sort((c1, c2) => Math.abs(cx(c1) - x0) - Math.abs(cx(c2) - x0))
+      .slice(0, cap - 1);
+  }
+
+  // Carta girata trascinata in un Bastione: diventa subito un Muro (con le
+  // carte impilate sotto, extras, tutte nello stesso Bastione)
+  function _startFlippedWallDrag(card, x, y, extras = []) {
     const err = _wallRefusal();
     if (err) { Renderer.toast(err, 'error'); return false; }
-    const iid = card.dataset.instanceId;
+    const iids = [card, ...extras].map(c => c.dataset.instanceId);
     const zones = ['left', 'right'].map(side => ({ key: side, el: document.getElementById(`my-bastion-${side}`) }));
     DragPlay.start(card, x, y, {
-      zones,
+      zones, extras,
       onDrop: side => {
-        sendAction('add_wall', { walls: [{ instance_id: iid, bastion: side }] });
+        sendAction('add_wall', { walls: iids.map(iid => ({ instance_id: iid, bastion: side })) });
         return true;
       },
     });
@@ -1670,20 +1686,31 @@ const App = (() => {
   // Pressione del mouse su una carta di `container` (pick(target) → la carta, o
   // null): oltre qualche pixel di movimento parte il trascinamento (start(card,
   // x, y) → false se non si può), e il click che segue il rilascio non apre il
-  // dettaglio.
-  function _bindPressDrag(container, pick, start) {
+  // dettaglio. hold(card, x, y), se c'è, è la pressione prolungata a mouse fermo:
+  // se ritorna true ha già fatto partire il trascinamento.
+  function _bindPressDrag(container, pick, start, hold = null) {
+    const HOLD_MS = 280;
     let press = null;
     let suppressClick = false;
 
     container.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
       const card = pick(e.target);
-      if (card) press = { card, x: e.clientX, y: e.clientY, dragging: false };
+      if (!card) return;
+      const p = { card, x: e.clientX, y: e.clientY, dragging: false, timer: null };
+      if (hold) {
+        p.timer = setTimeout(() => {
+          p.timer = null;
+          if (press === p && !p.dragging && hold(p.card, p.x, p.y)) p.dragging = true;
+        }, HOLD_MS);
+      }
+      press = p;
     });
     window.addEventListener('pointermove', e => {
       if (!press) return;
       if (!press.dragging) {
         if (Math.hypot(e.clientX - press.x, e.clientY - press.y) < 6) return;
+        clearTimeout(press.timer);
         if (!start(press.card, e.clientX, e.clientY)) { press = null; return; }
         press.dragging = true;
       }
@@ -1691,6 +1718,7 @@ const App = (() => {
     });
     window.addEventListener('pointerup', e => {
       if (!press) return;
+      clearTimeout(press.timer);
       if (press.dragging) {
         DragPlay.end(e.clientX, e.clientY);
         suppressClick = true;
@@ -1699,6 +1727,7 @@ const App = (() => {
       press = null;
     });
     window.addEventListener('pointercancel', () => {
+      if (press) clearTimeout(press.timer);
       if (press && press.dragging) DragPlay.cancel();
       press = null;
     });
@@ -1718,7 +1747,13 @@ const App = (() => {
         return _canDragFromHand() ? c : null;
       },
       (card, x, y) => (wallFlips.has(card.dataset.instanceId) ? _startFlippedWallDrag(card, x, y)
-        : _startHandDrag(card, x, y)));
+        : _startHandDrag(card, x, y)),
+      // Tenendo premuto su una carta girata, le altre girate le si impilano sotto
+      (card, x, y) => {
+        if (!wallFlips.has(card.dataset.instanceId)) return false;
+        const extras = _wallStack(card);
+        return extras.length > 0 && _startFlippedWallDrag(card, x, y, extras);
+      });
   }
 
   // -- Schieramento: i miei Guerrieri si trascinano su un'altra Regione --------

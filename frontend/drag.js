@@ -80,31 +80,74 @@ const DragPlay = (() => {
    *                azione (es. un Muro posato, da confermare): la copia ci sparisce dentro
    * opts.choiceOpen () → bool: è aperta una scelta (selettore, conferma) nata dal
    *                rilascio; finché lo è la carta aspetta dove è stata lasciata
+   * opts.extras    [cardEl]: altre carte della mano portate insieme (Muri impilati):
+   *                volano dal loro posto sotto la carta trascinata e la seguono
    */
   function start(cardEl, x, y, opts) {
     cancel();
     _releasePending();
     const w = cardEl.offsetWidth, h = cardEl.offsetHeight;
+    const ghost = _makeGhost(cardEl, w, h);
+    document.body.appendChild(ghost);
+    // Sotto la carta trascinata, ognuna sotto la precedente (stesso z-index:
+    // conta l'ordine nel documento)
+    let above = ghost;
+    const extras = (opts.extras || []).map(el => {
+      const g = _makeGhost(el, w, h);
+      document.body.insertBefore(g, above);
+      above = g;
+      el.classList.add('drag-source');
+      return { cardEl: el, ghost: g, from: el.getBoundingClientRect() };
+    });
+    cardEl.classList.add('drag-source');
+    document.body.classList.add('dragging-card');
+    (opts.zones || []).forEach(z => { if (!z.quiet) z.el.classList.add('drop-zone'); });
+    s = { cardEl, ghost, w, h, opts, over: null, extras };
+    move(x, y);
+    _gather(extras);
+  }
+
+  function _makeGhost(cardEl, w, h) {
     const ghost = cardEl.cloneNode(true);
     ghost.removeAttribute('id');
+    ghost.classList.remove('drag-source', 'peeked');
     ghost.classList.add('motion-ghost', 'drag-ghost');
     ghost.style.width = `${w}px`;
     ghost.style.height = `${h}px`;
     ghost.style.opacity = '';
     ghost.style.margin = '0';  // le carte in mano hanno un margine inline (sovrapposizione del ventaglio)
-    document.body.appendChild(ghost);
-    cardEl.classList.add('drag-source');
-    document.body.classList.add('dragging-card');
-    (opts.zones || []).forEach(z => { if (!z.quiet) z.el.classList.add('drop-zone'); });
-    s = { cardEl, ghost, w, h, opts, over: null };
-    move(x, y);
+    return ghost;
+  }
+
+  // Le carte al seguito partono dal loro posto in mano e raggiungono la pila
+  function _gather(extras) {
+    if (typeof Motion !== 'undefined' && Motion.reducedMotion()) return;
+    extras.forEach(({ ghost, from }, i) => {
+      const to = ghost.getBoundingClientRect();
+      const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+      const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+      ghost.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
+        { duration: 200, delay: i * 50, easing: 'cubic-bezier(.2, .75, .25, 1)', fill: 'backwards' });
+    });
+  }
+
+  // Carta trascinata e carte al seguito: [{ cardEl, ghost }]
+  function _all(cur) {
+    return [{ cardEl: cur.cardEl, ghost: cur.ghost }, ...(cur.extras || [])];
   }
 
   function move(x, y) {
     if (!s) return;
     const { ghost, w, h, opts } = s;
-    ghost.style.left = `${x - w / 2}px`;
-    ghost.style.top = `${y - h / 2 - h * (opts.lift || 0)}px`;
+    const left = x - w / 2, top = y - h / 2 - h * (opts.lift || 0);
+    ghost.style.left = `${left}px`;
+    ghost.style.top = `${top}px`;
+    // La pila: le carte sotto, allineate, sporgono appena in alto
+    s.extras.forEach(({ ghost: g }, i) => {
+      const off = (i + 1) * Math.max(3, h * 0.05);
+      g.style.left = `${left}px`;
+      g.style.top = `${top - off}px`;
+    });
     let over = null;
     for (const z of opts.zones || []) {
       const r = z.el.getBoundingClientRect();
@@ -116,7 +159,7 @@ const DragPlay = (() => {
       if (over && over.el) over.el.classList.add('drop-over');
     }
     s.over = over;
-    ghost.classList.toggle('drop-ok', !!over && !opts.noGlow);
+    _all(s).forEach(c => c.ghost.classList.toggle('drop-ok', !!over && !opts.noGlow));
   }
 
   function _cleanup() {
@@ -132,19 +175,21 @@ const DragPlay = (() => {
     if (!s) return false;
     move(x, y);
     const cur = _cleanup();
-    cur.cardEl.classList.remove('drag-source');
+    _all(cur).forEach(c => c.cardEl.classList.remove('drag-source'));
     if (!cur.over) { _flyBack(cur); return false; }
     const res = cur.opts.onDrop(cur.over.key);
     if (res === 'land') { _land(cur); return true; }
     if (res) {
-      cur.cardEl.classList.add('drag-pending');
+      _all(cur).forEach(c => c.cardEl.classList.add('drag-pending'));
       pending = { ...cur, timer: setTimeout(_releasePending, PENDING_MS), poll: null };
       return true;
     }
     if (cur.opts.choiceOpen && cur.opts.choiceOpen()) {
       // Si sceglie: la carta aspetta sotto la finestra della scelta
-      cur.cardEl.classList.add('drag-pending');
-      cur.ghost.classList.add('drag-held');
+      _all(cur).forEach(c => {
+        c.cardEl.classList.add('drag-pending');
+        c.ghost.classList.add('drag-held');
+      });
       pending = { ...cur, timer: null, poll: null };
       pending.poll = setInterval(() => { if (!cur.opts.choiceOpen()) _releasePending(); }, CHOICE_POLL_MS);
       return true;
@@ -158,8 +203,10 @@ const DragPlay = (() => {
     pending = null;
     clearTimeout(cur.timer);
     clearInterval(cur.poll);
-    cur.cardEl.classList.remove('drag-pending');
-    cur.ghost.classList.remove('drag-held');
+    _all(cur).forEach(c => {
+      c.cardEl.classList.remove('drag-pending');
+      c.ghost.classList.remove('drag-held');
+    });
     return cur;
   }
 
@@ -176,41 +223,46 @@ const DragPlay = (() => {
     if (!pending || !pending.poll) return;
     clearInterval(pending.poll);
     pending.poll = null;
-    pending.ghost.classList.remove('drag-held');
+    _all(pending).forEach(c => c.ghost.classList.remove('drag-held'));
     pending.timer = setTimeout(_releasePending, PENDING_MS);
   }
 
   /**
-   * Per Motion.snapshot: ritira la copia della carta appena lasciata e dice da
-   * dove deve partire il suo volo ({ iid, rect }), o null.
+   * Per Motion.snapshot: ritira le copie delle carte appena lasciate (con quelle
+   * al seguito) e dice da dove deve partire il loro volo ([{ iid, rect }]), o null.
    */
   function takeDrop() {
     // Durante una scelta un aggiornamento qualsiasi non la riguarda: resta lì
     if (!pending || pending.poll) return null;
-    const cur = _clearPending();
-    const rect = cur.ghost.getBoundingClientRect();
-    cur.ghost.remove();
-    return { iid: cur.cardEl.dataset.instanceId, rect };
+    return _all(_clearPending()).map(({ cardEl, ghost }) => {
+      const rect = ghost.getBoundingClientRect();
+      ghost.remove();
+      return { iid: cardEl.dataset.instanceId, rect };
+    });
   }
 
-  // La copia rimpicciolisce verso il centro della zona e sparisce
+  // Le copie rimpiccioliscono verso il centro della zona e spariscono
   function _land(cur) {
-    const { ghost } = cur;
-    const done = () => ghost.remove();
     const zone = cur.over && cur.over.el ? cur.over.el.getBoundingClientRect() : null;
-    if (!zone || (typeof Motion !== 'undefined' && Motion.reducedMotion())) { done(); return; }
-    const g = ghost.getBoundingClientRect();
-    const dx = zone.left + zone.width / 2 - (g.left + g.width / 2);
-    const dy = zone.top + zone.height / 2 - (g.top + g.height / 2);
-    const anim = ghost.animate(
-      [{ transform: 'none', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(0.35)`, opacity: 0 }],
-      { duration: 260, easing: 'cubic-bezier(.4, 0, .6, 1)', fill: 'forwards' });
-    anim.onfinish = done;
-    anim.oncancel = done;
+    _all(cur).forEach(({ ghost }) => {
+      const done = () => ghost.remove();
+      if (!zone || (typeof Motion !== 'undefined' && Motion.reducedMotion())) { done(); return; }
+      const g = ghost.getBoundingClientRect();
+      const dx = zone.left + zone.width / 2 - (g.left + g.width / 2);
+      const dy = zone.top + zone.height / 2 - (g.top + g.height / 2);
+      const anim = ghost.animate(
+        [{ transform: 'none', opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(0.35)`, opacity: 0 }],
+        { duration: 260, easing: 'cubic-bezier(.4, 0, .6, 1)', fill: 'forwards' });
+      anim.onfinish = done;
+      anim.oncancel = done;
+    });
   }
 
   function _flyBack(cur) {
-    const { ghost, cardEl } = cur;
+    _all(cur).forEach(_flyBackOne);
+  }
+
+  function _flyBackOne({ ghost, cardEl }) {
     ghost.classList.remove('drop-ok');
     const done = () => { ghost.remove(); cardEl.classList.remove('drag-source'); };
     const from = ghost.getBoundingClientRect();
@@ -228,8 +280,10 @@ const DragPlay = (() => {
   function cancel() {
     if (!s) return;
     const cur = _cleanup();
-    cur.ghost.remove();
-    cur.cardEl.classList.remove('drag-source');
+    _all(cur).forEach(c => {
+      c.ghost.remove();
+      c.cardEl.classList.remove('drag-source');
+    });
   }
 
   const active = () => !!s;
