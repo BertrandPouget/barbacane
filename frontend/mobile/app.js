@@ -1536,10 +1536,14 @@ const Mob = (() => {
       return true;
     }
     // Magie, Trono ed Eroi: basta portarli un po' sopra la mano, verso il campo.
-    // Il Guerriero del Trono e la Recluta dell'Eroe si scelgono dopo: i riquadri
-    // delle Regioni non mostrano le singole carte.
+    // Trono ed Eroi si lasciano anche sul riquadro della Regione del loro Guerriero
+    // (i Bastioni stanno in basso, fuori da quella fascia); il Guerriero, se ce
+    // n'è più d'uno, si sceglie dopo: i riquadri non mostrano le singole carte.
     const asSpell = def.type === 'spell' || def.id === 'trono' || def.subtype === 'hero';
-    const zones = asSpell ? [] : keys.filter(k => DROP_ZONE_IDS[k])
+    const zoneKeys = def.type === 'spell' ? []
+      : def.id === 'trono' ? PICKER_ZONES.map(z => z.key).filter(r => zoneWarriors(me(), r).length > 0)
+      : keys;
+    const zones = zoneKeys.filter(k => DROP_ZONE_IDS[k])
       .map(k => ({ key: k, el: $(DROP_ZONE_IDS[k]) }))
       .filter(z => z.el);
     const fieldTest = asSpell ? towardField : null;
@@ -1555,13 +1559,15 @@ const Mob = (() => {
   function playDropped(iid, def, key) {
     const my = me();
     if (def.type === 'spell') return showSpellOptions(iid, def, { direct: true }) === true;
+    // Trono ed Eroi lasciati su una Regione: si sceglie solo fra i suoi Guerrieri
+    const region = key === 'field' ? null : key;
     if (def.id === 'trono') {
-      const ws = DragPlay.warriorsOf(my);
+      const ws = region ? zoneWarriors(my, region) : DragPlay.warriorsOf(my);
       if (ws.length === 1) {
         sendAction('play_building', { instance_id: iid, target_warrior_iid: ws[0].instance_id });
         return true;
       }
-      showTronoPlayOptions(iid, def);
+      showTronoPlayOptions(iid, def, region);
       return false;
     }
     if (def.type === 'building') {
@@ -1574,7 +1580,7 @@ const Mob = (() => {
     }
     // Eroe: se in campo c'è una sola Recluta che evolve in lui si gioca subito,
     // altrimenti si sceglie quale
-    const recruits = DragPlay.warriorsOf(my).filter(w => {
+    const recruits = (region ? zoneWarriors(my, region) : DragPlay.warriorsOf(my)).filter(w => {
       const d = getCardDef(w.instance_id);
       return d && d.evolves_into === def.id;
     });
@@ -1582,7 +1588,7 @@ const Mob = (() => {
       sendAction('evolve', { recruit_instance_id: recruits[0].instance_id, hero_instance_id: iid });
       return true;
     }
-    showHeroPlayOptions(iid, def);
+    showHeroPlayOptions(iid, def, region);
     return false;
   }
 
@@ -1594,7 +1600,8 @@ const Mob = (() => {
 
 
   // Trono: richiede la scelta immediata del Guerriero a cui assegnarlo
-  function showTronoPlayOptions(iid, def) {
+  // (region: solo fra i Guerrieri di quella Regione)
+  function showTronoPlayOptions(iid, def, region = null) {
     const my = me();
     const warriors = my ? getAllWarriors(my) : [];
     if (warriors.length === 0) {
@@ -1605,18 +1612,22 @@ const Mob = (() => {
       title: `Costruisci ${def.name}`,
       subtitle: "Scegli il Guerriero a cui assegnarlo: completato, ne rende sempre attivo l'effetto Orda",
       players: [my],
+      filter: (w, p, zoneKey) => !region || zoneKey === region,
       note: (w) => { const d = getCardDef(w.instance_id); return d && d.horde_effect ? null : 'Nessun effetto Orda'; },
       onPick: (w) => sendAction('play_building', { instance_id: iid, target_warrior_iid: w.instance_id }),
     });
   }
 
-  function showHeroPlayOptions(iid, def) {
+  function showHeroPlayOptions(iid, def, region = null) {
     const my = me();
     pickWarrior({
       title: `Evolvi in ${def.name}`,
       subtitle: 'La Recluta diventa Eroe e ne eredita le carte assegnate',
       players: [my],
-      filter: (w) => { const d = getCardDef(w.instance_id); return !!d && d.evolves_into === def.id; },
+      filter: (w, p, zoneKey) => {
+        const d = getCardDef(w.instance_id);
+        return !!d && d.evolves_into === def.id && (!region || zoneKey === region);
+      },
       empty: `Nessuna Recluta compatibile in campo per evolvere ${def.name}.`,
       onPick: (w) => sendAction('evolve', { recruit_instance_id: w.instance_id, hero_instance_id: iid }),
     });
