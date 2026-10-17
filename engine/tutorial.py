@@ -158,7 +158,7 @@ class TutorialDef:
 # Lettura delle carte
 # ---------------------------------------------------------------------------
 
-# Riquadri delle sezioni sulle immagini delle carte (card_factory/output/full/*.png),
+# Riquadri delle sezioni sulle immagini delle carte (card_factory/output/full/*.webp),
 # in percentuale della carta: [x, y, larghezza, altezza]. Misurati sul layout
 # di card_factory/assets/card.html (carta 744x1039px) con un piccolo margine
 # attorno a ogni sezione: se card.html cambia layout vanno rimisurati.

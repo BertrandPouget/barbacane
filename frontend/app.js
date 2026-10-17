@@ -131,8 +131,6 @@ const App = (() => {
     const lobby = document.getElementById('screen-lobby');
     if (!splash || !lobby) return;
 
-    BgMusic.start();   // questo click è il gesto che sblocca l'audio
-
     const splashLogo = document.getElementById('splash-logo');
     const lobbyLogo = lobby.querySelector('.logo');
     const container = lobby.querySelector('.lobby-container');
@@ -674,16 +672,16 @@ const App = (() => {
         const cell = document.createElement('div');
         cell.className = 'catalog-card';
         const img = document.createElement('img');
-        // Nella griglia basta l'anteprima; la carta ingrandita usa il PNG grande
-        img.src = CardArt.previewUrl(def.id);
+        // Nella griglia basta l'anteprima; la carta ingrandita usa quella piena
+        CardArt.setPreview(img, def.id);
         img.alt = def.name;
         img.loading = 'lazy';
         img.draggable = false;
-        // Senza anteprima si ripiega sul PNG; senza nemmeno quello, una tessera col nome
+        // Senza anteprima si ripiega sulla carta piena; senza nemmeno quello, una tessera col nome
         img.onerror = () => {
           if (!img.dataset.fallback) {
             img.dataset.fallback = '1';
-            img.src = `/card_images/full/${def.id}.png`;
+            img.src = `/card_images/full/${def.id}.webp`;
             return;
           }
           cell.innerHTML = `<div class="catalog-card-fallback">${def.name}</div>`;

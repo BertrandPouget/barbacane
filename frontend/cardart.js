@@ -9,8 +9,9 @@
  *   Costruzione, stella del Prodigio). Le immagini (illustrazione
  *   ridotta, pergamena) sono in /card_images/mini/, generate da card_factory.
  * - Anteprima (/card_images/preview/<id>.webp, ~30 KB): la carta intera
- *   rimpicciolita, per il catalogo e in attesa del PNG pieno (showFull).
- * Le viste ingrandite continuano a usare il PNG pieno (/card_images/full/<id>.png).
+ *   rimpicciolita, per la griglia del catalogo (setPreview); se è già stata
+ *   scaricata fa anche da segnaposto in attesa della carta piena (showFull).
+ * Le viste ingrandite usano la carta piena (/card_images/full/<id>.webp).
  */
 
 'use strict';
@@ -31,21 +32,32 @@ const CardArt = (() => {
     return `/card_images/mini/${encodeURIComponent(baseId)}.webp`;
   }
 
+  /** Mostra in `img` l'anteprima della carta, ricordando quando è arrivata. */
+  function setPreview(img, baseId) {
+    const url = previewUrl(baseId);
+    img.addEventListener('load', () => { if (img.src.endsWith(url)) loaded.add(url); }, { once: true });
+    img.src = url;
+  }
+
   /**
-   * Mostra in `img` la carta vera (PNG pieno, ~1,2 MB). Se non è ancora stata
-   * scaricata, intanto mostra l'anteprima (già in cache) e la sostituisce quando
-   * il PNG arriva, purché `img` mostri ancora la stessa carta.
+   * Mostra in `img` la carta vera (WebP pieno, ~200 KB). Se non è ancora stata
+   * scaricata, intanto mostra l'anteprima se è già in cache (aperta dal catalogo),
+   * altrimenti tiene `img` invisibile, e la sostituisce quando la carta piena
+   * arriva, purché `img` mostri ancora la stessa carta. Così in partita non si
+   * scaricano due versioni della stessa carta.
    */
   const fullLoaded = new Set();
   function showFull(img, baseId) {
-    const full = `/card_images/full/${encodeURIComponent(baseId)}.png`;
+    const full = `/card_images/full/${encodeURIComponent(baseId)}.webp`;
     img.dataset.cardId = baseId;
-    if (fullLoaded.has(full)) { img.src = full; return; }
-    img.src = previewUrl(baseId);
+    if (fullLoaded.has(full)) { img.src = full; img.style.visibility = ''; return; }
+    const preview = previewUrl(baseId);
+    if (loaded.has(preview)) img.src = preview;
+    else img.style.visibility = 'hidden';
     const probe = new Image();
     probe.onload = () => {
       fullLoaded.add(full);
-      if (img.dataset.cardId === baseId) img.src = full;
+      if (img.dataset.cardId === baseId) { img.src = full; img.style.visibility = ''; }
     };
     probe.src = full;
   }
@@ -257,17 +269,17 @@ const CardArt = (() => {
   }
 
   /**
-   * Scarica in sottofondo le immagini delle carte indicate (prima pergamena e
-   * illustrazioni delle minicarte, ~1 MB in tutto, poi le anteprime), così una
-   * carta appena pescata ha già la sua immagine anche mentre vola in mano. Va
-   * chiamata entrando in partita.
+   * Scarica in sottofondo le immagini delle minicarte indicate (pergamena e
+   * illustrazioni, ~1 MB in tutto), così una carta appena pescata ha già la sua
+   * immagine anche mentre vola in mano. Va chiamata entrando in partita. Le
+   * anteprime no: in partita servono solo come segnaposto della carta piena.
    */
   let preloading = false;
   function preload(baseIds) {
     if (preloading) return;
     preloading = true;
     const ids = baseIds || [];
-    const queue = [miniUrl('sfondo'), ...ids.map(miniUrl), ...ids.map(previewUrl)].filter(u => !loaded.has(u));
+    const queue = [miniUrl('sfondo'), ...ids.map(miniUrl)].filter(u => !loaded.has(u));
     const idle = window.requestIdleCallback || (cb => setTimeout(cb, 200));
     const next = () => {
       const batch = queue.splice(0, 6);
@@ -283,5 +295,5 @@ const CardArt = (() => {
     idle(next);
   }
 
-  return { previewUrl, miniUrl, showFull, attach, attachAssigned, flipWall, update, handInfo, preload };
+  return { miniUrl, setPreview, showFull, attach, attachAssigned, flipWall, update, handInfo, preload };
 })();

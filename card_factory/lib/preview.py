@@ -3,14 +3,13 @@
 lib/preview.py
 Anteprime: la carta intera rimpicciolita, per l'interfaccia di gioco.
 
-Le carte finali in output/full/<id>.png sono a ~300 DPI (744×1040, ~1,2 MB l'una):
-perfette per la vista ingrandita e per la stampa, troppo pesanti dove la carta
-intera si vede piccola (Catalogo Carte, anteprima al passaggio del mouse).
+Le carte finali in output/full/<id>.webp sono a ~300 DPI (744×1040, ~200 KB l'una):
+giuste per la vista ingrandita, troppo pesanti dove la carta intera si vede piccola (Catalogo Carte, anteprima al passaggio del mouse).
 Qui se ne ricava una versione ridotta in WebP, in output/preview/<id>.webp
 (~30 KB), servita al frontend come
 /card_images/preview/<id>.webp.
 
-Un'anteprima viene rigenerata solo se manca o se il PNG di origine è più
+Un'anteprima viene rigenerata solo se manca o se la carta di origine è più
 recente: rilanciare lo script dopo aver aggiunto o modificato carte aggiorna
 solo quelle toccate.
 
@@ -45,9 +44,9 @@ def make_previews(ids: Optional[Iterable[str]] = None, force: bool = False,
     """
     PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
     if ids is None:
-        sources = sorted(FULL_DIR.glob("*.png"))
+        sources = sorted(FULL_DIR.glob("*.webp"))
     else:
-        sources = [FULL_DIR / f"{cid}.png" for cid in ids]
+        sources = [FULL_DIR / f"{cid}.webp" for cid in ids]
 
     written: List[Path] = []
     for src in sources:

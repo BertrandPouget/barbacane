@@ -13,8 +13,11 @@ Usato sia da 2_generate_cards.py (carte gioco, output/) sia da
 3_make_print_pdf.py (rigenerazione a risoluzione di stampa).
 """
 
+import io
 from pathlib import Path
+from typing import Optional
 
+from PIL import Image
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent   # card_factory/
@@ -22,9 +25,12 @@ CARD_HTML = ROOT / "assets" / "card.html"
 IMAGES_DIR = ROOT / "images"
 
 
-def render_cards(cards, id_to_name, out_dir: Path, scale: float = 1.0, quiet: bool = False, debug: bool = False):
+def render_cards(cards, id_to_name, out_dir: Path, scale: float = 1.0, quiet: bool = False, debug: bool = False,
+                 webp_quality: Optional[int] = None):
     """Renderizza ogni carta con card.html in un browser headless e salva out_dir/<id>.png.
 
+    Con webp_quality salva invece out_dir/<id>.webp a quella qualità (le carte del
+    gioco: ~200 KB invece di ~1,2 MB del PNG). La stampa resta sul PNG senza perdite.
     debug=True disegna i bordi dei contenitori flex (vedi card.html, classe .debug-borders).
     """
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -46,8 +52,13 @@ def render_cards(cards, id_to_name, out_dir: Path, scale: float = 1.0, quiet: bo
             page.evaluate("() => document.fonts.ready")
             page.wait_for_timeout(120)  # lascia assestare il fit del testo
             el = page.query_selector("#card")
-            out = out_dir / f"{cid}.png"
-            el.screenshot(path=str(out))
+            if webp_quality is None:
+                out = out_dir / f"{cid}.png"
+                el.screenshot(path=str(out))
+            else:
+                out = out_dir / f"{cid}.webp"
+                with Image.open(io.BytesIO(el.screenshot())) as im:
+                    im.convert("RGB").save(out, "WEBP", quality=webp_quality, method=6)
             if not quiet:
                 print(f"  OK {out.name}  [{card.get('type', '?')}/{card.get('subtype') or '-'}]"
                       f"{'' if has_img or card.get('type') == 'back' else '  (nessuna illustrazione)'}")

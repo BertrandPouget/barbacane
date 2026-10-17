@@ -31,7 +31,7 @@
 <body>
 
 <canvas id="sparks-canvas"></canvas>
-<audio id="bgm-audio" src="/assets/Tower-Defense_Looping.ogg" loop preload="auto"></audio>
+<audio id="bgm-audio" src="/assets/Tower-Defense_Looping.ogg" loop preload="none"></audio>
 <button id="btn-music-toggle" class="music-toggle" aria-label="Attiva/disattiva musica" title="Musica">♪</button>
 
 <!-- ===== SCHERMATA: SPLASH ===== -->
@@ -330,11 +330,11 @@
 
   <!-- Modalità immagine carta -->
   <div id="card-image-wrap" class="hidden">
-    <!-- Carta che si gira al clic: fronte = immagine della carta, retro = retro.png -->
+    <!-- Carta che si gira al clic: fronte = immagine della carta, retro = retro.webp -->
     <div id="card-flip" class="card-flip" title="Clicca per girare la carta">
       <div class="card-flip-inner">
         <img id="card-detail-img" class="card-flip-face" alt="" />
-        <img id="card-detail-back" class="card-flip-face card-flip-back" alt="Retro carta" draggable="false" src="/card_images/full/retro.png" />
+        <img id="card-detail-back" class="card-flip-face card-flip-back" alt="Retro carta" draggable="false" src="/card_images/full/retro.webp" />
       </div>
     </div>
     <div class="card-flip-hint">clicca la carta per girarla</div>

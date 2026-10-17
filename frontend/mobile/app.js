@@ -98,8 +98,6 @@ const Mob = (() => {
     const lobby = $('scr-lobby');
     if (!splash || !lobby) return;
 
-    BgMusic.start();   // questo tocco è il gesto che sblocca l'audio
-
     const splashLogo = $('splash-logo');
     const lobbyLogo = lobby.querySelector('.lobby-logo');
     const scroll = lobby.querySelector('.lobby-scroll');
@@ -679,13 +677,13 @@ const Mob = (() => {
         const cell = el('div', { className: 'cat-card' });
         const img = el('img', { alt: def.name, draggable: 'false' });
         img.loading = 'lazy';
-        // Nella griglia basta l'anteprima; la carta ingrandita usa il PNG grande
-        img.src = CardArt.previewUrl(def.id);
-        // Senza anteprima si ripiega sul PNG; senza nemmeno quello, una tessera col nome
+        // Nella griglia basta l'anteprima; la carta ingrandita usa quella piena
+        CardArt.setPreview(img, def.id);
+        // Senza anteprima si ripiega sulla carta piena; senza nemmeno quello, una tessera col nome
         img.onerror = () => {
           if (!img.dataset.fallback) {
             img.dataset.fallback = '1';
-            img.src = `/card_images/full/${def.id}.png`;
+            img.src = `/card_images/full/${def.id}.webp`;
             return;
           }
           cell.innerHTML = '';

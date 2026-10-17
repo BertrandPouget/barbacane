@@ -570,7 +570,7 @@ const Render = (() => {
 
   /**
    * Vista carta per lo sheet: immagine con flip verso il testo, o solo flashcard.
-   * Ritorna un Node. Prova a caricare /card_images/full/{baseId}.png.
+   * Ritorna un Node. Prova a caricare /card_images/full/{baseId}.webp.
    */
   // Immagini carta caricate almeno una volta: per queste la vista carta viene
   // costruita subito, senza il flash della flashcard testuale in attesa della rete.
@@ -580,7 +580,7 @@ const Render = (() => {
     if (!baseId || _imgLoaded.has(baseId)) return;
     const i = new Image();
     i.onload = () => _imgLoaded.add(baseId);
-    i.src = `/card_images/full/${baseId}.png`;
+    i.src = `/card_images/full/${baseId}.webp`;
   }
 
   function cardViewNode(def, ctx = {}) {
@@ -601,7 +601,7 @@ const Render = (() => {
     // resta solo se la chiamata la chiede (ctx.textBack)
     if (!ctx.textBack) {
       back.classList.add('flip-back-img');
-      back.appendChild(el('img', { alt: 'Retro carta', draggable: 'false', src: '/card_images/full/retro.png' }));
+      back.appendChild(el('img', { alt: 'Retro carta', draggable: 'false', src: '/card_images/full/retro.webp' }));
     } else {
       back.innerHTML = textHTML;
     }
@@ -619,12 +619,12 @@ const Render = (() => {
 
     if (_imgLoaded.has(def.id)) {
       img.onerror = () => { wrap.innerHTML = ''; wrap.appendChild(textOnly); };
-      img.src = `/card_images/full/${def.id}.png`;
+      img.src = `/card_images/full/${def.id}.webp`;
       showFlip();
     } else {
       img.onload = showFlip;
       img.onerror = () => { /* resta la flashcard testuale */ };
-      img.src = `/card_images/full/${def.id}.png`;
+      img.src = `/card_images/full/${def.id}.webp`;
       wrap.appendChild(textOnly);
     }
     return wrap;

@@ -10,7 +10,7 @@ immagini, in output/mini/ (servite come /card_images/mini/):
                 trasparenza; le carte senza illustrazione usano la stessa di
                 ripiego della carta intera (card.html), così le due coincidono;
   - sfondo.webp la pergamena di fondo (assets/sfondo.png), ridotta;
-  - retro.webp  il dorso (output/full/retro.png) con la cornice della minicarta,
+  - retro.webp  il dorso (output/full/retro.webp) con la cornice della minicarta,
                 per i mazzi coperti del gioco (Muri, Vite, Carte Attive).
 
 Le immagini dipendono solo dai file di partenza: rigenerarle dà sempre lo
@@ -47,8 +47,8 @@ BACK_SIZE = (280, 400)
 BACK_FRAME = 13
 BACK_RADIUS_OUT = 16
 BACK_RADIUS_IN = 8
-BACK_FRAME_PX = 20            # spessore della cornice in retro.png (744 px di larghezza)
-BACK_COLOR = (98, 55, 10, 255)  # colore della cornice di retro.png
+BACK_FRAME_PX = 20            # spessore della cornice in retro.webp (744 px di larghezza)
+BACK_COLOR = (98, 55, 10, 255)  # colore della cornice di retro.webp
 
 
 def _save_webp(src: Path, dst: Path, width: int) -> None:
@@ -59,11 +59,11 @@ def _save_webp(src: Path, dst: Path, width: int) -> None:
 
 
 def make_mini_back(quiet: bool = False) -> Path:
-    """Dorso con la cornice della minicarta: la pergamena di retro.png (senza la
+    """Dorso con la cornice della minicarta: la pergamena di retro.webp (senza la
     sua cornice, più sottile) dentro una cornice dello spessore delle minicarte."""
     MINI_DIR.mkdir(parents=True, exist_ok=True)
     w, h = BACK_SIZE
-    with Image.open(FULL_DIR / "retro.png") as full:
+    with Image.open(FULL_DIR / "retro.webp") as full:
         full = full.convert("RGBA")
         f = BACK_FRAME_PX
         inner = full.crop((f, f, full.width - f, full.height - f))

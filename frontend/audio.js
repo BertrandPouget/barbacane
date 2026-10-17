@@ -1,19 +1,16 @@
 /**
  * audio.js — Musica di sottofondo di Barbacane.
  *
- * La musica parte al primo gesto dell'utente (il click sulla splash): è l'unico
- * modo in cui i browser consentono l'audio udibile. Nessuna preferenza salvata:
- * entrando in Barbacane la musica c'è sempre, il muto vale per la sessione.
+ * La musica è spenta di default e parte solo dal suo pulsante: il file pesa
+ * ~6 MB e, con preload="none" negli index.html, lo scarica solo chi la accende.
+ * Nessuna preferenza salvata: la scelta vale per la sessione.
  */
 
 const BgMusic = (() => {
 
-  const GESTURES = ['click', 'pointerup', 'touchend', 'keydown'];
-
   let audioEl = null;
   let btn = null;
-  let wanted = true;
-  let playing = false;
+  let wanted = false;
 
   function init() {
     audioEl = document.getElementById('bgm-audio');
@@ -23,29 +20,19 @@ const BgMusic = (() => {
     audioEl.volume = 0.05;
     audioEl.muted = false;
 
-    audioEl.addEventListener('playing', () => { playing = true; });
     audioEl.addEventListener('error', () => report('caricamento fallito', audioEl.error));
 
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       setWanted(!wanted);
     });
-    GESTURES.forEach(evt => document.addEventListener(evt, start, true));
     updateButton();
-  }
-
-  // Da chiamare dentro un gesto dell'utente.
-  function start() {
-    if (!audioEl || !wanted || playing) return;
-    attemptPlay('gesto utente');
   }
 
   function attemptPlay(origin) {
     audioEl.muted = false;
     const promise = audioEl.play();
-    if (!promise || !promise.then) { playing = true; return; }
-    promise.then(() => { playing = true; })
-           .catch(err => report('play() rifiutato — ' + origin, err));
+    if (promise && promise.catch) promise.catch(err => report('play() rifiutato — ' + origin, err));
   }
 
   function setWanted(on) {
@@ -54,7 +41,6 @@ const BgMusic = (() => {
       attemptPlay('pulsante musica');
     } else {
       audioEl.pause();
-      playing = false;
     }
     updateButton();
   }
@@ -79,5 +65,5 @@ const BgMusic = (() => {
       });
   }
 
-  return { init, start };
+  return { init };
 })();

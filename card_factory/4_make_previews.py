@@ -2,9 +2,9 @@
 """
 4_make_previews.py
 Crea le anteprime (output/preview/<id>.webp, la carta intera rimpicciolita)
-a partire dai PNG finali in output/full/, per catalogo e anteprima del gioco.
+a partire dalle carte finali in output/full/, per catalogo e anteprima del gioco.
 
-Rifà solo le anteprime mancanti o più vecchie del loro PNG: si può rilanciare
+Rifà solo le anteprime mancanti o più vecchie della loro carta: si può rilanciare
 in qualunque momento. 2_generate_cards.py lo fa già da solo per le carte che
 genera; questo script serve per ricrearle tutte o per sistemare a mano.
 

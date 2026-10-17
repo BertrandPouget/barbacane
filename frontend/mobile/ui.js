@@ -63,8 +63,7 @@ function placeMusicToggle(name) {
   const btn = $('btn-music-toggle');
   if (!btn) return;
 
-  // Nella splash la musica è ancora muta finché non si tocca il logo: il
-  // pulsante non ha senso finché non parte, quindi resta nascosto.
+  // Nella splash c'è solo il logo da toccare: il pulsante compare dopo.
   btn.hidden = (name === 'splash');
 
   let target = null;

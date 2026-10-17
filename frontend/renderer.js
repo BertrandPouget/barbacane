@@ -1150,14 +1150,14 @@ const Renderer = (() => {
     }
 
     if (baseCardId) {
-      const imgUrl = `/card_images/full/${baseCardId}.png`;
+      const imgUrl = `/card_images/full/${baseCardId}.webp`;
       const probe = new window.Image();
       probe.onload = () => _showImageMode(imgUrl);
       probe.onerror = () => {
-        // Easter egg (es. obelisco_completo): se il PNG alternativo manca,
+        // Easter egg (es. obelisco_completo): se l'immagine alternativa manca,
         // torna alla carta ufficiale invece di scadere a modalità testo.
         if (fallbackBaseCardId) {
-          const fallbackUrl = `/card_images/full/${fallbackBaseCardId}.png`;
+          const fallbackUrl = `/card_images/full/${fallbackBaseCardId}.webp`;
           const fallbackProbe = new window.Image();
           fallbackProbe.onload = () => _showImageMode(fallbackUrl);
           fallbackProbe.onerror = () => _showTextMode();
@@ -1638,8 +1638,7 @@ const Renderer = (() => {
     const btn = document.getElementById('btn-music-toggle');
     if (!btn) return;
 
-    // Nella splash la musica è ancora muta finché non si preme il logo: il
-    // pulsante non ha senso finché non parte, quindi resta nascosto.
+    // Nella splash c'è solo il logo da premere: il pulsante compare dopo.
     btn.hidden = (name === 'splash');
 
     let target = null;

@@ -9,6 +9,7 @@ import logging
 import os
 import re
 from fastapi import FastAPI, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -22,6 +23,10 @@ app = FastAPI(
     description="Gioco di carte fantasy multiplayer online",
     version="0.1.0",
 )
+
+# Comprime al volo le risposte di testo (HTML, JS, CSS, JSON): la banda in uscita
+# di Render è limitata. Immagini e audio sono già compressi e non ci guadagnano.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 _CLEANUP_INTERVAL_SECONDS = 5 * 60
 

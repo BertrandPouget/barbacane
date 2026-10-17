@@ -3,11 +3,13 @@
 2_generate_cards.py
 Genera le carte Barbacane finali (versione gioco) dal renderer HTML unico
 (assets/card.html). Legge i dati da ../data/cards.json e le illustrazioni da
-images/<id>.png (assenti = carta con sola cornice, senza illustrazione).
+images/<id>.png (assenti = carta con sola cornice, senza illustrazione) e salva
+output/full/<id>.webp (WebP qualità 90: ~200 KB contro ~1,2 MB del PNG, a vista
+identica).
 
 render_cards() (lib/render.py) è riutilizzato anche da 3_make_print_pdf.py, che
-rigenera le carte a risoluzione più alta apposta per la stampa senza toccare i
-PNG in output/full/.
+rigenera le carte a risoluzione più alta apposta per la stampa (in PNG, senza
+perdite) senza toccare le carte del gioco in output/full/.
 
 In coda aggiorna anche le anteprime delle carte generate
 (output/preview/<id>.webp: la carta intera rimpicciolita, per catalogo e anteprima,
@@ -34,6 +36,7 @@ from lib.render import render_cards
 ROOT = Path(__file__).resolve().parent
 OUT_DIR = ROOT / "output"
 FULL_DIR = OUT_DIR / "full"
+WEBP_QUALITY = 90
 
 
 def main():
@@ -71,7 +74,8 @@ def main():
 
     if not args.mini_only:
         print(f"Carte da generare: {len(cards)}  (scala {args.scale}x)\n")
-        render_cards(cards, id_to_name, FULL_DIR, scale=args.scale, debug=args.debug_borders)
+        render_cards(cards, id_to_name, FULL_DIR, scale=args.scale, debug=args.debug_borders,
+                     webp_quality=WEBP_QUALITY)
 
         print("\nAnteprime (catalogo e passaggio del mouse):")
         make_previews([c.get("id") for c in cards])
