@@ -16,7 +16,7 @@ Scopo: evitare che un Claude futuro **sbagli** o perda molto tempo. Non è docum
 
 ## Stato e convenzioni
 
-- Gioco **completo e in produzione** (tutte le carte di `data/cards.json` implementate). Deploy automatico da GitHub su Render free tier + Postgres Neon: https://barbacane-online.onrender.com (`render.yaml`). Lavoro corrente: rifinitura.
+- Gioco **completo e in produzione** (tutte le carte di `data/cards.json` implementate). Deploy automatico da GitHub su Render free tier + Postgres Neon: https://barbacane-online.onrender.com (`render.yaml`). Lavoro corrente: rifinitura e nuova interfaccia di partita (campo a triangoli, branch `feature/revamp_UI`): fatta sul mobile, il desktop è ancora da adeguare.
 - **Voci della home** (identiche su desktop e mobile, da usare nei testi per gli utenti): **Gioca** (Crea/Unisciti lobby, Bot compresi), **Tutorial**, **Catalogo**.
 - **Lingua**: commenti e messaggi al giocatore in italiano; rispondere all'utente in italiano.
 - **Python**: conda, ambiente `barbacane`. Avvio: `python main.py` → `http://localhost:8000` (desktop), `/m` (mobile; `?desktop=1` forza il desktop).
@@ -48,7 +48,7 @@ db/storage.py      Postgres (DATABASE_URL) o SQLite
 frontend/          Desktop (app.js, renderer.js) + moduli condivisi col mobile: ws, spotlight, sparks,
                    audio, chronicle, session, cardart (minicarte), motion (transizioni),
                    drag (giocare le carte trascinandole in campo)
-frontend/mobile/   Client mobile (modulo Mob), ui.js (sheet, toast)
+frontend/mobile/   Client mobile (modulo Mob), ui.js (sheet, toast), board.js (campo a triangoli)
 card_factory/      Grafica carte (vedi suo README) → output/full, output/preview, output/mini, serviti su /card_images
 ```
 
@@ -117,4 +117,5 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 - **Minicarte** (`cardart.js`, classi `.mc-*` in entrambi i CSS): sopra una carta `.has-art` il CSS nasconde tutto tranne minicarta e badge del costo; ciò che deve restare visibile va marcato `card-keep`. Il corpo del nome è tarato sul nome più lungo: se arriva un nome più lungo, usa `mini_name`. Le carte assegnate a un Guerriero si disegnano sotto di lui in `CardArt.attachAssigned` (un nuovo tipo assegnabile va gestito lì).
 - **Tavolo desktop**: la dimensione delle carte la calcola `fitCards()` (`renderer.js`); con altezza ≤ 1000px alcune zone hanno `zoom`, quindi si misurano con `getBoundingClientRect`.
 - **Sheet mobile** di sola consultazione: passare `refresh` a `Sheet.open`, altrimenti si chiude al cambio turno.
+- **Campo mobile** (`board.js`): Regioni come sagome SVG in unità di tavola (geometria fissa in `SHAPES`, disegno costruito una volta sola). Gli id delle sagome (`fld-vanguard`, `tw-*`, `opp-b*`) li usano il tutorial (`_MOBILE_HIGHLIGHT_MAP`), le transizioni (`MOTION_TILES`) e il trascinamento (`Board.contains`): rinominarli ovunque. Il campo può mostrare un altro giocatore (occhio, `viewId` in `app.js`): mano e azioni restano sempre mie.
 - `game.py` contiene ancora un bot casuale (`random_bot_turn`) per `simulate_game`: non è il Bot delle partite reali.

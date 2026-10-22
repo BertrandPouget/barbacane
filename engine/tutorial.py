@@ -106,33 +106,33 @@ class TutorialStep:
         self.show_opponents = show_opponents
 
 
-# Il frontend mobile usa ID DOM diversi (layout a tasselli invece che regioni
-# fisse): questa mappa deriva automaticamente gli highlight mobile da quelli
+# Il frontend mobile usa ID DOM diversi (campo a triangoli, frontend/mobile/board.js):
+# questa mappa deriva automaticamente gli highlight mobile da quelli
 # desktop, così ogni passo si scrive una volta sola. Un ID desktop può
 # corrispondere a più ID mobile (una lista): lo Spotlight li evidenzia tutti.
 _MOBILE_HIGHLIGHT_MAP: Dict[str, Union[str, List[str]]] = {
     ">hand-cards": ">hand",
     "hdr-deck": "tb-deck",
     "my-life-deck": "st-lives",
-    "my-field": "field-grid",
+    "my-field": "board-center-box",
     "my-vanguard": "fld-vanguard",
     "my-bastion-left": "tw-left",
     "my-bastion-right": "tw-right",
     "my-village": "tw-village",
-    # Solo Mana e Azioni: nella statusbar mobile ci sono anche Vite ed Effetti.
+    # Solo Mana e Azioni: nell'intestazione mobile ci sono anche Vite ed Effetti.
     "my-stats": ["st-mana", "st-actions"],
     "my-mana": "st-mana",
     "my-actions": "st-actions",
     "action-panel": "dock",
-    "btn-next-phase": "dock-next",
+    # La fase successiva nell'intestazione (si cambia fase toccandola)
+    "btn-next-phase": "tb-next-phase",
     "btn-horde": "dock-horde",
     "btn-battle": "dock-attack",
     "btn-end-turn": "dock-end-turn",
     "phase-bar": "tb-phase",
     "my-active-cards": "st-fx",
-    # Solo i riquadri degli avversari: la riga ha spazio vuoto in alto, e l'anello
-    # dello spotlight finirebbe sopra la barra superiore
-    "top-opponents": ">opp-rail",
+    # I nomi degli avversari (solo dove ci sono) e i loro Bastioni esposti
+    "top-opponents": [">opp-rail", "opp-bl", "opp-br"],
 }
 
 

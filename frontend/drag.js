@@ -66,15 +66,20 @@ const DragPlay = (() => {
 
   /**
    * Inizia il trascinamento della carta `cardEl` dal punto (x, y).
-   * opts.zones     [{ key, el, quiet }]: zone dove la carta si può lasciare
-   *                (quiet: non illuminata finché la carta non ci è sopra)
+   * opts.zones     [{ key, el, quiet, contains }]: zone dove la carta si può lasciare
+   *                (quiet: non illuminata finché la carta non ci è sopra;
+   *                contains(x, y): il punto è nella zona, per le zone che non sono
+   *                rettangoli, come le Regioni a triangolo del mobile)
    * opts.fieldTest (x, y) → bool: per le Magie, la carta è abbastanza dentro il
    *                campo; (x, y) è il centro della carta trascinata (sul mobile sta
    *                sopra il dito, vedi lift)
    * opts.noGlow    la carta non si accende sopra una zona (non si può giocare:
    *                lasciata lì torna in mano con l'errore)
    * opts.lift      di quanto la carta sta sopra il puntatore (frazione dell'altezza;
-   *                sul mobile il dito non deve coprirla)
+   *                sul mobile il dito non deve coprirla). Zone e campo si cercano
+   *                al centro della carta, dove la si vede, non sotto il puntatore
+   * opts.scale     misura della copia rispetto alla carta (sul mobile le carte in
+   *                mano sono grandi e coprirebbero le Regioni su cui lasciarle)
    * opts.onDrop(key) chiamata al rilascio su una zona valida; ritorna true se ha
    *                già mandato l'azione, 'land' se la carta resta nella zona senza
    *                azione (es. un Muro posato, da confermare): la copia ci sparisce dentro
@@ -86,7 +91,8 @@ const DragPlay = (() => {
   function start(cardEl, x, y, opts) {
     cancel();
     _releasePending();
-    const w = cardEl.offsetWidth, h = cardEl.offsetHeight;
+    const k = opts.scale || 1;
+    const w = cardEl.offsetWidth * k, h = cardEl.offsetHeight * k;
     const ghost = _makeGhost(cardEl, w, h);
     document.body.appendChild(ghost);
     // Sotto la carta trascinata, ognuna sotto la precedente (stesso z-index:
@@ -148,12 +154,18 @@ const DragPlay = (() => {
       g.style.left = `${left}px`;
       g.style.top = `${top - off}px`;
     });
+    // Centro della carta trascinata (col lift sta sopra il puntatore)
+    const cy = y - h * (opts.lift || 0);
     let over = null;
     for (const z of opts.zones || []) {
+      if (z.contains) {
+        if (z.contains(x, cy)) { over = z; break; }
+        continue;
+      }
       const r = z.el.getBoundingClientRect();
-      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) { over = z; break; }
+      if (x >= r.left && x <= r.right && cy >= r.top && cy <= r.bottom) { over = z; break; }
     }
-    if (!over && opts.fieldTest && opts.fieldTest(x, y - h * (opts.lift || 0))) over = { key: 'field', el: null };
+    if (!over && opts.fieldTest && opts.fieldTest(x, cy)) over = { key: 'field', el: null };
     if ((over && over.el) !== (s.over && s.over.el)) {
       if (s.over && s.over.el) s.over.el.classList.remove('drop-over');
       if (over && over.el) over.el.classList.add('drop-over');

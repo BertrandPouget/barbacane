@@ -68,6 +68,9 @@
   --card-h-sm: 98px;
   --card-w-hand: 90px;
   --card-h-hand: 118px;
+  /* Carte intere della mano in partita (proporzioni della carta stampata) */
+  --hc-h: clamp(112px, 20dvh, 178px);
+  --hc-w: calc(var(--hc-h) * 0.7154);
 
   --r-lg: 8px;
   --r-md: 6px;
@@ -176,13 +179,15 @@ input {
 .music-toggle.muted { color: var(--brown-light); }
 .music-toggle[hidden] { display: none; }
 
-/* In partita si inserisce nella barra superiore, accanto a "Abbandona" */
+/* In partita si inserisce nell'intestazione, accanto a "Abbandona" */
 .music-toggle.in-header {
   position: static;
   z-index: auto;
-  width: 28px;
-  height: 28px;
-  font-size: 0.85rem;
+  width: 30px;
+  height: 30px;
+  font-size: 0.9rem;
+  background: #1a0d03;
+  opacity: 1;
 }
 
 /* Nel catalogo si inserisce nell'header del titolo, speculare a "←" */
@@ -689,75 +694,126 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 
 /* ═══════════════════════ GIOCO ═══════════════════════ */
 
+/* La partita si gioca su un terreno di terra scura e boschi: il campo
+   (board.js) ci disegna sopra la radura con le Regioni. Lo sfondo a mattoni
+   crepati resta per le altre schermate. */
 #scr-game.active {
   height: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='1' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.85 0 0 0 0 0.7 0 0 0 0 0.5 0 0 0 0.5 -0.2'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.03' numOctaves='4' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.04 0 0 0 0 0.02 0 0 0 0 0 0 0 0 1.2 -0.45'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 90% 40% at 50% 47%, #3b2613, transparent 75%),
+    #25170b;
 }
 
-/* ── Topbar ── */
+/* ── Intestazione: cornice a bastione con le punte in basso; il lato di
+   sopra esce dallo schermo ── */
 
 #topbar {
+  --frame-size: 20px;
+  --frame-fill: rgba(28, 15, 4, 0.95);
+  position: relative;
+  z-index: 5;
+  flex: 0 0 auto;
+  margin: calc(-1 * var(--frame-size)) 2px 0;
+  padding: calc(var(--sat) + 6px) 0 0;
+  display: flex;
+  flex-direction: column;
+}
+.tb-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: calc(var(--sat) + 8px) 10px 0;
-  padding: 7px 9px;
-  border-radius: var(--r-md);
-  flex: 0 0 auto;
   min-width: 0;
 }
-.tb-left { display: flex; gap: 6px; }
+#topbar > .tb-row:first-child {
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(185, 138, 62, 0.5);
+}
 .tb-pill {
-  background: var(--bg-dark);
-  border: 1px solid var(--border);
+  flex: 0 0 auto;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  background: #1a0d03;
+  border: 1px solid #6e3c15;
   border-radius: var(--r-sm);
-  padding: 4px 9px;
-  font-size: 0.76rem;
+  font-size: 0.95rem;
   font-weight: 700;
-  color: var(--text-dim);
+  color: var(--text);
   white-space: nowrap;
 }
-#tb-turn { color: var(--gold-light); }
+/* Il mazzo: una carta coperta in piccolo */
+.tb-deck-ico {
+  width: 9px;
+  height: 13px;
+  background: #6b1515;
+  border: 1px solid var(--card-gold);
+  border-radius: 1.5px;
+}
 
-/* Fasi del turno */
+/* Fasi del turno: toccando una fase successiva ci si passa (app.js, onPhaseTap) */
 .tb-phase {
-  display: flex;
-  gap: 10px;
   flex: 1;
-  justify-content: center;
   min-width: 0;
-  padding-top: 2px;
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
+  gap: 3px;
 }
-@media (max-width: 374px) {
-  .ph-dot em { display: none; }
-  .tb-phase { gap: 7px; }
+.ph-dot {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 0;
+  border-radius: var(--r-sm);
 }
-.ph-dot { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.ph-dot:disabled { cursor: default; }
+.ph-dot:disabled:active { transform: none; }
 .ph-dot i {
-  width: 9px; height: 9px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
-  background: var(--bg-light);
-  border: 1px solid var(--border);
-  transition: background 0.3s, border-color 0.3s;
+  background: #3b2210;
+  border: 1px solid #5e3a19;
+  transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
 }
 .ph-dot em {
+  font-size: clamp(0.6rem, 2.75vw, 0.72rem);  /* le tre fasi stanno tra mazzo e «Abbandona» */
   font-style: italic;
-  font-size: 0.6rem;
-  color: var(--text-dim);
+  color: #a88a5a;
+  white-space: nowrap;
   transition: color 0.3s;
 }
 .ph-dot.on i {
-  background: var(--gold);
-  border-color: var(--gold-light);
+  background: var(--gold-light);
+  border-color: #ffe48c;
+  box-shadow: 0 0 8px rgba(255, 208, 66, 0.55);
 }
 .ph-dot.on em { color: var(--gold-light); font-weight: 700; }
-.ph-dot.done i { background: var(--border-gold); border-color: var(--border); }
-.ph-dot.done em { text-decoration: line-through; opacity: 0.5; }
-.tb-phase.dimmed { opacity: 0.35; }
+.ph-dot.done i { background: #7a5520; border-color: #8a6428; }
+.ph-dot.done em { opacity: 0.6; }
+/* Fasi in cui si può passare: un filo d'oro attorno al pallino */
+.ph-dot.ahead i { border-color: var(--card-gold); }
+.ph-dot.ahead em { color: var(--text-dim); }
+.ph-dot.ahead:active i { background: rgba(255, 208, 66, 0.45); }
+/* Fase finita (Azioni esaurite): la successiva pulsa */
+.ph-dot.ready i { animation: ph-ready 1.6s ease-in-out infinite; }
+.ph-dot.ready em { color: var(--gold-light); }
+@keyframes ph-ready {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 196, 2, 0.7); background: #3b2210; }
+  50%      { box-shadow: 0 0 0 6px rgba(251, 196, 2, 0); background: rgba(255, 208, 66, 0.55); }
+}
+.tb-phase.dimmed { opacity: 0.45; }
 
-.tb-right { display: flex; align-items: center; gap: 6px; }
+.tb-right { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
 .tb-btn {
   font-size: 1.05rem;
   padding: 4px 7px;
@@ -768,369 +824,369 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 #multi-back, #bot-diff-back, #cat-back, #wait-back { font-size: 1.7rem; line-height: 1; padding: 0 10px 4px; }
 .tb-btn:active { border-color: var(--border); }
 .tb-leave {
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 4px 6px;
+  height: 30px;
+  padding: 0 6px;
+  font-size: 0.78rem;
   color: var(--danger);
-  border-color: rgba(176, 48, 48, 0.55);
+  background: #1a0d03;
+  border-color: rgba(224, 64, 64, 0.6);
   white-space: nowrap;
 }
 
-.tb-timer { position: relative; width: 34px; height: 34px; }
-.tb-timer svg { width: 34px; height: 34px; transform: rotate(-90deg); }
-.tb-timer circle { fill: none; stroke-width: 3.4; }
-.ring-bg { stroke: var(--bg-light); }
-.ring-fg {
-  stroke: var(--gold);
-  stroke-linecap: round;
-  stroke-dasharray: 97.4;
-  stroke-dashoffset: 0;
-  transition: stroke-dashoffset 1s linear, stroke 0.4s;
+/* Seconda riga: le mie Azioni, Vite e Mana */
+.tb-res { justify-content: center; gap: 0; padding: 7px 0 0; }
+.st-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 10px;
+  font-size: 0.98rem;
+  color: var(--text);
+  white-space: nowrap;
 }
-.tb-timer.urgent .ring-fg { stroke: var(--danger); }
+.st-sep {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 28px;
+  background: rgba(185, 138, 62, 0.45);
+}
+/* Azioni: rombi azzurri come la stella delle Maghe, vuoti quelli già usati */
+.st-pips { display: inline-flex; align-items: center; gap: 7px; padding: 0 3px; }
+.st-pips i {
+  width: 13px;
+  height: 13px;
+  transform: rotate(45deg);
+  background: var(--hex-maga);
+  box-shadow: 0 0 0 1.5px #2a5a6e;
+}
+.st-pips i.off { background: rgba(42, 90, 110, 0.25); box-shadow: 0 0 0 1.5px rgba(80, 140, 165, 0.5); }
+.st-pips b { margin-left: 3px; font-size: 0.85em; color: #a3d7ed; }
+.st-hearts, .opp-hearts { display: inline-flex; align-items: center; gap: 3px; }
+.st-hearts svg { width: 20px; height: 20px; fill: var(--red-light); }
+.st-hearts b, .opp-hearts b { color: var(--red-light); font-size: 0.85em; margin-left: 2px; }
+/* Mana: la gemma ottagonale delle carte stampate */
+.st-gem {
+  --gem: polygon(29.3% 0, 70.7% 0, 100% 29.3%, 100% 70.7%, 70.7% 100%, 29.3% 100%, 0 70.7%, 0 29.3%);
+  position: relative;
+  isolation: isolate;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  clip-path: var(--gem);
+  background: var(--hex-border);
+}
+.st-gem::before {
+  content: '';
+  position: absolute;
+  inset: 1.5px;
+  z-index: -1;
+  clip-path: var(--gem);
+  background: var(--hex-mana);
+}
+.st-gem b { font-size: 1rem; font-weight: 800; color: var(--hex-ink); padding-top: 1px; }
+.st-fx {
+  margin-left: 4px;
+  padding: 3px 9px;
+  border: 1px solid rgba(185, 138, 62, 0.55);
+  border-radius: 12px;
+  font-size: 0.85rem;
+  color: var(--gold-light);
+}
+.st-item.bump { animation: chip-bump 0.5s var(--ease-out); }
+@keyframes chip-bump {
+  0%   { transform: none; }
+  35%  { transform: scale(1.14); }
+  100% { transform: none; }
+}
+@media (max-width: 374px) {
+  .tb-row { gap: 4px; }
+  .tb-pill, .tb-leave { padding: 0 5px; }
+  .st-item { padding: 2px 7px; gap: 6px; }
+}
+
+/* Timer del turno: una barra che si accorcia sopra il bordo dell'intestazione */
+.tb-timer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -7px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.4);
+}
+#timer-bar {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--gold);
+  transform-origin: left center;
+  transition: transform 1s linear, background 0.4s;
+}
+#tb-timer-num {
+  position: absolute;
+  right: 0;
+  bottom: 5px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+.tb-timer.urgent #timer-bar { background: var(--danger); }
 .tb-timer.urgent #tb-timer-num { color: var(--danger); animation: pulse 1s infinite; }
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
 }
-#tb-timer-num {
+
+/* ── Campo (board.js): la tavola scala per stare nello spazio libero ── */
+
+#field {
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+  z-index: 1;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#board {
+  position: relative;
+  flex: 0 0 auto;
+  width: min(100cqw, 100cqh * 0.78);  /* 390 × 500 unità di tavola */
+  aspect-ratio: 390 / 500;
+  container-type: inline-size;        /* i numeri si misurano sulla tavola (cqw) */
+}
+#board > svg {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;   /* le Regioni dei vicini escono dalla tavola, fino al bordo dello schermo */
+  pointer-events: none;
+}
+/* Il disegno fisso su un livello suo: le animazioni sopra non ne ricalcolano i filtri */
+#board-art { will-change: transform; }
+#board-ov, #opp-rail { position: absolute; inset: 0; pointer-events: none; }
+#board-ov { z-index: 2; }
+#opp-rail { z-index: 3; }
+/* Cambio di punto di vista (occhio): la tavola ricompare */
+#board.switching { animation: board-switch 0.45s var(--ease-out); }
+@keyframes board-switch {
+  from { opacity: 0.2; transform: scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Terreno: radura di terra battuta, alberi, erba */
+.ba-clearing { fill: #644224; stroke: #644224; stroke-width: 30; stroke-linejoin: round; stroke-linecap: round; }
+.ba-tree-shadows { fill: rgba(8, 4, 0, 0.42); }
+.ba-crown { fill: #22301a; stroke: #0f170a; stroke-width: 0.8; }
+.ba-light { fill: #31452a; opacity: 0.8; }
+.ba-regions path { stroke: rgba(30, 14, 4, 0.55); stroke-width: 1.2; }
+.ba-grass { fill: none; stroke: #8fb957; stroke-width: 1.05; stroke-linecap: round; opacity: 0.9; }
+
+/* Muri di pietra lungo il lato esposto di un Bastione che ne ha */
+.bl-wall { display: none; }
+.bl-wall.on { display: inline; }
+.bl-stone-shadows { fill: rgba(22, 10, 3, 0.5); }
+.bl-stones { fill: #cbc4b6; stroke: #635b4f; stroke-width: 0.6; }
+
+/* Sagome toccabili delle Regioni (anche zone in cui trascinare le carte) */
+.rg-shape {
+  fill: rgba(255, 220, 140, 0);
+  stroke: rgba(251, 196, 2, 0);
+  stroke-width: 2;
+  pointer-events: all;
+  cursor: pointer;
+  transition: fill 0.15s, stroke 0.15s;
+}
+.rg-shape.empty { pointer-events: none; }
+.rg-shape:active { fill: rgba(255, 220, 140, 0.12); }
+/* Schieramento: Regioni con Guerrieri da spostare */
+.rg-shape.hot { stroke: rgba(251, 196, 2, 0.85); stroke-width: 1.8; stroke-dasharray: 6 5; }
+/* Battaglia: Bastioni esposti che posso attaccare ora */
+.rg-shape.target { stroke: rgba(255, 150, 70, 0.95); stroke-width: 2.2; animation: rg-target 1.5s ease-in-out infinite; }
+@keyframes rg-target {
+  0%, 100% { stroke-opacity: 1; fill: rgba(255, 120, 60, 0.04); }
+  50%      { stroke-opacity: 0.35; fill: rgba(255, 120, 60, 0.16); }
+}
+.rg-shape.drop-zone { stroke: rgba(251, 196, 2, 0.6); stroke-width: 2.2; fill: rgba(251, 196, 2, 0.06); box-shadow: none; }
+.rg-shape.drop-over { stroke: rgb(255, 214, 90); stroke-width: 3; fill: rgba(251, 196, 2, 0.2); background-color: transparent; }
+
+/* Numeri delle Regioni: rombi delle Caratteristiche come sulle carte, Muri,
+   torri delle Costruzioni, pallini delle Specie */
+.ov-slot { position: absolute; inset: 0; }
+.ov {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  line-height: 1;
+  color: var(--text);
+  text-shadow: 0 1px 2px rgba(20, 10, 2, 0.8);
+}
+.ov-dia {
+  width: max(20px, 7cqw);
+  height: max(20px, 7cqw);
   display: grid;
   place-items: center;
-  font-size: 0.62rem;
-  font-weight: 800;
+  isolation: isolate;
+  text-shadow: none;
+}
+.ov-dia::before {
+  content: '';
+  position: absolute;
+  inset: 15%;
+  z-index: -1;
+  background: var(--card-brown);
+  border: max(1px, 0.4cqw) solid var(--card-gold);
+  border-radius: 2px;
+  transform: rotate(45deg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+.ov-dia b { font-size: max(11px, 3.7cqw); font-weight: 700; color: var(--card-cream); padding-top: 0.08em; }
+.ov-dia.zero b, .ov-wall.zero b { color: #a8875a; }
+.ov-lbl { font-size: max(8px, 2.6cqw); letter-spacing: 0.08em; text-transform: uppercase; }
+.ov-title { font-size: max(9px, 3.3cqw); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.ov-wall, .ov-tower { display: grid; place-items: center; }
+.ov-wall { width: max(20px, 7.4cqw); height: max(16px, 5.9cqw); }
+.ov-tower { width: max(18px, 6.4cqw); height: max(20px, 7.1cqw); }
+.ov-wall svg, .ov-tower svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+.ov-wall svg { fill: #3a2414; stroke: #d0a24a; stroke-width: 1.5; }
+.ov-tower svg { fill: #3a2414; stroke: #d0a24a; stroke-width: 1.3; stroke-linejoin: round; }
+.ov-tower.done svg { fill: #e7b94b; stroke: #9a6f22; }
+.ov-wall b, .ov-tower b { position: relative; font-weight: 700; color: var(--card-cream); }
+.ov-wall b { font-size: max(10px, 3.4cqw); padding-top: 0.08em; }
+.ov-tower b { top: 13%; font-size: max(9px, 3.1cqw); }
+.ov-tower.done b { color: #3a2414; text-shadow: none; }
+.ov-dots { display: flex; align-items: center; gap: max(3px, 1.4cqw); }
+.ov-dots i {
+  width: max(6px, 2.4cqw);
+  height: max(6px, 2.4cqw);
+  border-radius: 50%;
+  background: var(--sp);
+  box-shadow: 0 0 0 1px rgba(20, 10, 2, 0.35);
+}
+.ov-dots em { font-style: normal; font-size: max(8px, 2.8cqw); margin-left: 0.2em; }
+/* Tavola piccola (schermi bassi): via le etichette, restano i numeri */
+@container (max-width: 300px) {
+  .ov-lbl { display: none; }
 }
 
-/* ── Avversari: mini versione delle 4 Regioni ── */
+/* ── Gli altri giocatori sopra il campo: nome, Vite, occhio per guardare il
+   loro campo. I vicini sopra i loro Bastioni, gli altri in alto al centro ── */
 
-#opp-rail {
+.opp-label {
+  position: absolute;
   display: flex;
-  gap: 8px;
-  padding: 8px 10px 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  gap: max(2px, 0.6cqw);
+  max-width: 46%;
+  pointer-events: auto;
+  text-shadow: 0 1px 3px rgba(10, 5, 0, 0.9);
 }
-#opp-rail::-webkit-scrollbar { display: none; }
-
-.opp-chip {
-  position: relative;
-  flex: 1 0 auto;
-  min-width: 148px;
-  max-width: 210px;
-  background: var(--panel);
-  border: 1px solid rgba(122, 68, 24, 0.4);
-  border-radius: var(--r-md);
-  padding: 7px 9px;
-  text-align: left;
-  transition: border-color 0.3s;
+/* I vicini un nome più in basso di quelli al centro, che stanno sulla strada */
+.opp-label.pos-l,
+.opp-label.pos-r { top: calc(1.2% + 1.2 * max(12px, 3.9cqw) + 4px); }
+.opp-label.pos-l { left: 3.6%; }
+.opp-label.pos-r { right: 3.6%; }
+.opp-top {
+  position: absolute;
+  left: 50%;
+  top: 1.2%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 5cqw;
 }
-.opp-chip.turn {
-  border-color: var(--gold);
-  border-width: 2px;
-  box-shadow: 0 0 16px rgba(251, 196, 2, 0.45);
-  padding: 6px 8px;
-}
-.opp-chip.dead { opacity: 0.4; filter: grayscale(0.8); }
-.opp-chip.damaged { animation: chip-flash 0.55s; }
-@keyframes chip-flash {
-  0%, 100% { border-color: var(--border); }
-  50% { border-color: var(--red-light); background: rgba(176, 48, 48, 0.15); }
-}
-
-.opp-top { display: flex; align-items: baseline; gap: 7px; }
+.opp-top .opp-label { position: static; max-width: 42cqw; }
 .opp-name {
-  font-weight: bold;
-  font-size: 0.85rem;
-  color: var(--gold-light);
+  max-width: 100%;
+  padding: 1px 2px;
+  font-weight: 700;
+  font-size: max(12px, 3.9cqw);
+  line-height: 1.2;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 1;
 }
-.opp-lives { font-size: 0.68rem; letter-spacing: 1px; color: var(--red-light); white-space: nowrap; }
-.opp-fx-badge { color: var(--gold-light); font-size: 0.68rem; flex: 0 0 auto; }
-
-/* Mini-griglia delle 4 regioni dell'avversario */
-.opp-grid {
+.opp-sub { display: flex; align-items: center; gap: max(6px, 2.4cqw); min-height: max(18px, 5cqw); }
+.opp-hearts svg { width: max(9px, 2.9cqw); height: max(9px, 2.9cqw); fill: var(--red-light); }
+.opp-fx { font-size: max(9px, 2.8cqw); color: var(--gold-light); }
+.opp-out { font-size: max(10px, 2.9cqw); font-style: italic; color: var(--text-faint); }
+.opp-eye {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3px;
-  margin-top: 5px;
+  place-items: center;
+  width: max(30px, 8cqw);
+  height: max(26px, 6.6cqw);
+  margin: -6px -8px;
+  color: var(--text-dim);
 }
-.og-cell {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 4px;
-  min-width: 0;
-  background: rgba(26, 12, 0, 0.6);
-  border: 1px dashed rgba(122, 68, 24, 0.45);
-  border-radius: 3px;
-  padding: 2px 5px;
-  font-size: 0.6rem;
-}
-.og-cell i {
-  font-style: italic;
+.opp-eye svg { width: max(15px, 4.6cqw); height: max(15px, 4.6cqw); }
+/* Di turno: nome d'oro */
+.opp-label.turn .opp-name {
   color: var(--gold-light);
-  font-size: 0.54rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-shadow: 0 0 10px rgba(251, 196, 2, 0.55), 0 1px 3px rgba(10, 5, 0, 0.9);
 }
-.og-cell b { color: var(--text); font-weight: 700; white-space: nowrap; }
-.og-cell.atk-target {
-  border: 1px dashed var(--gold);
-  background: rgba(89, 61, 0, 0.45);
+.opp-label.dead { opacity: 0.55; filter: grayscale(0.7); }
+.opp-label.damaged .opp-name { animation: name-hit 0.6s; }
+@keyframes name-hit {
+  30% { color: var(--red-light); transform: translateX(-3px); }
+  60% { color: var(--red-light); transform: translateX(3px); }
 }
-.og-cell.atk-target i { color: var(--gold-light); }
 
-/* ── Ticker eventi ── */
+/* ── Sotto il campo: l'ultima voce della cronaca e la riga della fase ── */
 
 .ticker {
-  margin: 5px 12px 0;
-  padding: 5px 12px;
-  font-size: 0.74rem;
-  color: var(--brown-light);
-  background: var(--panel-deep);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  text-align: left;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 26px;
+  padding: 0 16px;
+  font-size: 0.98rem;
+  line-height: 26px;
+  color: var(--text);
+  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 0 0 auto;
-  animation: ticker-in 0.35s var(--ease-out);
+  text-shadow: 0 1px 3px rgba(10, 5, 0, 0.9);
 }
+.ticker:active { transform: none; opacity: 0.8; }
+.ticker-in { animation: ticker-in 0.35s var(--ease-out); }
 @keyframes ticker-in {
   from { opacity: 0; transform: translateY(-5px); }
   to   { opacity: 1; transform: none; }
 }
 
-/* ── Campo: 4 tasselli uguali ── */
-
-#field {
-  flex: 1;
-  display: flex;
-  padding: 8px 12px 4px;
-  min-height: 0;
-}
-
-#field-grid {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 8px;
-  min-height: 0;
-  min-width: 0;
-}
-
-.rg-tile {
-  position: relative;
-  min-height: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  background: rgba(50, 22, 4, 0.72);
-  border: 1px solid rgba(160, 90, 30, 0.55);
-  border-radius: var(--r-sm);
-  padding: 4px;
-  overflow: hidden;
-  transition: border-color 0.2s, background 0.2s;
-}
-/* Etichetta regione: come sul desktop, oro corsivo via ::before */
-.rg-tile::before {
-  content: attr(data-label);
-  display: block;
-  width: 100%;
-  font-size: 0.65rem;
-  color: var(--gold-light);
-  text-align: center;
-  padding-bottom: 2px;
-  pointer-events: none;
-  font-style: italic;
-}
-.rg-tile-bastion::before { content: none; }
-.rg-title {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  padding-bottom: 3px;
-  pointer-events: none;
-}
-.rg-title-main {
-  font-size: 0.65rem;
-  color: var(--gold-light);
-  font-style: italic;
-  text-align: center;
-}
-.rg-title-sub {
-  font-size: 0.62rem;
-  color: var(--gold-light);
-  font-style: italic;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-.rg-title-sub:empty { display: none; }
-.rg-tile:active { border-color: var(--gold); }
-/* Regione con Guerrieri riposizionabili (fase Schieramento):
-   solo bordo oro, lo sfondo resta quello normale del tassello. */
-.rg-tile.hot {
-  border-color: var(--gold);
-  box-shadow: inset 0 0 8px rgba(251, 196, 2, 0.18);
-}
-
-.rg-cards {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.rg-empty {
-  width: 100%;
-  margin: auto 0;
-  text-align: center;
-  color: var(--text-dim);
-  font-size: 0.72rem;
-  font-style: italic;
-}
-
-/* Riassunto numerico di una Regione (solo conteggi, come per gli avversari
-   ma con più respiro). Il dettaglio carta per carta si apre toccando il tassello. */
-.rg-summary {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 2px;
-  text-align: center;
-}
-
-/* Blocchi statistica affiancati: icona sopra, numero grande, etichetta sotto */
-.rg-stat-row {
-  display: flex;
-  width: 100%;
-  justify-content: space-evenly;
-  align-items: flex-start;
-}
-.rg-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-  min-width: 0;
-}
-.rg-stat-num {
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: var(--gold-light);
-  line-height: 1.15;
-}
-.rg-stat-label {
-  font-size: 0.56rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text);
-  font-weight: 600;
-  white-space: nowrap;
-}
-.rg-stat.zero .rg-stat-num { color: var(--text-dim); }
-
-.rg-summary-sub {
-  font-size: 0.62rem;
-  color: var(--text);
-  border-top: 1px solid rgba(122, 68, 24, 0.4);
-  padding-top: 4px;
-  width: 82%;
-}
-.rg-dots {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-}
-.rg-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
-}
-.rg-dot.sp-elfo  { background: var(--elfo); }
-.rg-dot.sp-nano  { background: var(--nano); }
-.rg-dot.sp-maga  { background: var(--maga); }
-.rg-dot.sp-umano { background: var(--umano); }
-.rg-dots-more { font-size: 0.56rem; color: var(--text-dim); }
-
-/* ── Statusbar personale ── */
-
-#statusbar {
-  display: flex;
-  gap: 7px;
-  padding: 4px 12px 0;
-  flex: 0 0 auto;
-}
-.st-chip {
-  flex: 1;
-  min-width: 0;
-  background: var(--panel);
-  border: 1px solid rgba(160, 90, 30, 0.5);
-  border-radius: 20px;
-  padding: 7px 6px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-#st-lives { color: var(--red-light); flex: 0 0 auto; padding: 7px 11px; }
-#st-mana { color: var(--gold-light); }
-#st-actions { color: #8fcde4; }  /* l'azzurro della stella delle Maghe (--hex-maga) */
-.st-fx { color: var(--gold-light); flex: 0 0 auto; padding: 7px 13px; }
-.st-chip.bump { animation: chip-bump 0.5s var(--ease-out); }
-@keyframes chip-bump {
-  0%   { transform: none; }
-  35%  { transform: scale(1.12); border-color: var(--gold); }
-  100% { transform: none; }
-}
-
-/* ── Dock azioni ── */
-
-#dock-wrap {
-  flex: 0 0 auto;
-  padding: 8px 12px 2px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
 #dock {
-  border-radius: var(--r-lg);
-  padding: 8px;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 2;
+  min-height: 42px;
+  padding: 2px 14px 4px;
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: 7px;
-  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 10px;
 }
-#dock .dock-hint { min-width: 0; flex-basis: 120px; }
-#dock .mbtn { flex: 1 0 auto; }
-#dock .mbtn.mbtn-compact { flex: 0 0 auto; }  /* scelta dei Muri: ✕ e «Conferma» ai lati */
-.dock-wait {
-  flex: 1;
-  text-align: center;
-  color: var(--text-dim);
-  font-size: 0.88rem;
+.dock-hint, .dock-wait {
+  font-size: 0.98rem;
   font-style: italic;
+  line-height: 1.25;
+  color: var(--text);
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(10, 5, 0, 0.9);
 }
 .dock-wait .dots::after {
   content: "…";
@@ -1142,16 +1198,41 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   50%  { content: ".."; }
   75%  { content: "..."; }
 }
-.dock-hint {
-  flex: 1;
-  font-size: 0.76rem;
-  color: var(--text-dim);
-  font-style: italic;
-  padding-left: 5px;
-  line-height: 1.25;
+
+/* Pulsanti a nastro, come lo stendardo del nome sulle carte: il bordo d'oro è
+   il fondo del pulsante, il colore il nastro interno */
+.rib-btn {
+  --rib: polygon(0 0, 100% 0, calc(100% - 9px) 50%, 100% 100%, 0 100%, 9px 50%);
+  flex: 0 0 auto;
+  height: 36px;
+  padding: 1.5px;
+  background: var(--card-gold);
+  clip-path: var(--rib);
+}
+.rib-btn > span {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 20px;
+  clip-path: var(--rib);
+  background: var(--card-brown);
+  color: var(--card-cream);
+  font-weight: 700;
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+.rib-btn.rib-gold > span { background: linear-gradient(#ffd75a, #e6a911); color: #2a1604; }
+.rib-btn.rib-danger > span { background: #7c1d16; color: #ffe2d6; }
+.rib-btn.rib-warn > span { background: #8a5a20; color: #fff3dc; }
+.rib-btn:disabled { opacity: 0.45; }
+.rib-btn:disabled:active { transform: none; }
+.rib-btn.rib-pulse { animation: rib-pulse 1.8s ease-in-out infinite; }
+@keyframes rib-pulse {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.3); }
 }
 
-/* Bottoni: come i .banner-btn / .btn del desktop */
+/* Bottoni degli sheet: come i .banner-btn / .btn del desktop */
 .mbtn {
   border-radius: var(--r-sm);
   border: 1px solid var(--border);
@@ -1185,8 +1266,6 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   0%, 100% { box-shadow: 0 0 0 0 rgba(251, 196, 2, 0.5); }
   50%      { box-shadow: 0 0 0 6px rgba(251, 196, 2, 0); }
 }
-
-/* ── Vassoio muri ── */
 
 
 /* ═══════════════════════ CARTE (identiche al desktop) ═══════════════════ */
@@ -1382,68 +1461,6 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   margin-top: auto;
 }
 
-.hand-cost-row {
-  font-size: 0.82rem;
-}
-
-/* Guerriero in mano: ATT/GIT/DIF in colonna, una sotto l'altra */
-.card-warrior-attrs {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: auto;
-  font-size: 0.68rem;
-}
-
-/* Badge costo: la gemma ottagonale della carta stampata (giallo e arancio, con un bordino
-   marrone), fuori dalla carta in alto a destra. La minicarta non riporta il
-   costo: è solo qui. Il costo in Maghe sta in una stella azzurra (come sulle
-   Magie stampate); bianco = carta eterea (gratis).
-   Il bordo è il fondo della gemma, il colore uno strato interno (::before):
-   con clip-path un border vero verrebbe tagliato. */
-.card-cost-badge {
-  position: absolute;
-  top: -9px;    /* sull'angolo della carta, un po' dentro */
-  right: -7px;
-  min-width: 25px;  /* ottagono regolare: largo quanto alto */
-  height: 25px;
-  padding: 0 5px;
-  clip-path: var(--badge-shape);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Caudex', Georgia, serif;
-  font-size: 0.74rem;
-  font-weight: 800;
-  color: var(--hex-ink);
-  background: var(--hex-border);
-  isolation: isolate;
-  z-index: 2;
-}
-.card-cost-badge::before {
-  content: '';
-  position: absolute;
-  inset: 1.5px;
-  z-index: -1;
-  clip-path: var(--badge-shape);
-  background: var(--hex-fill, var(--hex-mana));
-}
-.card-cost-badge { --badge-shape: polygon(29.3% 0, 70.7% 0, 100% 29.3%, 100% 70.7%, 70.7% 100%, 29.3% 100%, 0 70.7%, 0 29.3%); }  /* ottagono, come la gemma della carta */
-/* Stella: più grande della gemma, perché il numero sta nella parte centrale */
-.card-cost-badge.star {
-  --badge-shape: polygon(50% 4%, 65.9% 32.2%, 97.6% 38.5%, 75.7% 62.3%, 79.4% 94.5%, 50% 81%, 20.6% 94.5%, 24.3% 62.3%, 2.4% 38.5%, 34.1% 32.2%);
-  top: -12px;
-  right: -9px;
-  width: 34px;
-  min-width: 34px;
-  height: 34px;
-  padding: 4px 0 0;
-}
-.card-cost-badge.star::before { inset: 2px; }
-.card-cost-badge.maga { --hex-fill: var(--hex-maga); }
-/* Eterea: gemma bianca sfumata di grigio, come le altre sono sfumate */
-.card-cost-badge.ethereal { --hex-fill: radial-gradient(closest-side, #b4b4b4 0%, #cfcfcf 55%, #ececec 86%, #ffffff 100%); color: #241608; }
-
 .stat { color: var(--text-dim); }
 .stat-att { color: var(--red-light); }
 .stat-git { color: #aaa; }
@@ -1480,66 +1497,76 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .school-sortilegio { color: var(--blue-light); }
 .school-incantesimo { color: #88bbcc; }
 
-/* ── Mano: riga orizzontale scorrevole, come il desktop ── */
+/* ── Mano: carte intere a ventaglio, che toccano il fondo dello schermo e
+   escono un poco dai lati (fanHand in render.js) ── */
+
+/* La carta stampata (anteprima 744×1040); fuori da #hand vale anche per i
+   fantasmi delle animazioni e del trascinamento */
+.card.hand-card {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 6px;
+  box-shadow: 0 2px 9px rgba(0, 0, 0, 0.55);
+}
+.hand-card > .hc-img,
+.hand-card > .mc-back {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+/* Girata per diventare un Muro (CardArt.flipWall): si vede il dorso */
+.hand-card > .mc-back { position: absolute; inset: 0; display: none; }
+.hand-card.wall-marked > .mc-back { display: block; }
+/* Eterea: giocabile gratis, bordo bianco luminoso */
+.card.hand-card.ethereal { box-shadow: 0 0 0 2px #fff, 0 0 16px rgba(255, 255, 255, 0.65); }
+.hc-missing { padding: 8px; font-size: 0.7rem; color: var(--text); }
 
 #hand-wrap {
   flex: 0 0 auto;
+  position: relative;
+  z-index: 3;
+  height: calc(var(--hc-h) + 10px);
 }
 #hand {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 10px;
+  height: var(--hc-h);
   display: flex;
-  gap: 0;  /* a ventaglio le carte si sovrappongono (margini negativi da fanHand) */
-  flex-wrap: nowrap;
+  justify-content: center;  /* le carte in più escono da entrambi i lati */
   align-items: flex-start;
-  justify-content: center;
-  /* La mano non scorre: fanHand sovrappone le carte quanto serve per starci tutte */
-  overflow: hidden;
   touch-action: none;  /* il dito sulla mano sfoglia le carte (bindCardPeek) */
-  padding: 24px 12px 0;  /* sopra: badge del costo (la stella sporge di più) anche con la carta sollevata */
-  /* Altezza della mano calcolata su --card-h-hand: le carte sono più grandi e
-     la loro parte bassa esce dal fondo dello schermo (qui viene tagliata). */
-  box-sizing: border-box;
-  height: calc(var(--card-h-hand) + var(--sab) + 40px);
 }
-
-/* Carte in mano con le proporzioni della minicarta (280×400): l'altezza è
-   quella della mano, la larghezza ne deriva. */
-#hand .card {
-  height: var(--card-h-hand);
-  width: auto;
-  min-width: 0;
-  aspect-ratio: 7 / 10;
+#hand .hand-card {
   flex: 0 0 auto;
-}
-/* Ventaglio (fanHand in render.js): ogni carta copre il lato destro della
-   precedente, quindi il badge del costo sta a sinistra per restare visibile. */
-#hand .card {
-  height: calc(var(--card-h-hand) * 1.2);
+  width: var(--hc-w);
+  min-width: 0;
+  height: var(--hc-h);
   rotate: var(--fan-rot, 0deg);
   translate: 0 var(--fan-y, 0px);
-  transform-origin: 50% 100%;
+  transform-origin: 50% 120%;  /* sotto la carta: le carte ai lati scendono lungo un arco */
 }
-/* Classe e non #hand: vale anche per i fantasmi delle animazioni */
-.hand-card .card-cost-badge { right: auto; left: -7px; }
-.hand-card .card-cost-badge.star { left: -9px; }
-#hand .card .card-name { font-size: 0.74rem; }
-#hand .card .card-species { font-size: 0.6rem; }
 /* Carta sotto il dito mentre si sfoglia la mano (bindCardPeek in app.js) */
 #hand .card.peeked {
-  translate: 0 calc(var(--fan-y, 0px) - 10px);
+  translate: 0 calc(var(--fan-y, 0px) - 14px);
   z-index: 10;
-  border-color: var(--gold);
 }
 /* Mentre si sfoglia, la carta toccata per prima resta :active per tutto il tocco */
-#hand.peeking .card:active:not(.peeked) { transform: none; border-color: transparent; }
+#hand.peeking .card:active:not(.peeked) { transform: none; }
 #hand .card:active {
-  transform: translateY(-4px);
+  transform: translateY(-6px);
   z-index: 10;
-  border-color: var(--gold);
 }
-#hand .card.wall-marked:active { border-color: #8a6a20; }
 
 /* Carta non giocabile ora (Azioni esaurite) */
-#hand .card.unplayable { opacity: 0.4; filter: grayscale(0.6); }
+#hand .card.unplayable { opacity: 0.45; filter: grayscale(0.6) brightness(0.8); }
 
 .hand-empty {
   width: 100%;
@@ -1769,8 +1796,6 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   pointer-events: none;
 }
 .card.has-art.wall-marked > .mc-back { display: block; }
-.card.wall-marked .card-cost-badge,
-.card.flipping .card-cost-badge { visibility: hidden; }
 
 /* Transizioni delle carte (motion.js): i "fantasmi" volano sopra l'interfaccia */
 .motion-layer {
@@ -2124,7 +2149,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 
 #toasts {
   position: fixed;
-  top: calc(var(--sat) + 58px);
+  top: calc(var(--sat) + 100px);  /* sotto l'intestazione della partita */
   left: 0; right: 0;
   z-index: 70;
   display: flex;
@@ -2957,10 +2982,10 @@ button.menu-frame:active {
 .card-peek {
   position: fixed;
   left: 50%;
-  /* Appena sopra la mano (stessa altezza di #hand), un po' sotto il dito */
-  bottom: calc(var(--card-h-hand) + var(--sab) + 40px - 10px);
+  /* Appena sopra la mano, un po' sotto il dito */
+  bottom: calc(var(--hc-h) + 16px);
   translate: -50% 0;
-  width: min(74vw, 290px, calc((100vh - var(--card-h-hand) - var(--sab) - 40px) * 744 / 1040));
+  width: min(74vw, 290px, calc((100dvh - var(--hc-h) - 120px) * 744 / 1040));
   height: auto;
   z-index: 300;
   border-radius: 12px;

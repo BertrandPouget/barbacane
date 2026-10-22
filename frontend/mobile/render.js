@@ -1,8 +1,8 @@
 /**
  * render.js — Rendering dello stato di gioco per il client mobile.
- * Costruisce topbar, avversari, campo (4 tasselli), statusbar e mano.
- * Nei tasselli le carte sono riassunte in chip a una riga (dettaglio nello
- * sheet della Regione); negli sheet e in mano usano il markup del desktop.
+ * Costruisce l'intestazione (turno, mazzo, fasi, le mie risorse), il campo a
+ * triangoli (board.js) con i nomi degli avversari e la mano a ventaglio.
+ * Negli sheet le carte usano il markup del desktop con le minicarte.
  * I gesti/flussi sono delegati a Mob (app.js).
  */
 
@@ -12,35 +12,39 @@ const Render = (() => {
 
   const SPECIES_ICON = { elfo: '🌿', nano: '⛏️', maga: '🔮', umano: '🛡️' };
 
+  const HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.6 1.1 4.6 2.6C12 6.1 13.6 5 15.6 5 19 5 21.1 8.4 19.6 11.8 17.5 16.4 12 21 12 21z"/></svg>';
+  const EYE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1.6 12S5.6 5.2 12 5.2 22.4 12 22.4 12 18.4 18.8 12 18.8 1.6 12 1.6 12z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.3" fill="currentColor"/></svg>';
+
   // ---------------------------------------------------------------------------
   // Render principale
   // ---------------------------------------------------------------------------
 
-  function game(state, myId) {
+  /** viewId: giocatore di cui si guarda il campo (null = il mio). */
+  function game(state, myId, viewId = null) {
     if (!state) return;
     topbar(state);
-    opponents(state, myId);
 
     const me = state.players.find(p => p.id === myId);
     if (!me) return;
 
-    field(me, state, myId);
+    field(state, myId, viewId);
     statusbar(me);
     hand(me);
   }
 
   // ---------------------------------------------------------------------------
-  // Topbar
+  // Intestazione: turno, mazzo, fasi
   // ---------------------------------------------------------------------------
+
+  const PHASES = ['action', 'schieramento', 'battaglia'];
 
   function topbar(state) {
     $('tb-turn').textContent = `T${state.turn}`;
-    $('tb-deck').textContent = `🃏 ${state.deck_count}`;
+    $('tb-deck-n').textContent = state.deck_count;
 
-    const phases = ['action', 'schieramento', 'battaglia'];
-    const idx = phases.indexOf(state.phase);
-    document.querySelectorAll('.ph-dot').forEach(dot => {
-      const i = phases.indexOf(dot.dataset.ph);
+    const idx = PHASES.indexOf(state.phase);
+    document.querySelectorAll('#tb-phase .ph-dot').forEach(dot => {
+      const i = PHASES.indexOf(dot.dataset.ph);
       dot.classList.toggle('on', i === idx);
       dot.classList.toggle('done', idx >= 0 && i < idx);
     });
@@ -50,11 +54,28 @@ const Render = (() => {
     $('tb-phase').classList.toggle('dimmed', dimmed);
   }
 
+  /**
+   * Fasi toccabili: con canAdvance quelle dopo la corrente portano lì (app.js);
+   * la successiva ha l'id per il tutorial e, con ready, pulsa (fase finita).
+   */
+  function phaseControls(phase, canAdvance, ready) {
+    const idx = PHASES.indexOf(phase);
+    document.querySelectorAll('#tb-phase .ph-dot').forEach(dot => {
+      const i = PHASES.indexOf(dot.dataset.ph);
+      const ahead = canAdvance && idx >= 0 && i > idx;
+      dot.disabled = !ahead;
+      dot.classList.toggle('ahead', ahead);
+      const next = ahead && i === idx + 1;
+      if (next) dot.id = 'tb-next-phase';
+      else dot.removeAttribute('id');
+      dot.classList.toggle('ready', next && ready);
+    });
+  }
+
   // ---------------------------------------------------------------------------
-  // Timer ad anello
+  // Timer: barra sotto l'intestazione
   // ---------------------------------------------------------------------------
 
-  const RING_LEN = 97.4;
   let _timerTotal = 120;
 
   function timerStart(total) { _timerTotal = Math.max(1, total); }
@@ -64,7 +85,7 @@ const Render = (() => {
     box.hidden = false;
     $('tb-timer-num').textContent = secondsLeft;
     const frac = Math.max(0, Math.min(1, secondsLeft / _timerTotal));
-    $('timer-ring').style.strokeDashoffset = (RING_LEN * (1 - frac)).toFixed(1);
+    $('timer-bar').style.transform = `scaleX(${frac.toFixed(3)})`;
     box.classList.toggle('urgent', secondsLeft <= 15);
   }
 
@@ -137,112 +158,16 @@ const Render = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Riassunto di una Regione dentro i suoi tasselli — solo numeri, come per
-  // gli avversari ma con più respiro. Il dettaglio carta per carta si apre
-  // toccando il tassello (vedi openVanguardSheet/openBastionSheet/openVillageSheet).
+  // Campo — le Regioni del giocatore osservato e dei suoi vicini (board.js)
   // ---------------------------------------------------------------------------
 
-  function _speciesDots(warriors, max = 8) {
-    const wrap = el('span', { className: 'rg-dots' });
-    (warriors || []).slice(0, max).forEach(w => {
-      wrap.appendChild(el('i', { className: `rg-dot sp-${w.species || 'umano'}` }));
-    });
-    if ((warriors || []).length > max) {
-      wrap.appendChild(el('span', { className: 'rg-dots-more' }, [`+${warriors.length - max}`]));
-    }
-    return wrap;
-  }
-
-  function _maxStat(warriors, key) {
-    if (!warriors || warriors.length === 0) return 0;
-    return Math.max(...warriors.map(w => w[key] || 0));
-  }
-
-  function _statBlock(num, label) {
-    return el('div', { className: `rg-stat${num === 0 ? ' zero' : ''}` }, [
-      el('span', { className: 'rg-stat-num' }, [String(num)]),
-      el('span', { className: 'rg-stat-label' }, [label]),
-    ]);
-  }
-
-  function _statRow(...blocks) {
-    return el('div', { className: 'rg-stat-row' }, blocks);
-  }
-
-  function vanguardSummary(vg) {
-    const wrap = el('div', { className: 'rg-summary' }, [
-      _statRow(_statBlock(vg.length, vg.length === 1 ? 'Guerriero' : 'Guerrieri')),
-      _speciesDots(vg),
-      el('div', { className: 'rg-summary-sub' },
-        [`ATT max ${_maxStat(vg, 'att')} · GIT max ${_maxStat(vg, 'git')}`]),
-    ]);
-    return wrap;
-  }
-
-  function bastionSummary(bastion) {
-    const wallCount = bastion.wall_count ?? (bastion.walls || []).length;
-    const warriors = bastion.warriors || [];
-    const walls = _statBlock(wallCount, wallCount === 1 ? 'Muro' : 'Muri');
-    const wrap = el('div', { className: 'rg-summary' }, [
-      _statRow(
-        walls,
-        _statBlock(warriors.length, warriors.length === 1 ? 'Difensore' : 'Difensori'),
-      ),
-    ]);
-    if (warriors.length > 0) {
-      wrap.appendChild(_speciesDots(warriors));
-      wrap.appendChild(el('div', { className: 'rg-summary-sub' },
-        [`DIF max ${_maxStat(warriors, 'dif')} · GIT max ${_maxStat(warriors, 'git')}`]));
-    }
-    return wrap;
-  }
-
-  function villageSummary(buildings) {
-    const completed = buildings.filter(b => b.completed).length;
-    return el('div', { className: 'rg-summary' }, [
-      _statRow(
-        _statBlock(buildings.length, buildings.length === 1 ? 'Costruzione' : 'Costruzioni'),
-        _statBlock(completed, completed === 1 ? 'Completa' : 'Complete'),
-      ),
-    ]);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Avversari — mini versione delle 4 Regioni
-  // ---------------------------------------------------------------------------
-
-  function _livesStr(lives) {
-    const n = Math.max(0, lives);
-    return '❤︎'.repeat(n) + '✕'.repeat(Math.max(0, 3 - n));
-  }
-
-  function _oppGrid(p, canHitLeft, canHitRight) {
-    const cell = (label, value, attackable) => el('span', {
-      className: `og-cell${attackable ? ' atk-target' : ''}`
-    }, [
-      el('i', {}, [label]),
-      el('b', {}, [value]),
-    ]);
-    const vg = (p.field.vanguard || []).length;
-    const vil = ((p.field.village && p.field.village.buildings) || []).filter(b => !b.assigned_warrior).length;
-    const wallsL = p.field.bastion_left.wall_count ?? 0;
-    const wallsR = p.field.bastion_right.wall_count ?? 0;
-    const defL = (p.field.bastion_left.warriors || []).length;
-    const defR = (p.field.bastion_right.warriors || []).length;
-
-    return el('span', { className: 'opp-grid' }, [
-      cell('Avanscoperta', `🗡️${vg}`),
-      cell('Villaggio', `🏗️${vil}`),
-      cell('Bastione S.', `🧱${wallsL}${defL ? ` 🗡️${defL}` : ''}`, canHitLeft),
-      cell('Bastione D.', `🧱${wallsR}${defR ? ` 🗡️${defR}` : ''}`, canHitRight),
-    ]);
-  }
-
-  // Vicini vivi più prossimi a sinistra e a destra: gli eliminati vengono saltati.
-  function aliveNeighbors(state, myId) {
+  // Vicini vivi più prossimi a sinistra e a destra di un giocatore: gli
+  // eliminati vengono saltati. Il Bastione destro di X confina col sinistro
+  // del primo vivo alla sua destra (successivo in state.players).
+  function aliveNeighbors(state, playerId) {
     const ps = state.players;
     const n = ps.length;
-    const i = ps.findIndex(p => p.id === myId);
+    const i = ps.findIndex(p => p.id === playerId);
     const step = d => {
       let j = i;
       for (let k = 0; k < n - 1; k++) {
@@ -254,136 +179,191 @@ const Render = (() => {
     return { left: step(-1), right: step(1) };
   }
 
-  function opponents(state, myId) {
-    const rail = $('opp-rail');
-    rail.innerHTML = '';
-    const { left: leftNb, right: rightNb } = aliveNeighbors(state, myId);
-    const me = state.players.find(pp => pp.id === myId);
-    const guerremoto = !!me && (me.active_effects || []).some(e => e.type === 'guerremoto' && e.any_target);
+  function _maxStat(warriors, key) {
+    if (!warriors || warriors.length === 0) return 0;
+    return Math.max(...warriors.map(w => w[key] || 0));
+  }
 
-    // Ordine: vicino a cui espongo il Bastione S., vicino a cui espongo il
-    // Bastione D., poi gli altri (di fronte) in ordine di posto, eliminati in fondo.
-    const ps = state.players;
-    const myIdx = Math.max(0, ps.findIndex(pp => pp.id === myId));
-    const bySeat = ps.map((_, k) => ps[(myIdx + 1 + k) % ps.length]).filter(pp => pp.id !== myId);
-    const ordered = [];
-    const push = pp => { if (pp && pp.id !== myId && !ordered.includes(pp)) ordered.push(pp); };
-    push(leftNb);
-    push(rightNb);
-    bySeat.filter(pp => (pp.lives ?? 0) > 0).forEach(push);
-    bySeat.forEach(push);
+  // Numeri di una Regione per board.js (le Costruzioni assegnate a un
+  // Guerriero, es. Trono, si vedono sul Guerriero e non contano nel Villaggio)
+  function regionSlot(p, region) {
+    const f = p.field;
+    if (region === 'vanguard') {
+      const ws = f.vanguard || [];
+      return { ownerId: p.id, data: { att: _maxStat(ws, 'att'), git: _maxStat(ws, 'git'), species: ws.map(w => w.species) } };
+    }
+    if (region === 'village') {
+      const bs = ((f.village && f.village.buildings) || []).filter(b => !b.assigned_warrior);
+      const done = bs.filter(b => b.completed).length;
+      return { ownerId: p.id, data: { incomplete: bs.length - done, complete: done } };
+    }
+    const b = region === 'bastion_left' ? f.bastion_left : f.bastion_right;
+    const ws = b.warriors || [];
+    return {
+      ownerId: p.id,
+      data: {
+        walls: b.wall_count ?? (b.walls || []).length,
+        dif: _maxStat(ws, 'dif'), git: _maxStat(ws, 'git'), species: ws.map(w => w.species),
+      },
+    };
+  }
 
-    ordered.forEach(p => {
-      const isTurn = p.id === state.current_player_id;
-      const dead = (p.lives ?? 0) <= 0;
-      const fxCount = (p.active_effects || []).length;
-      // Bastione destro di X è adiacente al Bastione sinistro del primo vivo alla sua destra:
-      // se p è il mio vicino di destra posso colpire il suo Bastione S.,
-      // se p è il mio vicino di sinistra posso colpire il suo Bastione D.
-      // Con Guerremoto attivo (any_target) tutti i Bastioni sono bersagli validi.
-      const canHitLeft = guerremoto || (!dead && !!rightNb && p.id === rightNb.id);
-      const canHitRight = guerremoto || (!dead && !!leftNb && p.id === leftNb.id);
+  function field(state, myId, viewId) {
+    const center = state.players.find(p => p.id === viewId) || state.players.find(p => p.id === myId);
+    const { left, right } = aliveNeighbors(state, center.id);
+    const slots = {
+      c_vanguard: regionSlot(center, 'vanguard'),
+      c_village: regionSlot(center, 'village'),
+      c_bastion_left: regionSlot(center, 'bastion_left'),
+      c_bastion_right: regionSlot(center, 'bastion_right'),
+      // Il vicino di sinistra espone il suo Bastione destro, quello di destra il sinistro
+      l_bastion: left && regionSlot(left, 'bastion_right'),
+      l_vanguard: left && regionSlot(left, 'vanguard'),
+      l_village: left && regionSlot(left, 'village'),
+      r_bastion: right && regionSlot(right, 'bastion_left'),
+      r_vanguard: right && regionSlot(right, 'vanguard'),
+      r_village: right && regionSlot(right, 'village'),
+    };
 
-      const chip = el('button', {
-        className: `opp-chip${isTurn ? ' turn' : ''}${dead ? ' dead' : ''}`,
-        dataset: { playerId: p.id },
-      }, [
-        // Niente carte in mano (inutile, e la riga toglierebbe spazio ai Bastioni):
-        // gli effetti attivi stanno accanto alle Vite
-        el('span', { className: 'opp-top' }, [
-          el('span', { className: 'opp-name' }, [p.name]),
-          fxCount > 0 ? el('span', { className: 'opp-fx-badge' }, [`✨${fxCount}`]) : null,
-          el('span', { className: 'opp-lives' }, [_livesStr(p.lives ?? 0)]),
-        ]),
-        _oppGrid(p, canHitLeft, canHitRight),
-      ]);
-      chip.addEventListener('click', () => { haptic(); Mob.openOpponentSheet(p.id); });
-      rail.appendChild(chip);
+    const hot = new Set(), target = new Set(), quiet = new Set();
+    if (center.id === myId) {
+      // Nel mio turno le mie Regioni cambiano per le mie mosse: si illuminano
+      // quando ci arriva la carta (transizioni in app.js), non subito
+      if (state.current_player_id === myId) {
+        ['c_vanguard', 'c_village', 'c_bastion_left', 'c_bastion_right'].forEach(k => quiet.add(k));
+      }
+      // Schieramento: le mie Regioni con Guerrieri da spostare
+      if (state.current_player_id === myId && state.phase === 'schieramento') {
+        ['c_vanguard', 'c_bastion_left', 'c_bastion_right'].forEach(k => {
+          if (slots[k].data.species.length > 0) hot.add(k);
+        });
+      }
+      // Battaglia: i Bastioni esposti che posso attaccare ora
+      if (Mob.canAttackNow()) {
+        const keys = Mob.attackTargetKeys();
+        if (left && keys.has(`${left.id}:right`)) target.add('l_bastion');
+        if (right && keys.has(`${right.id}:left`)) target.add('r_bastion');
+      }
+    }
+    Board.update(slots, { hot, target, quiet });
+    opponents(state, myId, center.id, left, right);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Nomi degli altri giocatori sopra il campo: i vicini sopra i loro Bastioni,
+  // in alto al centro gli altri (e l'unico avversario di una partita a due)
+  // ---------------------------------------------------------------------------
+
+  function heartsNode(lives, cls) {
+    const n = Math.max(0, lives ?? 0);
+    const box = el('span', { className: cls, role: 'img', 'aria-label': `${n} ${n === 1 ? 'Vita' : 'Vite'}` });
+    box.innerHTML = HEART_SVG.repeat(Math.min(n, 4));
+    if (n > 4) box.appendChild(el('b', {}, [`×${n}`]));
+    return box;
+  }
+
+  function opponentLabel(state, p, pos, myId) {
+    const dead = (p.lives ?? 0) <= 0;
+    const isMe = p.id === myId;
+    const turn = p.id === state.current_player_id && !state.winner_id;
+    const label = el('div', {
+      className: `opp-label ${pos}${turn ? ' turn' : ''}${dead ? ' dead' : ''}${isMe ? ' me' : ''}`,
+      dataset: { playerId: p.id },
     });
+
+    // Il nome apre la scheda del giocatore; il mio riporta al mio campo
+    const name = el('button', { className: 'opp-name', type: 'button' }, [p.name]);
+    name.addEventListener('click', () => {
+      haptic();
+      if (isMe) Mob.setView(null);
+      else Mob.openOpponentSheet(p.id);
+    });
+    label.appendChild(name);
+
+    const sub = el('div', { className: 'opp-sub' });
+    if (dead) {
+      sub.appendChild(el('span', { className: 'opp-out' }, ['Eliminato']));
+    } else {
+      sub.appendChild(heartsNode(p.lives, 'opp-hearts'));
+      const fx = isMe ? 0 : activeEffectItems(p).length;
+      if (fx > 0) sub.appendChild(el('span', { className: 'opp-fx' }, [`✨${fx}`]));
+      // Occhio: il campo visto dalla sua parte (nel tutorial no: c'è un solo campo da seguire)
+      if (!Mob.isTutorial()) {
+        const eye = el('button', {
+          className: 'opp-eye', type: 'button',
+          'aria-label': isMe ? 'Torna al tuo campo' : `Guarda il campo di ${p.name}`,
+        });
+        eye.innerHTML = EYE_SVG;
+        eye.addEventListener('click', () => { haptic(); Mob.setView(isMe ? null : p.id); });
+        sub.appendChild(eye);
+      }
+    }
+    label.appendChild(sub);
+    return label;
+  }
+
+  function opponents(state, myId, centerId, left, right) {
+    const single = !!left && !!right && left.id === right.id;
+    const nodes = [];
+    if (!single) {
+      if (left) nodes.push(opponentLabel(state, left, 'pos-l', myId));
+      if (right) nodes.push(opponentLabel(state, right, 'pos-r', myId));
+    }
+    // In alto al centro: l'unico avversario di una partita a due, poi chi non
+    // confina (prima i vivi, in ordine di posto), poi gli eliminati
+    const ps = state.players;
+    const ci = Math.max(0, ps.findIndex(p => p.id === centerId));
+    const bySeat = ps.map((_, k) => ps[(ci + 1 + k) % ps.length]).filter(p => p.id !== centerId);
+    const sides = new Set(single ? [] : [left && left.id, right && right.id]);
+    const top = single ? [left] : [];
+    bySeat.filter(p => (p.lives ?? 0) > 0).forEach(p => { if (!sides.has(p.id) && !top.includes(p)) top.push(p); });
+    bySeat.forEach(p => { if (!sides.has(p.id) && !top.includes(p)) top.push(p); });
+    if (top.length) {
+      nodes.push(el('div', { className: 'opp-top' }, top.map(p => opponentLabel(state, p, 'pos-c', myId))));
+    }
+    $('opp-rail').replaceChildren(...nodes);
   }
 
   function flashOpponent(playerId) {
-    const chip = document.querySelector(`.opp-chip[data-player-id="${playerId}"]`);
-    if (!chip) return;
-    chip.classList.remove('damaged');
-    void chip.offsetWidth;
-    chip.classList.add('damaged');
-  }
-
-  // ---------------------------------------------------------------------------
-  // Campo — 4 tasselli uguali (Avanscoperta, Villaggio, Bastione S., Bastione D.)
-  // ---------------------------------------------------------------------------
-
-  function field(me, state, myId) {
-    const canMove = state.current_player_id === myId && state.phase === 'schieramento';
-
-    // Avanscoperta
-    const vgWrap = $('vg-cards');
-    vgWrap.innerHTML = '';
-    const vg = me.field.vanguard || [];
-    $('fld-vanguard').classList.toggle('hot', canMove && vg.length > 0);
-    vgWrap.appendChild(vg.length === 0
-      ? el('div', { className: 'rg-empty' }, ['Vuota'])
-      : vanguardSummary(vg));
-
-    // Villaggio (le Costruzioni assegnate a un Guerriero, es. Trono, sono mostrate sul Guerriero)
-    const vWrap = $('village-cards');
-    vWrap.innerHTML = '';
-    const buildings = (me.field.village.buildings || []).filter(b => !b.assigned_warrior);
-    vWrap.appendChild(buildings.length === 0
-      ? el('div', { className: 'rg-empty' }, ['Nessuna Costruzione'])
-      : villageSummary(buildings));
-
-    // Bastioni + nome del vicino che li minaccia
-    const { left: leftNb, right: rightNb } = aliveNeighbors(state, myId);
-    $('tw-left-threat').textContent = leftNb && leftNb.id !== myId ? `Esposto a ${leftNb.name}` : '';
-    $('tw-right-threat').textContent = rightNb && rightNb.id !== myId ? `Esposto a ${rightNb.name}` : '';
-
-    ['left', 'right'].forEach(side => {
-      const warriors = (side === 'left' ? me.field.bastion_left : me.field.bastion_right).warriors || [];
-      $(side === 'left' ? 'tw-left' : 'tw-right').classList.toggle('hot', canMove && warriors.length > 0);
-      bastionTile(me, side);
+    document.querySelectorAll(`.opp-label[data-player-id="${CSS.escape(playerId)}"]`).forEach(label => {
+      label.classList.remove('damaged');
+      void label.offsetWidth;
+      label.classList.add('damaged');
     });
   }
 
-  // Riepilogo nel riquadro di un mio Bastione
-  function bastionTile(me, side) {
-    const bastion = side === 'left' ? me.field.bastion_left : me.field.bastion_right;
-    const wrap = $(side === 'left' ? 'bl-cards' : 'br-cards');
-    wrap.innerHTML = '';
-    const wallCount = bastion.wall_count ?? (bastion.walls || []).length;
-    const warriors = bastion.warriors || [];
-    wrap.appendChild(wallCount === 0 && warriors.length === 0
-      ? el('div', { className: 'rg-empty' }, ['Vuoto'])
-      : bastionSummary(bastion));
-  }
-
   // ---------------------------------------------------------------------------
-  // Statusbar
+  // Le mie risorse (seconda riga dell'intestazione)
   // ---------------------------------------------------------------------------
 
   let _prevMana = null;
   let _prevActs = null;
 
   function _bump(id) {
-    const chip = $(id);
-    chip.classList.remove('bump');
-    void chip.offsetWidth;
-    chip.classList.add('bump');
+    const item = $(id);
+    item.classList.remove('bump');
+    void item.offsetWidth;
+    item.classList.add('bump');
   }
 
   function statusbar(me) {
-    $('st-lives').textContent = _livesStr(me.lives ?? 0);
-
-    const mana = me.mana_remaining ?? 0;
-    $('st-mana').textContent = `Mana: ${mana}`;
-    if (_prevMana !== null && mana !== _prevMana) _bump('st-mana');
-    _prevMana = mana;
-
+    // Azioni: un rombo per ognuna rimasta, vuoti quelli usati fino alle 2 del
+    // turno; oltre 3 (effetti, modalità Test) un rombo solo con il numero
     const acts = me.actions_remaining ?? 0;
-    $('st-actions').textContent = `Azioni: ${acts}`;
+    $('st-actions').querySelector('.st-pips').innerHTML = acts > 3 ? `<i></i><b>×${acts}</b>`
+      : '<i></i>'.repeat(acts) + '<i class="off"></i>'.repeat(Math.max(0, 2 - acts));
+    $('st-actions').setAttribute('aria-label', `Azioni: ${acts}`);
     if (_prevActs !== null && acts !== _prevActs) _bump('st-actions');
     _prevActs = acts;
+
+    const hearts = $('st-lives').querySelector('.st-hearts');
+    hearts.replaceWith(heartsNode(me.lives, 'st-hearts'));
+
+    const mana = me.mana_remaining ?? 0;
+    $('st-mana-n').textContent = mana;
+    $('st-mana').setAttribute('aria-label', `Mana: ${mana}`);
+    if (_prevMana !== null && mana !== _prevMana) _bump('st-mana');
+    _prevMana = mana;
 
     const fxItems = activeEffectItems(me);
     const fxBtn = $('st-fx');
@@ -413,7 +393,7 @@ const Render = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Mano — riga orizzontale scorrevole, carte identiche al desktop
+  // Mano — carte intere a ventaglio, che escono un poco dai lati dello schermo
   // ---------------------------------------------------------------------------
 
   // Carte della mano dell'ultimo ridisegno, per riusarle: ricreare le immagini a
@@ -438,11 +418,8 @@ const Render = (() => {
         node = prev.node;
         node.classList.remove('wall-marked');  // le carte girate le rigira app.js (applyWallFlips)
         node.style.opacity = '';
-        // La fascia della minicarta può cambiare anche se la carta resta (es. Prodigio)
-        const def = Mob.getCardDef(iid);
-        CardArt.update(node, def, CardArt.handInfo(def, iid, me.prodigy_ready));
       } else {
-        node = handCard(iid, etherealCard, me.prodigy_ready);
+        node = handCard(iid, ethereal);
       }
       next.set(iid, { node, ethereal });
       return node;
@@ -452,71 +429,48 @@ const Render = (() => {
     fanHand(nodes);
   }
 
-  // Mano a ventaglio: ogni carta ruota attorno al proprio fondo e quelle ai lati
-  // scendono un poco, lungo un arco. Rotate/translate stanno in proprietà CSS
-  // separate da transform, che resta libero per :active e animazioni (motion.js,
-  // che legge l'inclinazione per i fantasmi). La mano non scorre: se le carte non
-  // ci stanno in larghezza si sovrappongono quanto serve.
+  // Mano a ventaglio: ogni carta ruota attorno a un punto sotto il proprio fondo e
+  // quelle ai lati scendono un poco, lungo un arco. Rotate/translate stanno in
+  // proprietà CSS separate da transform, che resta libero per :active e
+  // animazioni (motion.js, che legge l'inclinazione per i fantasmi). Le carte si
+  // sovrappongono quanto serve: dai lati dello schermo escono solo gli angoli in
+  // basso, la parte scoperta di ogni carta resta da afferrare anche a metà altezza.
   function fanHand(nodes = [...document.querySelectorAll('#hand .card')]) {
     const n = nodes.length;
     if (!n) return;
-    const step = n > 1 ? Math.min(4, 14 / (n - 1)) : 0;  // apertura totale massima 14°
-    const cardW = nodes[0].offsetWidth;
-    const avail = $('hand').clientWidth - 24;
-    let shown = cardW * 0.76;  // parte di ogni carta non coperta dalla successiva
-    if (n > 1 && cardW + (n - 1) * shown > avail) shown = Math.max(4, (avail - cardW) / (n - 1));
+    const step = n > 1 ? Math.min(5.2, 26 / (n - 1)) : 0;  // apertura totale massima 26°
+    const cardW = nodes[0].offsetWidth, cardH = nodes[0].offsetHeight;
+    // Ruotando attorno a un punto 0,2 altezze sotto la carta, a 2/3 d'altezza le
+    // carte ai lati si spostano verso l'esterno di tanto: il ventaglio ne rientra
+    const tilt = Math.sin((step * (n - 1) / 2) * Math.PI / 180) * cardH * 0.85;
+    const avail = $('hand').clientWidth - 2 * (tilt + 6);
+    let shown = cardW * 0.6;  // parte di ogni carta non coperta dalla successiva
+    if (n > 1 && cardW + (n - 1) * shown > avail) shown = Math.max(6, (avail - cardW) / (n - 1));
     nodes.forEach((node, i) => {
       const rot = (i - (n - 1) / 2) * step;
       node.style.setProperty('--fan-rot', `${rot.toFixed(2)}deg`);
-      // Discesa delle carte ai lati: ruotando sul fondo l'angolo esterno sale, va compensato
-      node.style.setProperty('--fan-y', `calc(var(--card-h-hand) * ${(rot * rot * 0.0025).toFixed(4)})`);
+      node.style.setProperty('--fan-y', `${(cardH * rot * rot * 0.0008).toFixed(1)}px`);
       node.style.marginLeft = i ? `${(shown - cardW).toFixed(1)}px` : '';
     });
   }
 
-  function handCard(iid, etherealCard, prodigyReady) {
-    const isEthereal = etherealCard === iid;
-    const div = el('div', { className: isEthereal ? 'card hand-card ethereal' : 'card hand-card', dataset: { instanceId: iid } });
-
+  // Carta in mano: l'immagine intera della carta stampata; dietro, il dorso,
+  // che si vede quando la carta è girata per diventare un Muro (CardArt.flipWall)
+  function handCard(iid, ethereal) {
     const def = Mob.getCardDef(iid);
+    const div = el('div', {
+      className: `card hand-card${ethereal ? ' ethereal' : ''}`,
+      dataset: { instanceId: iid, baseId: def ? def.id : '' },
+    });
     if (def) {
-      div.dataset.type = def.type;
-      div.dataset.baseId = def.id;
-
-      // Badge costo come sulle carte stampate: esagono giallo per il Mana, stella azzurra per le Maghe, bianco per la carta Eterea
-      const badgeCls = isEthereal ? 'ethereal' : (def.cost_type === 'maga' ? 'maga' : 'mana');
-      div.appendChild(el('div', { className: `card-cost-badge ${badgeCls}${def.cost_type === 'maga' ? ' star' : ''}` }, [String(isEthereal ? 0 : def.cost)]));
-
-      div.appendChild(el('div', { className: 'card-name' }, [def.name]));
-
-      if (def.type === 'warrior') {
-        div.appendChild(el('div', {
-          className: `card-species species-${def.species}`
-        }, [`${capitalize(def.species)}${def.school ? ` · ${capitalize(def.school)}` : ''}`]));
-
-        // Caratteristiche in colonna, una sotto l'altra
-        const attrsDiv = el('div', { className: 'card-warrior-attrs' });
-        attrsDiv.appendChild(el('span', { className: 'stat stat-att' }, [`🗡️ ${def.att}`]));
-        attrsDiv.appendChild(el('span', { className: 'stat stat-git' }, [`🏹 ${def.git}`]));
-        attrsDiv.appendChild(el('span', { className: 'stat stat-dif' }, [`🛡️ ${def.dif}`]));
-        div.appendChild(attrsDiv);
-
-      } else if (def.type === 'spell') {
-        div.appendChild(el('div', {
-          className: `card-species school-${def.school}`
-        }, [capitalize(def.school)]));
-
-      } else if (def.type === 'building') {
-        div.appendChild(el('div', { className: 'card-stats hand-cost-row' }, [
-          el('span', { className: 'stat stat-mana' }, [`🏗️${def.completion_cost}`]),
-        ]));
-      }
-      // Minicarta disegnata sopra la versione testuale, che resta nascosta
-      CardArt.attach(div, def, CardArt.handInfo(def, iid, prodigyReady));
+      div.title = def.name;
+      const img = el('img', { className: 'hc-img', alt: def.name, draggable: 'false' });
+      CardArt.setPreview(img, def.id);
+      div.appendChild(img);
     } else {
-      div.appendChild(el('div', { className: 'card-name' }, [iid]));
+      div.appendChild(el('div', { className: 'hc-missing' }, [iid]));
     }
-
+    div.appendChild(el('img', { className: 'mc-back', alt: '', draggable: 'false', src: '/card_images/preview/retro.webp' }));
     div.addEventListener('click', () => Mob.onHandTap(iid));
     return div;
   }
@@ -631,26 +585,23 @@ const Render = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Registro eventi (log)
+  // Cronaca: l'ultima voce sotto il campo
   // ---------------------------------------------------------------------------
 
-  const _log = [];
-
-  /** Mostra nel ticker l'ultima voce della cronaca (HTML già sicuro, da chronicle.js). */
+  /** Mostra sotto il campo l'ultima voce della cronaca (HTML già sicuro, da chronicle.js). */
   function ticker(html) {
     const t = $('ticker');
     t.innerHTML = html;
-    t.hidden = false;
-    t.classList.remove('ticker');
+    t.classList.remove('ticker-in');
     void t.offsetWidth;  // forza il replay dell'animazione
-    t.classList.add('ticker');
+    t.classList.add('ticker-in');
   }
 
   return {
     game,
     topbar,
     phaseDimmed,
-    opponents,
+    phaseControls,
     flashOpponent,
     field,
     statusbar,

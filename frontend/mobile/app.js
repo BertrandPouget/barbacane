@@ -39,6 +39,12 @@ const Mob = (() => {
   // True mentre stiamo abbandonando la partita: ignora gli update in arrivo
   let leavingGame = false;
 
+  // Giocatore di cui si guarda il campo (occhio accanto al nome); null = il mio
+  let viewId = null;
+  // Fase verso cui si sta andando toccandola nell'intestazione: da Azioni a
+  // Battaglia servono due next_phase, il secondo parte all'arrivo del primo stato
+  let phaseGoal = null;
+
   // Orda di Evelyn: base_card_id della Magia da rigiocare. Finché è valorizzato,
   // le sendAction('play_spell') diventano 'recast_spell' (stessa UI di targeting).
   let recastPending = null;
@@ -479,12 +485,12 @@ const Mob = (() => {
   }
 
   // Cosa il pannello del tutorial evita di coprire, oltre alle zone evidenziate:
-  // avversari, cronaca e riquadri del campo; ancora di più la barra in alto, le
-  // carte in mano e, sopra tutto, Vite, Azioni, Mana e i pulsanti del dock
+  // avversari, cronaca e Regioni del campo; ancora di più l'intestazione, le
+  // carte in mano e, sopra tutto, Vite, Azioni, Mana e i pulsanti sotto il campo
   const TUTORIAL_AVOID = [
-    '#opp-rail > *', '#ticker', '#field-grid .rg-tile',
+    '#opp-rail .opp-label', '#ticker', '#fld-vanguard', '#tw-village', '#tw-left', '#tw-right',
     ['#topbar', 3], ['#hand .card', 3], ['#dock', 3],
-    ['#statusbar .st-chip', 20], ['#dock .mbtn', 20],
+    ['#statusbar .st-item', 20], ['#dock .rib-btn', 20],
   ];
 
   // Fine tutorial: stesso pannello, centrato a schermo spento, con un solo
@@ -979,6 +985,7 @@ const Mob = (() => {
     });
     WS.on('error', (msg) => {
       DragPlay.reject();
+      phaseGoal = null;
       Toast.show(msg.message || 'Errore', 'error');
       // Blocco dovuto a un'interazione in attesa: riapre gli sheet pendenti
       // nell'ordine giusto (prima la ricerca, poi Biblioteca & co.)
@@ -1011,14 +1018,17 @@ const Mob = (() => {
     gameId = gameId || state.game_id;
     currentState = state;
     rematchOffer = null;
+    viewId = null;
+    phaseGoal = null;
     chronicleSeenId = Chronicle.lastId(state);
     Dice.fromState(state, myPlayerId, cardDefs, { silent: true });
-    CardArt.preload(Object.keys(cardDefs));
+    // Minicarte (sheet) e carte intere della mano
+    CardArt.preload(Object.keys(cardDefs), { previews: true });
     saveSession();
     connectGameWS();
     Screens.show('game');
     _lastTurnPlayer = state.current_player_id;
-    Render.game(state, myPlayerId);
+    Render.game(state, myPlayerId, viewId);
     applyWallFlips();
     refreshDock();
     _openPendingSheets(state);
@@ -1061,18 +1071,35 @@ const Mob = (() => {
     currentState = state;
     _lastTurnPlayer = state.current_player_id;
 
+    const turnChanged = prevTurnPlayer !== state.current_player_id && !state.winner_id;
+    const myTurnStarts = turnChanged && state.current_player_id === myPlayerId;
+    // Si torna al proprio campo quando tocca a me, o se chi guardavo è uscito
+    if (viewId) {
+      const viewed = state.players.find(p => p.id === viewId);
+      if (myTurnStarts || !viewed || (viewed.lives ?? 0) <= 0) viewId = null;
+    }
+
     // Le carte si spostano con una transizione invece di ricomparire di colpo
     const screen = $('scr-game');
     const before = Motion.snapshot(screen);
-    Render.game(state, myPlayerId);
+    Render.game(state, myPlayerId, viewId);
     applyWallFlips();
     Motion.play(before, screen, _motionOptions(state));
+
+    // Fase toccata nell'intestazione più avanti della successiva: un altro passo
+    if (phaseGoal) {
+      const cur = PHASES.indexOf(state.phase), goal = PHASES.indexOf(phaseGoal);
+      if (action === 'next_phase' && state.current_player_id === myPlayerId && cur >= 0 && cur < goal &&
+          !_myPendingInteraction(state) && !state.pending_search) {
+        sendAction('next_phase', {});
+      } else {
+        phaseGoal = null;
+      }
+    }
 
     // Banner al cambio turno. I miei tiri di D10: a inizio del mio turno
     // (Estrattore) dopo il banner, a fine turno (Granaio) prima del banner
     // del giocatore successivo
-    const turnChanged = prevTurnPlayer !== state.current_player_id && !state.winner_id;
-    const myTurnStarts = turnChanged && state.current_player_id === myPlayerId;
     Dice.fromState(state, myPlayerId, cardDefs, { silent: !action, delay: myTurnStarts ? 1700 : 0 });
     if (myTurnStarts) {
       TurnBanner.show('Il tuo turno');
@@ -1217,10 +1244,10 @@ const Mob = (() => {
   // ---------------------------------------------------------------------------
 
   function bindGameChrome() {
-    $('fld-vanguard').addEventListener('click', () => { haptic(); openVanguardSheet(); });
-    $('tw-left').addEventListener('click', () => onBastionTileTap('left'));
-    $('tw-right').addEventListener('click', () => onBastionTileTap('right'));
-    $('tw-village').addEventListener('click', () => { haptic(); openVillageSheet(); });
+    Board.mount($('board'), { onTap: onRegionTap });
+    document.querySelectorAll('#tb-phase .ph-dot').forEach(dot => {
+      dot.addEventListener('click', () => onPhaseTap(dot.dataset.ph));
+    });
     $('st-lives').addEventListener('click', () => { haptic(); openLivesSheet(); });
     $('st-fx').addEventListener('click', () => { haptic(); openActiveFxSheet(); });
     $('tb-leave').addEventListener('click', () => { haptic(); confirmLeaveGame(); });
@@ -1301,7 +1328,7 @@ const Mob = (() => {
 
     hand.addEventListener('touchstart', e => {
       if (e.touches.length !== 1) { end(); return; }
-      const card = e.target.closest('.card.has-art');
+      const card = e.target.closest('.card.hand-card');
       if (!card) return;
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
@@ -1339,7 +1366,7 @@ const Mob = (() => {
         }
       }
       const under = document.elementFromPoint(t.clientX, t.clientY);
-      const card = under && under.closest('#hand .card.has-art');
+      const card = under && under.closest('#hand .card.hand-card');
       if (holdTimer) {
         // Il dito si muove prima della pressione prolungata: si sfoglia subito
         if (Math.hypot(t.clientX - startX, t.clientY - startY) > 8) startPeek(card);
@@ -1377,75 +1404,73 @@ const Mob = (() => {
     return currentState && currentState.current_player_id === myPlayerId;
   }
 
+  // C'è una mia risposta in sospeso (ricerca, Biblioteca, Velocemento…)?
+  function myAnswerPending() {
+    const my = me();
+    return !!(_myPendingInteraction(currentState) ||
+      (currentState.pending_search && currentState.pending_search.player_id === myPlayerId) ||
+      (my && my.pending_velocemento_buildings && my.pending_velocemento_buildings.length > 0));
+  }
+
+  // Attese generate da avversari mentre è il mio turno (rispondono loro)
+  function opponentAnswerPending() {
+    return (currentState.pending_interactions || [])
+      .find(i => i.type === 'magiscudo_counter' || i.type === 'malcomune_discard') || null;
+  }
+
+  // Riga sotto il campo: il suggerimento della fase e i suoi pulsanti (Orda,
+  // Attacca, Fine turno). Per cambiare fase si toccano le fasi nell'intestazione
+  // (onPhaseTap): qui si decide quali si possono toccare e se la successiva pulsa.
   function refreshDock() {
     const dock = $('dock');
-    dock.innerHTML = '';
     // Le carte della mano sono riusate tra un render e l'altro: si riaccendono qui
     document.querySelectorAll('#hand .card.unplayable').forEach(c => c.classList.remove('unplayable'));
-    if (!currentState) return;
+    if (!currentState) { dock.replaceChildren(); return; }
     const my = me();
-    Render.phaseDimmed(!isMyTurn());
+    const mine = isMyTurn();
+    Render.phaseDimmed(!mine);
 
-    const mkBtn = (label, cls, onClick, disabled = false, id = null) => {
-      const b = el('button', { className: `mbtn ${cls || ''}` }, [label]);
+    // Pulsanti a nastro, come lo stendardo del nome sulle carte
+    const mkBtn = (label, variant, onClick, disabled = false, id = null) => {
+      const b = el('button', { className: `rib-btn${variant ? ` ${variant}` : ''}`, type: 'button' }, [el('span', {}, [label])]);
       if (id) b.id = id;  // usato dallo spotlight dei tutorial
       b.disabled = disabled;
       b.addEventListener('click', () => { haptic(); onClick(); });
       return b;
     };
     const hint = (text) => el('div', { className: 'dock-hint' }, [text]);
+    const wait = (text) => el('div', { className: 'dock-wait' }, [text, el('span', { className: 'dots' })]);
 
-    // Interazioni pendenti che mi riguardano → un solo bottone che riapre lo sheet
-    const myPending = _myPendingInteraction(currentState);
-    const searchMine = currentState.pending_search && currentState.pending_search.player_id === myPlayerId;
-    const veloMine = my && my.pending_velocemento_buildings && my.pending_velocemento_buildings.length > 0;
-    if (myPending || searchMine || veloMine) {
-      dock.appendChild(hint('Devi rispondere prima di continuare.'));
-      dock.appendChild(mkBtn('❗ Rispondi', 'mbtn-gold mbtn-pulse', () => _openPendingSheets(currentState)));
-      return;
-    }
+    const items = [];
+    let canAdvance = false, ready = false;
+    const blocking = mine ? opponentAnswerPending() : null;
 
-    if (!isMyTurn()) {
-      const w = el('div', { className: 'dock-wait' }, [
-        `Turno di ${playerName(currentState.current_player_id)}`,
-        el('span', { className: 'dots' }),
-      ]);
-      dock.appendChild(w);
-      return;
-    }
-
-    // Attese generate da avversari mentre è il mio turno
-    const blocking = (currentState.pending_interactions || [])
-      .find(i => i.type === 'magiscudo_counter' || i.type === 'malcomune_discard');
-    if (blocking) {
-      const who = playerName(blocking.player_id);
+    if (myAnswerPending()) {
+      // Interazioni pendenti che mi riguardano → un solo pulsante che riapre lo sheet
+      items.push(hint('Devi rispondere prima di continuare.'),
+        mkBtn('❗ Rispondi', 'rib-gold rib-pulse', () => _openPendingSheets(currentState)));
+    } else if (!mine) {
+      items.push(wait(`Turno di ${playerName(currentState.current_player_id)}`));
+    } else if (blocking) {
       const what = blocking.type === 'magiscudo_counter' ? 'Magiscudo' : 'Malcomune';
-      dock.appendChild(el('div', { className: 'dock-wait' }, [
-        `In attesa di ${who} (${what})`, el('span', { className: 'dots' }),
-      ]));
-      return;
-    }
-
-    const phase = currentState.phase;
-
-    if (phase === 'action') {
+      items.push(wait(`In attesa di ${playerName(blocking.player_id)} (${what})`));
+    } else if (currentState.phase === 'action') {
+      canAdvance = true;
       const acts = my ? (my.actions_remaining ?? 0) : 0;
       const hasCards = my && my.hand && my.hand.length > 0;
       const hasEthereal = my && my.ethereal_card;
-
       // Muri posati da poco: i successivi (fino a 3) rientrano nella stessa Azione
       const slots = my ? (my.wall_slots || 0) : 0;
-      const actsLabel = `${acts} Azion${acts === 1 ? 'e' : 'i'}`;
       if (acts > 0 || slots > 0) {
         // Le carte si giocano trascinandole (girate col doppio tocco per i Muri)
         // e le Costruzioni si completano dal Villaggio
-        dock.appendChild(hint(slots > 0 ? `🧱 Ancora ${slots} Mur${slots === 1 ? 'o' : 'i'} in quest'Azione · ${actsLabel}`
-          : !hasCards ? `Nessuna carta in mano · ${actsLabel}`
-          : `Trascina per giocare, doppio tocco per un Muro · ${actsLabel}`));
-        dock.appendChild(mkBtn('›', '', () => sendAction('next_phase', {}), false, 'dock-next'));
+        items.push(hint(slots > 0 ? `Ancora ${slots} Mur${slots === 1 ? 'o' : 'i'} in quest'Azione`
+          : !hasCards ? 'Nessuna carta in mano'
+          : 'Trascina per giocare, doppio tocco per un Muro'));
       } else {
         // Azioni finite: restano le giocate che non consumano Azioni (Orde, eterea,
-        // Decumano); le carte non giocabili gratis si spengono
+        // Decumano); le carte non giocabili gratis si spengono. «Schiera» pulsa.
+        ready = true;
         const freePlays = my && hasFreePlays(my);
         const freeCompletes = my && completableBuildings(my).length > 0;
         if (freePlays) {
@@ -1453,30 +1478,90 @@ const Mob = (() => {
             c.classList.toggle('unplayable', !isFreePlay(my, c.dataset.instanceId));
           });
         }
-        dock.appendChild(hint(
-          hasEthereal && !freeCompletes ? 'Gioca la carta eterea o avanza'
+        items.push(hint(
+          hasEthereal && !freeCompletes ? 'Gioca la carta eterea o passa allo Schieramento'
           : freePlays && freeCompletes ? 'Puoi ancora giocare le carte accese o completare'
           : freePlays ? 'Puoi ancora giocare le carte accese'
           : freeCompletes ? 'Puoi ancora completare Costruzioni'
-          : 'Azioni esaurite'));
-        dock.appendChild(mkBtn('Schieramento ›', 'mbtn-gold mbtn-pulse', () => sendAction('next_phase', {}), false, 'dock-next'));
+          : 'Azioni esaurite: tocca «Schiera» per proseguire'));
       }
-
-    } else if (phase === 'schieramento') {
+    } else if (currentState.phase === 'schieramento') {
+      canAdvance = true;
       const hordes = (my && my.available_hordes) || [];
-      dock.appendChild(hint('Tocca una Regione per riposizionare i Guerrieri.'));
+      items.push(hint('Tocca una Regione per spostare i Guerrieri'));
       if (hordes.length > 0) {
-        dock.appendChild(mkBtn(`⚡ Orda (${hordes.length})`, 'mbtn-warn mbtn-pulse', openHordeSheet, false, 'dock-horde'));
+        items.push(mkBtn(`⚡ Orda (${hordes.length})`, 'rib-warn rib-pulse', openHordeSheet, false, 'dock-horde'));
       }
-      dock.appendChild(mkBtn('Battaglia ›', '', () => sendAction('next_phase', {}), false, 'dock-next'));
-
-    } else if (phase === 'battaglia') {
-      const canAttack = currentState.battles_remaining > 0 &&
-        my && my.field.vanguard && my.field.vanguard.length > 0;
-      dock.appendChild(hint(canAttack ? 'Attacca o termina il turno.' : 'Nessun attacco possibile.'));
-      dock.appendChild(mkBtn('⚔️ Attacca', canAttack ? 'mbtn-gold' : '', openBattleSheet, !canAttack, 'dock-attack'));
-      dock.appendChild(mkBtn('Fine turno', 'mbtn-danger', confirmEndTurn, false, 'dock-end-turn'));
+    } else if (currentState.phase === 'battaglia') {
+      const canAttack = canAttackNow();
+      if (!canAttack) items.push(hint('Nessun attacco possibile'));
+      items.push(mkBtn('⚔️ Attacca', canAttack ? 'rib-gold' : '', openBattleSheet, !canAttack, 'dock-attack'));
+      items.push(mkBtn('Fine turno', 'rib-danger', confirmEndTurn, false, 'dock-end-turn'));
     }
+
+    // Guardando il campo di un altro giocatore la riga serve a tornare al proprio
+    // (una risposta in sospeso resta più importante)
+    const viewed = viewId && currentState.players.find(p => p.id === viewId);
+    if (viewed && !myAnswerPending()) {
+      items.splice(0, items.length,
+        hint(`Campo di ${viewed.name}`),
+        mkBtn('‹ Il tuo campo', 'rib-gold', () => setView(null), false, 'dock-my-field'));
+    }
+
+    dock.replaceChildren(...items);
+    Render.phaseControls(currentState.phase, canAdvance, ready);
+  }
+
+  // -- Fasi toccabili nell'intestazione ----------------------------------------
+
+  const PHASES = ['action', 'schieramento', 'battaglia'];
+
+  // Tocco su una fase dopo quella corrente: ci si va (anche saltando lo
+  // Schieramento: il secondo passo parte all'arrivo del nuovo stato)
+  function onPhaseTap(ph) {
+    if (!currentState || !isMyTurn() || myAnswerPending() || opponentAnswerPending()) return;
+    const cur = PHASES.indexOf(currentState.phase), goal = PHASES.indexOf(ph);
+    if (cur < 0 || goal <= cur) return;
+    haptic();
+    phaseGoal = ph;
+    sendAction('next_phase', {});
+  }
+
+  // -- Campo: Regioni toccate e campo degli altri giocatori ----------------------
+
+  // Tocco su una Regione: le mie si aprono come sempre (Guerrieri da spostare,
+  // Muri, Costruzioni da completare), quelle degli altri in sola lettura
+  function onRegionTap(slot) {
+    const { ownerId, region } = Board.slotInfo(slot);
+    if (!currentState || !ownerId) return;
+    haptic();
+    if (ownerId !== myPlayerId) { openEnemyRegionSheet(ownerId, region); return; }
+    if (region === 'vanguard') openVanguardSheet();
+    else if (region === 'village') openVillageSheet();
+    else openBastionSheet(region === 'bastion_left' ? 'left' : 'right');
+  }
+
+  // Guarda il campo di un altro giocatore dalla sua parte (pid null = il mio)
+  function setView(pid) {
+    const next = pid && pid !== myPlayerId ? pid : null;
+    if (next === viewId || !currentState) { viewId = next; return; }
+    viewId = next;
+    // Solo il campo: la mano resta com'è (si può star trascinando una carta)
+    Render.field(currentState, myPlayerId, viewId);
+    // La tavola ricompare dal nuovo punto di vista
+    const board = $('board');
+    board.classList.remove('switching');
+    void board.offsetWidth;
+    board.classList.add('switching');
+    refreshDock();
+  }
+
+  // Posso attaccare ora? (mio turno, Battaglia, attacchi rimasti, Guerrieri in Avanscoperta)
+  function canAttackNow() {
+    const my = me();
+    return !!(currentState && isMyTurn() && currentState.phase === 'battaglia' &&
+      currentState.battles_remaining > 0 && my && (my.field.vanguard || []).length > 0 &&
+      !myAnswerPending() && !opponentAnswerPending());
   }
 
   function confirmEndTurn() {
@@ -1512,14 +1597,30 @@ const Mob = (() => {
 
   // -- Giocare le carte trascinandole dalla mano al campo (drag.js) -----------
 
-  const DROP_ZONE_IDS = {
-    bastion_left: 'tw-left', vanguard: 'fld-vanguard',
-    bastion_right: 'tw-right', village: 'tw-village',
+  // Le mie Regioni sul campo (board.js): la carta si lascia sul triangolo, o appena fuori
+  const DROP_SLOTS = {
+    bastion_left: 'c_bastion_left', vanguard: 'c_vanguard',
+    bastion_right: 'c_bastion_right', village: 'c_village',
   };
+
+  // La carta trascinata è più piccola di quella in mano, così non copre le
+  // Regioni: si lascia dove la si vede (drag.js cerca la zona al suo centro)
+  const DRAG_SCALE = 0.6;
+
+  function dropZone(key) {
+    const slot = DROP_SLOTS[key];
+    const shape = slot && Board.shape(slot);
+    return shape ? { key, el: shape, contains: (x, y) => Board.contains(slot, x, y) } : null;
+  }
 
   // Nel mio turno, in fase Azioni
   function canDragFromHand() {
     return !!me() && isMyTurn() && currentState.phase === 'action';
+  }
+
+  // Si gioca sempre sul proprio campo: trascinando una carta si torna lì
+  function backToMyField() {
+    if (viewId) setView(null);
   }
 
   // Perché la carta ora non si può giocare (o null). Si trascina lo stesso, verso
@@ -1539,15 +1640,18 @@ const Mob = (() => {
     // Tutorial: una carta da spiegare non ancora letta apre la lettura invece di partire
     if (maybeReadCard(iid)) return false;
     const def = getCardDef(iid);
+    backToMyField();
     const keys = DragPlay.zonesFor(def, me(), getCardDef);
-    // Verso il campo: oltre un po' sotto la metà dei riquadri del mio campo
-    // Verso il campo: la carta circa a metà schermo, in una fascia (sopra, sugli
-    // avversari, non vale: le Magie con bersaglio si giocano come le altre)
-    const towardField = (px, py) => py > window.innerHeight * 0.3 && py < window.innerHeight * 0.65;
+    // Verso il campo: la carta sopra la tavola, sotto i nomi degli avversari (le
+    // Magie con bersaglio si giocano come le altre, il bersaglio si sceglie dopo)
+    const towardField = (px, py) => {
+      const b = $('board').getBoundingClientRect();
+      return py > b.top + b.height * 0.12 && py < b.bottom;
+    };
     const refusal = dragRefusal(iid, def, me(), keys);
     if (refusal) {
       DragPlay.start(card, x, y, {
-        zones: [], fieldTest: towardField, noGlow: true, lift: 0.5,
+        zones: [], fieldTest: towardField, noGlow: true, lift: 0.5, scale: DRAG_SCALE,
         onDrop: () => { Toast.show(refusal, 'error'); return false; },
       });
       return true;
@@ -1560,13 +1664,11 @@ const Mob = (() => {
     const zoneKeys = def.type === 'spell' ? []
       : def.id === 'trono' ? PICKER_ZONES.map(z => z.key).filter(r => zoneWarriors(me(), r).length > 0)
       : keys;
-    const zones = zoneKeys.filter(k => DROP_ZONE_IDS[k])
-      .map(k => ({ key: k, el: $(DROP_ZONE_IDS[k]) }))
-      .filter(z => z.el);
+    const zones = zoneKeys.map(dropZone).filter(Boolean);
     const fieldTest = asSpell ? towardField : null;
     // La carta sta sopra il dito, che altrimenti la coprirebbe
     DragPlay.start(card, x, y, {
-      zones, fieldTest, lift: 0.5, onDrop: key => playDropped(iid, def, key),
+      zones, fieldTest, lift: 0.5, scale: DRAG_SCALE, onDrop: key => playDropped(iid, def, key),
       choiceOpen: () => Sheet.isOpen(),
     });
     return true;
@@ -2043,11 +2145,6 @@ const Mob = (() => {
   // Muri
   // ---------------------------------------------------------------------------
 
-  function onBastionTileTap(side) {
-    haptic();
-    openBastionSheet(side);
-  }
-
   // Dopo ogni ridisegno della mano: le carte girate restano girate (senza
   // rifare il giro); quelle uscite dalla mano si dimenticano
   function applyWallFlips() {
@@ -2084,10 +2181,11 @@ const Mob = (() => {
       : !(my && (my.actions_remaining > 0 || my.wall_slots > 0)) ? 'Azioni esaurite per questo turno.'
       : null;
     if (err) { Toast.show(err, 'error'); return false; }
+    backToMyField();
     const iids = [card, ...extras].map(c => c.dataset.instanceId);
-    const zones = [['left', 'tw-left'], ['right', 'tw-right']].map(([side, id]) => ({ key: side, el: $(id) }));
+    const zones = ['left', 'right'].map(side => ({ ...dropZone(`bastion_${side}`), key: side }));
     DragPlay.start(card, x, y, {
-      zones, lift: 0.5, extras,
+      zones, lift: 0.5, scale: DRAG_SCALE, extras,
       onDrop: side => {
         haptic();
         sendAction('add_wall', { walls: iids.map(iid => ({ instance_id: iid, bastion: side })) });
@@ -2853,19 +2951,99 @@ const Mob = (() => {
     });
   }
 
-  function openEnemyCardSheet(w, owner) {
+  // Sheet di una Regione di un altro giocatore (toccata sul campo), in sola
+  // lettura. Un suo Bastione che posso attaccare ora si attacca da qui.
+  function openEnemyRegionSheet(playerId, region) {
+    const p = currentState && currentState.players.find(pp => pp.id === playerId);
+    if (!p) return;
+    const reopen = () => openEnemyRegionSheet(playerId, region);
+    const maxOf = (ws, k) => (ws.length ? Math.max(...ws.map(w => w[k] || 0)) : 0);
+    const warriorNode = w => {
+      const mini = Render.warriorMini(w);
+      mini.addEventListener('click', () => { haptic(); openEnemyCardSheet(w, p, reopen); });
+      return mini;
+    };
+    const body = [];
+    const footer = [];
+    let title, subtitle;
+
+    if (region === 'vanguard') {
+      const ws = p.field.vanguard || [];
+      title = `⚔️ Avanscoperta di ${p.name}`;
+      subtitle = ws.length ? `${plural(ws.length, 'Guerriero', 'Guerrieri')} · ATT ${maxOf(ws, 'att')} · GIT ${maxOf(ws, 'git')}` : '';
+      body.push(ws.length ? el('div', { className: 'sheet-cards' }, ws.map(warriorNode))
+        : el('div', { className: 'sheet-note' }, ['Nessun Guerriero in Avanscoperta: non può attaccare.']));
+
+    } else if (region === 'village') {
+      const bs = ((p.field.village && p.field.village.buildings) || []).filter(b => !b.assigned_warrior);
+      const done = bs.filter(b => b.completed).length;
+      title = `🏰 Villaggio di ${p.name}`;
+      subtitle = bs.length ? `${plural(bs.length, 'Costruzione', 'Costruzioni')} · ${done} complet${done === 1 ? 'a' : 'e'}` : '';
+      body.push(bs.length ? el('div', { className: 'sheet-cards' }, bs.map(b => {
+        const def = getCardDef(b.instance_id);
+        const mini = Render.buildingMini(b);
+        mini.addEventListener('click', () => {
+          haptic();
+          Sheet.open({
+            title: def ? def.name : b.instance_id,
+            subtitle: `${p.name} — ${b.completed ? '✓ Completata' : 'Incompleta'}`,
+            body: Render.cardViewNode(def, { completed: b.completed }),
+            footer: [{ label: '‹ Indietro', onClick: reopen }],
+          });
+        });
+        return mini;
+      })) : el('div', { className: 'sheet-note' }, ['Nessuna Costruzione.']));
+
+    } else {
+      const side = region === 'bastion_left' ? 'left' : 'right';
+      const b = bastionOf(p, side);
+      const ws = b.warriors || [];
+      const walls = b.wall_count ?? 0;
+      title = `🧱 Bastione ${side === 'left' ? 'Sinistro' : 'Destro'} di ${p.name}`;
+      subtitle = `${plural(walls, 'Muro', 'Muri')} · DIF ${maxOf(ws, 'dif')} · GIT ${maxOf(ws, 'git')}`;
+      body.push(el('div', { className: 'sheet-cards' }, [Render.deckNode('wall', walls), ...ws.map(warriorNode)]));
+      // In Battaglia, nel mio turno: si attacca toccandolo
+      const t = canAttackNow() && myAttackTargets().find(tt => tt.player.id === playerId && tt.side === side);
+      if (t) {
+        footer.push({
+          label: `⚔️ Attacca · Danno stimato ${estimateDamage(p, side)}`,
+          className: 'mbtn-gold',
+          onClick: () => {
+            Sheet.close(true);
+            haptic(30);
+            sendAction('battle', { defender_player_index: t.playerIndex, defender_bastion_side: side });
+          },
+        });
+      }
+    }
+
+    footer.push({ label: 'Chiudi', onClick: () => Sheet.close() });
+    Sheet.open({ title, subtitle, body, footer, refresh: reopen });
+  }
+
+  // Danno della mia Avanscoperta contro il Bastione `side` di p, come in Battaglia
+  function estimateDamage(p, side) {
+    const vg = me().field.vanguard || [];
+    const defs = bastionOf(p, side).warriors || [];
+    const top = (ws, k) => (ws.length ? Math.max(...ws.map(w => w[k] || 0)) : 0);
+    return Math.max(top(vg, 'att') - top(defs, 'dif'), 0) + Math.max(top(vg, 'git') - top(defs, 'git'), 0);
+  }
+
+  // onBack: dove torna «Indietro» (di norma la scheda del giocatore)
+  function openEnemyCardSheet(w, owner, onBack = null) {
     const def = getCardDef(w.instance_id);
+    const back = onBack || (() => openOpponentSheet(owner.id));
     const footer = [];
     if (w.evolved_from) {
       footer.push({
         label: 'Recluta',
-        onClick: () => { Sheet.close(true); openRecruitSheet(w.evolved_from, w.name || w.instance_id, () => openEnemyCardSheet(w, owner)); },
+        onClick: () => { Sheet.close(true); openRecruitSheet(w.evolved_from, w.name || w.instance_id, () => openEnemyCardSheet(w, owner, onBack)); },
       });
     }
     if (w.assigned_cards && w.assigned_cards.some(ac => ac.type !== 'wall')) {
       footer.push({
         label: 'Carte assegnate',
-        onClick: () => { Sheet.close(true); openAssignedCardsSheet(w.instance_id, owner.id, 0, () => openOpponentSheet(owner.id)); },
+        onClick: () => { Sheet.close(true); openAssignedCardsSheet(w.instance_id, owner.id, 0, back); },
       });
     }
     if (w.assigned_cards && w.assigned_cards.some(ac => ac.type === 'wall')) {
@@ -2875,11 +3053,11 @@ const Mob = (() => {
         label: 'Muri assegnati',
         disabled: !revealable,
         onClick: revealable
-          ? () => { Sheet.close(true); openAssignedWallSheet(w.instance_id, owner.id, 0, () => openOpponentSheet(owner.id)); }
+          ? () => { Sheet.close(true); openAssignedWallSheet(w.instance_id, owner.id, 0, back); }
           : () => {},
       });
     }
-    footer.push({ label: '‹ Indietro', onClick: () => openOpponentSheet(owner.id) });
+    footer.push({ label: '‹ Indietro', onClick: back });
     Sheet.open({
       title: w.name || w.instance_id,
       subtitle: `di ${owner.name}${liveStatsLabel(def, w)}`,
@@ -2891,7 +3069,7 @@ const Mob = (() => {
         const f = p && p.field;
         const now = f && [...(f.vanguard || []), ...(f.bastion_left.warriors || []), ...(f.bastion_right.warriors || [])]
           .find(x => x.instance_id === w.instance_id);
-        if (now) openEnemyCardSheet(now, p);
+        if (now) openEnemyCardSheet(now, p, onBack);
       },
     });
   }
@@ -3122,13 +3300,7 @@ const Mob = (() => {
       subtitle: `I tuoi attaccanti: ATT ${attAtt} · GIT ${attGit}`,
       players,
       filter: (p, side) => indexOf.has(`${p.id}:${side}`),
-      note: (p, side) => {
-        const defs = bastionOf(p, side).warriors || [];
-        const defDif = defs.length ? Math.max(...defs.map(w => w.dif)) : 0;
-        const defGit = defs.length ? Math.max(...defs.map(w => w.git)) : 0;
-        const est = Math.max(attAtt - defDif, 0) + Math.max(attGit - defGit, 0);
-        return `Danno stimato: ${est}`;
-      },
+      note: (p, side) => `Danno stimato: ${estimateDamage(p, side)}`,
       onPick: (p, side) => {
         haptic(30);
         sendAction('battle', { defender_player_index: indexOf.get(`${p.id}:${side}`), defender_bastion_side: side });
@@ -3446,8 +3618,8 @@ const Mob = (() => {
   // Transizioni delle carte (motion.js)
   // ---------------------------------------------------------------------------
 
-  // Sul telefono il campo mostra le Regioni come tasselli riassuntivi: una carta
-  // che lascia la mano vola verso il tassello in cui è finita.
+  // Sul telefono il campo mostra le Regioni come triangoli con i soli numeri:
+  // una carta che lascia la mano vola verso la Regione in cui è finita.
   const MOTION_TILES = {
     vanguard: 'fld-vanguard',
     bastion_left: 'tw-left', wall_left: 'tw-left',
@@ -3459,12 +3631,16 @@ const Mob = (() => {
     return {
       // Carte pescate: arrivano dal mazzo (contatore in alto)
       sourceFor: (iid, el) => (el.closest('#hand') ? $('tb-deck') : null),
-      // Carte giocate: verso il tassello della Regione; Magie e scarti si dissolvono
+      // Carte giocate: verso la mia Regione (se sto guardando il mio campo);
+      // Magie e scarti si dissolvono
       targetFor: (iid) => {
-        const id = MOTION_TILES[Motion.locate(state, myPlayerId, iid)];
+        const where = Motion.locate(state, myPlayerId, iid);
+        if (viewId && where !== 'life') return null;
+        const id = MOTION_TILES[where];
         return id ? $(id) : null;
       },
-      onLand: Motion.pulse,
+      // Le Regioni sono sagome SVG: si illuminano invece dell'impulso dei riquadri
+      onLand: (el) => (el instanceof SVGElement ? Board.flash(el) : Motion.pulse(el)),
     };
   }
 
@@ -3528,6 +3704,10 @@ const Mob = (() => {
     openBuildingSheet,
     openOpponentSheet,
     sendAction,
+    setView,
+    canAttackNow,
+    attackTargetKeys: targetKeys,
+    isTutorial: () => isTutorial,
   };
 })();
 
