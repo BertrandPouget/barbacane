@@ -78,7 +78,7 @@ const Mob = (() => {
     await loadCardDefs();
     bindLobbyUI();
     bindGameChrome();
-    Spotlight.keepVisible(['tb-leave']);  // nel tutorial «Abbandona» resta scoperto
+    Spotlight.keepVisible(['tb-leave']);  // nel tutorial «Esci» resta scoperto
     bindSplashUI();
     ['in-create-name', 'in-join-name'].forEach(id => { $(id).value = PlayerName.get(); });
     const resumed = await tryResume();
@@ -487,7 +487,7 @@ const Mob = (() => {
   const TUTORIAL_AVOID = [
     '#opp-rail .opp-label', '#ticker', '#fld-vanguard', '#tw-village', '#tw-left', '#tw-right',
     ['#topbar', 3], ['#hand .card', 3], ['#dock', 3],
-    ['#statusbar .st-item', 20], ['#dock .rib-btn', 20],
+    ['#statusbar > *', 20], ['#dock .dk-btn', 20],
   ];
 
   // Fine tutorial: stesso pannello, centrato a schermo spento, con un solo
@@ -1398,53 +1398,61 @@ const Mob = (() => {
       .find(i => i.type === 'magiscudo_counter' || i.type === 'malcomune_discard') || null;
   }
 
-  // Riga sotto il campo: il suggerimento della fase e i suoi pulsanti (fase
-  // successiva, Orda, Attacca, Fine turno)
+  // Riga sotto il campo: il suggerimento della fase e i suoi pulsanti (Rispondi,
+  // Orda, Attacca); il passo successivo del turno sta nella riga delle risorse
   function refreshDock() {
     const dock = $('dock');
+    const next = $('st-next');
     // Le carte della mano sono riusate tra un render e l'altro: si riaccendono qui
     document.querySelectorAll('#hand .card.unplayable').forEach(c => c.classList.remove('unplayable'));
-    if (!currentState) { dock.replaceChildren(); return; }
+    if (!currentState) { dock.replaceChildren(); next.disabled = true; return; }
     const my = me();
     const mine = isMyTurn();
     Render.phaseDimmed(!mine);
 
-    // Pulsanti a nastro, come lo stendardo del nome sulle carte
     const mkBtn = (label, variant, onClick, disabled = false, id = null) => {
-      const b = el('button', { className: `rib-btn${variant ? ` ${variant}` : ''}`, type: 'button' }, [el('span', {}, [label])]);
+      const b = el('button', { className: `dk-btn${variant ? ` ${variant}` : ''}`, type: 'button' }, [el('span', {}, [label])]);
       if (id) b.id = id;  // usato dallo spotlight dei tutorial
       b.disabled = disabled;
       b.addEventListener('click', () => { haptic(); onClick(); });
       return b;
     };
-    const hint = (text) => el('div', { className: 'dock-hint' }, [text]);
+    const hint = (text, cls = '') => el('div', { className: `dock-hint${cls ? ` ${cls}` : ''}` }, [text]);
     const wait = (text) => el('div', { className: 'dock-wait' }, [text, el('span', { className: 'dots' })]);
 
     const items = [];
     const blocking = mine ? opponentAnswerPending() : null;
+    const acts = my ? (my.actions_remaining ?? 0) : 0;
+    // Muri posati da poco: i successivi (fino a 3) rientrano nella stessa Azione
+    const slots = my ? (my.wall_slots || 0) : 0;
+
+    // Quarta sezione della riga delle risorse: Schieramento, Battaglia, Fine turno
+    const phase = currentState.phase;
+    const toBattle = phase === 'schieramento', toEnd = phase === 'battaglia';
+    next.firstChild.textContent = toEnd ? 'Fine turno' : toBattle ? 'Battaglia ›' : 'Schieramento ›';
+    next.disabled = !mine || !!blocking || !!myAnswerPending() || phase === 'end';
+    next.className = 'dk-btn st-next' + (toEnd ? ' dk-danger'
+      : !next.disabled && phase === 'action' && acts === 0 && slots === 0 ? ' dk-gold dk-pulse' : '');
+    next.onclick = () => { haptic(); if (toEnd) confirmEndTurn(); else sendAction('next_phase', {}); };
 
     if (myAnswerPending()) {
       // Interazioni pendenti che mi riguardano → un solo pulsante che riapre lo sheet
       items.push(hint('Devi rispondere prima di continuare.'),
-        mkBtn('❗ Rispondi', 'rib-gold rib-pulse', () => _openPendingSheets(currentState)));
+        mkBtn('❗ Rispondi', 'dk-gold dk-pulse', () => _openPendingSheets(currentState)));
     } else if (!mine) {
       items.push(wait(`Turno di ${playerName(currentState.current_player_id)}`));
     } else if (blocking) {
       const what = blocking.type === 'magiscudo_counter' ? 'Magiscudo' : 'Malcomune';
       items.push(wait(`In attesa di ${playerName(blocking.player_id)} (${what})`));
     } else if (currentState.phase === 'action') {
-      const acts = my ? (my.actions_remaining ?? 0) : 0;
       const hasCards = my && my.hand && my.hand.length > 0;
       const hasEthereal = my && my.ethereal_card;
-      // Muri posati da poco: i successivi (fino a 3) rientrano nella stessa Azione
-      const slots = my ? (my.wall_slots || 0) : 0;
       if (acts > 0 || slots > 0) {
         // Le carte si giocano trascinandole (girate col doppio tocco per i Muri)
         // e le Costruzioni si completano dal Villaggio
         items.push(hint(slots > 0 ? `Ancora ${slots} Mur${slots === 1 ? 'o' : 'i'} in quest'Azione`
           : !hasCards ? 'Nessuna carta in mano'
-          : 'Trascina per giocare, doppio tocco per un Muro'));
-        items.push(mkBtn('›', '', () => sendAction('next_phase', {}), false, 'dock-next'));
+          : 'Trascina per giocare, doppio tocco per un Muro', slots > 0 || hasCards ? 'dock-hint-sm' : ''));
       } else {
         // Azioni finite: restano le giocate che non consumano Azioni (Orde, eterea,
         // Decumano); le carte non giocabili gratis si spengono
@@ -1461,20 +1469,17 @@ const Mob = (() => {
           : freePlays ? 'Puoi ancora giocare le carte accese'
           : freeCompletes ? 'Puoi ancora completare Costruzioni'
           : 'Azioni esaurite'));
-        items.push(mkBtn('Schieramento ›', 'rib-gold rib-pulse', () => sendAction('next_phase', {}), false, 'dock-next'));
       }
     } else if (currentState.phase === 'schieramento') {
       const hordes = (my && my.available_hordes) || [];
       items.push(hint('Tocca una Regione per spostare i Guerrieri'));
       if (hordes.length > 0) {
-        items.push(mkBtn(`⚡ Orda (${hordes.length})`, 'rib-warn rib-pulse', openHordeSheet, false, 'dock-horde'));
+        items.push(mkBtn(`⚡ Orda (${hordes.length})`, 'dk-warn dk-pulse', openHordeSheet, false, 'dock-horde'));
       }
-      items.push(mkBtn('Battaglia ›', '', () => sendAction('next_phase', {}), false, 'dock-next'));
     } else if (currentState.phase === 'battaglia') {
       const canAttack = canAttackNow();
       if (!canAttack) items.push(hint('Nessun attacco possibile'));
-      items.push(mkBtn('⚔️ Attacca', canAttack ? 'rib-gold' : '', openBattleSheet, !canAttack, 'dock-attack'));
-      items.push(mkBtn('Fine turno', 'rib-danger', confirmEndTurn, false, 'dock-end-turn'));
+      items.push(mkBtn('Attacca', canAttack ? 'dk-gold' : '', openBattleSheet, !canAttack, 'dock-attack'));
     }
 
     // Guardando il campo di un altro giocatore la riga serve a tornare al proprio
@@ -1483,7 +1488,7 @@ const Mob = (() => {
     if (viewed && !myAnswerPending()) {
       items.splice(0, items.length,
         hint(`Campo di ${viewed.name}`),
-        mkBtn('‹ Il tuo campo', 'rib-gold', () => setView(null), false, 'dock-my-field'));
+        mkBtn('‹ Il tuo campo', 'dk-gold', () => setView(null), false, 'dock-my-field'));
     }
 
     dock.replaceChildren(...items);
@@ -2840,10 +2845,10 @@ const Mob = (() => {
     // Effetti attivi visibili
     const fxItems = Render.activeEffectItems(p);
     if (fxItems.length > 0) {
-      body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' }, ['✨ Effetti attivi']));
+      body.push(el('div', { className: 'zone-label', style: 'padding:6px 4px' }, ['✧ Effetti attivi']));
       fxItems.forEach(item => {
         body.push(el('div', { className: 'opt-row gold', style: 'pointer-events:none' }, [
-          el('span', { className: 'opt-icon' }, ['✨']),
+          el('span', { className: 'opt-icon' }, ['✧']),
           el('span', { className: 'opt-main' }, [
             el('span', { className: 'opt-label' }, [item.label]),
             el('span', { className: 'opt-sub', style: 'display:block' }, [item.desc]),
@@ -2968,7 +2973,7 @@ const Mob = (() => {
       const t = canAttackNow() && myAttackTargets().find(tt => tt.player.id === playerId && tt.side === side);
       if (t) {
         footer.push({
-          label: `⚔️ Attacca · Danno stimato ${estimateDamage(p, side)}`,
+          label: `Attacca · Danno stimato ${estimateDamage(p, side)}`,
           className: 'mbtn-gold',
           onClick: () => {
             Sheet.close(true);
@@ -3166,14 +3171,14 @@ const Mob = (() => {
     const items = Render.activeEffectItems(my);
     if (items.length === 0) return;
     const body = items.map(item => el('div', { className: 'opt-row gold', style: 'pointer-events:none' }, [
-      el('span', { className: 'opt-icon' }, ['✨']),
+      el('span', { className: 'opt-icon' }, ['✧']),
       el('span', { className: 'opt-main' }, [
         el('span', { className: 'opt-label' }, [item.label]),
         el('span', { className: 'opt-sub', style: 'display:block' }, [item.desc]),
       ]),
     ]));
     Sheet.open({
-      title: '✨ Effetti attivi',
+      title: '✧ Effetti attivi',
       body,
       footer: [{ label: 'Chiudi', onClick: () => Sheet.close() }],
       refresh: openActiveFxSheet,

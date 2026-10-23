@@ -268,7 +268,7 @@ const Render = (() => {
     } else {
       sub.appendChild(heartsNode(p.lives, 'opp-hearts'));
       const fx = isMe ? 0 : activeEffectItems(p).length;
-      if (fx > 0) sub.appendChild(el('span', { className: 'opp-fx' }, [`✨${fx}`]));
+      if (fx > 0) sub.appendChild(el('span', { className: 'opp-fx' }, [`✧${fx}`]));
       // Occhio: il campo visto dalla sua parte (nel tutorial no: c'è un solo campo da seguire)
       if (!Mob.isTutorial()) {
         const eye = el('button', {
@@ -303,6 +303,9 @@ const Render = (() => {
     if (top.length) {
       nodes.push(el('div', { className: 'opp-top' }, top.map(p => opponentLabel(state, p, 'pos-c', myId))));
     }
+    // Con nomi al centro i vicini scendono di una riga e la fascia dei nomi
+    // sopra la tavola si allarga (CSS: #field.has-top)
+    $('field').classList.toggle('has-top', top.length > 0 && !single && !!(left || right));
     $('opp-rail').replaceChildren(...nodes);
   }
 
@@ -329,17 +332,16 @@ const Render = (() => {
   }
 
   function statusbar(me) {
-    // Azioni: un rombo per ognuna rimasta, vuoti quelli usati fino alle 2 del
-    // turno; oltre 3 (effetti, modalità Test) un rombo solo con il numero
+    // Vite e Azioni come il Mana: un simbolo con dentro il numero
     const acts = me.actions_remaining ?? 0;
-    $('st-actions').querySelector('.st-pips').innerHTML = acts > 3 ? `<i></i><b>×${acts}</b>`
-      : '<i></i>'.repeat(acts) + '<i class="off"></i>'.repeat(Math.max(0, 2 - acts));
+    $('st-actions-n').textContent = acts;
     $('st-actions').setAttribute('aria-label', `Azioni: ${acts}`);
     if (_prevActs !== null && acts !== _prevActs) _bump('st-actions');
     _prevActs = acts;
 
-    const hearts = $('st-lives').querySelector('.st-hearts');
-    hearts.replaceWith(heartsNode(me.lives, 'st-hearts'));
+    const lives = Math.max(0, me.lives ?? 0);
+    $('st-lives-n').textContent = lives;
+    $('st-lives').setAttribute('aria-label', `Le tue Vite: ${lives}`);
 
     const mana = me.mana_remaining ?? 0;
     $('st-mana-n').textContent = mana;
@@ -350,7 +352,7 @@ const Render = (() => {
     const fxItems = activeEffectItems(me);
     const fxBtn = $('st-fx');
     fxBtn.hidden = fxItems.length === 0;
-    fxBtn.textContent = `✨ ${fxItems.length}`;
+    fxBtn.textContent = `✧ ${fxItems.length}`;
   }
 
   const ACTIVE_EFFECT_CONFIG = {

@@ -53,11 +53,11 @@ const Board = (() => {
   };
 
   // Colori delle Regioni (centro e bordo della sfumatura): quelle del giocatore
-  // al centro più accese, quelle dei vicini più cupe
+  // al centro più accese (e con alone e bordo d'oro), quelle dei vicini più cupe
   const PALETTE = {
-    'vanguard':     ['#d06d44', '#a2492c'],
-    'bastion':      ['#b49169', '#876646'],
-    'village':      ['#699a3b', '#4a7029'],
+    'vanguard':     ['#dc7c4c', '#ae5332'],
+    'bastion':      ['#c3a279', '#937350'],
+    'village':      ['#75a941', '#527c2e'],
     'opp-vanguard': ['#8b3b2b', '#64281c'],
     'opp-bastion':  ['#6a5545', '#4c3b2f'],
     'opp-village':  ['#5c7432', '#3e5224'],
@@ -114,6 +114,28 @@ const Board = (() => {
     return d + 'Z';
   }
 
+  // Come roundedPath, ma con i lati frastagliati: punti ogni ~7 unità spostati a
+  // caso (sempre gli stessi) di poco verso l'interno o l'esterno
+  function roughPath(pts, seed) {
+    const rand = rng(seed);
+    const corners = pts.map((v, i) => {
+      const p = pts[(i + pts.length - 1) % pts.length], q = pts[(i + 1) % pts.length];
+      return [toward(v, p), v, toward(v, q)];
+    });
+    let d = '';
+    corners.forEach(([a, v, b], i) => {
+      d += `${i ? 'L' : 'M'}${f1(a[0])} ${f1(a[1])} Q${v[0]} ${v[1]} ${f1(b[0])} ${f1(b[1])} `;
+      const e = corners[(i + 1) % corners.length][0];
+      const dx = e[0] - b[0], dy = e[1] - b[1], len = Math.hypot(dx, dy);
+      const n = Math.max(1, Math.round(len / 7));
+      for (let j = 1; j < n; j++) {
+        const t = j / n, o = (rand() - 0.5) * 1.4;
+        d += `L${f1(b[0] + dx * t - dy / len * o)} ${f1(b[1] + dy * t + dx / len * o)} `;
+      }
+    });
+    return d + 'Z';
+  }
+
   function toward(v, p) {
     const dx = p[0] - v[0], dy = p[1] - v[1], len = Math.hypot(dx, dy);
     const k = Math.min(R, len / 2) / len;
@@ -148,12 +170,32 @@ const Board = (() => {
   // simbolo alto 2·halfPx centrato lì: la corda più stretta tra il suo bordo in
   // alto e quello in basso, così il simbolo sta tutto dentro il triangolo
   function midX(slot, y, halfPx = 0) {
-    const hu = halfPx * unitsPerPx;
-    const a = chord(slot, y - hu), b = chord(slot, y + hu), m = chord(slot, y);
+    const m = chord(slot, y);
     if (!m) return (SHAPES[slot].pts.reduce((s, p) => s + p[0], 0)) / 3;
-    const lo = Math.max(a ? a[0] : m[0], b ? b[0] : m[0], visible[0]);
-    const hi = Math.min(a ? a[1] : m[1], b ? b[1] : m[1], visible[1]);
+    const [lo, hi] = span(slot, y, halfPx, m);
     return hi > lo ? (lo + hi) / 2 : (m[0] + m[1]) / 2;
+  }
+
+  // Fascia visibile del triangolo che contiene per intero un simbolo alto
+  // 2·halfPx centrato all'altezza y
+  function span(slot, y, halfPx, m = chord(slot, y)) {
+    const hu = halfPx * unitsPerPx;
+    const a = chord(slot, y - hu), b = chord(slot, y + hu);
+    return [Math.max(a ? a[0] : m[0], b ? b[0] : m[0], visible[0]),
+            Math.min(a ? a[1] : m[1], b ? b[1] : m[1], visible[1])];
+  }
+
+  // Una sola x per una colonna di simboli alle altezze ys: il centro della
+  // fascia che li contiene tutti (se non c'è, quello del simbolo più stretto)
+  function columnX(slot, ys, halfPx) {
+    let lo = -Infinity, hi = Infinity;
+    ys.forEach(y => {
+      const m = chord(slot, y);
+      if (!m) return;
+      const [l, h] = span(slot, y, halfPx, m);
+      lo = Math.max(lo, l); hi = Math.min(hi, h);
+    });
+    return hi > lo ? (lo + hi) / 2 : midX(slot, ys[ys.length - 1], halfPx);
   }
 
   // Parte della tavola dentro lo schermo (la schermata di gioco), con un margine,
@@ -220,8 +262,10 @@ const Board = (() => {
       `<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(r)}" class="ba-crown"/>` +
       `<circle cx="${f1(x - r * 0.3)}" cy="${f1(y - r * 0.32)}" r="${f1(r * 0.48)}" class="ba-light"/>`).join('');
 
-    const regions = SLOTS.map(k =>
-      `<path d="${roundedPath(SHAPES[k].pts)}" fill="url(#ba-g-${k})"/>`).join('');
+    const mine = k => k.startsWith('c_');
+    const regions = SLOTS.map((k, i) =>
+      `<path d="${roughPath(SHAPES[k].pts, 7000 + i)}" fill="url(#ba-g-${k})"${mine(k) ? ' class="mine"' : ''}/>`).join('');
+    const glow = SLOTS.filter(mine).map(k => `<path d="${roundedPath(SHAPES[k].pts)}"/>`).join('');
 
     const grass = GRASS.map(([x, y]) =>
       `<path d="M${x} ${y} l-2.2 -4.6 M${x + 1.6} ${y} l0.4 -5.6 M${x + 3.2} ${y} l2.4 -4.2"/>`).join('');
@@ -247,6 +291,7 @@ const Board = (() => {
       <g class="ba-clearing" filter="url(#ba-blur)">${clearing}</g>
       <g class="ba-tree-shadows">${treeShadows}</g>
       <g class="ba-trees">${treeCrowns}</g>
+      <g class="ba-glow" filter="url(#ba-blur)">${glow}</g>
       <g class="ba-regions" filter="url(#ba-paint)">${regions}</g>
       <g class="ba-grass">${grass}</g>
     </svg>`;
@@ -256,7 +301,8 @@ const Board = (() => {
   // Livello vivo: sagome toccabili e Muri di pietra
   // ---------------------------------------------------------------------------
 
-  // Pietre in due file lungo un lato, fuori dal triangolo
+  // Pietre in tre file lungo un lato, fuori dal triangolo: se ne vedono una,
+  // due o tre secondo i Muri (wallRows)
   function stonesMarkup(slot) {
     const e = WALL_EDGES[slot];
     const pts = SHAPES[slot].pts;
@@ -269,9 +315,10 @@ const Board = (() => {
     const angle = Math.atan2(uy, ux) * 180 / Math.PI;
     const rand = rng(slot.length * 7919 + Math.round(e.from[0]));
     const step = 7.4;
-    let shadow = '', body = '';
-    [5.4, 11.6].forEach((off, row) => {
-      for (let s = len * e.t0 + row * step / 2; s < len * e.t1; s += step) {
+    let rows = '';
+    [5.4, 11.6, 17.8].forEach((off, row) => {
+      let shadow = '', body = '';
+      for (let s = len * e.t0 + (row % 2) * step / 2; s < len * e.t1; s += step) {
         const l = 6.2 + rand() * 1.4, w = 4.4 + rand() * 0.9;
         const o = off + (rand() - 0.5) * 1.2;
         const x = e.from[0] + ux * s + nx * o, y = e.from[1] + uy * s + ny * o;
@@ -280,9 +327,13 @@ const Board = (() => {
         shadow += `<rect ${r} transform="translate(${f1(x + 0.7)} ${f1(y + 1.1)}) rotate(${rot})"/>`;
         body += `<rect ${r} transform="translate(${f1(x)} ${f1(y)}) rotate(${rot})"/>`;
       }
+      rows += `<g class="bl-row" data-row="${row + 1}"><g class="bl-stone-shadows">${shadow}</g><g class="bl-stones">${body}</g></g>`;
     });
-    return `<g class="bl-wall" data-slot="${slot}"><g class="bl-stone-shadows">${shadow}</g><g class="bl-stones">${body}</g></g>`;
+    return `<g class="bl-wall" data-slot="${slot}">${rows}</g>`;
   }
+
+  // File di sassi per i Muri: 1–5 una, 6–10 due, da 11 tre
+  const wallRows = n => (n <= 0 ? 0 : n <= 5 ? 1 : n <= 10 ? 2 : 3);
 
   function liveMarkup() {
     const walls = Object.keys(WALL_EDGES).map(stonesMarkup).join('');
@@ -327,17 +378,17 @@ const Board = (() => {
   function overlayHTML(slot, d) {
     // Punto al centro del triangolo all'altezza y, spostato di dx
     const c = (y, dx = 0) => [midX(slot, y) + dx, y];
-    // Rombi e torri dei vicini: interi dentro la parte visibile del triangolo
-    const fit = (y, halfPx) => [midX(slot, y, halfPx), y];
+    // Rombi e torri dei vicini: in colonna, interi dentro la parte visibile del triangolo
+    const col = ys => columnX(slot, ys, diaPx / 2);
     const base = SHAPES[slot].pts[1][1];  // bordo dritto delle mie Regioni
     switch (slot) {
       case 'c_vanguard':
-        return dia(...c(153), d.att) + lbl(...c(176), 'ATT') + dia(...c(203), d.git) + lbl(...c(224), 'GIT') +
+        return dia(...c(145), d.att) + lbl(...c(169), 'ATT') + dia(...c(194), d.git) + lbl(...c(218), 'GIT') +
           dots(...c(base), d.species, true) + titleAt(...c(base), 'Avanscoperta', 'base');
       case 'c_village':
         return titleAt(...c(base), 'Villaggio', 'top') +
           tower(...c(327), d.incomplete, false) + lbl(...c(351), 'Incompl.') +
-          tower(...c(380), d.complete, true) + lbl(...c(400), 'Compl.');
+          tower(...c(376), d.complete, true) + lbl(...c(400), 'Compl.');
       case 'c_bastion_left':
       case 'c_bastion_right':
         return wall(...c(369), d.walls) + lbl(...c(390), 'Muri') +
@@ -348,17 +399,21 @@ const Board = (() => {
       case 'l_bastion':
       case 'r_bastion':
         return dia(...c(99, -19), d.dif) + dia(...c(99, 19), d.git) +
-          lbl(...c(120, -19), 'DIF') + lbl(...c(120, 19), 'GIT') + wall(...c(148), d.walls);
+          lbl(...c(122, -19), 'DIF') + lbl(...c(122, 19), 'GIT') + wall(...c(151), d.walls) + lbl(...c(172), 'Muri');
       // Regioni che escono dallo schermo: in colonna, al centro di ciò che se ne vede
       // (ogni etichetta sotto il suo rombo)
       case 'l_village':
       case 'r_village':
-        return tower(...fit(200, diaPx / 2), d.incomplete, false) + tower(...fit(236, diaPx / 2), d.complete, true);
+      {
+        const x = col([170, 222]);
+        return tower(x, 170, d.incomplete, false) + lbl(x, 194, 'Incompl.') +
+          tower(x, 222, d.complete, true) + lbl(x, 246, 'Compl.');
+      }
       case 'l_vanguard':
       case 'r_vanguard': {
         // Il triangolo punta in giù: la colonna sta in alto, dove è più largo
-        const [xa] = fit(310, diaPx / 2), [xg] = fit(352, diaPx / 2);
-        return dia(xa, 310, d.att) + lbl(xa, 331, 'ATT') + dia(xg, 352, d.git) + lbl(xg, 373, 'GIT');
+        const x = col([306, 352]);
+        return dia(x, 306, d.att) + lbl(x, 329, 'ATT') + dia(x, 352, d.git) + lbl(x, 375, 'GIT');
       }
       default:
         return '';
@@ -422,7 +477,7 @@ const Board = (() => {
           !(flags.quiet && flags.quiet.has(k))) flash(shape);
       datas[k] = data;
       owners[k] = owner;
-      if (stones[k]) stones[k].classList.toggle('on', !!(s && s.data.walls > 0));
+      if (stones[k]) stones[k].dataset.rows = s ? wallRows(s.data.walls) : 0;
     });
   }
 

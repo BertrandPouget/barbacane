@@ -176,7 +176,7 @@ input {
 .music-toggle.muted { color: var(--brown-light); }
 .music-toggle[hidden] { display: none; }
 
-/* In partita si inserisce nell'intestazione, accanto a "Abbandona" */
+/* In partita si inserisce nell'intestazione, accanto a "Esci" */
 .music-toggle.in-header {
   position: static;
   z-index: auto;
@@ -719,7 +719,9 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   padding: calc(var(--sat) + 6px) 0 0;
   display: flex;
   flex-direction: column;
+  pointer-events: none;  /* il bordo trasparente lascia toccare il campo sotto */
 }
+#topbar > * { pointer-events: auto; }
 .tb-row {
   display: flex;
   align-items: center;
@@ -727,12 +729,12 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   min-width: 0;
 }
 #topbar > .tb-row:first-child {
-  padding-bottom: 8px;
+  padding-bottom: 5px;
   border-bottom: 1px solid rgba(185, 138, 62, 0.5);
 }
 .tb-pill {
   flex: 0 0 auto;
-  height: 30px;
+  height: 27px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -781,7 +783,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
 }
 .ph-dot em {
-  font-size: clamp(0.6rem, 2.75vw, 0.72rem);  /* le tre fasi stanno tra mazzo e «Abbandona» */
+  font-size: clamp(0.6rem, 2.75vw, 0.72rem);  /* le tre fasi stanno tra mazzo e «Esci» */
   font-style: italic;
   color: #a88a5a;
   white-space: nowrap;
@@ -808,7 +810,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 #multi-back, #bot-diff-back, #cat-back, #wait-back { font-size: 1.7rem; line-height: 1; padding: 0 10px 4px; }
 .tb-btn:active { border-color: var(--border); }
 .tb-leave {
-  height: 30px;
+  height: 27px;
   padding: 0 6px;
   font-size: 0.78rem;
   color: var(--danger);
@@ -817,53 +819,67 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   white-space: nowrap;
 }
 
-/* Sotto il campo: le mie Azioni, Vite e Mana */
+/* Sotto il campo, in quattro sezioni: Vite, Azioni, Mana e il passo successivo.
+   Cornice a bastione con le punte in alto, specchio dell'intestazione e larga
+   come lei (stessa misura e stessi margini laterali) */
 #statusbar {
+  --frame-size: 20px;
+  --frame-fill: rgba(28, 15, 4, 0.95);
   flex: 0 0 auto;
   position: relative;
   z-index: 2;
-  display: flex;
+  margin: 0 2px;
+  pointer-events: none;  /* il bordo trasparente lascia toccare il campo sotto */
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.6fr);
   align-items: center;
-  justify-content: center;
-  padding: 6px 8px 0;
+  padding: 0;
   text-shadow: 0 1px 3px rgba(10, 5, 0, 0.9);
 }
+#statusbar > * { pointer-events: auto; }
 .st-item {
-  display: inline-flex;
+  min-width: 0;
+  height: 38px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 2px 10px;
-  font-size: 0.98rem;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 4px;
   color: var(--text);
   white-space: nowrap;
 }
-.st-sep {
-  flex: 0 0 auto;
-  width: 1px;
-  height: 28px;
-  background: rgba(185, 138, 62, 0.45);
+.st-item + .st-item { border-left: 1px solid rgba(185, 138, 62, 0.45); }
+.st-lbl { font-size: 0.66rem; line-height: 1; color: var(--text-dim); }
+.st-next { height: 34px; margin-left: 6px; }
+.st-next > span { padding: 0 5px; font-size: clamp(0.72rem, 3.3vw, 0.86rem); }
+.opp-hearts { display: inline-flex; align-items: center; gap: 3px; }
+.opp-hearts b { color: var(--red-light); font-size: 0.85em; margin-left: 2px; }
+/* Vite: un cuore col numero dentro */
+.st-heart {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
 }
-/* Azioni: rombi azzurri come la stella delle Maghe, vuoti quelli già usati */
-.st-pips { display: inline-flex; align-items: center; gap: 7px; padding: 0 3px; }
-.st-pips i {
-  width: 13px;
-  height: 13px;
-  transform: rotate(45deg);
-  background: var(--hex-maga);
-  box-shadow: 0 0 0 1.5px #2a5a6e;
+.st-heart svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: #b52a22;
+  stroke: var(--hex-border);
+  stroke-width: 1.4;
 }
-.st-pips i.off { background: rgba(42, 90, 110, 0.25); box-shadow: 0 0 0 1.5px rgba(80, 140, 165, 0.5); }
-.st-pips b { margin-left: 3px; font-size: 0.85em; color: #a3d7ed; }
-.st-hearts, .opp-hearts { display: inline-flex; align-items: center; gap: 3px; }
-.st-hearts svg { width: 20px; height: 20px; fill: var(--red-light); }
-.st-hearts b, .opp-hearts b { color: var(--red-light); font-size: 0.85em; margin-left: 2px; }
+.st-heart b { position: relative; padding-bottom: 3px; font-size: 0.82rem; font-weight: 800; color: #fff2e6; text-shadow: none; }
 /* Mana: la gemma ottagonale delle carte stampate */
 .st-gem {
   --gem: polygon(29.3% 0, 70.7% 0, 100% 29.3%, 100% 70.7%, 70.7% 100%, 29.3% 100%, 0 70.7%, 0 29.3%);
   position: relative;
   isolation: isolate;
-  width: 28px;
-  height: 28px;
+  width: 23px;
+  height: 23px;
   display: grid;
   place-items: center;
   clip-path: var(--gem);
@@ -877,15 +893,13 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   clip-path: var(--gem);
   background: var(--hex-mana);
 }
-.st-gem b { font-size: 1rem; font-weight: 800; color: var(--hex-ink); padding-top: 1px; }
-.st-fx {
-  margin-left: 4px;
-  padding: 3px 9px;
-  border: 1px solid rgba(185, 138, 62, 0.55);
-  border-radius: 12px;
-  font-size: 0.85rem;
-  color: var(--gold-light);
-}
+.st-gem b { text-shadow: none; font-size: 0.82rem; font-weight: 800; color: var(--hex-ink); padding-top: 1px; }
+/* Azioni: rombo azzurro come la stella delle Maghe */
+.st-gem-act { --gem: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); width: 26px; height: 26px; }
+.st-gem-act::before { inset: 2px; background: var(--hex-maga); }
+.st-gem-act b { color: #1d3f50; }
+/* Effetti attivi: nell'intestazione, accanto a «Esci» */
+.tb-fx { padding: 0 6px; font-size: 0.85rem; color: var(--gold-light); }
 .st-item.bump { animation: chip-bump 0.5s var(--ease-out); }
 @keyframes chip-bump {
   0%   { transform: none; }
@@ -895,7 +909,6 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 @media (max-width: 374px) {
   .tb-row { gap: 4px; }
   .tb-pill, .tb-leave { padding: 0 5px; }
-  .st-item { padding: 2px 7px; gap: 6px; }
 }
 
 /* Timer del turno: una barra che si accorcia sopra il bordo dell'intestazione */
@@ -933,9 +946,17 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 
 /* ── Campo (board.js): la tavola scala per stare nello spazio libero ── */
 
+/* Spazio in px per le etichette degli avversari (vedi --band in #board):
+   4 + 40 + 4; con i nomi anche al centro i vicini stanno 24px più in basso */
+@property --band { syntax: '<length>'; inherits: true; initial-value: 0px; }
+#field { --need: 48px; }
+#field.has-top { --need: 72px; }
+/* Il campo scivola sotto le cornici di intestazione e risorse, nella parte
+   trasparente del loro bordo (sotto e sopra il tratto dorato) */
 #field {
   flex: 1 1 0;
   min-height: 0;
+  margin: -11px 0;
   position: relative;
   z-index: 1;
   container-type: size;
@@ -946,7 +967,17 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 #board {
   position: relative;
   flex: 0 0 auto;
-  width: min(100cqw, 100cqh * 0.78);  /* 390 × 500 unità di tavola */
+  /* Fascia sopra la tavola per i nomi degli avversari, a ogni misura di
+     schermo: le etichette (in px) richiedono --need px dal bordo di sopra al
+     tratto dei Bastioni dei vicini (y 67 = 13,4% dell'altezza della tavola,
+     che è 1,282 volte la larghezza); la tavola cede solo ciò che manca. La
+     prima formula vale se la tavola è limitata in altezza, la seconda in
+     larghezza: la maggiore basta in entrambi i casi. */
+  --band: max(0px, (var(--need) - 13.4cqh) / 0.866, var(--need) - 20.3cqw);
+  margin-top: var(--band);
+  /* 390 × 500 unità di tavola. Può essere più larga dello schermo: le Regioni
+     dei vicini escono dai lati (board.js ne ricentra i numeri nella parte visibile) */
+  width: min(118cqw, (100cqh - var(--band)) * 0.78);
   aspect-ratio: 390 / 500;
   container-type: inline-size;        /* i numeri si misurano sulla tavola (cqw) */
 }
@@ -961,6 +992,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 /* Il disegno fisso su un livello suo: le animazioni sopra non ne ricalcolano i filtri */
 #board-art { will-change: transform; }
 #board-ov, #opp-rail { position: absolute; inset: 0; pointer-events: none; }
+#opp-rail { top: calc(-1 * var(--band)); }  /* i nomi occupano anche la fascia */
 #board-ov { z-index: 2; }
 #opp-rail { z-index: 3; }
 /* Cambio di punto di vista (occhio): la tavola ricompare */
@@ -976,11 +1008,16 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .ba-crown { fill: #22301a; stroke: #0f170a; stroke-width: 0.8; }
 .ba-light { fill: #31452a; opacity: 0.8; }
 .ba-regions path { stroke: rgba(30, 14, 4, 0.55); stroke-width: 1.2; }
+/* Le Regioni del giocatore al centro: alone caldo attorno e bordo d'oro, tenui */
+.ba-glow { fill: rgba(255, 196, 96, 0.22); }
+.ba-regions path.mine { stroke: rgba(255, 214, 120, 0.5); stroke-width: 1.5; }
 .ba-grass { fill: none; stroke: #8fb957; stroke-width: 1.05; stroke-linecap: round; opacity: 0.9; }
 
 /* Muri di pietra lungo il lato esposto di un Bastione che ne ha */
-.bl-wall { display: none; }
-.bl-wall.on { display: inline; }
+.bl-row { display: none; }
+.bl-wall[data-rows="1"] .bl-row[data-row="1"],
+.bl-wall[data-rows="2"] .bl-row:is([data-row="1"], [data-row="2"]),
+.bl-wall[data-rows="3"] .bl-row { display: inline; }
 .bl-stone-shadows { fill: rgba(22, 10, 3, 0.5); }
 .bl-stones { fill: #cbc4b6; stroke: #635b4f; stroke-width: 0.6; }
 
@@ -1090,20 +1127,26 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: max(2px, 0.6cqw);
+  gap: 2px;
   max-width: 46%;
   pointer-events: auto;
   text-shadow: 0 1px 3px rgba(10, 5, 0, 0.9);
 }
-/* I vicini un nome più in basso di quelli al centro, che stanno sulla strada */
+/* Etichette a misura fissa (in px, non scalano con la tavola): alte 40px
+   (nome 20 + 2 + Vite e occhio 18). I vicini un nome più in basso di quelli
+   al centro, che stanno sulla strada; se al centro non c'è nessuno in cima.
+   Lo spazio sopra i Bastioni dei vicini è garantito da --band (#board). */
 .opp-label.pos-l,
-.opp-label.pos-r { top: calc(1.2% + 1.2 * max(12px, 3.9cqw) + 4px); }
-.opp-label.pos-l { left: 3.6%; }
-.opp-label.pos-r { right: 3.6%; }
+.opp-label.pos-r { top: 4px; }
+#field.has-top .opp-label.pos-l,
+#field.has-top .opp-label.pos-r { top: 28px; }
+/* Dentro lo schermo anche quando la tavola ne esce dai lati */
+.opp-label.pos-l { left: max(3.6%, calc(50% - 50vw + 10px)); }
+.opp-label.pos-r { right: max(3.6%, calc(50% - 50vw + 10px)); }
 .opp-top {
   position: absolute;
   left: 50%;
-  top: 1.2%;
+  top: 4px;
   transform: translateX(-50%);
   display: flex;
   gap: 5cqw;
@@ -1113,26 +1156,26 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   max-width: 100%;
   padding: 1px 2px;
   font-weight: 700;
-  font-size: max(12px, 3.9cqw);
+  font-size: 15px;
   line-height: 1.2;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.opp-sub { display: flex; align-items: center; gap: max(6px, 2.4cqw); min-height: max(18px, 5cqw); }
-.opp-hearts svg { width: max(9px, 2.9cqw); height: max(9px, 2.9cqw); fill: var(--red-light); }
-.opp-fx { font-size: max(9px, 2.8cqw); color: var(--gold-light); }
-.opp-out { font-size: max(10px, 2.9cqw); font-style: italic; color: var(--text-faint); }
+.opp-sub { display: flex; align-items: center; gap: 8px; height: 18px; }
+.opp-hearts svg { width: 10px; height: 10px; fill: var(--red-light); }
+.opp-fx { font-size: 10px; color: var(--gold-light); }
+.opp-out { font-size: 11px; font-style: italic; color: var(--text-faint); }
 .opp-eye {
   display: grid;
   place-items: center;
-  width: max(30px, 8cqw);
-  height: max(26px, 6.6cqw);
-  margin: -6px -8px;
+  width: 30px;
+  height: 26px;
+  margin: -4px -8px;
   color: var(--text-dim);
 }
-.opp-eye svg { width: max(15px, 4.6cqw); height: max(15px, 4.6cqw); }
+.opp-eye svg { width: 16px; height: 16px; }
 /* Di turno: nome d'oro */
 .opp-label.turn .opp-name {
   color: var(--gold-light);
@@ -1152,10 +1195,14 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   position: relative;
   display: block;
   width: 100%;
-  height: 34px;
-  padding: 6px 4px 0;
-  font-size: 0.95rem;
-  line-height: 28px;
+  /* Occupa tutto lo spazio tra la riga di sopra e il tratto dorato della
+     cornice (a 9px dentro il bordo, cioè 11 dei 20px di --frame-size dal
+     fondo), con il testo al centro */
+  height: 26px;
+  margin-bottom: -9px;
+  padding: 0 4px;
+  font-size: 0.78rem;  /* come «Esci» */
+  line-height: 26px;
   color: var(--text);
   text-align: center;
   white-space: nowrap;
@@ -1178,8 +1225,8 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   flex: 0 0 auto;
   position: relative;
   z-index: 2;
-  min-height: 42px;
-  padding: 2px 14px 4px;
+  min-height: 26px;
+  padding: 0 14px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1196,6 +1243,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   text-align: center;
   text-shadow: 0 1px 3px rgba(10, 5, 0, 0.9);
 }
+.dock-hint-sm { font-size: 0.76rem; }
 .dock-wait .dots::after {
   content: "…";
   animation: dots-blink 1.4s steps(4) infinite;
@@ -1207,35 +1255,42 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   75%  { content: "..."; }
 }
 
-/* Pulsanti a nastro, come lo stendardo del nome sulle carte: il bordo d'oro è
-   il fondo del pulsante, il colore il nastro interno */
-.rib-btn {
-  --rib: polygon(0 0, 100% 0, calc(100% - 9px) 50%, 100% 100%, 0 100%, 9px 50%);
+/* Pulsanti della riga sotto il campo e del passo successivo: rettangoli col
+   bordo d'oro delle carte, fondo marrone */
+.dk-btn {
   flex: 0 0 auto;
-  height: 36px;
-  padding: 1.5px;
-  background: var(--card-gold);
-  clip-path: var(--rib);
+  height: 38px;
+  display: flex;
+  align-items: stretch;
+  padding: 0;
+  border: 1.5px solid var(--card-gold);
+  border-radius: 2px;
+  background: var(--card-brown);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35), 0 2px 5px rgba(10, 5, 0, 0.6);
 }
-.rib-btn > span {
+.dk-btn > span {
+  flex: 1;
   display: flex;
   align-items: center;
-  height: 100%;
-  padding: 0 20px;
-  clip-path: var(--rib);
-  background: var(--card-brown);
+  justify-content: center;
+  padding: 0 16px;
   color: var(--card-cream);
   font-weight: 700;
   font-size: 0.92rem;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.rib-btn.rib-gold > span { background: linear-gradient(#ffd75a, #e6a911); color: #2a1604; }
-.rib-btn.rib-danger > span { background: #7c1d16; color: #ffe2d6; }
-.rib-btn.rib-warn > span { background: #8a5a20; color: #fff3dc; }
-.rib-btn:disabled { opacity: 0.45; }
-.rib-btn:disabled:active { transform: none; }
-.rib-btn.rib-pulse { animation: rib-pulse 1.8s ease-in-out infinite; }
-@keyframes rib-pulse {
+.dk-btn.dk-gold { background: var(--gold); }
+.dk-btn.dk-gold > span { color: #2a1604; }
+.dk-btn.dk-danger { background: #7c1d16; }
+.dk-btn.dk-danger > span { color: #ffe2d6; }
+.dk-btn.dk-warn { background: #8a5a20; }
+.dk-btn.dk-warn > span { color: #fff3dc; }
+.dk-btn:disabled { opacity: 0.45; }
+.dk-btn:disabled:active { transform: none; }
+.dk-btn.dk-pulse { animation: dk-pulse 1.8s ease-in-out infinite; }
+@keyframes dk-pulse {
   0%, 100% { filter: brightness(1); }
   50%      { filter: brightness(1.3); }
 }
@@ -1583,11 +1638,11 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   /* La mano non scorre: fanHand sovrappone le carte quanto serve per starci tutte */
   overflow: hidden;
   touch-action: none;  /* il dito sulla mano sfoglia le carte (bindCardPeek) */
-  padding: 24px 12px 0;  /* sopra: badge del costo (la stella sporge di più) anche con la carta sollevata */
+  padding: 12px 12px 0;  /* sopra: badge del costo (la stella sporge di più) anche con la carta sollevata */
   /* Altezza della mano calcolata su --card-h-hand: le carte sono più grandi e
      la loro parte bassa esce dal fondo dello schermo (qui viene tagliata). */
   box-sizing: border-box;
-  height: calc(var(--card-h-hand) + var(--sab) + 40px);
+  height: calc(var(--card-h-hand) + var(--sab) - 14px);
 }
 
 /* Carte in mano con le proporzioni della minicarta (280×400): l'altezza è
@@ -3047,9 +3102,9 @@ button.menu-frame:active {
   position: fixed;
   left: 50%;
   /* Appena sopra la mano (stessa altezza di #hand), un po' sotto il dito */
-  bottom: calc(var(--card-h-hand) + var(--sab) + 40px - 10px);
+  bottom: calc(var(--card-h-hand) + var(--sab) - 14px - 10px);
   translate: -50% 0;
-  width: min(74vw, 290px, calc((100vh - var(--card-h-hand) - var(--sab) - 40px) * 744 / 1040));
+  width: min(74vw, 290px, calc((100vh - var(--card-h-hand) - var(--sab) + 14px) * 744 / 1040));
   height: auto;
   z-index: 300;
   border-radius: 12px;
