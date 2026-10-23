@@ -184,29 +184,23 @@
 <!-- ═══════════ SCHERMATA: GIOCO ═══════════ -->
 <section id="scr-game" class="scr">
 
-  <!-- Intestazione: turno, mazzo, fasi (toccando una fase successiva ci si
-       passa), Abbandona e musica; sotto le mie Azioni, Vite e Mana -->
+  <!-- Intestazione: turno, mazzo, fasi, Abbandona e musica; sotto l'ultima
+       voce della cronaca -->
   <header id="topbar" class="menu-frame menu-frame-basso">
     <div class="tb-row">
       <span id="tb-turn" class="tb-pill">T1</span>
       <span id="tb-deck" class="tb-pill" aria-label="Carte nel mazzo"><i class="tb-deck-ico"></i><span id="tb-deck-n">—</span></span>
       <div id="tb-phase" class="tb-phase" aria-label="Fase del turno">
-        <button class="ph-dot" data-ph="action" type="button" disabled><i></i><em>Azioni</em></button>
-        <button class="ph-dot" data-ph="schieramento" type="button" disabled><i></i><em>Schiera</em></button>
-        <button class="ph-dot" data-ph="battaglia" type="button" disabled><i></i><em>Battaglia</em></button>
+        <span class="ph-dot" data-ph="action"><i></i><em>Azioni</em></span>
+        <span class="ph-dot" data-ph="schieramento"><i></i><em>Schiera</em></span>
+        <span class="ph-dot" data-ph="battaglia"><i></i><em>Battaglia</em></span>
       </div>
       <div class="tb-right">
         <button id="tb-leave" class="tb-btn tb-leave" aria-label="Abbandona la partita">Abbandona</button>
       </div>
     </div>
-    <div id="statusbar" class="tb-row tb-res">
-      <div id="st-actions" class="st-item" role="img" aria-label="Azioni"><span class="st-pips"></span><span class="st-lbl">Azioni</span></div>
-      <i class="st-sep"></i>
-      <button id="st-lives" class="st-item" type="button" aria-label="Le tue Vite"><span class="st-hearts"></span><span class="st-lbl">Vite</span></button>
-      <i class="st-sep"></i>
-      <div id="st-mana" class="st-item" role="img" aria-label="Mana"><span class="st-gem"><b id="st-mana-n">0</b></span><span class="st-lbl">Mana</span></div>
-      <button id="st-fx" class="st-item st-fx" type="button" hidden aria-label="Effetti attivi">✨ 0</button>
-    </div>
+    <!-- Ultima voce della cronaca: toccandola si legge tutta -->
+    <button id="ticker" class="ticker" type="button" aria-label="Cronaca della partita"></button>
     <!-- Timer del turno (solo se impostato nella sala d'attesa) -->
     <div id="tb-timer" class="tb-timer" hidden><i id="timer-bar"></i><span id="tb-timer-num">—</span></div>
   </header>
@@ -237,10 +231,17 @@
     </div>
   </main>
 
-  <!-- Ultima voce della cronaca: toccandola si legge tutta -->
-  <button id="ticker" class="ticker" type="button" aria-label="Cronaca della partita"></button>
+  <!-- Le mie Azioni, Vite e Mana -->
+  <div id="statusbar">
+    <div id="st-actions" class="st-item" role="img" aria-label="Azioni"><span class="st-pips"></span><span class="st-lbl">Azioni</span></div>
+    <i class="st-sep"></i>
+    <button id="st-lives" class="st-item" type="button" aria-label="Le tue Vite"><span class="st-hearts"></span><span class="st-lbl">Vite</span></button>
+    <i class="st-sep"></i>
+    <div id="st-mana" class="st-item" role="img" aria-label="Mana"><span class="st-gem"><b id="st-mana-n">0</b></span><span class="st-lbl">Mana</span></div>
+    <button id="st-fx" class="st-item st-fx" type="button" hidden aria-label="Effetti attivi">✨ 0</button>
+  </div>
 
-  <!-- Suggerimento e pulsanti della fase (Orda, Attacca, Fine turno) -->
+  <!-- Suggerimento della fase e i suoi pulsanti (fase successiva, Orda, Attacca, Fine turno) -->
   <div id="dock"></div>
 
   <!-- Mano -->

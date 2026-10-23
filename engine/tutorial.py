@@ -119,13 +119,12 @@ _MOBILE_HIGHLIGHT_MAP: Dict[str, Union[str, List[str]]] = {
     "my-bastion-left": "tw-left",
     "my-bastion-right": "tw-right",
     "my-village": "tw-village",
-    # Solo Mana e Azioni: nell'intestazione mobile ci sono anche Vite ed Effetti.
+    # Solo Mana e Azioni: nella riga delle risorse ci sono anche Vite ed Effetti.
     "my-stats": ["st-mana", "st-actions"],
     "my-mana": "st-mana",
     "my-actions": "st-actions",
     "action-panel": "dock",
-    # La fase successiva nell'intestazione (si cambia fase toccandola)
-    "btn-next-phase": "tb-next-phase",
+    "btn-next-phase": "dock-next",
     "btn-horde": "dock-horde",
     "btn-battle": "dock-attack",
     "btn-end-turn": "dock-end-turn",

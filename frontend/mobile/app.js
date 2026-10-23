@@ -41,9 +41,6 @@ const Mob = (() => {
 
   // Giocatore di cui si guarda il campo (occhio accanto al nome); null = il mio
   let viewId = null;
-  // Fase verso cui si sta andando toccandola nell'intestazione: da Azioni a
-  // Battaglia servono due next_phase, il secondo parte all'arrivo del primo stato
-  let phaseGoal = null;
 
   // Orda di Evelyn: base_card_id della Magia da rigiocare. Finché è valorizzato,
   // le sendAction('play_spell') diventano 'recast_spell' (stessa UI di targeting).
@@ -985,7 +982,6 @@ const Mob = (() => {
     });
     WS.on('error', (msg) => {
       DragPlay.reject();
-      phaseGoal = null;
       Toast.show(msg.message || 'Errore', 'error');
       // Blocco dovuto a un'interazione in attesa: riapre gli sheet pendenti
       // nell'ordine giusto (prima la ricerca, poi Biblioteca & co.)
@@ -1019,11 +1015,9 @@ const Mob = (() => {
     currentState = state;
     rematchOffer = null;
     viewId = null;
-    phaseGoal = null;
     chronicleSeenId = Chronicle.lastId(state);
     Dice.fromState(state, myPlayerId, cardDefs, { silent: true });
-    // Minicarte (sheet) e carte intere della mano
-    CardArt.preload(Object.keys(cardDefs), { previews: true });
+    CardArt.preload(Object.keys(cardDefs));
     saveSession();
     connectGameWS();
     Screens.show('game');
@@ -1085,17 +1079,6 @@ const Mob = (() => {
     Render.game(state, myPlayerId, viewId);
     applyWallFlips();
     Motion.play(before, screen, _motionOptions(state));
-
-    // Fase toccata nell'intestazione più avanti della successiva: un altro passo
-    if (phaseGoal) {
-      const cur = PHASES.indexOf(state.phase), goal = PHASES.indexOf(phaseGoal);
-      if (action === 'next_phase' && state.current_player_id === myPlayerId && cur >= 0 && cur < goal &&
-          !_myPendingInteraction(state) && !state.pending_search) {
-        sendAction('next_phase', {});
-      } else {
-        phaseGoal = null;
-      }
-    }
 
     // Banner al cambio turno. I miei tiri di D10: a inizio del mio turno
     // (Estrattore) dopo il banner, a fine turno (Granaio) prima del banner
@@ -1245,9 +1228,6 @@ const Mob = (() => {
 
   function bindGameChrome() {
     Board.mount($('board'), { onTap: onRegionTap });
-    document.querySelectorAll('#tb-phase .ph-dot').forEach(dot => {
-      dot.addEventListener('click', () => onPhaseTap(dot.dataset.ph));
-    });
     $('st-lives').addEventListener('click', () => { haptic(); openLivesSheet(); });
     $('st-fx').addEventListener('click', () => { haptic(); openActiveFxSheet(); });
     $('tb-leave').addEventListener('click', () => { haptic(); confirmLeaveGame(); });
@@ -1328,7 +1308,7 @@ const Mob = (() => {
 
     hand.addEventListener('touchstart', e => {
       if (e.touches.length !== 1) { end(); return; }
-      const card = e.target.closest('.card.hand-card');
+      const card = e.target.closest('.card.has-art');
       if (!card) return;
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
@@ -1366,7 +1346,7 @@ const Mob = (() => {
         }
       }
       const under = document.elementFromPoint(t.clientX, t.clientY);
-      const card = under && under.closest('#hand .card.hand-card');
+      const card = under && under.closest('#hand .card.has-art');
       if (holdTimer) {
         // Il dito si muove prima della pressione prolungata: si sfoglia subito
         if (Math.hypot(t.clientX - startX, t.clientY - startY) > 8) startPeek(card);
@@ -1418,9 +1398,8 @@ const Mob = (() => {
       .find(i => i.type === 'magiscudo_counter' || i.type === 'malcomune_discard') || null;
   }
 
-  // Riga sotto il campo: il suggerimento della fase e i suoi pulsanti (Orda,
-  // Attacca, Fine turno). Per cambiare fase si toccano le fasi nell'intestazione
-  // (onPhaseTap): qui si decide quali si possono toccare e se la successiva pulsa.
+  // Riga sotto il campo: il suggerimento della fase e i suoi pulsanti (fase
+  // successiva, Orda, Attacca, Fine turno)
   function refreshDock() {
     const dock = $('dock');
     // Le carte della mano sono riusate tra un render e l'altro: si riaccendono qui
@@ -1442,7 +1421,6 @@ const Mob = (() => {
     const wait = (text) => el('div', { className: 'dock-wait' }, [text, el('span', { className: 'dots' })]);
 
     const items = [];
-    let canAdvance = false, ready = false;
     const blocking = mine ? opponentAnswerPending() : null;
 
     if (myAnswerPending()) {
@@ -1455,7 +1433,6 @@ const Mob = (() => {
       const what = blocking.type === 'magiscudo_counter' ? 'Magiscudo' : 'Malcomune';
       items.push(wait(`In attesa di ${playerName(blocking.player_id)} (${what})`));
     } else if (currentState.phase === 'action') {
-      canAdvance = true;
       const acts = my ? (my.actions_remaining ?? 0) : 0;
       const hasCards = my && my.hand && my.hand.length > 0;
       const hasEthereal = my && my.ethereal_card;
@@ -1467,10 +1444,10 @@ const Mob = (() => {
         items.push(hint(slots > 0 ? `Ancora ${slots} Mur${slots === 1 ? 'o' : 'i'} in quest'Azione`
           : !hasCards ? 'Nessuna carta in mano'
           : 'Trascina per giocare, doppio tocco per un Muro'));
+        items.push(mkBtn('›', '', () => sendAction('next_phase', {}), false, 'dock-next'));
       } else {
         // Azioni finite: restano le giocate che non consumano Azioni (Orde, eterea,
-        // Decumano); le carte non giocabili gratis si spengono. «Schiera» pulsa.
-        ready = true;
+        // Decumano); le carte non giocabili gratis si spengono
         const freePlays = my && hasFreePlays(my);
         const freeCompletes = my && completableBuildings(my).length > 0;
         if (freePlays) {
@@ -1483,15 +1460,16 @@ const Mob = (() => {
           : freePlays && freeCompletes ? 'Puoi ancora giocare le carte accese o completare'
           : freePlays ? 'Puoi ancora giocare le carte accese'
           : freeCompletes ? 'Puoi ancora completare Costruzioni'
-          : 'Azioni esaurite: tocca «Schiera» per proseguire'));
+          : 'Azioni esaurite'));
+        items.push(mkBtn('Schieramento ›', 'rib-gold rib-pulse', () => sendAction('next_phase', {}), false, 'dock-next'));
       }
     } else if (currentState.phase === 'schieramento') {
-      canAdvance = true;
       const hordes = (my && my.available_hordes) || [];
       items.push(hint('Tocca una Regione per spostare i Guerrieri'));
       if (hordes.length > 0) {
         items.push(mkBtn(`⚡ Orda (${hordes.length})`, 'rib-warn rib-pulse', openHordeSheet, false, 'dock-horde'));
       }
+      items.push(mkBtn('Battaglia ›', '', () => sendAction('next_phase', {}), false, 'dock-next'));
     } else if (currentState.phase === 'battaglia') {
       const canAttack = canAttackNow();
       if (!canAttack) items.push(hint('Nessun attacco possibile'));
@@ -1509,22 +1487,6 @@ const Mob = (() => {
     }
 
     dock.replaceChildren(...items);
-    Render.phaseControls(currentState.phase, canAdvance, ready);
-  }
-
-  // -- Fasi toccabili nell'intestazione ----------------------------------------
-
-  const PHASES = ['action', 'schieramento', 'battaglia'];
-
-  // Tocco su una fase dopo quella corrente: ci si va (anche saltando lo
-  // Schieramento: il secondo passo parte all'arrivo del nuovo stato)
-  function onPhaseTap(ph) {
-    if (!currentState || !isMyTurn() || myAnswerPending() || opponentAnswerPending()) return;
-    const cur = PHASES.indexOf(currentState.phase), goal = PHASES.indexOf(ph);
-    if (cur < 0 || goal <= cur) return;
-    haptic();
-    phaseGoal = ph;
-    sendAction('next_phase', {});
   }
 
   // -- Campo: Regioni toccate e campo degli altri giocatori ----------------------
@@ -1603,9 +1565,9 @@ const Mob = (() => {
     bastion_right: 'c_bastion_right', village: 'c_village',
   };
 
-  // La carta trascinata è più piccola di quella in mano, così non copre le
-  // Regioni: si lascia dove la si vede (drag.js cerca la zona al suo centro)
-  const DRAG_SCALE = 0.6;
+  // La carta trascinata è un po' più piccola di quella in mano, così non copre
+  // le Regioni: si lascia dove la si vede (drag.js cerca la zona al suo centro)
+  const DRAG_SCALE = 0.8;
 
   function dropZone(key) {
     const slot = DROP_SLOTS[key];

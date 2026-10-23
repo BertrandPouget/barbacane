@@ -130,25 +130,41 @@ const Board = (() => {
   // orizzontale, ritagliata sulla parte di tavola dentro lo schermo (le Regioni
   // dei vicini escono dai lati: i loro numeri stanno in ciò che se ne vede)
   let visible = [-Infinity, Infinity];  // unità di tavola dentro lo schermo
-  function midX(slot, y) {
+  let unitsPerPx = 1;                    // unità di tavola in un pixel
+  let diaPx = 27;                        // lato dei rombi delle Caratteristiche (CSS: max(20px, 7cqw))
+
+  // Corda orizzontale del triangolo all'altezza y: [sinistra, destra] o null
+  function chord(slot, y) {
     const pts = SHAPES[slot].pts;
     const xs = [];
     pts.forEach((a, i) => {
       const b = pts[(i + 1) % 3];
       if (a[1] !== b[1] && (y - a[1]) * (y - b[1]) <= 0) xs.push(a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]));
     });
-    if (!xs.length) return (pts[0][0] + pts[1][0] + pts[2][0]) / 3;
-    const lo = Math.max(Math.min(...xs), visible[0]), hi = Math.min(Math.max(...xs), visible[1]);
-    return hi > lo ? (lo + hi) / 2 : (Math.min(...xs) + Math.max(...xs)) / 2;
+    return xs.length ? [Math.min(...xs), Math.max(...xs)] : null;
   }
 
-  // Parte della tavola dentro lo schermo (la schermata di gioco), con un margine
-  function measureVisible(live) {
+  // Centro della parte visibile del triangolo all'altezza y. Con halfPx, per un
+  // simbolo alto 2·halfPx centrato lì: la corda più stretta tra il suo bordo in
+  // alto e quello in basso, così il simbolo sta tutto dentro il triangolo
+  function midX(slot, y, halfPx = 0) {
+    const hu = halfPx * unitsPerPx;
+    const a = chord(slot, y - hu), b = chord(slot, y + hu), m = chord(slot, y);
+    if (!m) return (SHAPES[slot].pts.reduce((s, p) => s + p[0], 0)) / 3;
+    const lo = Math.max(a ? a[0] : m[0], b ? b[0] : m[0], visible[0]);
+    const hi = Math.min(a ? a[1] : m[1], b ? b[1] : m[1], visible[1]);
+    return hi > lo ? (lo + hi) / 2 : (m[0] + m[1]) / 2;
+  }
+
+  // Parte della tavola dentro lo schermo (la schermata di gioco), con un margine,
+  // e misure dei simboli in unità di tavola
+  function measure(live) {
     const r = live.getBoundingClientRect();
+    if (!r.width) return;
     const scr = (live.closest('#scr-game') || document.documentElement).getBoundingClientRect();
-    if (!r.width) return [-Infinity, Infinity];
-    const k = W / r.width;
-    return [(scr.left - r.left) * k + 4, (scr.right - r.left) * k - 4];
+    unitsPerPx = W / r.width;
+    diaPx = Math.max(20, 0.07 * r.width);
+    visible = [(scr.left - r.left) * unitsPerPx + 4, (scr.right - r.left) * unitsPerPx - 4];
   }
 
   // Distanza di un punto dal triangolo (0 se è dentro)
@@ -292,15 +308,18 @@ const Board = (() => {
   const pos = (x, y) => `left:${f1(x / W * 100)}%;top:${f1(y / H * 100)}%`;
   const dia = (x, y, n) => `<span class="ov ov-dia${n ? '' : ' zero'}" style="${pos(x, y)}"><b>${n}</b></span>`;
   const lbl = (x, y, text) => `<span class="ov ov-lbl" style="${pos(x, y)}">${text}</span>`;
-  const title = (x, y, text) => `<span class="ov ov-title" style="${pos(x, y)}">${text}</span>`;
+  // Titoli a distanza fissa dal bordo dritto del triangolo (in basso per quelli
+  // con la punta in su, in alto per il Villaggio): la y è quella del bordo
+  const titleAt = (x, y, text, edge) => `<span class="ov ov-title at-${edge}" style="${pos(x, y)}">${text}</span>`;
   const wall = (x, y, n) => `<span class="ov ov-wall${n ? '' : ' zero'}" style="${pos(x, y)}">${WALL_SVG}<b>${n}</b></span>`;
   const tower = (x, y, n, done) =>
     `<span class="ov ov-tower${done ? ' done' : ''}${n ? '' : ' zero'}" style="${pos(x, y)}">${TOWER_SVG}<b>${n}</b></span>`;
-  function dots(x, y, species, max = 5) {
+  // Pallini delle Specie; con onTitle poggiano sul titolo in fondo (y = bordo)
+  function dots(x, y, species, onTitle = false, max = 5) {
     if (!species.length) return '';
     const shown = species.slice(0, max).map(s => `<i class="sp-${s || 'umano'}"></i>`).join('');
     const more = species.length > max ? `<em>+${species.length - max}</em>` : '';
-    return `<span class="ov ov-dots" style="${pos(x, y)}">${shown}${more}</span>`;
+    return `<span class="ov ov-dots${onTitle ? ' on-title' : ''}" style="${pos(x, y)}">${shown}${more}</span>`;
   }
 
   // Contenuto di una Regione, in unità di tavola. Le mie (al centro) con
@@ -308,12 +327,15 @@ const Board = (() => {
   function overlayHTML(slot, d) {
     // Punto al centro del triangolo all'altezza y, spostato di dx
     const c = (y, dx = 0) => [midX(slot, y) + dx, y];
+    // Rombi e torri dei vicini: interi dentro la parte visibile del triangolo
+    const fit = (y, halfPx) => [midX(slot, y, halfPx), y];
+    const base = SHAPES[slot].pts[1][1];  // bordo dritto delle mie Regioni
     switch (slot) {
       case 'c_vanguard':
         return dia(...c(153), d.att) + lbl(...c(176), 'ATT') + dia(...c(203), d.git) + lbl(...c(224), 'GIT') +
-          dots(...c(242), d.species) + title(...c(260), 'Avanscoperta');
+          dots(...c(base), d.species, true) + titleAt(...c(base), 'Avanscoperta', 'base');
       case 'c_village':
-        return title(...c(301), 'Villaggio') +
+        return titleAt(...c(base), 'Villaggio', 'top') +
           tower(...c(327), d.incomplete, false) + lbl(...c(351), 'Incompl.') +
           tower(...c(380), d.complete, true) + lbl(...c(400), 'Compl.');
       case 'c_bastion_left':
@@ -321,8 +343,8 @@ const Board = (() => {
         return wall(...c(369), d.walls) + lbl(...c(390), 'Muri') +
           dia(...c(417, -19), d.dif) + dia(...c(417, 19), d.git) +
           lbl(...c(440, -19), 'DIF') + lbl(...c(440, 19), 'GIT') +
-          dots(...c(457), d.species) +
-          title(...c(475), slot === 'c_bastion_left' ? 'Bastione SX' : 'Bastione DX');
+          dots(...c(base), d.species, true) +
+          titleAt(...c(base), slot === 'c_bastion_left' ? 'Bastione SX' : 'Bastione DX', 'base');
       case 'l_bastion':
       case 'r_bastion':
         return dia(...c(99, -19), d.dif) + dia(...c(99, 19), d.git) +
@@ -331,11 +353,12 @@ const Board = (() => {
       // (ogni etichetta sotto il suo rombo)
       case 'l_village':
       case 'r_village':
-        return tower(...c(200), d.incomplete, false) + tower(...c(236), d.complete, true);
+        return tower(...fit(200, diaPx / 2), d.incomplete, false) + tower(...fit(236, diaPx / 2), d.complete, true);
       case 'l_vanguard':
       case 'r_vanguard': {
-        const [xa] = c(318), [xg] = c(364);
-        return dia(xa, 318, d.att) + lbl(xa, 339, 'ATT') + dia(xg, 364, d.git) + lbl(xg, 385, 'GIT');
+        // Il triangolo punta in giù: la colonna sta in alto, dove è più largo
+        const [xa] = fit(310, diaPx / 2), [xg] = fit(352, diaPx / 2);
+        return dia(xa, 310, d.att) + lbl(xa, 331, 'ATT') + dia(xg, 352, d.git) + lbl(xg, 373, 'GIT');
       }
       default:
         return '';
@@ -379,7 +402,7 @@ const Board = (() => {
   function update(slots, flags = {}) {
     if (!mounted) return;
     last = { slots, flags };
-    visible = measureVisible(liveSvg);
+    measure(liveSvg);
     SLOTS.forEach(k => {
       const s = slots[k] || null;
       const shape = shapes[k];

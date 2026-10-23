@@ -1,7 +1,7 @@
 /**
  * render.js — Rendering dello stato di gioco per il client mobile.
- * Costruisce l'intestazione (turno, mazzo, fasi, le mie risorse), il campo a
- * triangoli (board.js) con i nomi degli avversari e la mano a ventaglio.
+ * Costruisce l'intestazione (turno, mazzo, fasi, cronaca), il campo a
+ * triangoli (board.js) con i nomi degli avversari, le mie risorse e la mano.
  * Negli sheet le carte usano il markup del desktop con le minicarte.
  * I gesti/flussi sono delegati a Mob (app.js).
  */
@@ -54,26 +54,8 @@ const Render = (() => {
     $('tb-phase').classList.toggle('dimmed', dimmed);
   }
 
-  /**
-   * Fasi toccabili: con canAdvance quelle dopo la corrente portano lì (app.js);
-   * la successiva ha l'id per il tutorial e, con ready, pulsa (fase finita).
-   */
-  function phaseControls(phase, canAdvance, ready) {
-    const idx = PHASES.indexOf(phase);
-    document.querySelectorAll('#tb-phase .ph-dot').forEach(dot => {
-      const i = PHASES.indexOf(dot.dataset.ph);
-      const ahead = canAdvance && idx >= 0 && i > idx;
-      dot.disabled = !ahead;
-      dot.classList.toggle('ahead', ahead);
-      const next = ahead && i === idx + 1;
-      if (next) dot.id = 'tb-next-phase';
-      else dot.removeAttribute('id');
-      dot.classList.toggle('ready', next && ready);
-    });
-  }
-
   // ---------------------------------------------------------------------------
-  // Timer: barra sotto l'intestazione
+  // Timer: barra in fondo all'intestazione
   // ---------------------------------------------------------------------------
 
   let _timerTotal = 120;
@@ -333,7 +315,7 @@ const Render = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Le mie risorse (seconda riga dell'intestazione)
+  // Le mie risorse (sotto il campo)
   // ---------------------------------------------------------------------------
 
   let _prevMana = null;
@@ -393,7 +375,7 @@ const Render = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Mano — carte intere a ventaglio, che escono un poco dai lati dello schermo
+  // Mano — riga orizzontale scorrevole, carte identiche al desktop
   // ---------------------------------------------------------------------------
 
   // Carte della mano dell'ultimo ridisegno, per riusarle: ricreare le immagini a
@@ -418,8 +400,11 @@ const Render = (() => {
         node = prev.node;
         node.classList.remove('wall-marked');  // le carte girate le rigira app.js (applyWallFlips)
         node.style.opacity = '';
+        // La fascia della minicarta può cambiare anche se la carta resta (es. Prodigio)
+        const def = Mob.getCardDef(iid);
+        CardArt.update(node, def, CardArt.handInfo(def, iid, me.prodigy_ready));
       } else {
-        node = handCard(iid, ethereal);
+        node = handCard(iid, etherealCard, me.prodigy_ready);
       }
       next.set(iid, { node, ethereal });
       return node;
@@ -429,48 +414,71 @@ const Render = (() => {
     fanHand(nodes);
   }
 
-  // Mano a ventaglio: ogni carta ruota attorno a un punto sotto il proprio fondo e
-  // quelle ai lati scendono un poco, lungo un arco. Rotate/translate stanno in
-  // proprietà CSS separate da transform, che resta libero per :active e
-  // animazioni (motion.js, che legge l'inclinazione per i fantasmi). Le carte si
-  // sovrappongono quanto serve: dai lati dello schermo escono solo gli angoli in
-  // basso, la parte scoperta di ogni carta resta da afferrare anche a metà altezza.
+  // Mano a ventaglio: ogni carta ruota attorno al proprio fondo e quelle ai lati
+  // scendono un poco, lungo un arco. Rotate/translate stanno in proprietà CSS
+  // separate da transform, che resta libero per :active e animazioni (motion.js,
+  // che legge l'inclinazione per i fantasmi). La mano non scorre: se le carte non
+  // ci stanno in larghezza si sovrappongono quanto serve.
   function fanHand(nodes = [...document.querySelectorAll('#hand .card')]) {
     const n = nodes.length;
     if (!n) return;
-    const step = n > 1 ? Math.min(5.2, 26 / (n - 1)) : 0;  // apertura totale massima 26°
-    const cardW = nodes[0].offsetWidth, cardH = nodes[0].offsetHeight;
-    // Ruotando attorno a un punto 0,2 altezze sotto la carta, a 2/3 d'altezza le
-    // carte ai lati si spostano verso l'esterno di tanto: il ventaglio ne rientra
-    const tilt = Math.sin((step * (n - 1) / 2) * Math.PI / 180) * cardH * 0.85;
-    const avail = $('hand').clientWidth - 2 * (tilt + 6);
-    let shown = cardW * 0.6;  // parte di ogni carta non coperta dalla successiva
-    if (n > 1 && cardW + (n - 1) * shown > avail) shown = Math.max(6, (avail - cardW) / (n - 1));
+    const step = n > 1 ? Math.min(4, 14 / (n - 1)) : 0;  // apertura totale massima 14°
+    const cardW = nodes[0].offsetWidth;
+    const avail = $('hand').clientWidth - 24;
+    let shown = cardW * 0.76;  // parte di ogni carta non coperta dalla successiva
+    if (n > 1 && cardW + (n - 1) * shown > avail) shown = Math.max(4, (avail - cardW) / (n - 1));
     nodes.forEach((node, i) => {
       const rot = (i - (n - 1) / 2) * step;
       node.style.setProperty('--fan-rot', `${rot.toFixed(2)}deg`);
-      node.style.setProperty('--fan-y', `${(cardH * rot * rot * 0.0008).toFixed(1)}px`);
+      // Discesa delle carte ai lati: ruotando sul fondo l'angolo esterno sale, va compensato
+      node.style.setProperty('--fan-y', `calc(var(--card-h-hand) * ${(rot * rot * 0.0025).toFixed(4)})`);
       node.style.marginLeft = i ? `${(shown - cardW).toFixed(1)}px` : '';
     });
   }
 
-  // Carta in mano: l'immagine intera della carta stampata; dietro, il dorso,
-  // che si vede quando la carta è girata per diventare un Muro (CardArt.flipWall)
-  function handCard(iid, ethereal) {
+  function handCard(iid, etherealCard, prodigyReady) {
+    const isEthereal = etherealCard === iid;
+    const div = el('div', { className: isEthereal ? 'card hand-card ethereal' : 'card hand-card', dataset: { instanceId: iid } });
+
     const def = Mob.getCardDef(iid);
-    const div = el('div', {
-      className: `card hand-card${ethereal ? ' ethereal' : ''}`,
-      dataset: { instanceId: iid, baseId: def ? def.id : '' },
-    });
     if (def) {
-      div.title = def.name;
-      const img = el('img', { className: 'hc-img', alt: def.name, draggable: 'false' });
-      CardArt.setPreview(img, def.id);
-      div.appendChild(img);
+      div.dataset.type = def.type;
+      div.dataset.baseId = def.id;
+
+      // Badge costo come sulle carte stampate: esagono giallo per il Mana, stella azzurra per le Maghe, bianco per la carta Eterea
+      const badgeCls = isEthereal ? 'ethereal' : (def.cost_type === 'maga' ? 'maga' : 'mana');
+      div.appendChild(el('div', { className: `card-cost-badge ${badgeCls}${def.cost_type === 'maga' ? ' star' : ''}` }, [String(isEthereal ? 0 : def.cost)]));
+
+      div.appendChild(el('div', { className: 'card-name' }, [def.name]));
+
+      if (def.type === 'warrior') {
+        div.appendChild(el('div', {
+          className: `card-species species-${def.species}`
+        }, [`${capitalize(def.species)}${def.school ? ` · ${capitalize(def.school)}` : ''}`]));
+
+        // Caratteristiche in colonna, una sotto l'altra
+        const attrsDiv = el('div', { className: 'card-warrior-attrs' });
+        attrsDiv.appendChild(el('span', { className: 'stat stat-att' }, [`🗡️ ${def.att}`]));
+        attrsDiv.appendChild(el('span', { className: 'stat stat-git' }, [`🏹 ${def.git}`]));
+        attrsDiv.appendChild(el('span', { className: 'stat stat-dif' }, [`🛡️ ${def.dif}`]));
+        div.appendChild(attrsDiv);
+
+      } else if (def.type === 'spell') {
+        div.appendChild(el('div', {
+          className: `card-species school-${def.school}`
+        }, [capitalize(def.school)]));
+
+      } else if (def.type === 'building') {
+        div.appendChild(el('div', { className: 'card-stats hand-cost-row' }, [
+          el('span', { className: 'stat stat-mana' }, [`🏗️${def.completion_cost}`]),
+        ]));
+      }
+      // Minicarta disegnata sopra la versione testuale, che resta nascosta
+      CardArt.attach(div, def, CardArt.handInfo(def, iid, prodigyReady));
     } else {
-      div.appendChild(el('div', { className: 'hc-missing' }, [iid]));
+      div.appendChild(el('div', { className: 'card-name' }, [iid]));
     }
-    div.appendChild(el('img', { className: 'mc-back', alt: '', draggable: 'false', src: '/card_images/preview/retro.webp' }));
+
     div.addEventListener('click', () => Mob.onHandTap(iid));
     return div;
   }
@@ -585,10 +593,10 @@ const Render = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Cronaca: l'ultima voce sotto il campo
+  // Cronaca: l'ultima voce nell'intestazione
   // ---------------------------------------------------------------------------
 
-  /** Mostra sotto il campo l'ultima voce della cronaca (HTML già sicuro, da chronicle.js). */
+  /** Mostra nell'intestazione l'ultima voce della cronaca (HTML già sicuro, da chronicle.js). */
   function ticker(html) {
     const t = $('ticker');
     t.innerHTML = html;
@@ -601,7 +609,6 @@ const Render = (() => {
     game,
     topbar,
     phaseDimmed,
-    phaseControls,
     flashOpponent,
     field,
     statusbar,

@@ -272,17 +272,14 @@ const CardArt = (() => {
    * Scarica in sottofondo le immagini delle minicarte indicate (pergamena e
    * illustrazioni, ~1 MB in tutto), così una carta appena pescata ha già la sua
    * immagine anche mentre vola in mano. Va chiamata entrando in partita. Le
-   * anteprime solo con opts.previews: il client mobile le usa per la mano (carte
-   * intere); sul desktop in partita servono solo come segnaposto della carta piena.
+   * anteprime no: in partita servono solo come segnaposto della carta piena.
    */
   let preloading = false;
-  function preload(baseIds, opts = {}) {
+  function preload(baseIds) {
     if (preloading) return;
     preloading = true;
     const ids = baseIds || [];
-    const queue = [miniUrl('sfondo'), ...ids.map(miniUrl)];
-    if (opts.previews) queue.push(previewUrl('retro'), ...ids.map(previewUrl));
-    for (let i = queue.length - 1; i >= 0; i--) if (loaded.has(queue[i])) queue.splice(i, 1);
+    const queue = [miniUrl('sfondo'), ...ids.map(miniUrl)].filter(u => !loaded.has(u));
     const idle = window.requestIdleCallback || (cb => setTimeout(cb, 200));
     const next = () => {
       const batch = queue.splice(0, 6);

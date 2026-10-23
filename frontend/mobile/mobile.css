@@ -68,9 +68,6 @@
   --card-h-sm: 98px;
   --card-w-hand: 90px;
   --card-h-hand: 118px;
-  /* Carte intere della mano in partita (proporzioni della carta stampata) */
-  --hc-h: clamp(112px, 20dvh, 178px);
-  --hc-w: calc(var(--hc-h) * 0.7154);
 
   --r-lg: 8px;
   --r-md: 6px;
@@ -757,7 +754,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   border-radius: 1.5px;
 }
 
-/* Fasi del turno: toccando una fase successiva ci si passa (app.js, onPhaseTap) */
+/* Fasi del turno */
 .tb-phase {
   flex: 1;
   min-width: 0;
@@ -775,8 +772,6 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   padding: 2px 0;
   border-radius: var(--r-sm);
 }
-.ph-dot:disabled { cursor: default; }
-.ph-dot:disabled:active { transform: none; }
 .ph-dot i {
   width: 13px;
   height: 13px;
@@ -800,17 +795,6 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .ph-dot.on em { color: var(--gold-light); font-weight: 700; }
 .ph-dot.done i { background: #7a5520; border-color: #8a6428; }
 .ph-dot.done em { opacity: 0.6; }
-/* Fasi in cui si può passare: un filo d'oro attorno al pallino */
-.ph-dot.ahead i { border-color: var(--card-gold); }
-.ph-dot.ahead em { color: var(--text-dim); }
-.ph-dot.ahead:active i { background: rgba(255, 208, 66, 0.45); }
-/* Fase finita (Azioni esaurite): la successiva pulsa */
-.ph-dot.ready i { animation: ph-ready 1.6s ease-in-out infinite; }
-.ph-dot.ready em { color: var(--gold-light); }
-@keyframes ph-ready {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 196, 2, 0.7); background: #3b2210; }
-  50%      { box-shadow: 0 0 0 6px rgba(251, 196, 2, 0); background: rgba(255, 208, 66, 0.55); }
-}
 .tb-phase.dimmed { opacity: 0.45; }
 
 .tb-right { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
@@ -833,8 +817,17 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   white-space: nowrap;
 }
 
-/* Seconda riga: le mie Azioni, Vite e Mana */
-.tb-res { justify-content: center; gap: 0; padding: 7px 0 0; }
+/* Sotto il campo: le mie Azioni, Vite e Mana */
+#statusbar {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 8px 0;
+  text-shadow: 0 1px 3px rgba(10, 5, 0, 0.9);
+}
 .st-item {
   display: inline-flex;
   align-items: center;
@@ -1046,7 +1039,14 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .ov-dia b { font-size: max(11px, 3.7cqw); font-weight: 700; color: var(--card-cream); padding-top: 0.08em; }
 .ov-dia.zero b, .ov-wall.zero b { color: #a8875a; }
 .ov-lbl { font-size: max(8px, 2.6cqw); letter-spacing: 0.08em; text-transform: uppercase; }
-.ov-title { font-size: max(9px, 3.3cqw); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+/* Titolo delle mie Regioni: sempre alla stessa distanza (in pixel) dal bordo
+   dritto del triangolo, a ogni misura della tavola; i pallini delle Specie ci
+   poggiano sopra (board.js dà la y del bordo) */
+.ov-slot { --title-size: max(9px, 3.3cqw); --title-gap: 9px; }
+.ov-title { font-size: var(--title-size); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.ov-title.at-base { transform: translate(-50%, calc(-100% - var(--title-gap))); }
+.ov-title.at-top { transform: translate(-50%, var(--title-gap)); }
+.ov-dots.on-title { transform: translate(-50%, calc(-100% - var(--title-gap) - var(--title-size) - 6px)); }
 .ov-wall, .ov-tower { display: grid; place-items: center; }
 .ov-wall { width: max(20px, 7.4cqw); height: max(16px, 5.9cqw); }
 .ov-tower { width: max(18px, 6.4cqw); height: max(20px, 7.1cqw); }
@@ -1077,6 +1077,9 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 /* Tavola piccola (schermi bassi): via le etichette, restano i numeri */
 @container (max-width: 300px) {
   .ov-lbl { display: none; }
+  /* I titoli devono stare nella larghezza del triangolo */
+  .ov-slot { --title-size: 8.5px; }
+  .ov-title { letter-spacing: 0.04em; }
 }
 
 /* ── Gli altri giocatori sopra il campo: nome, Vite, occhio per guardare il
@@ -1142,18 +1145,17 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   60% { color: var(--red-light); transform: translateX(3px); }
 }
 
-/* ── Sotto il campo: l'ultima voce della cronaca e la riga della fase ── */
+/* ── Seconda riga dell'intestazione: l'ultima voce della cronaca ── */
 
 .ticker {
   flex: 0 0 auto;
   position: relative;
-  z-index: 2;
   display: block;
   width: 100%;
-  height: 26px;
-  padding: 0 16px;
-  font-size: 0.98rem;
-  line-height: 26px;
+  height: 34px;
+  padding: 6px 4px 0;
+  font-size: 0.95rem;
+  line-height: 28px;
   color: var(--text);
   text-align: center;
   white-space: nowrap;
@@ -1162,11 +1164,15 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   text-shadow: 0 1px 3px rgba(10, 5, 0, 0.9);
 }
 .ticker:active { transform: none; opacity: 0.8; }
+/* Prima della prima mossa */
+.ticker:empty::before { content: 'Cronaca della partita'; font-style: italic; color: var(--text-faint); }
 .ticker-in { animation: ticker-in 0.35s var(--ease-out); }
 @keyframes ticker-in {
   from { opacity: 0; transform: translateY(-5px); }
   to   { opacity: 1; transform: none; }
 }
+
+/* ── Sotto le risorse: suggerimento e pulsanti della fase ── */
 
 #dock {
   flex: 0 0 auto;
@@ -1175,13 +1181,15 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   min-height: 42px;
   padding: 2px 14px 4px;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 6px 10px;
+  gap: 10px;
 }
+/* Il suggerimento va a capo da sé: i pulsanti restano sulla sua riga */
 .dock-hint, .dock-wait {
-  font-size: 0.98rem;
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 0.9rem;
   font-style: italic;
   line-height: 1.25;
   color: var(--text);
@@ -1461,6 +1469,68 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   margin-top: auto;
 }
 
+.hand-cost-row {
+  font-size: 0.82rem;
+}
+
+/* Guerriero in mano: ATT/GIT/DIF in colonna, una sotto l'altra */
+.card-warrior-attrs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: auto;
+  font-size: 0.68rem;
+}
+
+/* Badge costo: la gemma ottagonale della carta stampata (giallo e arancio, con un bordino
+   marrone), fuori dalla carta in alto a destra. La minicarta non riporta il
+   costo: è solo qui. Il costo in Maghe sta in una stella azzurra (come sulle
+   Magie stampate); bianco = carta eterea (gratis).
+   Il bordo è il fondo della gemma, il colore uno strato interno (::before):
+   con clip-path un border vero verrebbe tagliato. */
+.card-cost-badge {
+  position: absolute;
+  top: -9px;    /* sull'angolo della carta, un po' dentro */
+  right: -7px;
+  min-width: 25px;  /* ottagono regolare: largo quanto alto */
+  height: 25px;
+  padding: 0 5px;
+  clip-path: var(--badge-shape);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Caudex', Georgia, serif;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--hex-ink);
+  background: var(--hex-border);
+  isolation: isolate;
+  z-index: 2;
+}
+.card-cost-badge::before {
+  content: '';
+  position: absolute;
+  inset: 1.5px;
+  z-index: -1;
+  clip-path: var(--badge-shape);
+  background: var(--hex-fill, var(--hex-mana));
+}
+.card-cost-badge { --badge-shape: polygon(29.3% 0, 70.7% 0, 100% 29.3%, 100% 70.7%, 70.7% 100%, 29.3% 100%, 0 70.7%, 0 29.3%); }  /* ottagono, come la gemma della carta */
+/* Stella: più grande della gemma, perché il numero sta nella parte centrale */
+.card-cost-badge.star {
+  --badge-shape: polygon(50% 4%, 65.9% 32.2%, 97.6% 38.5%, 75.7% 62.3%, 79.4% 94.5%, 50% 81%, 20.6% 94.5%, 24.3% 62.3%, 2.4% 38.5%, 34.1% 32.2%);
+  top: -12px;
+  right: -9px;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 4px 0 0;
+}
+.card-cost-badge.star::before { inset: 2px; }
+.card-cost-badge.maga { --hex-fill: var(--hex-maga); }
+/* Eterea: gemma bianca sfumata di grigio, come le altre sono sfumate */
+.card-cost-badge.ethereal { --hex-fill: radial-gradient(closest-side, #b4b4b4 0%, #cfcfcf 55%, #ececec 86%, #ffffff 100%); color: #241608; }
+
 .stat { color: var(--text-dim); }
 .stat-att { color: var(--red-light); }
 .stat-git { color: #aaa; }
@@ -1497,76 +1567,68 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .school-sortilegio { color: var(--blue-light); }
 .school-incantesimo { color: #88bbcc; }
 
-/* ── Mano: carte intere a ventaglio, che toccano il fondo dello schermo e
-   escono un poco dai lati (fanHand in render.js) ── */
-
-/* La carta stampata (anteprima 744×1040); fuori da #hand vale anche per i
-   fantasmi delle animazioni e del trascinamento */
-.card.hand-card {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  border-radius: 6px;
-  box-shadow: 0 2px 9px rgba(0, 0, 0, 0.55);
-}
-.hand-card > .hc-img,
-.hand-card > .mc-back {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: inherit;
-  pointer-events: none;
-  user-select: none;
-  -webkit-user-drag: none;
-}
-/* Girata per diventare un Muro (CardArt.flipWall): si vede il dorso */
-.hand-card > .mc-back { position: absolute; inset: 0; display: none; }
-.hand-card.wall-marked > .mc-back { display: block; }
-/* Eterea: giocabile gratis, bordo bianco luminoso */
-.card.hand-card.ethereal { box-shadow: 0 0 0 2px #fff, 0 0 16px rgba(255, 255, 255, 0.65); }
-.hc-missing { padding: 8px; font-size: 0.7rem; color: var(--text); }
+/* ── Mano: riga orizzontale scorrevole, come il desktop ── */
 
 #hand-wrap {
   flex: 0 0 auto;
   position: relative;
-  z-index: 3;
-  height: calc(var(--hc-h) + 10px);
+  z-index: 3;  /* sopra gli alberi della tavola che sporgono in basso */
 }
 #hand {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 10px;
-  height: var(--hc-h);
   display: flex;
-  justify-content: center;  /* le carte in più escono da entrambi i lati */
+  gap: 0;  /* a ventaglio le carte si sovrappongono (margini negativi da fanHand) */
+  flex-wrap: nowrap;
   align-items: flex-start;
+  justify-content: center;
+  /* La mano non scorre: fanHand sovrappone le carte quanto serve per starci tutte */
+  overflow: hidden;
   touch-action: none;  /* il dito sulla mano sfoglia le carte (bindCardPeek) */
-}
-#hand .hand-card {
-  flex: 0 0 auto;
-  width: var(--hc-w);
-  min-width: 0;
-  height: var(--hc-h);
-  rotate: var(--fan-rot, 0deg);
-  translate: 0 var(--fan-y, 0px);
-  transform-origin: 50% 120%;  /* sotto la carta: le carte ai lati scendono lungo un arco */
-}
-/* Carta sotto il dito mentre si sfoglia la mano (bindCardPeek in app.js) */
-#hand .card.peeked {
-  translate: 0 calc(var(--fan-y, 0px) - 14px);
-  z-index: 10;
-}
-/* Mentre si sfoglia, la carta toccata per prima resta :active per tutto il tocco */
-#hand.peeking .card:active:not(.peeked) { transform: none; }
-#hand .card:active {
-  transform: translateY(-6px);
-  z-index: 10;
+  padding: 24px 12px 0;  /* sopra: badge del costo (la stella sporge di più) anche con la carta sollevata */
+  /* Altezza della mano calcolata su --card-h-hand: le carte sono più grandi e
+     la loro parte bassa esce dal fondo dello schermo (qui viene tagliata). */
+  box-sizing: border-box;
+  height: calc(var(--card-h-hand) + var(--sab) + 40px);
 }
 
+/* Carte in mano con le proporzioni della minicarta (280×400): l'altezza è
+   quella della mano, la larghezza ne deriva. */
+#hand .card {
+  height: var(--card-h-hand);
+  width: auto;
+  min-width: 0;
+  aspect-ratio: 7 / 10;
+  flex: 0 0 auto;
+}
+/* Ventaglio (fanHand in render.js): ogni carta copre il lato destro della
+   precedente, quindi il badge del costo sta a sinistra per restare visibile. */
+#hand .card {
+  height: calc(var(--card-h-hand) * 1.2);
+  rotate: var(--fan-rot, 0deg);
+  translate: 0 var(--fan-y, 0px);
+  transform-origin: 50% 100%;
+}
+/* Classe e non #hand: vale anche per i fantasmi delle animazioni */
+.hand-card .card-cost-badge { right: auto; left: -7px; }
+.hand-card .card-cost-badge.star { left: -9px; }
+#hand .card .card-name { font-size: 0.74rem; }
+#hand .card .card-species { font-size: 0.6rem; }
+/* Carta sotto il dito mentre si sfoglia la mano (bindCardPeek in app.js) */
+#hand .card.peeked {
+  translate: 0 calc(var(--fan-y, 0px) - 10px);
+  z-index: 10;
+  border-color: var(--gold);
+}
+/* Mentre si sfoglia, la carta toccata per prima resta :active per tutto il tocco */
+#hand.peeking .card:active:not(.peeked) { transform: none; border-color: transparent; }
+#hand .card:active {
+  transform: translateY(-4px);
+  z-index: 10;
+  border-color: var(--gold);
+}
+#hand .card.wall-marked:active { border-color: #8a6a20; }
+
 /* Carta non giocabile ora (Azioni esaurite) */
-#hand .card.unplayable { opacity: 0.45; filter: grayscale(0.6) brightness(0.8); }
+#hand .card.unplayable { opacity: 0.4; filter: grayscale(0.6); }
 
 .hand-empty {
   width: 100%;
@@ -1796,6 +1858,8 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   pointer-events: none;
 }
 .card.has-art.wall-marked > .mc-back { display: block; }
+.card.wall-marked .card-cost-badge,
+.card.flipping .card-cost-badge { visibility: hidden; }
 
 /* Transizioni delle carte (motion.js): i "fantasmi" volano sopra l'interfaccia */
 .motion-layer {
@@ -2982,10 +3046,10 @@ button.menu-frame:active {
 .card-peek {
   position: fixed;
   left: 50%;
-  /* Appena sopra la mano, un po' sotto il dito */
-  bottom: calc(var(--hc-h) + 16px);
+  /* Appena sopra la mano (stessa altezza di #hand), un po' sotto il dito */
+  bottom: calc(var(--card-h-hand) + var(--sab) + 40px - 10px);
   translate: -50% 0;
-  width: min(74vw, 290px, calc((100dvh - var(--hc-h) - 120px) * 744 / 1040));
+  width: min(74vw, 290px, calc((100vh - var(--card-h-hand) - var(--sab) - 40px) * 744 / 1040));
   height: auto;
   z-index: 300;
   border-radius: 12px;
