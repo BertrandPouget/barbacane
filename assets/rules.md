@@ -11,7 +11,7 @@ In dotazione troverete anche un D10, che svolge due funzioni: tiene traccia del 
 
 Durante la partita pescherete e giocherete varie carte. Sulla base della posizione e dell’orientamento di tali carte si andrà a formare pian piano il campo da gioco. L’obiettivo sarà quindi quello di creare Bastioni e Guerrieri in grado di difendere il vostro nucleo e allo stesso tempo distruggere quello degli altri.
 
-Il vostro nucleo ha originariamente tre Vite, esse possono aumentare e ovviamente diminuire. Quando un giocatore perde la sua terza vita, viene eliminato. Come potete immaginare, vince l’ultimo a restare in vita.
+Il vostro nucleo ha originariamente tre Vite, esse possono aumentare e ovviamente diminuire. Quando un giocatore perde la sua terza vita, viene eliminato: tutte le sue carte, in mano e in campo, finiscono negli scarti. Come potete immaginare, vince l’ultimo a restare in vita.
 
 Nelle prossime sezioni entreremo più nel dettaglio sulle singole regole del gioco, su come si struttura un turno e come posizionare le vostre carte per formare il miglior campo da gioco possibile.
 

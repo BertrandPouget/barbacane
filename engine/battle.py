@@ -287,6 +287,47 @@ def calculate_damage(
 # Applicazione danni al Bastione
 # ---------------------------------------------------------------------------
 
+def release_player_cards(state: GameState, player: Player) -> None:
+    """
+    Giocatore eliminato (Vite finite o abbandono): tutte le sue carte (mano,
+    Vite, campo) vanno negli scarti, così il mazzo comune non si impoverisce
+    quando gli scarti vengono rimescolati. Effetti e interazioni in sospeso
+    che lo riguardano non hanno più senso.
+    """
+    cards: List[str] = list(player.hand) + list(player.life_cards)
+    for w in player.all_warriors():
+        cards.append(w.instance_id)
+        if w.evolved_from:
+            cards.append(w.evolved_from)
+        cards += w.assigned_cards
+    for bastion in (player.field.bastion_left, player.field.bastion_right):
+        cards += [wall.instance_id for wall in bastion.walls]
+    cards += [b.instance_id for b in player.field.village.buildings]
+    # Il Trono sta sia nel Villaggio sia tra le carte assegnate al Guerriero
+    state.discard_pile.extend(dict.fromkeys(cards))
+
+    player.hand = []
+    player.life_cards = []
+    player.field.vanguard = []
+    for bastion in (player.field.bastion_left, player.field.bastion_right):
+        bastion.walls = []
+        bastion.warriors = []
+    player.field.village.buildings = []
+
+    player.active_effects = []
+    player.ethereal_card = None
+    player.ethereal_complete = None
+    player.pending_velocemento_buildings = []
+    player.pending_velocemento_prodigy = False
+
+    if state.pending_search and state.pending_search.get("player_id") == player.id:
+        random.shuffle(state.deck)
+        state.pending_search = None
+    state.pending_interactions = [
+        i for i in state.pending_interactions if i.get("player_id") != player.id
+    ]
+
+
 def apply_damage_to_bastion(
     state: GameState,
     defender: Player,
@@ -296,7 +337,8 @@ def apply_damage_to_bastion(
     """
     Applica `total_damage` Danni al Bastione.
     - Rimuove Muri finché il danno è assorbito (ogni Muro assorbe durability danni).
-    - Se i Muri non bastano → il difensore perde 1 Vita.
+    - Se i Muri non bastano → il difensore perde 1 Vita; se era l'ultima, le sue
+      carte vanno negli scarti (release_player_cards).
 
     Ritorna un dict con i dettagli: walls_destroyed, life_lost.
     """
@@ -331,6 +373,11 @@ def apply_damage_to_bastion(
         lost_card = defender.life_cards.pop(0)
         state.discard_pile.append(lost_card)
         life_lost = 1
+        # Ultima Vita (Battaglia o Incendifesa): eliminato, le sue carte tornano
+        # in gioco. In Battaglia succede prima dell'Orda di Eracle, che così non
+        # trova Costruzioni da distruggere
+        if not defender.is_alive:
+            release_player_cards(state, defender)
 
     return {"walls_destroyed": walls_destroyed, "life_lost": life_lost}
 
