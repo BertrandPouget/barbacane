@@ -692,7 +692,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 /* ═══════════════════════ GIOCO ═══════════════════════ */
 
 /* La partita si gioca sullo sfondo dell'app: il campo (board.js) ci disegna
-   sopra le mie Regioni e quelle dei vicini, tra gli alberi. */
+   sopra le mie Regioni e quelle dei vicini. */
 #scr-game.active {
   height: 100%;
   overflow: hidden;
@@ -996,10 +996,6 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   to   { opacity: 1; transform: none; }
 }
 
-/* Alberi (sopra le Regioni) */
-.ba-tree-shadows { fill: rgba(8, 4, 0, 0.42); }
-.ba-crown { fill: #22301a; }
-.ba-light { fill: #31452a; opacity: 0.8; }
 .ba-regions path { stroke: rgba(30, 14, 4, 0.55); stroke-width: 1.2; }
 /* Le Regioni del giocatore al centro: alone caldo attorno e bordo d'oro, tenui */
 .ba-glow { fill: rgba(255, 196, 96, 0.22); }
@@ -1154,7 +1150,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   font-size: 15px;
   line-height: 1.2;
   color: var(--text);
-  /* Contorno marrone: si legge sullo sfondo dell'app e sugli alberi */
+  /* Contorno marrone: si legge sullo sfondo dell'app e sulle Regioni */
   text-shadow:
     -1px -1px 0 #3a1f08, 1px -1px 0 #3a1f08, -1px 1px 0 #3a1f08, 1px 1px 0 #3a1f08,
     0 -1px 0 #3a1f08, 0 1px 0 #3a1f08, -1px 0 0 #3a1f08, 1px 0 0 #3a1f08;
@@ -1627,7 +1623,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 #hand-wrap {
   flex: 0 0 auto;
   position: relative;
-  z-index: 3;  /* sopra gli alberi della tavola che sporgono in basso */
+  z-index: 3;  /* sopra la tavola, che sporge in basso */
 }
 #hand {
   display: flex;

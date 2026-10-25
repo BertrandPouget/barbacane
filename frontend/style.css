@@ -785,19 +785,6 @@ input:focus {
   min-height: 0;
 }
 
-/* Alberi (renderer.js → _plantTrees): colori di quelli del campo mobile. Senza
-   z-index: le carte, posizionate e dopo nel documento, gli passano sopra */
-#table-trees {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-.ba-tree-shadows { fill: rgba(8, 4, 0, 0.42); }
-.ba-crown { fill: #22301a; }
-.ba-light { fill: #31452a; opacity: 0.8; }
-
 /* Giocatore di fronte (2p: unico avversario; 4p: across player) */
 #top-opponents {
   flex-shrink: 0;

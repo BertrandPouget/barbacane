@@ -30,7 +30,6 @@ const Renderer = (() => {
     if (myPlayer) renderMyField(myPlayer, state, myPlayerId);
     updateActionPanel(state, myPlayerId);
     fitCards(state, myPlayerId);
-    scheduleTrees();
   }
 
   // ---------------------------------------------------------------------------
@@ -127,7 +126,6 @@ const Renderer = (() => {
     column.classList.remove('fitting');
     _panelHeight = _measurePanel();
     fanHand();
-    scheduleTrees();
   }
 
   // Il pannello azioni si riempie dopo il primo disegno (app.js) e può andare
@@ -152,97 +150,6 @@ const Renderer = (() => {
   // Il font delle carte cambia le misure: si ricalcola quando è caricato
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(() => { if (_lastState) fitCards(_lastState, _myPlayerId, true); });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Alberi, con la regola del campo mobile (mobile/board.js → plantTrees):
-  // candidati sparsi a caso su tutto il tavolo, tenuti se non cadono su carte,
-  // scritte e pannelli (le Regioni, tranne i Villaggi, appena sfiorate). In più
-  // una distanza minima tra due alberi: dove il posto libero è tanto non si
-  // fanno boschetti. Seme fisso: uno spostamento piccolo cambia solo gli alberi
-  // lì vicino. Il livello sta prima del resto del tavolo: le carte (posizionate)
-  // gli passano sopra, gli sfondi delle Regioni sotto.
-  // ---------------------------------------------------------------------------
-
-  const TREE_DENSITY = 0.00004;  // alberi per px² di tavolo, prima delle esclusioni
-  const TREE_SPACING = 70;       // px minimi tra i centri di due alberi
-  const TREE_GAP = 5;            // px liberi attorno a carte e scritte
-  // Le Regioni si possono appena sfiorare (i Villaggi no, tranne i tasselli
-  // sbiaditi: l'opacity li porta sopra gli alberi)...
-  const TREE_SOFT = '#my-field .region:not(.village), .opp-tile:not([data-zone="village"]), .opp-tile.nonadj';
-  // ...carte, scritte e pannelli no
-  const TREE_HARD = [
-    '#game-table .card', '.opp-head > *', '.opp-tile-title', '.opp-tile .rg-stat', '.opp-tile .ov-dots',
-    '.rg-recap-item', '#action-panel', '#my-life-deck', '#my-active-cards',
-  ].join(', ');
-  let _treeSig = '', _treeFrame = 0;
-  // Il mio campo e le file di carte scorrono: le carte si spostano rispetto agli alberi
-  document.getElementById('my-field')?.addEventListener('scroll', () => scheduleTrees(), { capture: true, passive: true });
-
-  function scheduleTrees() {
-    cancelAnimationFrame(_treeFrame);
-    _treeFrame = requestAnimationFrame(_plantTrees);
-  }
-
-  function _plantTrees() {
-    const svg = document.getElementById('table-trees');
-    const r = svg && svg.getBoundingClientRect();
-    if (!r || !r.width || !r.height) return;
-    const box = (b, g) => [b.left - r.left - g, b.top - r.top - g, b.right - r.left + g, b.bottom - r.top + g];
-    const boxes = (sel, g) => Array.from(document.querySelectorAll(sel), e => e.getBoundingClientRect())
-      .filter(b => b.width && b.height).map(b => box(b, g));
-    const soft = boxes(TREE_SOFT, 0);
-    const hard = boxes(TREE_HARD, TREE_GAP);
-    // Nomi delle mie Regioni (::before, non si misurano): la fascia sopra le carte
-    document.querySelectorAll('#my-field .region').forEach(reg => {
-      const b = reg.getBoundingClientRect(), row = reg.firstElementChild;
-      if (b.width && row) hard.push(box({ left: b.left, right: b.right, top: b.top, bottom: row.getBoundingClientRect().top }, TREE_GAP));
-    });
-    // Righe della cronaca: solo il testo (le righe sono larghe quanto la barra)
-    document.querySelectorAll('#battle-log > *').forEach(line => {
-      const range = document.createRange();
-      range.selectNodeContents(line);
-      const b = range.getBoundingClientRect();
-      if (b.width) hard.push(box(b, TREE_GAP));
-    });
-
-    const sig = [r.width, r.height, ...soft.flat(), ...hard.flat()].map(Math.round).join(',');
-    if (sig === _treeSig) return;
-    _treeSig = sig;
-
-    const W = Math.round(r.width), H = Math.round(r.height);
-    const rand = _rng(20251022);
-    const want = Math.round(W * H * TREE_DENSITY);
-    const trees = [];
-    const dist = ([a, b, c, d], x, y) => Math.hypot(Math.max(a - x, 0, x - c), Math.max(b - y, 0, y - d));
-    const clear = (x, y, rr) =>
-      hard.every(b => dist(b, x, y) >= rr) &&
-      soft.every(b => dist(b, x, y) >= rr * 0.55) &&
-      trees.every(([a, b]) => Math.hypot(x - a, y - b) >= TREE_SPACING);
-    for (let i = 0; i < want * 4 && trees.length < want; i++) {
-      const x = rand() * W, y = rand() * H, rr = 7 + rand() * 4.5;
-      if (x >= rr && x <= W - rr && y >= rr && y <= H - rr && clear(x, y, rr)) trees.push([x, y, rr]);
-    }
-    trees.sort((a, b) => a[1] - b[1]);  // quelli più in basso sopra gli altri
-    const f1 = n => (Math.round(n * 10) / 10).toString();
-    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    svg.innerHTML =
-      '<g class="ba-tree-shadows">' + trees.map(([x, y, rr]) =>
-        `<ellipse cx="${f1(x + 2)}" cy="${f1(y + 3)}" rx="${f1(rr * 1.05)}" ry="${f1(rr * 0.92)}"/>`).join('') +
-      '</g><g class="ba-trees">' + trees.map(([x, y, rr]) =>
-        `<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(rr)}" class="ba-crown"/>` +
-        `<circle cx="${f1(x - rr * 0.3)}" cy="${f1(y - rr * 0.32)}" r="${f1(rr * 0.48)}" class="ba-light"/>`).join('') +
-      '</g>';
-  }
-
-  // Numeri pseudocasuali ripetibili (come board.js): gli alberi sono sempre gli stessi
-  function _rng(seed) {
-    return () => {
-      seed = (seed + 0x6D2B79F5) | 0;
-      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
   }
 
   // ---------------------------------------------------------------------------

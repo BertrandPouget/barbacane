@@ -16,7 +16,6 @@
  * - #board-art: Regioni dipinte. Non cambia mai e si costruisce una volta
  *   sola: i filtri SVG che danno la grana costano, non vanno ricalcolati a
  *   ogni aggiornamento;
- * - #board-trees: gli alberi, ripiantati quando le scritte cambiano posto;
  * - #board-live: le sagome toccabili (zone in cui trascinare le carte,
  *   evidenziazioni, con gli id usati dal tutorial) e i Muri di pietra;
  * - #board-ov: i numeri di ogni Regione, in HTML posizionato in percentuale.
@@ -207,7 +206,7 @@ const Board = (() => {
     return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy);
   }
 
-  // Numeri pseudocasuali ripetibili: alberi e pietre sono sempre gli stessi
+  // Numeri pseudocasuali ripetibili: le pietre sono sempre le stesse
   function rng(seed) {
     return () => {
       seed = (seed + 0x6D2B79F5) | 0;
@@ -218,7 +217,7 @@ const Board = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Disegno fisso: terreno, alberi, Regioni dipinte
+  // Disegno fisso: terreno, Regioni dipinte
   // ---------------------------------------------------------------------------
 
   function artMarkup() {
@@ -255,75 +254,6 @@ const Board = (() => {
       <g class="ba-glow" filter="url(#ba-blur)">${glow}</g>
       <g class="ba-regions" filter="url(#ba-paint)">${regions}</g>
     </svg>`;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Alberi
-  // ---------------------------------------------------------------------------
-
-  // Sparsi a caso su tutto il campo: sul terreno e nei Villaggi, appena sopra il
-  // bordo delle altre Regioni, mai sui Muri né vicino alle scritte (numeri,
-  // nomi degli avversari, intestazione). Le scritte si spostano con lo schermo,
-  // quindi gli alberi si ripiantano dopo ogni aggiornamento in cui cambiano
-  // posto. I candidati hanno sempre lo stesso ordine (seme fisso): uno
-  // spostamento piccolo cambia solo gli alberi lì vicino. Su un SVG a parte,
-  // per non ricalcolare i filtri delle Regioni.
-  const TREE_DENSITY = 0.00026;  // alberi per unità² di campo, prima delle esclusioni
-  const TEXT_GAP = 4;            // unità libere attorno ai numeri delle Regioni
-  const TOP_GAP = 30;            // px liberi sotto l'intestazione e attorno ai nomi
-  let treesSvg = null, treeSig = '', treeFrame = 0;
-
-  function scheduleTrees() {
-    cancelAnimationFrame(treeFrame);
-    treeFrame = requestAnimationFrame(plantTrees);
-  }
-
-  function plantTrees() {
-    const r = treesSvg.getBoundingClientRect();
-    const field = treesSvg.closest('#field'), top = document.getElementById('topbar');
-    if (!r.width || !field) return;
-    const k = W / r.width;  // unità di tavola in un pixel
-    const toU = (b, g) => [(b.left - r.left) * k - g, (b.top - r.top) * k - g,
-                           (b.right - r.left) * k + g, (b.bottom - r.top) * k + g];
-    const f = field.getBoundingClientRect();
-    const [x0, , x1, y1] = toU(f, 0);
-    const y0 = ((top ? top.getBoundingClientRect().bottom : f.top) - r.top) * k + TOP_GAP * k;
-    const boxes = [];
-    const add = (sel, g) => treesSvg.parentNode.querySelectorAll(sel).forEach(el => {
-      const b = el.getBoundingClientRect();
-      if (b.width && b.height) boxes.push(toU(b, g));
-    });
-    add('#board-ov .ov', TEXT_GAP);
-    add('#opp-rail .opp-label', TOP_GAP * k);
-
-    const sig = [x0, y0, x1, y1, ...boxes.flat()].map(Math.round).join(',');
-    if (sig === treeSig) return;
-    treeSig = sig;
-
-    const rand = rng(20251022);
-    const want = Math.round((x1 - x0) * (y1 - y0) * TREE_DENSITY);
-    const trees = [];
-    const clear = (x, y, rr) =>
-      // niente scritte sotto la chioma
-      boxes.every(([a, b, c, d]) => Math.hypot(Math.max(a - x, 0, x - c), Math.max(b - y, 0, y - d)) >= rr) &&
-      // le Regioni (tranne i Villaggi) appena sfiorate
-      SLOTS.every(s => SHAPES[s].region === 'village' || distance(SHAPES[s].pts, x, y) >= rr * 0.55) &&
-      // lontano dalle pietre dei Muri
-      Object.values(WALL_EDGES).every(e => segDistance(e.from, e.to, x, y) >= rr + 20) &&
-      // due chiome possono toccarsi, non entrare una nell'altra
-      trees.every(([a, b, s]) => Math.hypot(x - a, y - b) >= rr + s);
-    for (let i = 0; i < want * 4 && trees.length < want; i++) {
-      const x = x0 + rand() * (x1 - x0), y = y0 + rand() * (y1 - y0), rr = 5.2 + rand() * 3.6;
-      if (clear(x, y, rr)) trees.push([x, y, rr]);
-    }
-    trees.sort((a, b) => a[1] - b[1]);  // quelli più in basso sopra gli altri
-    treesSvg.innerHTML =
-      '<g class="ba-tree-shadows">' + trees.map(([x, y, rr]) =>
-        `<ellipse cx="${f1(x + 1.6)}" cy="${f1(y + 2.4)}" rx="${f1(rr * 1.05)}" ry="${f1(rr * 0.92)}"/>`).join('') +
-      '</g><g class="ba-trees">' + trees.map(([x, y, rr]) =>
-        `<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(rr)}" class="ba-crown"/>` +
-        `<circle cx="${f1(x - rr * 0.3)}" cy="${f1(y - rr * 0.32)}" r="${f1(rr * 0.48)}" class="ba-light"/>`).join('') +
-      '</g>';
   }
 
   // ---------------------------------------------------------------------------
@@ -462,11 +392,7 @@ const Board = (() => {
     if (mounted) return;
     mounted = true;
     const ov = SLOTS.map(k => `<div class="ov-slot" data-slot="${k}"></div>`).join('');
-    const treesMarkup = `<svg id="board-trees" viewBox="0 0 ${W} ${H}" aria-hidden="true" focusable="false"></svg>`;
-    boardEl.insertAdjacentHTML('afterbegin', artMarkup() + treesMarkup + liveMarkup() + `<div id="board-ov">${ov}</div>`);
-    treesSvg = boardEl.querySelector('#board-trees');
-    // Le scritte cambiano misura quando arriva il font
-    if (document.fonts) document.fonts.ready.then(() => { treeSig = ''; scheduleTrees(); });
+    boardEl.insertAdjacentHTML('afterbegin', artMarkup() + liveMarkup() + `<div id="board-ov">${ov}</div>`);
     SLOTS.forEach(k => {
       shapes[k] = boardEl.querySelector(`.rg-shape[data-slot="${k}"]`);
       overlays[k] = boardEl.querySelector(`.ov-slot[data-slot="${k}"]`);
@@ -491,7 +417,6 @@ const Board = (() => {
     if (!mounted) return;
     last = { slots, flags };
     measure(liveSvg);
-    scheduleTrees();  // dopo i nomi degli avversari (render.js li disegna subito dopo)
     SLOTS.forEach(k => {
       const s = slots[k] || null;
       const shape = shapes[k];

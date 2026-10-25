@@ -16,7 +16,7 @@ Scopo: evitare che un Claude futuro **sbagli** o perda molto tempo. Non è docum
 
 ## Stato e convenzioni
 
-- Gioco **completo e in produzione** (tutte le carte di `data/cards.json` implementate). Deploy automatico da GitHub su Render free tier + Postgres Neon: https://barbacane-online.onrender.com (`render.yaml`). Lavoro corrente: rifinitura e nuova interfaccia di partita (campo a triangoli, branch `feature/revamp_UI`). Il desktop tiene le Regioni rettangolari ma ne riprende colori, pittura, simboli e alberi.
+- Gioco **completo e in produzione** (tutte le carte di `data/cards.json` implementate). Deploy automatico da GitHub su Render free tier + Postgres Neon: https://barbacane-online.onrender.com (`render.yaml`). Lavoro corrente: rifinitura e nuova interfaccia di partita (campo a triangoli, branch `feature/revamp_UI`). Il desktop tiene le Regioni rettangolari ma ne riprende colori, pittura e simboli.
 - **Voci della home** (identiche su desktop e mobile, da usare nei testi per gli utenti): **Gioca** (Crea/Unisciti lobby, Bot compresi), **Tutorial**, **Catalogo**.
 - **Lingua**: commenti e messaggi al giocatore in italiano; rispondere all'utente in italiano.
 - **Python**: conda, ambiente `barbacane`. Avvio: `python main.py` → `http://localhost:8000` (desktop), `/m` (mobile; `?desktop=1` forza il desktop).
@@ -118,5 +118,5 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 - **Tavolo desktop**: la dimensione delle carte la calcola `fitCards()` (`renderer.js`); con altezza ≤ 1000px alcune zone hanno `zoom`, quindi si misurano con `getBoundingClientRect`.
 - **Sheet mobile** di sola consultazione: passare `refresh` a `Sheet.open`, altrimenti si chiude al cambio turno.
 - **Campo mobile** (`board.js`): Regioni come sagome SVG in unità di tavola (geometria fissa in `SHAPES`, disegno costruito una volta sola). Gli id delle sagome (`fld-vanguard`, `tw-*`, `opp-b*`) li usano il tutorial (`_MOBILE_HIGHLIGHT_MAP`), le transizioni (`MOTION_TILES`) e il trascinamento (`Board.contains`): rinominarli ovunque. Il campo può mostrare un altro giocatore (occhio, `viewId` in `app.js`): mano e azioni restano sempre mie.
-- **Regioni dipinte sul desktop**: palette copiata da `PALETTE` di `board.js` in `--rg-*` di `style.css`, simboli `.ov-*` copiati da `mobile.css`. Gli alberi (`#table-trees`, `_plantTrees` in `renderer.js`) stanno sopra gli sfondi non posizionati: `position`/`filter`/`opacity` su un Villaggio lo porterebbero sopra i suoi alberi.
+- **Regioni dipinte sul desktop**: palette copiata da `PALETTE` di `board.js` in `--rg-*` di `style.css`, simboli `.ov-*` copiati da `mobile.css`.
 - `game.py` contiene ancora un bot casuale (`random_bot_turn`) per `simulate_game`: non è il Bot delle partite reali.
