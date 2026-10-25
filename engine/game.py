@@ -26,7 +26,9 @@ from engine.models import (
 from engine.cards import CARD_REGISTRY, get_card, WarriorCard, SpellCard, BuildingCard
 from engine.deck import build_deck, draw_cards, get_base_card_id
 from engine.effects import apply_effect
-from engine.battle import resolve_battle, get_valid_attack_targets, battle_building_bonus, fossato_block_message
+from engine.battle import (
+    resolve_battle, get_valid_attack_targets, battle_building_bonus, fossato_block_message, release_player_cards,
+)
 from engine.actions import (
     ActionError,
     play_warrior,
@@ -513,40 +515,9 @@ def abandon_game(state: GameState, player_id: str) -> dict:
 
     was_current = state.current_player.id == player_id
 
-    # Tutte le carte del giocatore tornano nella pila degli scarti,
-    # così il mazzo comune non si impoverisce quando gli scarti vengono rimescolati.
-    discarded: List[str] = []
-    discarded += player.hand
-    player.hand = []
-    discarded += player.life_cards
-    player.life_cards = []
-    for w in player.all_warriors():
-        discarded.append(w.instance_id)
-        if w.evolved_from:
-            discarded.append(w.evolved_from)
-        discarded += w.assigned_cards
-    player.field.vanguard = []
-    for bastion in (player.field.bastion_left, player.field.bastion_right):
-        discarded += [wall.instance_id for wall in bastion.walls]
-        bastion.walls = []
-        bastion.warriors = []
-    discarded += [b.instance_id for b in player.field.village.buildings]
-    player.field.village.buildings = []
-    state.discard_pile.extend(discarded)
-
-    player.active_effects = []
-    player.ethereal_card = None
-    player.ethereal_complete = None
-    player.pending_velocemento_buildings = []
-    player.pending_velocemento_prodigy = False
-
-    # Interazioni in sospeso di chi abbandona non hanno più senso
-    if state.pending_search and state.pending_search.get("player_id") == player_id:
-        random.shuffle(state.deck)
-        state.pending_search = None
-    state.pending_interactions = [
-        i for i in state.pending_interactions if i.get("player_id") != player_id
-    ]
+    # Tutte le carte del giocatore tornano negli scarti, come per chi perde
+    # l'ultima Vita in Battaglia
+    release_player_cards(state, player)
 
     state.recent_events.append({"type": "abandon", "player_id": player_id})
     state.add_log(player_id, "abandon")
