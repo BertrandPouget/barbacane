@@ -3339,18 +3339,46 @@ const App = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Click bastione
+  // Click su una mia Regione (fuori dalle carte): il suo riepilogo, come le
+  // schede del mobile e i tasselli degli avversari
   // ---------------------------------------------------------------------------
 
   function bindBastionClickHandlers() {
-    ['my-bastion-left', 'my-bastion-right'].forEach(id => {
+    const open = {
+      'my-bastion-left':  () => showBastionContents('left'),
+      'my-bastion-right': () => showBastionContents('right'),
+      'my-vanguard':      showVanguardContents,
+      'my-village':       showVillageContents,
+    };
+    Object.entries(open).forEach(([id, fn]) => {
       const region = document.getElementById(id);
       if (!region) return;
       region.addEventListener('click', (e) => {
         if (e.target.closest('.card') || e.target.closest('.wall-card')) return;
-        showBastionContents(id === 'my-bastion-left' ? 'left' : 'right');
+        fn();
       });
     });
+  }
+
+  // Come la scheda del mobile (openVanguardSheet)
+  function showVanguardContents() {
+    const myPlayer = currentState && currentState.players.find(p => p.id === myPlayerId);
+    if (!myPlayer) return;
+    const warriors = myPlayer.field.vanguard || [];
+    Renderer.showRegionSheet('Avanscoperta', `${warriors.length} Guerrieri`,
+      warriors.map(w => Renderer.renderWarriorCard(w, true, true)),
+      'Nessun Guerriero in Avanscoperta. Senza di loro non puoi attaccare in Battaglia.');
+  }
+
+  // Come la scheda del mobile (openVillageSheet): le Costruzioni assegnate a un
+  // Guerriero (es. Trono) sono mostrate sul Guerriero, non qui
+  function showVillageContents() {
+    const myPlayer = currentState && currentState.players.find(p => p.id === myPlayerId);
+    if (!myPlayer) return;
+    const buildings = (myPlayer.field.village.buildings || []).filter(b => !b.assigned_warrior);
+    Renderer.showRegionSheet('Villaggio', `${buildings.length} Costruzioni`,
+      buildings.map(b => Renderer.renderBuildingCard(b, true, myPlayer.ethereal_complete || null)),
+      'Nessuna Costruzione nel Villaggio. Giocale dalla mano nella fase Azioni.');
   }
 
   function showBastionContents(side) {
@@ -3358,74 +3386,18 @@ const App = (() => {
     const myPlayer = currentState.players.find(p => p.id === myPlayerId);
     if (!myPlayer) return;
 
+    // Come la scheda del mobile (openBastionSheet): la pila dei Muri (clic per
+    // guardarli uno a uno) e i Guerrieri in minicarta
     const sideName = side === 'left' ? 'Sinistro' : 'Destro';
     const bastion = side === 'left' ? myPlayer.field.bastion_left : myPlayer.field.bastion_right;
     const walls = bastion.walls || [];
     const warriors = bastion.warriors || [];
-
-    const body = document.getElementById('modal-body');
-    body.innerHTML = '';
-
-    if (walls.length === 0 && warriors.length === 0) {
-      body.innerHTML = '<p style="color:var(--text-dim);font-style:italic;font-size:0.9rem">Bastione vuoto.</p>';
-    } else {
-      if (walls.length > 0) {
-        const wallHeader = document.createElement('p');
-        wallHeader.className = 'search-summary';
-        wallHeader.textContent = `${walls.length} ${walls.length === 1 ? 'Muro' : 'Muri'}`;
-        body.appendChild(wallHeader);
-
-        const wallList = document.createElement('div');
-        wallList.className = 'search-deck-list';
-        walls.forEach(iid => {
-          const def = getCardDef(iid);
-          const name = def ? def.name : iid;
-          const typeLabel = def
-            ? (def.type === 'warrior' ? 'Guerriero' : def.type === 'spell' ? 'Magia' : 'Costruzione')
-            : 'Carta';
-          const div = document.createElement('div');
-          div.className = 'search-deck-card search-match';
-          div.innerHTML = `<span class="search-card-name">${name}</span><span class="search-card-type">${typeLabel}</span>`;
-          div.addEventListener('click', () => {
-            document.getElementById('modal-overlay').classList.add('hidden');
-            showCardDetail(iid, 'wall');
-          });
-          wallList.appendChild(div);
-        });
-        body.appendChild(wallList);
-      }
-
-      if (warriors.length > 0) {
-        const warriorHeader = document.createElement('p');
-        warriorHeader.className = 'search-summary';
-        if (walls.length > 0) warriorHeader.style.marginTop = '0.7rem';
-        warriorHeader.textContent = `${warriors.length} ${warriors.length === 1 ? 'Guerriero' : 'Guerrieri'}`;
-        body.appendChild(warriorHeader);
-
-        const warriorList = document.createElement('div');
-        warriorList.className = 'search-deck-list';
-        warriors.forEach(w => {
-          const div = document.createElement('div');
-          div.className = 'search-deck-card search-match';
-          div.innerHTML = `<span class="search-card-name">${w.name || w.base_card_id}</span>` +
-            `<span class="search-card-type">🗡️${w.att} 🏹${w.git} 🛡️${w.dif}</span>`;
-          div.addEventListener('click', () => {
-            document.getElementById('modal-overlay').classList.add('hidden');
-            showCardDetail(w.instance_id, 'field');
-          });
-          warriorList.appendChild(div);
-        });
-        body.appendChild(warriorList);
-      }
-    }
-
-    document.getElementById('modal-title').textContent = `Bastione ${sideName}`;
-    document.getElementById('modal-confirm').classList.add('hidden');
-    const cancelBtn = document.getElementById('modal-cancel');
-    cancelBtn.classList.remove('hidden');
-    cancelBtn.textContent = 'Chiudi';
-    cancelBtn.onclick = () => document.getElementById('modal-overlay').classList.add('hidden');
-    document.getElementById('modal-overlay').classList.remove('hidden');
+    const cards = [
+      ...(walls.length ? [Renderer.renderWallStack(walls, side, true)] : []),
+      ...warriors.map(w => Renderer.renderWarriorCard(w, true, true)),
+    ];
+    Renderer.showRegionSheet(`Bastione ${sideName}`, `${walls.length} Muri · ${warriors.length} Guerrieri`,
+      cards, 'Bastione vuoto. Aggiungi Muri o schiera Guerrieri qui.');
   }
 
   function showActiveSlideshow(items, idx) {

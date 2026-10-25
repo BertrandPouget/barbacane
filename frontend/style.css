@@ -43,17 +43,16 @@
 
   /* Regioni dipinte come il campo del client mobile (PALETTE in mobile/board.js):
      centro e bordo della sfumatura; le mie più accese, quelle degli avversari più cupe */
-  --rg-vanguard:     #c66a3e;  --rg-vanguard-edge:     #94432a;
+  --rg-vanguard:     #a33a22;  --rg-vanguard-edge:     #742316;
   --rg-bastion:      #c3a279;  --rg-bastion-edge:      #937350;
-  --rg-village:      #5f9035;  --rg-village-edge:      #446826;
-  --rg-opp-vanguard: #8b3b2b;  --rg-opp-vanguard-edge: #64281c;
+  --rg-village:      #3f6339;  --rg-village-edge:      #2a462a;
+  --rg-opp-vanguard: #64221a;  --rg-opp-vanguard-edge: #451610;
   --rg-opp-bastion:  #6a5545;  --rg-opp-bastion-edge:  #4c3b2f;
-  --rg-opp-village:  #5c7432;  --rg-opp-village-edge:  #3e5224;
+  --rg-opp-village:  #2e442c;  --rg-opp-village-edge:  #1e2f1e;
   /* La grana della pittura (filtro ba-paint di board.js), in due tessere:
-     macchie scure larghe e puntini chiari fitti */
+     macchie scure larghe e puntini chiari fitti, appena percettibili */
   --rg-blots: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='b' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.022' numOctaves='3' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.08 0 0 0 0 0.04 0 0 0 0 0 0 0 0 0.8 -0.34'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23b)'/%3E%3C/svg%3E");
-  --rg-specks: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='1' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.92 0 0 0 0 0.78 0 0 0 0.45 -0.17'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)'/%3E%3C/svg%3E");
-
+  --rg-specks: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='1' seed='5' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 0.92 0 0 0 0 0.78 0 0 0 0.16 -0.07'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)'/%3E%3C/svg%3E");
 
   /* Colori dei giocatori nella cronaca e nel riepilogo, per posto al tavolo */
   --seat-0: #fbc402;
@@ -922,17 +921,18 @@ input:focus {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 5px 4px;
+  padding: 6px 5px;  /* senza bordo (--rg-bw: 0): overflow taglierebbe il contorno che ci cade sopra */
   overflow: hidden;
   cursor: pointer;
-  transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+  transition: box-shadow 0.2s, opacity 0.2s;
 }
+/* Il contorno è quello frastagliato della pittura (--rg-line, «Regioni dipinte») */
 .opp-tile:hover {
-  border-color: rgba(255, 214, 120, 0.85);
-  box-shadow: var(--rg-shadow), 0 0 10px rgba(255, 214, 120, 0.35);
+  --rg-line: rgba(255, 214, 120, 0.85);
+  box-shadow: 0 0 10px rgba(255, 214, 120, 0.35);
 }
 /* Bastione esposto al mio campo: il contorno arancio dei bersagli del mobile */
-.opp-tile.attack-target { border-color: rgba(255, 150, 70, 0.95); }
+.opp-tile.attack-target { --rg-line: rgba(255, 150, 70, 0.95); --rg-line-w: 1.6px; }
 /* Bastione che non posso attaccare */
 .opp-tile.nonadj { opacity: 0.6; }
 .opp-tile.nonadj:hover { opacity: 1; }
@@ -1080,11 +1080,15 @@ input:focus {
   overflow-y: auto;
   padding-right: 0.2rem;
 }
+/* Padding e distanza lasciano posto a ciò che sporge dalle carte: il bordo d'oro
+   e il tondo dell'Orda (6px in alto a destra). .oppf scorre e taglierebbe i
+   bordi; ogni carta è un contesto a sé (container-type), quindi la vicina, che
+   viene dopo, coprirebbe il tondo */
 .oppf-cards {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding-top: 4px;
+  gap: 12px;
+  padding: 10px 12px 12px;
 }
 .oppf-cards .card {
   width: var(--card-w-field);
@@ -1369,23 +1373,58 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 }
 
 /* ── Regioni dipinte, come il campo mobile (board.js): sfumatura dal centro,
-   grana (macchie e puntini), bordo interno in ombra; le mie con l'alone caldo
-   e il bordo d'oro. Le zone del trascinamento aggiungono la loro luce a
-   --rg-shadow (sotto, .drop-zone) ── */
+   grana (macchie e puntini), bordo interno in ombra; le mie col bordo d'oro
+   (niente alone: tra Regioni vicine si sommerebbe). La pittura sta in .rg-paint (renderer.js → paintRegions),
+   ritagliata coi lati frastagliati: il riquadro non ha sfondo e il suo bordo è
+   trasparente (tiene solo la misura). Bordo, passaggio del mouse e bersagli
+   cambiano il colore del contorno (--rg-line); le zone del trascinamento
+   aggiungono la loro luce a --rg-shadow (sotto, .drop-zone) ── */
 #my-field .region,
 .opp-tile {
+  --rg-bw: 1px;
+  --rg-line: rgba(30, 14, 4, 0.55);
+  --rg-line-w: 1.2px;
   --rg-shadow: inset 0 0 12px rgba(28, 13, 3, 0.85);
+  position: relative;
+  isolation: isolate;
+  background: none;
+  border: var(--rg-bw) solid transparent;
+  border-radius: 10px;
+  box-shadow: none;
+}
+.opp-tile { --rg-bw: 0px; }
+#my-field .region {
+  --rg-bw: 1.5px;
+  --rg-line: rgba(255, 214, 120, 0.5);
+  --rg-line-w: 1.5px;
+}
+.rg-paint {
+  position: absolute;
+  inset: calc(-1 * var(--rg-bw));
+  z-index: -1;
+  pointer-events: none;
+}
+.rg-fill {
+  position: absolute;
+  inset: 0;
   background:
     var(--rg-specks),
     var(--rg-blots),
     radial-gradient(60% 60% at 50% 50%, var(--rg-in), var(--rg-out));
-  border: 1px solid rgba(30, 14, 4, 0.55);
-  border-radius: 10px;
   box-shadow: var(--rg-shadow);
+  transition: box-shadow 0.12s;
 }
-#my-field .region {
-  --rg-shadow: inset 0 0 12px rgba(28, 13, 3, 0.85), 0 0 12px 2px rgba(255, 196, 96, 0.22);
-  border: 1.5px solid rgba(255, 214, 120, 0.5);
+.rg-paint svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: none;
+  stroke: var(--rg-line);
+  stroke-width: var(--rg-line-w);
+  stroke-linejoin: round;
+  transition: stroke 0.2s;
 }
 #my-field .region.vanguard { --rg-in: var(--rg-vanguard); --rg-out: var(--rg-vanguard-edge); }
 #my-field .region.bastion  { --rg-in: var(--rg-bastion);  --rg-out: var(--rg-bastion-edge); }
@@ -1393,12 +1432,20 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 .opp-tile[data-zone="vanguard"]  { --rg-in: var(--rg-opp-vanguard); --rg-out: var(--rg-opp-vanguard-edge); }
 .opp-tile.opp-tile-bastion       { --rg-in: var(--rg-opp-bastion);  --rg-out: var(--rg-opp-bastion-edge); }
 .opp-tile[data-zone="village"]   { --rg-in: var(--rg-opp-village);  --rg-out: var(--rg-opp-village-edge); }
-#my-field .region.drop-zone {
+/* Zone del trascinamento: la luce sulla pittura, non sul riquadro */
+#my-field .region.drop-zone,
+#my-field .region.drop-over { box-shadow: none; background: none; }
+#my-field .region.drop-zone > .rg-paint > .rg-fill {
   box-shadow: inset 0 0 0 2px rgba(251, 196, 2, 0.35), inset 0 0 18px rgba(251, 196, 2, 0.12), var(--rg-shadow);
 }
-#my-field .region.drop-over {
+#my-field .region.drop-over > .rg-paint > .rg-fill {
   box-shadow: inset 0 0 0 2px rgba(251, 196, 2, 0.9), inset 0 0 26px rgba(251, 196, 2, 0.35), var(--rg-shadow);
 }
+/* Un clic fuori dalle carte apre il riepilogo della Regione (app.js) */
+#my-field .region { cursor: pointer; }
+#my-field .region:hover,
+#my-field .region.drop-target { --rg-line: rgba(255, 214, 120, 0.85); }
+#my-field .region.drop-over { --rg-line: rgba(251, 196, 2, 0.95); }
 
 /* Riga di carte di Avanscoperta e Bastioni: scorre in orizzontale invece di
    andare a capo (vedi renderer.js → _regionCardsRow). Il padding in alto lascia

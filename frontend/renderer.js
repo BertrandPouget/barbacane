@@ -30,6 +30,7 @@ const Renderer = (() => {
     if (myPlayer) renderMyField(myPlayer, state, myPlayerId);
     updateActionPanel(state, myPlayerId);
     fitCards(state, myPlayerId);
+    paintRegions();
   }
 
   // ---------------------------------------------------------------------------
@@ -126,6 +127,7 @@ const Renderer = (() => {
     column.classList.remove('fitting');
     _panelHeight = _measurePanel();
     fanHand();
+    paintRegions();
   }
 
   // Il pannello azioni si riempie dopo il primo disegno (app.js) e può andare
@@ -150,6 +152,75 @@ const Renderer = (() => {
   // Il font delle carte cambia le misure: si ricalcola quando è caricato
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(() => { if (_lastState) fitCards(_lastState, _myPlayerId, true); });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Regioni dipinte con i lati frastagliati, come le sagome del campo mobile
+  // (mobile/board.js → roughPath): sotto il contenuto di ogni Regione e tassello
+  // un livello (.rg-paint) con la pittura ritagliata su un rettangolo dagli
+  // angoli arrotondati, i cui lati ondeggiano di poco, e il suo contorno. Le
+  // Regioni si svuotano a ogni disegno: il livello si rimette dopo render() e
+  // quando cambiano le misure (fitCards).
+  // ---------------------------------------------------------------------------
+
+  const RG_RADIUS = 10;  // px, raggio degli angoli
+  const RG_STEP = 7;     // px tra due punti del lato
+  const RG_WOBBLE = 1.6; // px di oscillazione dei punti
+  const RG_INSET = 1.4;  // px tra il bordo del riquadro e il lato medio
+
+  function _roughRect(w, h, seed) {
+    const rand = _rng(seed);
+    const m = RG_INSET, r = Math.min(RG_RADIUS, (w - 2 * m) / 2, (h - 2 * m) / 2);
+    const pts = [[m, m], [w - m, m], [w - m, h - m], [m, h - m]];
+    const f1 = n => (Math.round(n * 10) / 10).toString();
+    const toward = (v, p) => {
+      const dx = p[0] - v[0], dy = p[1] - v[1], len = Math.hypot(dx, dy);
+      return [v[0] + dx * r / len, v[1] + dy * r / len];
+    };
+    const corners = pts.map((v, i) => [toward(v, pts[(i + 3) % 4]), v, toward(v, pts[(i + 1) % 4])]);
+    let d = '';
+    corners.forEach(([a, v, b], i) => {
+      d += `${i ? 'L' : 'M'}${f1(a[0])} ${f1(a[1])} Q${v[0]} ${v[1]} ${f1(b[0])} ${f1(b[1])} `;
+      const e = corners[(i + 1) % 4][0];
+      const dx = e[0] - b[0], dy = e[1] - b[1], len = Math.hypot(dx, dy);
+      const n = Math.max(1, Math.round(len / RG_STEP));
+      for (let j = 1; j < n; j++) {
+        const t = j / n, o = (rand() - 0.5) * RG_WOBBLE;
+        d += `L${f1(b[0] + dx * t - dy / len * o)} ${f1(b[1] + dy * t + dx / len * o)} `;
+      }
+    });
+    return d + 'Z';
+  }
+
+  function paintRegions() {
+    document.querySelectorAll('#my-field .region, .opp-tile').forEach((reg, i) => {
+      // Misure senza lo zoom degli antenati: sono quelle in cui si ritaglia
+      const w = reg.offsetWidth, h = reg.offsetHeight;
+      if (!w || !h) return;
+      let paint = reg.querySelector(':scope > .rg-paint');
+      const key = `${w}x${h}`;
+      if (paint && paint.dataset.size === key) return;
+      if (!paint) {
+        paint = el('div', { className: 'rg-paint', 'aria-hidden': 'true' });
+        reg.prepend(paint);
+      }
+      paint.dataset.size = key;
+      const d = _roughRect(w, h, 7000 + i);
+      const fill = el('div', { className: 'rg-fill' });
+      fill.style.clipPath = `path('${d}')`;
+      paint.replaceChildren(fill);
+      paint.insertAdjacentHTML('beforeend', `<svg viewBox="0 0 ${w} ${h}"><path d="${d}"/></svg>`);
+    });
+  }
+
+  // Numeri pseudocasuali ripetibili (come board.js): i lati sono sempre gli stessi
+  function _rng(seed) {
+    return () => {
+      seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -430,8 +501,8 @@ const Renderer = (() => {
   }
 
   // Una Regione di un avversario carta per carta (minicarte con anteprima al
-  // passaggio del mouse, clic per il dettaglio), come i tasselli del proprio campo
-  // sul mobile (openVanguardSheet / openBastionSheet / openVillageSheet).
+  // passaggio del mouse, clic per il dettaglio), come le schede del mobile
+  // (openEnemyRegionSheet): titolo, Caratteristiche più alte, pila dei Muri.
   function showOpponentRegion(playerId, zone) {
     const state = _lastState;
     const p = state && state.players.find(pp => pp.id === playerId);
@@ -440,34 +511,38 @@ const Renderer = (() => {
     let title, subtitle, cards, empty;
     if (zone === 'vanguard') {
       const ws = p.field.vanguard || [];
-      title = 'Avanscoperta';
-      subtitle = _plural(ws.length, 'Guerriero', 'Guerrieri');
+      title = `Avanscoperta di ${p.name}`;
+      subtitle = ws.length ? `${_plural(ws.length, 'Guerriero', 'Guerrieri')} · ATT ${_maxStat(ws, 'att')} · GIT ${_maxStat(ws, 'git')}` : '';
       cards = ws.map(w => renderCardSmall(w, false));
       empty = 'Nessun Guerriero in Avanscoperta: non può attaccare.';
     } else if (zone === 'village') {
       const bs = _villageBuildings(p);
       const done = bs.filter(b => b.completed).length;
-      title = 'Villaggio';
-      subtitle = `${_plural(bs.length, 'Costruzione', 'Costruzioni')} · ${_plural(done, 'completa', 'complete')}`;
+      title = `Villaggio di ${p.name}`;
+      subtitle = bs.length ? `${_plural(bs.length, 'Costruzione', 'Costruzioni')} · ${done} complet${done === 1 ? 'a' : 'e'}` : '';
       cards = bs.map(b => {
         const card = renderBuildingCard(b, false, null);
         if (App.cardHasDetail(b.instance_id, 'opponent')) card.style.cursor = 'pointer';
         card.addEventListener('click', () => App.onCardClick(b.instance_id, 'opponent'));
         return card;
       });
-      empty = 'Nessuna Costruzione nel Villaggio.';
+      empty = 'Nessuna Costruzione.';
     } else {
       const side = zone === 'bastion_left' ? 'left' : 'right';
       const b = _bastion(p, side);
       const walls = b.wall_count ?? 0;
       const ws = b.warriors || [];
-      title = `Bastione ${side === 'left' ? 'Sinistro' : 'Destro'}`;
-      subtitle = `${_plural(walls, 'Muro', 'Muri')} · ${_plural(ws.length, 'Guerriero', 'Guerrieri')}` +
+      title = `Bastione ${side === 'left' ? 'Sinistro' : 'Destro'} di ${p.name}`;
+      subtitle = `${_plural(walls, 'Muro', 'Muri')} · DIF ${_maxStat(ws, 'dif')} · GIT ${_maxStat(ws, 'git')}` +
         (_isTarget(state, p, side) ? ` · ${TARGET_TAG}` : '');
-      cards = [...(walls > 0 ? [renderDeck('wall', walls)] : []), ...ws.map(w => renderCardSmall(w, false))];
-      empty = 'Bastione vuoto: niente Muri né Difensori.';
+      cards = [renderDeck('wall', walls), ...ws.map(w => renderCardSmall(w, false))];
     }
+    showRegionSheet(title, subtitle, cards, empty);
+  }
 
+  // Finestra di una Regione (mia o di un avversario), come le schede del mobile:
+  // titolo, riga di riepilogo, minicarte o una nota se è vuota
+  function showRegionSheet(title, subtitle, cards, empty) {
     const body = el('div', { className: 'oppf' });
     const row = el('div', { className: 'oppf-cards' });
     if (cards.length === 0) row.appendChild(el('div', { className: 'oppf-empty' }, [empty]));
@@ -477,10 +552,10 @@ const Renderer = (() => {
     const overlay = document.getElementById('modal-overlay');
     const confirmBtn = document.getElementById('modal-confirm');
     const cancelBtn  = document.getElementById('modal-cancel');
-    document.getElementById('modal-title').textContent = `${title} di ${p.name}`;
+    document.getElementById('modal-title').textContent = title;
     const modalBody = document.getElementById('modal-body');
     modalBody.innerHTML = '';
-    modalBody.appendChild(el('p', { className: 'wpick-subtitle' }, [subtitle]));
+    if (subtitle) modalBody.appendChild(el('p', { className: 'wpick-subtitle' }, [subtitle]));
     modalBody.appendChild(body);
     overlay.classList.remove('hidden');
 
@@ -1751,6 +1826,10 @@ const Renderer = (() => {
     showPlayerPicker,
     showBuildingPicker,
     showRegionPicker,
+    showRegionSheet,
+    renderWarriorCard,
+    renderBuildingCard,
+    renderWallStack,
     showCardPicker,
     cardMeta,
     showCardDetail,

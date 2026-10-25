@@ -55,12 +55,12 @@ const Board = (() => {
   // Colori delle Regioni (centro e bordo della sfumatura): quelle del giocatore
   // al centro più accese (e con alone e bordo d'oro), quelle dei vicini più cupe
   const PALETTE = {
-    'vanguard':     ['#c66a3e', '#94432a'],
+    'vanguard':     ['#a33a22', '#742316'],
     'bastion':      ['#c3a279', '#937350'],
-    'village':      ['#5f9035', '#446826'],
-    'opp-vanguard': ['#8b3b2b', '#64281c'],
+    'village':      ['#3f6339', '#2a462a'],
+    'opp-vanguard': ['#64221a', '#451610'],
     'opp-bastion':  ['#6a5545', '#4c3b2f'],
-    'opp-village':  ['#5c7432', '#3e5224'],
+    'opp-village':  ['#2e442c', '#1e2f1e'],
   };
 
   // Muri di pietra: lungo il lato del Bastione rivolto all'Avanscoperta che lo
@@ -242,7 +242,7 @@ const Board = (() => {
           <feColorMatrix in="noise" type="matrix" values="0 0 0 0 0.08  0 0 0 0 0.04  0 0 0 0 0  0 0 0 0.8 -0.34" result="blots"/>
           <feComposite in="blots" in2="SourceAlpha" operator="in" result="blotsIn"/>
           <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="1" seed="5" result="grain"/>
-          <feColorMatrix in="grain" type="matrix" values="0 0 0 0 1  0 0 0 0 0.92  0 0 0 0 0.78  0 0 0 0.45 -0.17" result="specks"/>
+          <feColorMatrix in="grain" type="matrix" values="0 0 0 0 1  0 0 0 0 0.92  0 0 0 0 0.78  0 0 0 0.16 -0.07" result="specks"/>
           <feComposite in="specks" in2="SourceAlpha" operator="in" result="specksIn"/>
           <feGaussianBlur in="SourceAlpha" stdDeviation="5" result="soft"/>
           <feComposite in="SourceAlpha" in2="soft" operator="out" result="rim"/>
