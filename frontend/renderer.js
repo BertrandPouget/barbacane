@@ -21,7 +21,7 @@ const Renderer = (() => {
     renderPhaseBar(state.phase);
     document.getElementById('hdr-current-player').textContent =
       `Il turno di: ${getPlayerName(state, state.current_player_id)}`;
-    document.getElementById('hdr-deck').textContent = `Mazzo: ${state.deck_count}`;
+    document.getElementById('hdr-deck-n').textContent = state.deck_count;
 
     const myPlayer = state.players.find(p => p.id === myPlayerId);
 
@@ -30,6 +30,7 @@ const Renderer = (() => {
     if (myPlayer) renderMyField(myPlayer, state, myPlayerId);
     updateActionPanel(state, myPlayerId);
     fitCards(state, myPlayerId);
+    scheduleTrees();
   }
 
   // ---------------------------------------------------------------------------
@@ -126,6 +127,7 @@ const Renderer = (() => {
     column.classList.remove('fitting');
     _panelHeight = _measurePanel();
     fanHand();
+    scheduleTrees();
   }
 
   // Il pannello azioni si riempie dopo il primo disegno (app.js) e può andare
@@ -150,6 +152,97 @@ const Renderer = (() => {
   // Il font delle carte cambia le misure: si ricalcola quando è caricato
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(() => { if (_lastState) fitCards(_lastState, _myPlayerId, true); });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Alberi, con la regola del campo mobile (mobile/board.js → plantTrees):
+  // candidati sparsi a caso su tutto il tavolo, tenuti se non cadono su carte,
+  // scritte e pannelli (le Regioni, tranne i Villaggi, appena sfiorate). In più
+  // una distanza minima tra due alberi: dove il posto libero è tanto non si
+  // fanno boschetti. Seme fisso: uno spostamento piccolo cambia solo gli alberi
+  // lì vicino. Il livello sta prima del resto del tavolo: le carte (posizionate)
+  // gli passano sopra, gli sfondi delle Regioni sotto.
+  // ---------------------------------------------------------------------------
+
+  const TREE_DENSITY = 0.00004;  // alberi per px² di tavolo, prima delle esclusioni
+  const TREE_SPACING = 70;       // px minimi tra i centri di due alberi
+  const TREE_GAP = 5;            // px liberi attorno a carte e scritte
+  // Le Regioni si possono appena sfiorare (i Villaggi no, tranne i tasselli
+  // sbiaditi: l'opacity li porta sopra gli alberi)...
+  const TREE_SOFT = '#my-field .region:not(.village), .opp-tile:not([data-zone="village"]), .opp-tile.nonadj';
+  // ...carte, scritte e pannelli no
+  const TREE_HARD = [
+    '#game-table .card', '.opp-head > *', '.opp-tile-title', '.opp-tile .rg-stat', '.opp-tile .ov-dots',
+    '.rg-recap-item', '#action-panel', '#my-life-deck', '#my-active-cards',
+  ].join(', ');
+  let _treeSig = '', _treeFrame = 0;
+  // Il mio campo e le file di carte scorrono: le carte si spostano rispetto agli alberi
+  document.getElementById('my-field')?.addEventListener('scroll', () => scheduleTrees(), { capture: true, passive: true });
+
+  function scheduleTrees() {
+    cancelAnimationFrame(_treeFrame);
+    _treeFrame = requestAnimationFrame(_plantTrees);
+  }
+
+  function _plantTrees() {
+    const svg = document.getElementById('table-trees');
+    const r = svg && svg.getBoundingClientRect();
+    if (!r || !r.width || !r.height) return;
+    const box = (b, g) => [b.left - r.left - g, b.top - r.top - g, b.right - r.left + g, b.bottom - r.top + g];
+    const boxes = (sel, g) => Array.from(document.querySelectorAll(sel), e => e.getBoundingClientRect())
+      .filter(b => b.width && b.height).map(b => box(b, g));
+    const soft = boxes(TREE_SOFT, 0);
+    const hard = boxes(TREE_HARD, TREE_GAP);
+    // Nomi delle mie Regioni (::before, non si misurano): la fascia sopra le carte
+    document.querySelectorAll('#my-field .region').forEach(reg => {
+      const b = reg.getBoundingClientRect(), row = reg.firstElementChild;
+      if (b.width && row) hard.push(box({ left: b.left, right: b.right, top: b.top, bottom: row.getBoundingClientRect().top }, TREE_GAP));
+    });
+    // Righe della cronaca: solo il testo (le righe sono larghe quanto la barra)
+    document.querySelectorAll('#battle-log > *').forEach(line => {
+      const range = document.createRange();
+      range.selectNodeContents(line);
+      const b = range.getBoundingClientRect();
+      if (b.width) hard.push(box(b, TREE_GAP));
+    });
+
+    const sig = [r.width, r.height, ...soft.flat(), ...hard.flat()].map(Math.round).join(',');
+    if (sig === _treeSig) return;
+    _treeSig = sig;
+
+    const W = Math.round(r.width), H = Math.round(r.height);
+    const rand = _rng(20251022);
+    const want = Math.round(W * H * TREE_DENSITY);
+    const trees = [];
+    const dist = ([a, b, c, d], x, y) => Math.hypot(Math.max(a - x, 0, x - c), Math.max(b - y, 0, y - d));
+    const clear = (x, y, rr) =>
+      hard.every(b => dist(b, x, y) >= rr) &&
+      soft.every(b => dist(b, x, y) >= rr * 0.55) &&
+      trees.every(([a, b]) => Math.hypot(x - a, y - b) >= TREE_SPACING);
+    for (let i = 0; i < want * 4 && trees.length < want; i++) {
+      const x = rand() * W, y = rand() * H, rr = 7 + rand() * 4.5;
+      if (x >= rr && x <= W - rr && y >= rr && y <= H - rr && clear(x, y, rr)) trees.push([x, y, rr]);
+    }
+    trees.sort((a, b) => a[1] - b[1]);  // quelli più in basso sopra gli altri
+    const f1 = n => (Math.round(n * 10) / 10).toString();
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.innerHTML =
+      '<g class="ba-tree-shadows">' + trees.map(([x, y, rr]) =>
+        `<ellipse cx="${f1(x + 2)}" cy="${f1(y + 3)}" rx="${f1(rr * 1.05)}" ry="${f1(rr * 0.92)}"/>`).join('') +
+      '</g><g class="ba-trees">' + trees.map(([x, y, rr]) =>
+        `<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(rr)}" class="ba-crown"/>` +
+        `<circle cx="${f1(x - rr * 0.3)}" cy="${f1(y - rr * 0.32)}" r="${f1(rr * 0.48)}" class="ba-light"/>`).join('') +
+      '</g>';
+  }
+
+  // Numeri pseudocasuali ripetibili (come board.js): gli alberi sono sempre gli stessi
+  function _rng(seed) {
+    return () => {
+      seed = (seed + 0x6D2B79F5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -251,66 +344,77 @@ const Renderer = (() => {
     return keys;
   }
 
-  // Riassunti numerici di una Regione: parità con vanguardSummary & co. di mobile/render.js
-  function _speciesDots(warriors, max = 8) {
-    const wrap = el('span', { className: 'rg-dots' });
-    (warriors || []).slice(0, max).forEach(w => {
-      wrap.appendChild(el('i', { className: `rg-dot sp-${w.species || 'umano'}` }));
-    });
-    if ((warriors || []).length > max) {
-      wrap.appendChild(el('span', { className: 'rg-dots-more' }, [`+${warriors.length - max}`]));
-    }
-    return wrap;
-  }
+  // Riassunti di una Regione con i simboli del campo mobile (mobile/board.js):
+  // rombi delle Caratteristiche come sulle carte, Muri, torri delle Costruzioni
+  // (piena se completa), pallini delle Specie. A zero i numeri si spengono.
+  const TOWER_PATH = 'M5 7 L5 4 L7 4 L7 6 L9 6 L9 4 L11 4 L11 6 L13 6 L13 4 L15 4 L15 6 L17 6 L17 4 L19 4 L19 7 L16.8 9 L16.3 14.5 L18.5 16.5 L19.5 20.5 L4.5 20.5 L5.5 16.5 L7.7 14.5 L7.2 9 Z';
+  const TOWER_SVG = `<svg viewBox="3.5 2.6 17 19" aria-hidden="true"><path d="${TOWER_PATH}"/></svg>`;
+  const WALL_SVG = '<svg viewBox="0 0 30 24" aria-hidden="true"><rect x="1" y="1" width="28" height="22" rx="1.6"/>' +
+    '<path d="M7 1v22M23 1v22M1 8.3h6M1 15.7h6M23 8.3h6M23 15.7h6"/></svg>';
 
-  function _statBlock(num, label) {
-    return el('div', { className: `rg-stat${num === 0 ? ' zero' : ''}` }, [
-      el('span', { className: 'rg-stat-num' }, [String(num)]),
-      el('span', { className: 'rg-stat-label' }, [label]),
-    ]);
+  function _symbol(cls, n, svg = '') {
+    const sym = el('span', { className: `${cls}${n ? '' : ' zero'}` });
+    sym.innerHTML = svg;
+    sym.appendChild(el('b', {}, [String(n)]));
+    return sym;
+  }
+  const _dia   = n => _symbol('ov-dia', n);
+  const _wall  = n => _symbol('ov-wall', n, WALL_SVG);
+  const _tower = (n, done) => _symbol(`ov-tower${done ? ' done' : ''}`, n, TOWER_SVG);
+
+  // Simbolo con la sua etichetta sotto
+  function _statBlock(symbol, label) {
+    return el('div', { className: 'rg-stat' }, [symbol, el('span', { className: 'ov-lbl' }, [label])]);
   }
 
   function _statRow(...blocks) {
     return el('div', { className: 'rg-stat-row' }, blocks);
   }
 
-  function _vanguardSummary(vg) {
-    if (vg.length === 0) return el('div', { className: 'rg-empty' }, ['Vuota']);
-    return el('div', { className: 'rg-summary' }, [
-      _statRow(_statBlock(vg.length, vg.length === 1 ? 'Guerriero' : 'Guerrieri')),
-      _speciesDots(vg),
-      el('div', { className: 'rg-summary-sub' },
-        [`ATT max ${_maxStat(vg, 'att')} · GIT max ${_maxStat(vg, 'git')}`]),
-    ]);
-  }
-
-  function _bastionSummary(bastion) {
-    const wallCount = bastion.wall_count ?? (bastion.walls || []).length;
-    const warriors = bastion.warriors || [];
-    if (wallCount === 0 && warriors.length === 0) return el('div', { className: 'rg-empty' }, ['Vuoto']);
-    const wrap = el('div', { className: 'rg-summary' }, [
-      _statRow(
-        _statBlock(wallCount, wallCount === 1 ? 'Muro' : 'Muri'),
-        _statBlock(warriors.length, warriors.length === 1 ? 'Difensore' : 'Difensori'),
-      ),
-    ]);
-    if (warriors.length > 0) {
-      wrap.appendChild(_speciesDots(warriors));
-      wrap.appendChild(el('div', { className: 'rg-summary-sub' },
-        [`DIF max ${_maxStat(warriors, 'dif')} · GIT max ${_maxStat(warriors, 'git')}`]));
+  function _speciesDots(warriors, max = 8) {
+    const wrap = el('span', { className: 'ov-dots' });
+    (warriors || []).slice(0, max).forEach(w => {
+      wrap.appendChild(el('i', { className: `sp-${w.species || 'umano'}` }));
+    });
+    if ((warriors || []).length > max) {
+      wrap.appendChild(el('em', {}, [`+${warriors.length - max}`]));
     }
     return wrap;
   }
 
+  function _vanguardSummary(vg) {
+    return el('div', { className: 'rg-summary' }, [
+      _statRow(_statBlock(_dia(_maxStat(vg, 'att')), 'ATT'), _statBlock(_dia(_maxStat(vg, 'git')), 'GIT')),
+      _speciesDots(vg),
+    ]);
+  }
+
+  function _bastionSummary(bastion) {
+    const warriors = bastion.warriors || [];
+    return el('div', { className: 'rg-summary' }, [
+      _statRow(
+        _statBlock(_wall(bastion.wall_count ?? (bastion.walls || []).length), 'Muri'),
+        _statBlock(_dia(_maxStat(warriors, 'dif')), 'DIF'),
+        _statBlock(_dia(_maxStat(warriors, 'git')), 'GIT'),
+      ),
+      _speciesDots(warriors),
+    ]);
+  }
+
   function _villageSummary(buildings) {
-    if (buildings.length === 0) return el('div', { className: 'rg-empty' }, ['Nessuna Costruzione']);
     const completed = buildings.filter(b => b.completed).length;
     return el('div', { className: 'rg-summary' }, [
       _statRow(
-        _statBlock(buildings.length, buildings.length === 1 ? 'Costruzione' : 'Costruzioni'),
-        _statBlock(completed, completed === 1 ? 'Completa' : 'Complete'),
+        _statBlock(_tower(buildings.length - completed, false), 'Incompl.'),
+        _statBlock(_tower(completed, true), 'Compl.'),
       ),
     ]);
+  }
+
+  // Riepilogo in fondo a una mia Regione: i rombi delle Caratteristiche più alte
+  function _regionRecap(warriors, keys) {
+    return el('div', { className: 'region-stats-recap' }, keys.map(k =>
+      el('span', { className: 'rg-recap-item' }, [_dia(_maxStat(warriors, k)), el('span', { className: 'ov-lbl' }, [k.toUpperCase()])])));
   }
 
   // Le Costruzioni assegnate a un Guerriero (es. Trono) sono mostrate sul Guerriero, non nel Villaggio
@@ -339,12 +443,24 @@ const Renderer = (() => {
       isTarget ? { targetPlayerId: player.id, targetSide: side } : {});
   }
 
+  // Vite e carte in mano con i simboli del mobile: cuori, dorso di carta come il mazzo
+  const HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.6 1.1 4.6 2.6C12 6.1 13.6 5 15.6 5 19 5 21.1 8.4 19.6 11.8 17.5 16.4 12 21 12 21z"/></svg>';
+
+  function _hearts(lives) {
+    const n = Math.max(0, lives ?? 0);
+    if (n === 0) return el('span', { className: 'opp-out' }, ['Eliminato']);
+    const box = el('span', { className: 'opp-lives', role: 'img', 'aria-label': `${n} ${n === 1 ? 'Vita' : 'Vite'}` });
+    box.innerHTML = HEART_SVG.repeat(Math.min(n, 4));
+    if (n > 4) box.appendChild(el('b', {}, [`×${n}`]));
+    return box;
+  }
+
   function _oppHeader(player) {
     const head = el('div', { className: 'opp-head' }, [
       el('span', { className: 'opp-name' }, [player.name]),
-      el('span', { className: 'opp-lives' },
-        ['❤'.repeat(Math.max(0, player.lives)) + '✕'.repeat(Math.max(0, 3 - player.lives))]),
-      el('span', { className: 'opp-hand-count' }, [`🃏 ${player.hand_count}`]),
+      _hearts(player.lives),
+      el('span', { className: 'opp-hand-count', title: 'Carte in mano' },
+        [el('i', { className: 'deck-ico' }), String(player.hand_count)]),
     ]);
     const fx = renderOppActiveEffects(player);
     if (fx) head.appendChild(fx);
@@ -401,7 +517,7 @@ const Renderer = (() => {
     if (items.length === 0) return null;
     const row = el('div', { className: 'opp-active-effects' });
     items.forEach(item => {
-      row.appendChild(el('span', { className: 'opp-active-badge', title: item.desc }, [item.label]));
+      row.appendChild(el('span', { className: 'opp-active-badge', title: item.desc }, [`✧ ${item.label}`]));
     });
     return row;
   }
@@ -478,8 +594,8 @@ const Renderer = (() => {
     // Carte-vita e carte con effetti attivi
     renderLifeCards(player);
     renderActiveCards(player);
-    document.getElementById('my-mana').textContent    = `Mana: ${player.mana_remaining ?? 0}`;
-    document.getElementById('my-actions').textContent = `Azioni: ${player.actions_remaining ?? 0}`;
+    document.getElementById('my-mana-n').textContent    = player.mana_remaining ?? 0;
+    document.getElementById('my-actions-n').textContent = player.actions_remaining ?? 0;
 
     // Etichette bastioni con nome del vicino che li minaccia
     const { left: leftNeighbor, right: rightNeighbor } = _aliveNeighbors(state, myPlayerId);
@@ -521,10 +637,7 @@ const Renderer = (() => {
       row.appendChild(card);
     });
     // Riepilogo sempre visibile, anche a 0 senza Guerrieri
-    if (kind === 'warrior') {
-      container.appendChild(el('div', { className: 'region-stats-recap' },
-        [`ATT max ${_maxStat(warriors, 'att')} · GIT max ${_maxStat(warriors, 'git')}`]));
-    }
+    if (kind === 'warrior') container.appendChild(_regionRecap(warriors, ['att', 'git']));
   }
 
   function renderBastionRegion(containerId, bastion, side, interactive) {
@@ -544,8 +657,7 @@ const Renderer = (() => {
     (bastion.warriors || []).forEach(w => {
       row.appendChild(renderWarriorCard(w, true, interactive));
     });
-    container.appendChild(el('div', { className: 'region-stats-recap' },
-      [`DIF max ${_maxStat(bastion.warriors, 'dif')} · GIT max ${_maxStat(bastion.warriors, 'git')}`]));
+    container.appendChild(_regionRecap(bastion.warriors, ['dif', 'git']));
   }
 
   // Mazzo coperto (Muri, Vite, Carte Attive): il dorso della carta e, sotto la
@@ -780,18 +892,18 @@ const Renderer = (() => {
       place(cardEl);
     }
 
-    // Carte in mano: al centro dello schermo. Carte in campo: accanto a quella
-    // sotto il mouse, a destra, o a sinistra se a destra non c'è spazio; in
-    // altezza centrata sulla carta, dentro lo schermo
+    // Carte in mano: al centro dello schermo, alzata quanto basta per non coprire
+    // la carta (nel ventaglio quelle centrali stanno più in alto). Carte in campo:
+    // accanto a quella sotto il mouse, a destra, o a sinistra se a destra non c'è
+    // spazio; in altezza centrata sulla carta, dentro lo schermo
     function place(cardEl) {
       const GAP = 14, EDGE = 12;
       const vw = window.innerWidth, vh = window.innerHeight;
       const w = node.offsetWidth, h = w * 1040 / 744;  // l'immagine può non essere ancora caricata
       const r = cardEl.getBoundingClientRect();
-      const centerTop = (vh - h) / 2;
-      if (cardEl.closest('#hand-cards') && r.top > centerTop + h + GAP) {
+      if (cardEl.closest('#hand-cards')) {
         node.style.left = `${Math.round((vw - w) / 2)}px`;
-        node.style.top = `${Math.round(centerTop)}px`;
+        node.style.top = `${Math.round(Math.max(EDGE, Math.min((vh - h) / 2, r.top - GAP - h)))}px`;
         return;
       }
       const roomRight = vw - EDGE - (r.right + GAP), roomLeft = r.left - GAP - EDGE;
@@ -1705,8 +1817,8 @@ const Renderer = (() => {
     return livesText(lives);
   }
 
-  // Fasi del turno nell'intestazione: quella in corso evidenziata, le precedenti
-  // barrate (a partita finita nessuna è in corso)
+  // Fasi del turno nell'intestazione: quella in corso accesa, le precedenti
+  // spente (a partita finita nessuna è in corso)
   const PHASES = ['action', 'schieramento', 'battaglia'];
   function renderPhaseBar(phase) {
     const current = PHASES.indexOf(phase);

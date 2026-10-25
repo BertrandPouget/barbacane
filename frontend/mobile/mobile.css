@@ -691,19 +691,13 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 
 /* ═══════════════════════ GIOCO ═══════════════════════ */
 
-/* La partita si gioca su un terreno di terra scura e boschi: il campo
-   (board.js) ci disegna sopra la radura con le Regioni. Lo sfondo a mattoni
-   crepati resta per le altre schermate. */
+/* La partita si gioca sullo sfondo dell'app: il campo (board.js) ci disegna
+   sopra le mie Regioni e quelle dei vicini, tra gli alberi. */
 #scr-game.active {
   height: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='1' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.85 0 0 0 0 0.7 0 0 0 0 0.5 0 0 0 0.5 -0.2'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)'/%3E%3C/svg%3E"),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.03' numOctaves='4' seed='9' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.04 0 0 0 0 0.02 0 0 0 0 0 0 0 0 1.2 -0.45'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E"),
-    radial-gradient(ellipse 90% 40% at 50% 47%, #3b2613, transparent 75%),
-    #25170b;
 }
 
 /* ── Intestazione: cornice a bastione con le punte in basso; il lato di
@@ -1002,16 +996,14 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   to   { opacity: 1; transform: none; }
 }
 
-/* Terreno: radura di terra battuta, alberi, erba */
-.ba-clearing { fill: #644224; stroke: #644224; stroke-width: 30; stroke-linejoin: round; stroke-linecap: round; }
+/* Alberi (sopra le Regioni) */
 .ba-tree-shadows { fill: rgba(8, 4, 0, 0.42); }
-.ba-crown { fill: #22301a; stroke: #0f170a; stroke-width: 0.8; }
+.ba-crown { fill: #22301a; }
 .ba-light { fill: #31452a; opacity: 0.8; }
 .ba-regions path { stroke: rgba(30, 14, 4, 0.55); stroke-width: 1.2; }
 /* Le Regioni del giocatore al centro: alone caldo attorno e bordo d'oro, tenui */
 .ba-glow { fill: rgba(255, 196, 96, 0.22); }
 .ba-regions path.mine { stroke: rgba(255, 214, 120, 0.5); stroke-width: 1.5; }
-.ba-grass { fill: none; stroke: #8fb957; stroke-width: 1.05; stroke-linecap: round; opacity: 0.9; }
 
 /* Muri di pietra lungo il lato esposto di un Bastione che ne ha */
 .bl-row { display: none; }
@@ -1102,13 +1094,16 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .ov-wall b { font-size: max(10px, 3.4cqw); padding-top: 0.08em; }
 .ov-tower b { top: 13%; font-size: max(9px, 3.1cqw); }
 .ov-tower.done b { color: #3a2414; text-shadow: none; }
-.ov-dots { display: flex; align-items: center; gap: max(3px, 1.4cqw); }
+.ov-dots { display: flex; align-items: center; gap: calc(max(3px, 1.4cqw) - 2px); }
+/* Pallino con un filo scuro attorno, disegnato con un gradiente circolare: la
+   misura in cqw non è un numero intero di pixel e il riquadro può venire
+   arrotondato diverso in larghezza e altezza (un border-radius diventerebbe ovale) */
 .ov-dots i {
-  width: max(6px, 2.4cqw);
-  height: max(6px, 2.4cqw);
-  border-radius: 50%;
-  background: var(--sp);
-  box-shadow: 0 0 0 1px rgba(20, 10, 2, 0.35);
+  flex: 0 0 auto;
+  width: calc(max(6px, 2.4cqw) + 2px);
+  height: calc(max(6px, 2.4cqw) + 2px);
+  background: radial-gradient(circle closest-side, var(--sp) calc(100% - 1.4px),
+    rgba(20, 10, 2, 0.35) calc(100% - 1px), rgba(20, 10, 2, 0.35) calc(100% - 0.4px), transparent 100%);
 }
 .ov-dots em { font-style: normal; font-size: max(8px, 2.8cqw); margin-left: 0.2em; }
 /* Tavola piccola (schermi bassi): via le etichette, restano i numeri */
@@ -1159,12 +1154,20 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   font-size: 15px;
   line-height: 1.2;
   color: var(--text);
+  /* Contorno marrone: si legge sullo sfondo dell'app e sugli alberi */
+  text-shadow:
+    -1px -1px 0 #3a1f08, 1px -1px 0 #3a1f08, -1px 1px 0 #3a1f08, 1px 1px 0 #3a1f08,
+    0 -1px 0 #3a1f08, 0 1px 0 #3a1f08, -1px 0 0 #3a1f08, 1px 0 0 #3a1f08;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.opp-sub { display: flex; align-items: center; gap: 8px; height: 18px; }
-.opp-hearts svg { width: 10px; height: 10px; fill: var(--red-light); }
+/* Vite e occhio un po' più vicini al nome, senza cambiare l'altezza dell'etichetta */
+.opp-sub { display: flex; align-items: center; gap: 8px; height: 18px; position: relative; top: -4px; }
+.opp-hearts svg {
+  width: 10px; height: 10px; fill: var(--red-light);
+  overflow: visible; stroke: #3a1f08; stroke-width: 5; stroke-linejoin: round; paint-order: stroke;
+}
 .opp-fx { font-size: 10px; color: var(--gold-light); }
 .opp-out { font-size: 11px; font-style: italic; color: var(--text-faint); }
 .opp-eye {
@@ -1177,10 +1180,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 }
 .opp-eye svg { width: 16px; height: 16px; }
 /* Di turno: nome d'oro */
-.opp-label.turn .opp-name {
-  color: var(--gold-light);
-  text-shadow: 0 0 10px rgba(251, 196, 2, 0.55), 0 1px 3px rgba(10, 5, 0, 0.9);
-}
+.opp-label.turn .opp-name { color: var(--gold-light); }
 .opp-label.dead { opacity: 0.55; filter: grayscale(0.7); }
 .opp-label.damaged .opp-name { animation: name-hit 0.6s; }
 @keyframes name-hit {
@@ -2463,6 +2463,27 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 @media (min-width: 560px) {
   /* tablet / telefono in landscape: contieni la larghezza del gioco */
   #scr-game { max-width: 560px; margin: 0 auto; width: 100%; }
+}
+
+/* Telefono in orizzontale: si gioca solo in verticale. Il manifest blocca la
+   rotazione nell'app installata (Android); nel browser non si può, quindi al
+   posto del gioco un invito a girare il telefono. */
+@media (orientation: landscape) and (max-height: 500px) {
+  body > * { visibility: hidden; }
+  body::after {
+    content: 'Gira il telefono in verticale';
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: grid;
+    place-items: center;
+    padding: 0 24px;
+    font-size: 1.1rem;
+    font-style: italic;
+    text-align: center;
+    color: var(--text);
+    background: var(--bg-dark) url('/assets/background.jpg') center center / cover no-repeat;
+  }
 }
 
 @media (max-height: 700px) {

@@ -188,21 +188,20 @@
   <!-- Header: info partita -->
   <div id="game-header">
     <div class="header-left">
-      <span id="hdr-turn">Turno 1</span>
-      <!-- Fasi del turno: in corso evidenziata, già fatte barrate (renderer.js) -->
+      <span id="hdr-turn" class="hdr-pill">Turno 1</span>
+      <!-- Fasi del turno, a pallini come sul mobile: acceso quello in corso,
+           spenti quelli già fatti (renderer.js) -->
       <div id="phase-bar">
-        <span class="phase-step" id="pstep-action">I. Azioni</span>
-        <span class="phase-sep">›</span>
-        <span class="phase-step" id="pstep-schieramento">II. Schieramento</span>
-        <span class="phase-sep">›</span>
-        <span class="phase-step" id="pstep-battaglia">III. Battaglia</span>
+        <span class="phase-step" id="pstep-action"><i></i><em>Azioni</em></span>
+        <span class="phase-step" id="pstep-schieramento"><i></i><em>Schieramento</em></span>
+        <span class="phase-step" id="pstep-battaglia"><i></i><em>Battaglia</em></span>
       </div>
     </div>
     <div class="header-center">
       <span id="hdr-current-player">Il turno di: —</span>
     </div>
     <div class="header-right">
-      <span id="hdr-deck">Mazzo: —</span>
+      <span id="hdr-deck" class="hdr-pill" title="Carte nel mazzo"><i class="deck-ico"></i><span id="hdr-deck-n">—</span></span>
       <div id="turn-timer-display" class="timer hidden"></div>
       <button id="btn-chronicle" class="btn btn-small btn-chronicle" title="Tutto quello che è successo nella partita">Cronaca</button>
       <button id="btn-abandon" class="btn btn-small btn-abandon">Abbandona</button>
@@ -211,6 +210,9 @@
 
   <!-- Area principale: tavolo da gioco -->
   <div id="game-table">
+    <!-- Alberi sullo sfondo e nei Villaggi (renderer.js → _plantTrees) -->
+    <svg id="table-trees" aria-hidden="true" focusable="false"></svg>
+
 
     <!-- Giocatore di fronte:
          2p = unico avversario (specchiato, piena larghezza)
@@ -241,7 +243,7 @@
           <div id="my-village"       class="region village"                   data-label="Villaggio"></div>
         </div>
         <!-- Barra azioni: sotto il Villaggio, sopra la mano -->
-        <div id="action-panel">
+        <div id="action-panel" class="menu-frame">
           <button id="panel-toggle" aria-label="Apri/chiudi pannello azioni">
             <span id="panel-toggle-label">⚙ Azioni</span>
           </button>
@@ -259,8 +261,9 @@
           </div>
 
           <div id="my-stats" class="player-stats">
-            <span id="my-actions">Azioni: 2</span>
-            <span id="my-mana">Mana: 0</span>
+            <!-- Come sul mobile: rombo azzurro per le Azioni, gemma del Mana -->
+            <span id="my-actions" class="stat-gem-item"><span class="st-gem st-gem-act"><b id="my-actions-n">2</b></span>Azioni</span>
+            <span id="my-mana" class="stat-gem-item"><span class="st-gem"><b id="my-mana-n">0</b></span>Mana</span>
           </div>
 
           <div class="ap-right">
