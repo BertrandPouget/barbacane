@@ -448,14 +448,15 @@ const Mob = (() => {
     // poi il commento all'ultima mossa); quelli fatti sono spuntati, i
     // successivi attenuati.
     const text = $('tutorial-panel-text');
-    text.textContent = step.goals.length ? '' : (step.text || '');
+    const stepText = step.text_mobile || step.text;
+    text.textContent = step.goals.length ? '' : (stepText || '');
     text.hidden = !text.textContent;
     // Lo schema della Battaglia compare solo all'attacco (_previewTutorialBattle)
     $('tutorial-panel-diagram').hidden = true;
     const goals = $('tutorial-panel-goals');
     goals.innerHTML = '';
     const current = step.goals.findIndex(g => !g.done);
-    const lead = step.goals.some(g => g.done) ? step.feedback : step.text;
+    const lead = step.goals.some(g => g.done) ? step.feedback : stepText;
     step.goals.forEach((g, i) => goals.appendChild(el('li', {
       className: g.done ? 'done' : i === current ? 'current' : 'todo',
     }, [

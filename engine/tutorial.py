@@ -87,11 +87,14 @@ class TutorialStep:
         panel_center: bool = False,
         battle_diagram: Optional[Dict[str, Any]] = None,
         show_opponents: bool = False,
+        text_mobile: Optional[str] = None,
     ):
         self.step_id = step_id
         self.chapter = chapter            # es. "Turno 1 di 4"
         self.title = title
         self.text = text
+        # Mobile: testo al posto di `text`, per ciò che si vede solo sul campo a triangoli
+        self.text_mobile = text_mobile
         self.highlight = highlight or []  # solo per gli step informativi
         self.goals = goals or []
         self.setup = setup
@@ -549,6 +552,11 @@ TUTORIAL_PARTITA = TutorialDef(
             "t3_actions", "Turno 3 di 4", "Tre Maghe",
             "Velocemento chiede 3 Maghe. Orfeo, nell'Avanscoperta del Manichino, minaccia i tuoi Bastioni: "
             "schiera Madeleine a difesa del destro.",
+            # Sul campo a triangoli, in una partita a due, l'avversario compare su entrambi i lati
+            text_mobile="Velocemento chiede 3 Maghe. Orfeo, nell'Avanscoperta del Manichino, minaccia i tuoi "
+                        "Bastioni. In una partita a due l'avversario ti confina da entrambi i lati, quindi vedi "
+                        "la sua Avanscoperta due volte, accanto a ciascun Bastione. Schiera Madeleine a difesa "
+                        "del destro.",
             goals=[
                 Goal(
                     "madeleine", "Schiera Madeleine nel Bastione destro", "play_warrior",
@@ -942,6 +950,7 @@ def public_view(state: GameState) -> Optional[dict]:
         "chapter": step.chapter,
         "title": step.title,
         "text": step.text,
+        "text_mobile": step.text_mobile,
         "feedback": tut.get("feedback"),
         "goals": [{"label": g.label, "done": g.goal_id in done} for g in step.goals],
         "highlight": highlight,
