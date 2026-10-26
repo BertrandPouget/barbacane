@@ -16,7 +16,7 @@ Scopo: evitare che un Claude futuro **sbagli** o perda molto tempo. Non è docum
 
 ## Stato e convenzioni
 
-- Gioco **completo e in produzione** (tutte le carte di `data/cards.json` implementate). Deploy automatico da GitHub su Render free tier + Postgres Neon: https://barbacane-online.onrender.com (`render.yaml`). Lavoro corrente: rifinitura e nuova interfaccia di partita (campo a triangoli, branch `feature/revamp_UI`). Il desktop tiene le Regioni rettangolari ma ne riprende colori, pittura e simboli.
+- Gioco **completo e in produzione** (tutte le carte di `data/cards.json` implementate). Deploy automatico da GitHub su Render free tier + Postgres Neon: https://barbacane-online.onrender.com (`render.yaml`). Lavoro corrente: rifinitura. Interfaccia di partita: campo a triangoli sul mobile; il desktop tiene le Regioni rettangolari ma ne riprende colori, pittura e simboli.
 - **Voci della home** (identiche su desktop e mobile, da usare nei testi per gli utenti): **Gioca** (Crea/Unisciti lobby, Bot compresi), **Tutorial**, **Catalogo**.
 - **Lingua**: commenti e messaggi al giocatore in italiano; rispondere all'utente in italiano.
 - **Python**: conda, ambiente `barbacane`. Avvio: `python main.py` → `http://localhost:8000` (desktop), `/m` (mobile; `?desktop=1` forza il desktop).
