@@ -1233,6 +1233,7 @@ const Mob = (() => {
     $('st-fx').addEventListener('click', () => { haptic(); openActiveFxSheet(); });
     $('tb-leave').addEventListener('click', () => { haptic(); confirmLeaveGame(); });
     $('ticker').addEventListener('click', () => { haptic(); openLogSheet(); });
+    tapNow($('st-next'));
 
     bindCardPeek();
   }
@@ -1416,6 +1417,7 @@ const Mob = (() => {
       if (id) b.id = id;  // usato dallo spotlight dei tutorial
       b.disabled = disabled;
       b.addEventListener('click', () => { haptic(); onClick(); });
+      tapNow(b);
       return b;
     };
     const hint = (text, cls = '') => el('div', { className: `dock-hint${cls ? ` ${cls}` : ''}` }, [text]);

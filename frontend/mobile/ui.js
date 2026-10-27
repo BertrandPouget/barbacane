@@ -34,6 +34,19 @@ function haptic(ms = 12) {
   try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {}
 }
 
+// Su iPhone Safari un tocco su un pulsante animato (dk-pulse) può valere solo
+// come «hover» e non generare il click: l'azione parte allora dal touchend,
+// e il click sintetico viene soppresso perché non scatti due volte
+function tapNow(btn) {
+  btn.addEventListener('touchend', (e) => {
+    const t = e.changedTouches[0];
+    const r = btn.getBoundingClientRect();
+    if (t.clientX < r.left || t.clientX > r.right || t.clientY < r.top || t.clientY > r.bottom) return;
+    if (e.cancelable) e.preventDefault();
+    btn.click();  // ignorato se il pulsante è disabilitato
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Schermate
 // ---------------------------------------------------------------------------
