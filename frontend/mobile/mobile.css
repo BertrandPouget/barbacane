@@ -825,7 +825,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   margin: 0 2px;
   pointer-events: none;  /* il bordo trasparente lascia toccare il campo sotto */
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.6fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 2.4fr);
   align-items: center;
   padding: 0;
   text-shadow: 0 1px 3px rgba(10, 5, 0, 0.9);
@@ -845,8 +845,12 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 }
 .st-item + .st-item { border-left: 1px solid rgba(185, 138, 62, 0.45); }
 .st-lbl { font-size: 0.66rem; line-height: 1; color: var(--text-dim); }
-.st-next { height: 34px; margin-left: 6px; }
-.st-next > span { padding: 0 5px; font-size: clamp(0.72rem, 3.3vw, 0.86rem); }
+/* Passo successivo; in Battaglia affiancato da Attacca. Selettori doppi: le
+   regole di .dk-btn stanno più in basso e li scavalcherebbero */
+.st-steps { min-width: 0; display: flex; gap: 4px; margin-left: 6px; }
+.st-steps > .st-next { flex: 1 1 0; min-width: 0; height: 34px; }
+.st-steps > .st-next[hidden] { display: none; }
+.st-steps > .st-next > span { padding: 0 4px; font-size: clamp(0.72rem, 3.3vw, 0.86rem); }
 .opp-hearts { display: inline-flex; align-items: center; gap: 3px; }
 .opp-hearts b { color: var(--red-light); font-size: 0.85em; margin-left: 2px; }
 /* Vite: un cuore col numero dentro */

@@ -1234,6 +1234,8 @@ const Mob = (() => {
     $('tb-leave').addEventListener('click', () => { haptic(); confirmLeaveGame(); });
     $('ticker').addEventListener('click', () => { haptic(); openLogSheet(); });
     tapNow($('st-next'));
+    tapNow($('st-attack'));
+    $('st-attack').addEventListener('click', () => { haptic(); openBattleSheet(); });
 
     bindCardPeek();
   }
@@ -1407,7 +1409,7 @@ const Mob = (() => {
     const next = $('st-next');
     // Le carte della mano sono riusate tra un render e l'altro: si riaccendono qui
     document.querySelectorAll('#hand .card.unplayable').forEach(c => c.classList.remove('unplayable'));
-    if (!currentState) { dock.replaceChildren(); next.disabled = true; return; }
+    if (!currentState) { dock.replaceChildren(); next.disabled = true; $('st-attack').hidden = true; return; }
     const my = me();
     const mine = isMyTurn();
     Render.phaseDimmed(!mine);
@@ -1432,11 +1434,17 @@ const Mob = (() => {
     // Quarta sezione della riga delle risorse: Schieramento, Battaglia, Fine turno
     const phase = currentState.phase;
     const toBattle = phase === 'schieramento', toEnd = phase === 'battaglia';
-    next.firstChild.textContent = toEnd ? 'Fine turno' : toBattle ? 'Battaglia ›' : 'Schieramento ›';
+    next.firstChild.textContent = toEnd ? 'Fine' : toBattle ? 'Battaglia ›' : 'Schieramento ›';
     next.disabled = !mine || !!blocking || !!myAnswerPending() || phase === 'end';
     next.className = 'dk-btn st-next' + (toEnd ? ' dk-danger'
       : !next.disabled && phase === 'action' && acts === 0 && slots === 0 ? ' dk-gold dk-pulse' : '');
     next.onclick = () => { haptic(); if (toEnd) confirmEndTurn(); else sendAction('next_phase', {}); };
+    // In Battaglia l'attacco sta accanto alla fine del turno, non sotto il campo
+    const attack = $('st-attack');
+    const canAttack = toEnd && mine && !blocking && !myAnswerPending() && canAttackNow();
+    attack.hidden = !toEnd;
+    attack.disabled = !canAttack;
+    attack.classList.toggle('dk-gold', canAttack);
 
     if (myAnswerPending()) {
       // Interazioni pendenti che mi riguardano → un solo pulsante che riapre lo sheet
@@ -1480,9 +1488,7 @@ const Mob = (() => {
         items.push(mkBtn(`⚡ Orda (${hordes.length})`, 'dk-warn dk-pulse', openHordeSheet, false, 'dock-horde'));
       }
     } else if (currentState.phase === 'battaglia') {
-      const canAttack = canAttackNow();
-      if (!canAttack) items.push(hint('Nessun attacco possibile'));
-      items.push(mkBtn('Attacca', canAttack ? 'dk-gold' : '', openBattleSheet, !canAttack, 'dock-attack'));
+      items.push(hint(canAttackNow() ? 'Scegli chi attaccare' : 'Nessun attacco possibile'));
     }
 
     // Guardando il campo di un altro giocatore la riga serve a tornare al proprio

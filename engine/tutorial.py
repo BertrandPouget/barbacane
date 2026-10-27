@@ -129,7 +129,7 @@ _MOBILE_HIGHLIGHT_MAP: Dict[str, Union[str, List[str]]] = {
     "action-panel": "dock",
     "btn-next-phase": "st-next",
     "btn-horde": "dock-horde",
-    "btn-battle": "dock-attack",
+    "btn-battle": "st-attack",
     "btn-end-turn": "st-next",
     "phase-bar": "tb-phase",
     "my-active-cards": "st-fx",
