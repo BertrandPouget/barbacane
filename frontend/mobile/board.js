@@ -136,6 +136,8 @@ const Board = (() => {
   let visible = [-Infinity, Infinity];  // unità di tavola dentro lo schermo
   let unitsPerPx = 1;                    // unità di tavola in un pixel
   let diaPx = 27;                        // lato dei rombi delle Caratteristiche (CSS: max(20px, 7cqw))
+  let oppTitlePx = 11;                   // corpo dei titoli dei vicini (CSS: --title-size-opp)
+  let screenPx = null;                   // schermata di gioco, per i titoli che non ci stanno
 
   // Corda orizzontale del triangolo all'altezza y: [sinistra, destra] o null
   function chord(slot, y) {
@@ -188,7 +190,9 @@ const Board = (() => {
     const scr = (live.closest('#scr-game') || document.documentElement).getBoundingClientRect();
     unitsPerPx = W / r.width;
     diaPx = Math.max(20, 0.07 * r.width);
-    visible = [(scr.left - r.left) * unitsPerPx + 4, (scr.right - r.left) * unitsPerPx - 4];
+    oppTitlePx = r.width <= 300 ? 8 : Math.max(8, 0.028 * r.width);
+    screenPx = scr;
+    visible =[(scr.left - r.left) * unitsPerPx + 4, (scr.right - r.left) * unitsPerPx - 4];
   }
 
   // Distanza di un punto dal triangolo (0 se è dentro)
@@ -296,12 +300,19 @@ const Board = (() => {
 
   function liveMarkup() {
     const walls = Object.keys(WALL_EDGES).map(stonesMarkup).join('');
+    // data-spot-*: il contorno che lo spotlight del tutorial segue (spotlight.js).
+    // Il raggio è quello dell'arco equivalente all'angolo più acuto (~42°)
+    // arrotondato da roundedPath: R · tan(21°) ≈ 4; con R l'anello taglierebbe le punte
+    const spot = pts => `data-spot-points="${pts.map(p => p.join(',')).join(' ')}" data-spot-radius="4"`;
     const hits = SLOTS.map(k =>
-      `<path id="${IDS[k]}" class="rg-shape${k.startsWith('c_') ? ' center' : ''}" data-slot="${k}" d="${roundedPath(SHAPES[k].pts)}"/>`).join('');
-    // Ingombro delle Regioni al centro (tutorial: «il tuo campo»)
+      `<path id="${IDS[k]}" class="rg-shape${k.startsWith('c_') ? ' center' : ''}" data-slot="${k}" ` +
+      `d="${roundedPath(SHAPES[k].pts)}" ${spot(SHAPES[k].pts)}/>`).join('');
+    // Regioni al centro (tutorial: «il tuo campo»): sagoma invisibile, lo
+    // spotlight ne prende l'inviluppo convesso
+    const field = SLOTS.filter(k => k.startsWith('c_')).flatMap(k => SHAPES[k].pts);
     return `<svg id="board-live" viewBox="0 0 ${W} ${H}" focusable="false">
       ${walls}
-      <rect id="board-center-box" x="32" y="77" width="326" height="416" fill="none"/>
+      <polygon id="board-center-box" points="${field.join(' ')}" fill="none" ${spot(field)}/>
       ${hits}
     </svg>`;
   }
@@ -320,7 +331,35 @@ const Board = (() => {
   const lbl = (x, y, text) => `<span class="ov ov-lbl" style="${pos(x, y)}">${text}</span>`;
   // Titoli a distanza fissa dal bordo dritto del triangolo (in basso per quelli
   // con la punta in su, in alto per il Villaggio): la y è quella del bordo
-  const titleAt = (x, y, text, edge) => `<span class="ov ov-title at-${edge}" style="${pos(x, y)}">${text}</span>`;
+  const titleAt = (x, y, text, edge, cls = '') =>
+    `<span class="ov ov-title at-${edge}${cls}" style="${pos(x, y)}">${text}</span>`;
+
+  // Titoli delle Regioni dei vicini ai lati: escono dallo schermo e se ne vede
+  // una striscia, quindi il titolo corre lungo il lato verso il centro (sempre
+  // visibile), inclinato come i nomi sulle mappe, a metà del lato.
+  const SIDE_TITLES = {
+    l_village:  [[20, 81], [100, 268]],
+    r_village:  [[370, 81], [290, 268]],
+    l_vanguard: [[70, 286], [0, 465]],
+    r_vanguard: [[320, 286], [390, 465]],
+  };
+  const SIDE_GAP = 4;  // px tra il lato e il titolo
+
+  function sideTitle(slot, text) {
+    const [a, b] = SIDE_TITLES[slot], t = 0.5;
+    const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
+    // Normale verso l'interno del triangolo (verso il suo baricentro)
+    const pts = SHAPES[slot].pts;
+    const cx = (pts[0][0] + pts[1][0] + pts[2][0]) / 3, cy = (pts[0][1] + pts[1][1] + pts[2][1]) / 3;
+    let nx = -dy / len, ny = dx / len;
+    if ((cx - a[0]) * nx + (cy - a[1]) * ny < 0) { nx = -nx; ny = -ny; }
+    const off = (SIDE_GAP + oppTitlePx / 2) * unitsPerPx;
+    const x = a[0] + dx * t + nx * off, y = a[1] + dy * t + ny * off;
+    // Sempre dritto da leggere: angolo tra -90° e 90°
+    let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    if (angle > 90) angle -= 180; else if (angle <= -90) angle += 180;
+    return `<span class="ov ov-title opp along" style="${pos(x, y)};transform:translate(-50%,-50%) rotate(${f1(angle)}deg)">${text}</span>`;
+  }
   const wall = (x, y, n) => `<span class="ov ov-wall${n ? '' : ' zero'}" style="${pos(x, y)}">${WALL_SVG}<b>${n}</b></span>`;
   const tower = (x, y, n, done) =>
     `<span class="ov ov-tower${done ? ' done' : ''}${n ? '' : ' zero'}" style="${pos(x, y)}">${TOWER_SVG}<b>${n}</b></span>`;
@@ -355,24 +394,32 @@ const Board = (() => {
           lbl(...c(440, -19), 'DIF') + lbl(...c(440, 19), 'GIT') +
           dots(...c(base), d.species, true) +
           titleAt(...c(base), slot === 'c_bastion_left' ? 'Bastione SX' : 'Bastione DX', 'base');
+      // Il titolo sotto il bordo dritto in alto: è il Bastione del vicino, quindi
+      // quello a sinistra sullo schermo è il suo destro (e viceversa)
       case 'l_bastion':
-      case 'r_bastion':
-        return dia(...c(99, -19), d.dif) + dia(...c(99, 19), d.git) +
-          lbl(...c(122, -19), 'DIF') + lbl(...c(122, 19), 'GIT') + wall(...c(151), d.walls) + lbl(...c(172), 'Muri');
+      case 'r_bastion': {
+        const top = SHAPES[slot].pts[0][1];
+        const name = SHAPES[slot].region === 'bastion_left' ? 'Bastione SX' : 'Bastione DX';
+        return titleAt(...c(top), name, 'top', ' opp') +
+          dia(...c(107, -19), d.dif) + dia(...c(107, 19), d.git) +
+          lbl(...c(130, -19), 'DIF') + lbl(...c(130, 19), 'GIT') + wall(...c(159), d.walls) + lbl(...c(180), 'Muri');
+      }
       // Regioni che escono dallo schermo: in colonna, al centro di ciò che se ne vede
       // (ogni etichetta sotto il suo rombo)
       case 'l_village':
       case 'r_village':
       {
         const x = col([170, 222]);
-        return tower(x, 170, d.incomplete, false) + lbl(x, 194, 'Incompl.') +
+        return sideTitle(slot, 'Villaggio') +
+          tower(x, 170, d.incomplete, false) + lbl(x, 194, 'Incompl.') +
           tower(x, 222, d.complete, true) + lbl(x, 246, 'Compl.');
       }
       case 'l_vanguard':
       case 'r_vanguard': {
         // Il triangolo punta in giù: la colonna sta in alto, dove è più largo
         const x = col([306, 352]);
-        return dia(x, 306, d.att) + lbl(x, 329, 'ATT') + dia(x, 352, d.git) + lbl(x, 375, 'GIT');
+        return sideTitle(slot, 'Avanscoperta') +
+          dia(x, 306, d.att) + lbl(x, 329, 'ATT') + dia(x, 352, d.git) + lbl(x, 375, 'GIT');
       }
       default:
         return '';
@@ -437,6 +484,20 @@ const Board = (() => {
       datas[k] = data;
       owners[k] = owner;
       if (stones[k]) stones[k].dataset.rows = s ? wallRows(s.data.walls) : 0;
+    });
+    fitSideTitles();
+  }
+
+  // Su schermi stretti un titolo lungo il lato può finire oltre il bordo: si nasconde
+  function fitSideTitles() {
+    if (!screenPx) return;
+    Object.keys(SIDE_TITLES).forEach(k => {
+      const el = overlays[k].querySelector('.ov-title.along');
+      if (!el) return;
+      el.classList.remove('nofit');
+      const r = el.getBoundingClientRect();
+      if (!r.width) return;  // tavola nascosta: si rifà al prossimo aggiornamento
+      el.classList.toggle('nofit', r.left < screenPx.left + 2 || r.right > screenPx.right - 2);
     });
   }
 

@@ -67,7 +67,10 @@
   --card-w-sm: 66px;
   --card-h-sm: 98px;
   --card-w-hand: 90px;
-  --card-h-hand: 118px;
+  --card-h-hand: 138px;
+  /* Altezza della mano: si vede il 90% della carta (fascia con stella,
+     Caratteristiche e costo di completamento compresa), il resto esce in basso */
+  --hand-h: calc(12px + var(--card-h-hand) * 0.9 + var(--sab));
 
   --r-lg: 8px;
   --r-md: 6px;
@@ -1076,6 +1079,12 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .ov-title.at-base { transform: translate(-50%, calc(-100% - var(--title-gap))); }
 .ov-title.at-top { transform: translate(-50%, var(--title-gap)); }
 .ov-dots.on-title { transform: translate(-50%, calc(-100% - var(--title-gap) - var(--title-size) - 6px)); }
+/* Titoli delle Regioni dei vicini: più piccoli dei miei. Quelli ai lati corrono
+   lungo il lato verso il centro, inclinati (board.js dà posizione e angolo; il
+   corpo va tenuto uguale a oppTitlePx lì) */
+.ov-slot { --title-size-opp: max(8px, 2.8cqw); }
+.ov-title.opp { font-size: var(--title-size-opp); letter-spacing: 0.08em; }
+.ov-title.nofit { visibility: hidden; }
 .ov-wall, .ov-tower { display: grid; place-items: center; }
 .ov-wall { width: max(20px, 7.4cqw); height: max(16px, 5.9cqw); }
 .ov-tower { width: max(18px, 6.4cqw); height: max(20px, 7.1cqw); }
@@ -1110,7 +1119,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 @container (max-width: 300px) {
   .ov-lbl { display: none; }
   /* I titoli devono stare nella larghezza del triangolo */
-  .ov-slot { --title-size: 8.5px; }
+  .ov-slot { --title-size: 8.5px; --title-size-opp: 8px; }
   .ov-title { letter-spacing: 0.04em; }
 }
 
@@ -1135,7 +1144,9 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .opp-label.pos-r { top: 4px; }
 #field.has-top .opp-label.pos-l,
 #field.has-top .opp-label.pos-r { top: 28px; }
-/* Dentro lo schermo anche quando la tavola ne esce dai lati */
+/* Dentro lo schermo anche quando la tavola ne esce dai lati. È solo il punto di
+   partenza: render.js (placeSideLabels) le centra sulla parte visibile del
+   Villaggio del vicino */
 .opp-label.pos-l { left: max(3.6%, calc(50% - 50vw + 10px)); }
 .opp-label.pos-r { right: max(3.6%, calc(50% - 50vw + 10px)); }
 .opp-top {
@@ -1639,10 +1650,9 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   overflow: hidden;
   touch-action: none;  /* il dito sulla mano sfoglia le carte (bindCardPeek) */
   padding: 12px 12px 0;  /* sopra: badge del costo (la stella sporge di più) anche con la carta sollevata */
-  /* Altezza della mano calcolata su --card-h-hand: le carte sono più grandi e
-     la loro parte bassa esce dal fondo dello schermo (qui viene tagliata). */
+  /* Solo il bordo in fondo della carta esce dallo schermo (vedi --hand-h) */
   box-sizing: border-box;
-  height: calc(var(--card-h-hand) + var(--sab) - 14px);
+  height: var(--hand-h);
 }
 
 /* Carte in mano con le proporzioni della minicarta (280×400): l'altezza è
@@ -1657,7 +1667,6 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 /* Ventaglio (fanHand in render.js): ogni carta copre il lato destro della
    precedente, quindi il badge del costo sta a sinistra per restare visibile. */
 #hand .card {
-  height: calc(var(--card-h-hand) * 1.2);
   rotate: var(--fan-rot, 0deg);
   translate: 0 var(--fan-y, 0px);
   transform-origin: 50% 100%;
@@ -2490,7 +2499,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   /* schermi bassi: carte più compatte, ma non al punto da tagliare i nomi */
   :root {
     --card-w-hand: 80px;
-    --card-h-hand: 106px;
+    --card-h-hand: 120px;
     --card-w-sm: 56px;
     --card-h-sm: 86px;
   }
@@ -2706,16 +2715,25 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   to   { opacity: 1; }
 }
 
-.spotlight-ring {
-  position: fixed;
-  border: 2px solid var(--gold);
-  border-radius: 10px;
+/* Anelli: tracciati SVG che seguono la forma della zona (triangoli del campo
+   compresi); il bagliore pulsa sull'intero strato */
+.spotlight-rings {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
   animation: spotlight-ring-pulse 1.6s ease-in-out infinite;
 }
 
+.spotlight-ring {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
 @keyframes spotlight-ring-pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(251, 196, 2, 0.6),  inset 0 0 6px rgba(251, 196, 2, 0.15); }
-  50%      { box-shadow: 0 0 18px var(--gold),           inset 0 0 12px rgba(251, 196, 2, 0.3); }
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(251, 196, 2, 0.6)); }
+  50%      { filter: drop-shadow(0 0 9px var(--gold)); }
 }
 
 /* ═══════════════════════ TUTORIAL ═══════════════════════ */
@@ -3123,9 +3141,9 @@ button.menu-frame:active {
   position: fixed;
   left: 50%;
   /* Appena sopra la mano (stessa altezza di #hand), un po' sotto il dito */
-  bottom: calc(var(--card-h-hand) + var(--sab) - 14px - 10px);
+  bottom: calc(var(--hand-h) - 10px);
   translate: -50% 0;
-  width: min(74vw, 290px, calc((100vh - var(--card-h-hand) - var(--sab) + 14px) * 744 / 1040));
+  width: min(74vw, 290px, calc((100vh - var(--hand-h)) * 744 / 1040));
   height: auto;
   z-index: 300;
   border-radius: 12px;

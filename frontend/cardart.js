@@ -222,30 +222,38 @@ const CardArt = (() => {
    */
   function flipWall(cardEl, on, instant = false) {
     if (!cardEl || cardEl.classList.contains('wall-marked') === on) return;
-    if (!cardEl.querySelector(':scope > .mc-back')) {
-      const back = document.createElement('img');
-      back.className = 'mc-back';
-      back.alt = '';
-      back.draggable = false;
-      back.src = miniUrl('retro');
-      cardEl.appendChild(back);
+    let backImg = cardEl.querySelector(':scope > .mc-back');
+    if (!backImg) {
+      backImg = document.createElement('img');
+      backImg.className = 'mc-back';
+      backImg.alt = '';
+      backImg.draggable = false;
+      backImg.src = miniUrl('retro');
+      cardEl.appendChild(backImg);
     }
     const apply = () => cardEl.classList.toggle('wall-marked', on);
     const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (instant || still || !cardEl.animate) { apply(); return; }
+    // Il dorso appena creato va decodificato prima di mostrarlo, se no per un
+    // istante si rivede il fronte
+    const ready = backImg.decode ? backImg.decode().catch(() => {}) : Promise.resolve();
     // Il costo sporge dalla carta e girando si vedrebbe troncare: sparisce prima
     // del giro e, se la carta torna di fronte, ricompare solo a giro finito
     cardEl.classList.add('flipping');
-    // Fino a taglio, si cambia faccia, e di nuovo di fronte
+    // Fino a taglio, si cambia faccia, e di nuovo di fronte. La prima metà resta
+    // ferma di taglio (fill) finché parte la seconda: tra le due non c'è un
+    // fotogramma con la carta dritta
     const P = 'perspective(500px) ';
     const half = cardEl.animate([{ transform: P + 'rotateY(0deg)' }, { transform: P + 'rotateY(90deg)' }],
-      { duration: 130, easing: 'ease-in' });
-    half.onfinish = () => {
+      { duration: 130, easing: 'ease-in', fill: 'forwards' });
+    half.onfinish = () => ready.then(() => {
       apply();
       const back = cardEl.animate([{ transform: P + 'rotateY(-90deg)' }, { transform: P + 'rotateY(0deg)' }],
         { duration: 130, easing: 'ease-out' });
+      half.oncancel = null;
+      half.cancel();
       back.onfinish = back.oncancel = () => cardEl.classList.remove('flipping');
-    };
+    });
     half.oncancel = () => cardEl.classList.remove('flipping');
   }
 

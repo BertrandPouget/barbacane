@@ -3179,17 +3179,25 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   to   { opacity: 1; }
 }
 
-.spotlight-ring {
-  position: fixed;
-  border: 3px solid var(--gold);
-  border-radius: 10px;
-  box-shadow: 0 0 18px var(--gold), inset 0 0 12px rgba(251, 196, 2, 0.25);
+/* Anelli: tracciati SVG che seguono la forma della zona; il bagliore pulsa
+   sull'intero strato */
+.spotlight-rings {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
   animation: spotlight-ring-pulse 1.6s ease-in-out infinite;
 }
 
+.spotlight-ring {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
 @keyframes spotlight-ring-pulse {
-  0%, 100% { box-shadow: 0 0 10px rgba(251, 196, 2, 0.6), inset 0 0 8px rgba(251, 196, 2, 0.15); }
-  50%      { box-shadow: 0 0 22px var(--gold),            inset 0 0 14px rgba(251, 196, 2, 0.3); }
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(251, 196, 2, 0.6)); }
+  50%      { filter: drop-shadow(0 0 11px var(--gold)); }
 }
 
 /* Pannello del tutorial: stesso aspetto sul campo e nella spiegazione delle carte */

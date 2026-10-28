@@ -307,6 +307,33 @@ const Render = (() => {
     // sopra la tavola si allarga (CSS: #field.has-top)
     $('field').classList.toggle('has-top', top.length > 0 && !single && !!(left || right));
     $('opp-rail').replaceChildren(...nodes);
+    placeSideLabels();
+  }
+
+  // I nomi dei vicini centrati sulla parte visibile del loro Villaggio, così si
+  // capisce che tutta la fascia di lato è loro; spostati verso il centro solo
+  // quanto basta a restare dentro lo schermo
+  let sideResize = false;
+  function placeSideLabels() {
+    if (!sideResize) {
+      sideResize = true;
+      window.addEventListener('resize', placeSideLabels);
+    }
+    const rail = $('opp-rail'), scr = $('scr-game');
+    if (!rail || !scr) return;
+    const railR = rail.getBoundingClientRect(), scrR = scr.getBoundingClientRect();
+    if (!railR.width) return;
+    [['pos-l', 'l_village'], ['pos-r', 'r_village']].forEach(([cls, slot]) => {
+      const label = rail.querySelector(`.opp-label.${cls}`);
+      const shape = Board.shape(slot);
+      if (!label || !shape) return;
+      const v = shape.getBoundingClientRect();
+      const lo = Math.max(v.left, scrR.left), hi = Math.min(v.right, scrR.right);
+      const w = label.offsetWidth, m = 6;
+      const x = Math.max(scrR.left + m, Math.min(scrR.right - m - w, (lo + hi) / 2 - w / 2));
+      label.style.left = `${x - railR.left}px`;
+      label.style.right = 'auto';
+    });
   }
 
   function flashOpponent(playerId) {
@@ -433,7 +460,7 @@ const Render = (() => {
       const rot = (i - (n - 1) / 2) * step;
       node.style.setProperty('--fan-rot', `${rot.toFixed(2)}deg`);
       // Discesa delle carte ai lati: ruotando sul fondo l'angolo esterno sale, va compensato
-      node.style.setProperty('--fan-y', `calc(var(--card-h-hand) * ${(rot * rot * 0.0025).toFixed(4)})`);
+      node.style.setProperty('--fan-y', `calc(var(--card-h-hand) * ${(rot * rot * 0.002).toFixed(4)})`);
       node.style.marginLeft = i ? `${(shown - cardW).toFixed(1)}px` : '';
     });
   }

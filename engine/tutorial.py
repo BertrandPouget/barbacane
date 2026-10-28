@@ -135,6 +135,8 @@ _MOBILE_HIGHLIGHT_MAP: Dict[str, Union[str, List[str]]] = {
     "my-active-cards": "st-fx",
     # I nomi degli avversari (solo dove ci sono) e i loro Bastioni esposti
     "top-opponents": [">opp-rail", "opp-bl", "opp-br"],
+    # Solo mobile (sul desktop non c'è): Avanscoperte e Villaggi dei vicini ai lati
+    "opp-sides": ["opp-vl", "opp-vr", "opp-tl", "opp-tr"],
 }
 
 
@@ -181,6 +183,15 @@ def _sections(*items: tuple) -> List[Dict[str, Any]]:
     return [{"rect": rect, "title": title, "text": text} for rect, title, text in items]
 
 
+def _union(*rects: List[float]) -> List[float]:
+    """Riquadro che contiene tutti quelli dati (sezioni spiegate insieme)."""
+    x = min(r[0] for r in rects)
+    y = min(r[1] for r in rects)
+    right = max(r[0] + r[2] for r in rects)
+    bottom = max(r[1] + r[3] for r in rects)
+    return [round(x, 1), round(y, 1), round(right - x, 1), round(bottom - y, 1)]
+
+
 # Carte spiegate al primo tocco in mano (una per tipo: le altre carte dello
 # stesso tipo si capiscono da queste). Chiave: base_card_id.
 CARD_READS: Dict[str, List[Dict[str, Any]]] = {
@@ -192,15 +203,9 @@ CARD_READS: Dict[str, List[Dict[str, Any]]] = {
         (_RECT_RECRUIT_STATS, "Le Caratteristiche",
          "L'Attacco (ATT) conta quando attacchi dall'Avanscoperta, la Difesa (DIF) quando difendi un Bastione, "
          "la Gittata (GIT) in entrambi i casi."),
-        (_RECT_RECRUIT_SPECIES, "La Specie",
-         "Evelyn è una Maga, una delle quattro Specie con Umani, Elfi e Nani. Guerrieri della stessa Specie "
-         "possono formare un'Orda."),
-        (_RECT_RECRUIT_SCHOOL, "La Scuola",
-         "La Scuola ce l'hanno solo le Maghe e le Magie. Lanciando una Magia con in campo una Maga della stessa "
-         "Scuola si attiva il Prodigio, una versione potenziata dell'effetto."),
-        (_RECT_RECRUIT_EVOLVE, "L'Evoluzione",
-         "Ogni Recluta può evolvere in un Eroe, un Guerriero dalle Caratteristiche più potenti. Quello di Evelyn "
-         "è The Briny."),
+        (_union(_RECT_RECRUIT_SPECIES, _RECT_RECRUIT_SCHOOL, _RECT_RECRUIT_EVOLVE), "Specie, Scuola, Evoluzione",
+         "Evelyn è una Maga e, come tutte le Maghe, appartiene a una Scuola. La Scuola serve a "
+         "potenziare alcune particolari Magie. Evelyn può inoltre evolvere in The Briny, un Guerriero più potente."),
         (_RECT_RECRUIT_HORDE, "L'effetto Orda",
          "Con 3 Guerrieri della stessa Specie nella stessa Regione formi un'Orda, e nello Schieramento ne "
          "attivi l'effetto."),
@@ -213,7 +218,7 @@ CARD_READS: Dict[str, List[Dict[str, Any]]] = {
          "Le Magie non costano Mana. La stella indica quante Maghe, di qualsiasi Scuola, devi avere in campo, "
          "in questo caso una. Lanciata la Magia, le Maghe restano in campo."),
         (_RECT_EFFECT_TOP, "Effetto Base",
-         "La stella vuota segna l'effetto Base, quello che ottieni senza Prodigio."),
+         "La stella vuota segna l'effetto Base, quello che ottieni normalmente."),
         (_RECT_EFFECT_BOTTOM, "Effetto Prodigio",
          "Se una tua Maga in campo è della stessa Scuola della Magia, scatta il Prodigio e ottieni questo "
          "effetto invece del Base. Se il testo inizia con «&», ottieni sia il Base che questo."),
@@ -324,7 +329,7 @@ def _give_hand(state: GameState, ids: List[str]) -> None:
 #     in Prodigio grazie a Evelyn (Sortilegio) → Catapulta giocata e completata
 #     gratis → Schieramento e Orda delle Maghe. Niente Battaglia.
 #   Manichino: Orfeo (ATT 3) sfonda il tuo Bastione destro (al massimo 2 Muri,
-#     sguarnito dopo lo spostamento di Madeleine): perdi 1 Vita.
+#     senza Guerrieri: Madeleine è passata in Avanscoperta): perdi 1 Vita.
 #   Turno 4 (turno 7, 4 Mana): The Pyric (2 Mana) + Muri → Battaglia:
 #     ATT 4 contro la DIF 3 di Joseph passa 1, GIT 1+2 contro la GIT 1 di
 #     Patrizio passa 2: 3 Danni contro 1 Muro, il Manichino perde la sua Vita
@@ -425,27 +430,38 @@ TUTORIAL_PARTITA = TutorialDef(
     steps=[
         TutorialStep(
             "welcome", "Benvenuto", "Benvenuto su Barbacane!",
-            "In un mondo di Umani, Elfi, Nani e Maghe, tutti di sangue Goblin, ogni "
-            "giocatore difende la propria fortezza e prova ad abbattere quelle degli altri.",
+            "In un mondo di Goblin assetati di potere, ogni giocatore difende la propria fortezza "
+            "e prova ad abbattere quelle degli altri.",
             setup=_setup_start,
         ),
         TutorialStep(
             "goal", "Benvenuto", "Le Vite",
-            "Le Vite sono carte coperte, tenute da parte. Proteggi le tue e togli quelle degli avversari. Vince "
-            "l'ultimo a cui ne resta almeno una. In questo tutorial affronti un Manichino che ne ha una sola.",
+            "Le Vite sono carte coperte che solo tu puoi vedere, ma non giocare. Proteggi le tue e togli quelle "
+            "degli avversari. In questo tutorial affronti un Manichino che ne ha una sola.",
             highlight=["my-life-deck"],
         ),
         TutorialStep(
             "field", "Benvenuto", "Il tuo campo",
-            "Il tuo campo ha 4 Regioni, ognuna con il suo scopo. Dall'Avanscoperta attacchi, i due Bastioni sono "
-            "difesi da Muri e Guerrieri e il Villaggio ospita le Costruzioni.",
+            "Il tuo campo ha 4 Regioni: l'Avanscoperta, da cui i tuoi Guerrieri attaccano; i due Bastioni, che "
+            "ti difendono con Muri e Guerrieri; il Villaggio, dove sorgeranno le tue Costruzioni.",
             highlight=["my-field"],
+        ),
+        TutorialStep(
+            "neighbors", "Benvenuto", "I vicini",
+            "Dall'Avanscoperta attacchi i Bastioni dei tuoi vicini, e loro i tuoi. Il Manichino è il tuo unico "
+            "avversario, quindi è tuo vicino da entrambi i lati: puoi attaccare tutti e due i suoi Bastioni, e "
+            "lui tutti e due i tuoi.",
+            # Sul campo a triangoli l'unico vicino compare su entrambi i lati
+            text_mobile="Dall'Avanscoperta attacchi i Bastioni dei tuoi vicini, e loro i tuoi. Il Manichino è il "
+                        "tuo unico avversario, quindi è tuo vicino da entrambi i lati. Per questo vedi alcune sue "
+                        "Regioni due volte, una per lato.",
+            highlight=["top-opponents", "opp-sides"],
         ),
         # --- Turno 1 ---
         TutorialStep(
             "cards", "Turno 1 di 4", "Le carte",
             "Le carte sono di tre tipi e la cornice li distingue. È rossa per i Guerrieri, blu per le Magie e "
-            "verde per le Costruzioni. Le vedrai tutte in azione.",
+            "verde per le Costruzioni.",
             highlight=[">hand-cards"],
         ),
         TutorialStep(
@@ -550,19 +566,14 @@ TUTORIAL_PARTITA = TutorialDef(
         # --- Turno 3 ---
         TutorialStep(
             "t3_actions", "Turno 3 di 4", "Tre Maghe",
-            "Velocemento chiede 3 Maghe. Orfeo, nell'Avanscoperta del Manichino, minaccia i tuoi Bastioni: "
-            "schiera Madeleine a difesa del destro.",
-            # Sul campo a triangoli, in una partita a due, l'avversario compare su entrambi i lati
-            text_mobile="Velocemento chiede 3 Maghe. Orfeo, nell'Avanscoperta del Manichino, minaccia i tuoi "
-                        "Bastioni. In una partita a due l'avversario ti confina da entrambi i lati, quindi vedi "
-                        "la sua Avanscoperta due volte, accanto a ciascun Bastione. Schiera Madeleine a difesa "
-                        "del destro.",
+            "Velocemento chiede 3 Maghe: schiera Madeleine in uno dei tuoi Bastioni.",
             goals=[
                 Goal(
-                    "madeleine", "Schiera Madeleine nel Bastione destro", "play_warrior",
-                    match={"instance_id": "madeleine_1", "region": "bastion_right"},
-                    hint="Trascina Madeleine dalla mano nel tuo Bastione destro.",
-                    highlight=[">hand-cards", "my-bastion-right"],
+                    "madeleine", "Schiera Madeleine in un Bastione", "play_warrior",
+                    match=lambda p: p.get("instance_id") == "madeleine_1"
+                    and p.get("region") in ("bastion_left", "bastion_right"),
+                    hint="Trascina Madeleine dalla mano in uno dei tuoi Bastioni.",
+                    highlight=[">hand-cards", "my-bastion-left", "my-bastion-right"],
                     feedback="Tre Maghe in campo. Ora puoi lanciare Velocemento.",
                 ),
                 Goal(
@@ -606,9 +617,9 @@ TUTORIAL_PARTITA = TutorialDef(
                 Goal(
                     "reposition", "Sposta Madeleine in Avanscoperta", "reposition",
                     match={"warrior_instance_id": "madeleine_1", "destination": "vanguard"},
-                    hint="Sposta Madeleine dal Bastione destro all'Avanscoperta.",
+                    hint="Sposta Madeleine dal suo Bastione all'Avanscoperta.",
                     after=["to_schieramento"],
-                    highlight=["my-bastion-right", "my-vanguard"],
+                    highlight=["my-bastion-left", "my-bastion-right", "my-vanguard"],
                     feedback="Tre Guerrieri della stessa Specie nella stessa Regione, anche se carte diverse, "
                              "formano un'Orda, come le tue tre Maghe. Ne attivi un effetto, a scelta tra quelli "
                              "dei tre.",
@@ -629,8 +640,8 @@ TUTORIAL_PARTITA = TutorialDef(
         ),
         TutorialStep(
             "dummy_3", "Turno del Manichino", "Il contrattacco",
-            "Orfeo (ATT 3) ha attaccato il tuo Bastione destro. Senza Madeleine e con pochi Muri, hai perso una "
-            "Vita.",
+            "Orfeo (ATT 3) ha attaccato il tuo Bastione destro. Senza Guerrieri a difenderlo e con pochi Muri, "
+            "hai perso una Vita.",
             highlight=["my-bastion-right", "my-life-deck", "top-opponents"],
             setup=_setup_dummy_turn_3,
         ),

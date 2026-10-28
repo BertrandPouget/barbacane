@@ -12,6 +12,13 @@
  * Tutto lo strato è "click-through" (pointer-events: none): il campo resta
  * giocabile sotto. Lo stile (colori, z-index) è nel CSS di ciascun client.
  *
+ * Ogni zona è un poligono convesso con gli angoli ad arco: il rettangolo
+ * dell'elemento o, per una sagoma SVG con `data-spot-points` ("x,y x,y …"
+ * nelle sue unità, più `data-spot-radius` per il raggio dei suoi angoli),
+ * la sagoma stessa (i triangoli del campo mobile). Due zone vicine si
+ * dividono lo spazio tra loro: gli anelli, tagliati dal lato del vicino, non
+ * si toccano.
+ *
  * keepVisible(ids): elementi sempre scoperti (es. «Abbandona»), con un buco
  * fermo e senza anello: non sono parte del passo, restano solo usabili.
  */
@@ -19,6 +26,11 @@
 const Spotlight = (() => {
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const PAD = 6;          // margine attorno all'elemento evidenziato
+  const RADIUS = 4;       // raggio degli angoli di un rettangolo, prima del margine
+  const SEP = 6;          // distanza minima tra due anelli
+  const OVERLAP = 4;      // zone sovrapposte di più (una dentro l'altra): i loro anelli non si tagliano
+  const SAMPLES = 160;    // punti di un contorno durante lo scivolamento
+  const ARC_STEP = Math.PI / 24; // passo degli archi agli angoli
   const INSET = 4;        // distanza minima dell'anello dal bordo dello schermo
   const GAP = 14;         // distanza tra zona evidenziata e pannello
   const EDGE = 12;        // margine minimo del pannello dal bordo schermo
@@ -38,8 +50,8 @@ const Spotlight = (() => {
   let avoidSel = [];      // selettori delle informazioni da non coprire (opts.avoid)
   let preferCenter = false; // torna al centro appena lì non copre l'importante (opts.preferCenter)
   let placed = null;      // ultima posizione del pannello {left, top}: ci resta finché non copre le zone
-  let current = [];       // rettangoli attualmente disegnati [{x,y,w,h}]
-  let goal = [];          // rettangoli verso cui si sta animando
+  let current = [];       // contorni attualmente disegnati [{pts, poly?, box?}]
+  let goal = [];          // contorni verso cui si sta animando
   let anim = null;
   let pollTimer = null;
   let visible = false;
@@ -58,7 +70,7 @@ const Spotlight = (() => {
         </mask></defs>
         <rect x="0" y="0" width="100%" height="100%" mask="url(#spotlight-mask)"></rect>
       </svg>
-      <div class="spotlight-rings"></div>`;
+      <svg class="spotlight-rings" width="100%" height="100%" aria-hidden="true"></svg>`;
     document.body.appendChild(root);
     maskGroup = root.querySelector('mask g:not(.spotlight-keep)');
     keepGroup = root.querySelector('mask g.spotlight-keep');
@@ -73,10 +85,7 @@ const Spotlight = (() => {
   // Un id preceduto da ">" (es. ">hand-cards") evidenzia solo l'ingombro dei
   // figli, ritagliato sul contenitore: la mano è una fascia larga quanto lo
   // schermo, ma va illuminata solo dove ci sono le carte.
-  function targetRect(spec) {
-    const own = spec.startsWith('>');
-    const el = document.getElementById(own ? spec.slice(1) : spec);
-    if (!el) return null;
+  function targetRect(el, own) {
     const box = el.getBoundingClientRect();
     if (!own) return box;
     // Con i figli diretti dei figli: il badge del costo sporge dalla carta
@@ -92,56 +101,246 @@ const Spotlight = (() => {
     return { left, top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
   }
 
-  // Il margine attorno all'elemento non esce dallo schermo: le zone larghe
-  // quanto la finestra (il tuo campo, gli avversari) restano incorniciate.
-  function measure() {
-    const vw = window.innerWidth, vh = window.innerHeight;
-    return targets
-      .map(targetRect)
-      .filter(Boolean)
-      .filter(r => r.width > 0 && r.height > 0)
-      .map(r => {
-        const x = Math.max(INSET, r.left - PAD), y = Math.max(INSET, r.top - PAD);
-        const right = Math.min(vw - INSET, r.left + r.width + PAD);
-        const bottom = Math.min(vh - INSET, r.top + r.height + PAD);
-        return { x, y, w: Math.max(0, right - x), h: Math.max(0, bottom - y) };
+  // Zona di un elemento in pixel dello schermo: {pts (poligono convesso), rc
+  // (raggio dei suoi angoli)}. Una sagoma SVG con data-spot-points dà i suoi
+  // vertici, portati sullo schermo; il resto il suo rettangolo.
+  function targetShape(spec) {
+    const own = spec.startsWith('>');
+    const el = document.getElementById(own ? spec.slice(1) : spec);
+    if (!el) return null;
+    const spot = !own && el.dataset && el.dataset.spotPoints;
+    if (spot && el.getScreenCTM) {
+      const box = el.getBoundingClientRect(), m = el.getScreenCTM();
+      if (!m || !box.width || !box.height) return null;
+      const pts = spot.trim().split(/\s+/).map(p => {
+        const [x, y] = p.split(',').map(Number);
+        const q = new DOMPoint(x, y).matrixTransform(m);
+        return [q.x, q.y];
       });
+      return { pts: hull(pts), rc: (+el.dataset.spotRadius || 0) * Math.hypot(m.a, m.b) };
+    }
+    const r = targetRect(el, own);
+    if (!r.width || !r.height) return null;
+    const right = r.left + r.width, bottom = r.top + r.height;
+    return {
+      pts: [[r.left, r.top], [right, r.top], [right, bottom], [r.left, bottom]],
+      rc: Math.min(RADIUS, r.width / 2, r.height / 2),
+    };
   }
 
-  const collapsed = r => ({ x: r.x + r.w / 2, y: r.y + r.h / 2, w: 0, h: 0 });
-  const center = () => ({ x: window.innerWidth / 2, y: window.innerHeight / 2, w: 0, h: 0 });
+  // Contorni delle zone evidenziate. Due zone vicine (es. Mana e Azioni) si
+  // dividono lo spazio tra loro: ciascun anello è tagliato, solo dal lato del
+  // vicino, a SEP/2 dalla linea di mezzo; sugli altri lati tiene il margine
+  // pieno. Quelle che si sovrappongono davvero (una dentro l'altra) restano intere.
+  function measure() {
+    const raw = targets.map(targetShape).filter(Boolean);
+    const cuts = raw.map(() => []);  // semipiani [n, limite]: si tiene p·n ≤ limite
+    raw.forEach((a, i) => raw.forEach((b, j) => {
+      if (j <= i) return;
+      const s = separation(a.pts, b.pts);
+      if (s.gap < -OVERLAP) return;
+      const mid = (s.from + s.to) / 2;
+      cuts[i].push([s.n, mid - SEP / 2]);
+      cuts[j].push([[-s.n[0], -s.n[1]], -(mid + SEP / 2)]);
+    }));
+    return raw.map((s, i) => outline(s, cuts[i])).filter(Boolean);
+  }
+
+  // Contorno a distanza PAD dalla zona, con angoli ad arco di raggio rc + PAD,
+  // tagliato dai semipiani `cuts` e sullo schermo: le zone larghe quanto la
+  // finestra (il tuo campo, gli avversari) o che ne escono restano
+  // incorniciate. poly è il contorno fitto da disegnare, pts lo stesso in
+  // SAMPLES punti (per lo scivolamento), box il rettangolo che lo contiene
+  // (per il pannello).
+  function outline(s, cuts) {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const screen = [[[-1, 0], -INSET], [[1, 0], vw - INSET], [[0, -1], -INSET], [[0, 1], vh - INSET]];
+    const poly = cuts.concat(screen).reduce((p, [n, lim]) => cut(p, n, lim),
+      around(inset(s.pts, s.rc), s.rc + PAD));
+    if (poly.length < 3 || Math.abs(signedArea(poly)) < 1) return null;
+    const xs = poly.map(p => p[0]), ys = poly.map(p => p[1]);
+    const x = Math.min(...xs), y = Math.min(...ys);
+    return { poly, pts: resample(poly), box: { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y } };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Geometria dei poligoni convessi (punti [x, y] in pixel dello schermo)
+  // ---------------------------------------------------------------------------
+
+  // Area con segno: il segno dice il verso dei vertici
+  const signedArea = pts => pts.reduce((sum, p, i) => {
+    const q = pts[(i + 1) % pts.length];
+    return sum + p[0] * q[1] - q[0] * p[1];
+  }, 0) / 2;
+
+  const centroid = pts => [
+    pts.reduce((s, p) => s + p[0], 0) / pts.length,
+    pts.reduce((s, p) => s + p[1], 0) / pts.length,
+  ];
+
+  // Inviluppo convesso (catena monotona)
+  function hull(pts) {
+    const ps = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const half = list => {
+      const out = [];
+      for (const p of list) {
+        while (out.length >= 2 && cross(out[out.length - 2], out[out.length - 1], p) <= 0) out.pop();
+        out.push(p);
+      }
+      out.pop();
+      return out;
+    };
+    return half(ps).concat(half(ps.slice().reverse()));
+  }
+
+  // Normale verso l'esterno del lato a→b, in un poligono di verso s (±1)
+  function outward(a, b, s) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1;
+    return [s * dy / len, -s * dx / len];
+  }
+
+  // Incontro delle rette [punto, direzione] (null se parallele)
+  function meet([p, u], [q, v]) {
+    const den = u[0] * v[1] - u[1] * v[0];
+    if (Math.abs(den) < 1e-9) return null;
+    const t = ((q[0] - p[0]) * v[1] - (q[1] - p[1]) * v[0]) / den;
+    return [p[0] + u[0] * t, p[1] + u[1] * t];
+  }
+
+  // Il poligono con i lati spostati verso l'interno di d; se così si
+  // rovescerebbe (zona troppo piccola), d si dimezza
+  function inset(pts, d) {
+    const s = Math.sign(signedArea(pts)) || 1;
+    for (let k = 0; k < 8 && d > 0.1; k++, d /= 2) {
+      const lines = pts.map((a, i) => {
+        const b = pts[(i + 1) % pts.length], n = outward(a, b, s);
+        return [[a[0] - n[0] * d, a[1] - n[1] * d], [b[0] - a[0], b[1] - a[1]]];
+      });
+      const out = lines.map((l, i) => meet(lines[(i + lines.length - 1) % lines.length], l));
+      if (out.every(Boolean) && signedArea(out) * s > 1) return out;
+    }
+    return pts;
+  }
+
+  // Contorno a distanza rad dal poligono: lati paralleli e archi agli angoli
+  function around(core, rad) {
+    const s = Math.sign(signedArea(core)) || 1, n = core.length, out = [];
+    core.forEach((v, i) => {
+      const n1 = outward(core[(i + n - 1) % n], v, s), n2 = outward(v, core[(i + 1) % n], s);
+      const a1 = Math.atan2(n1[1], n1[0]);
+      let turn = Math.atan2(n2[1], n2[0]) - a1;
+      turn -= 2 * Math.PI * Math.round(turn / (2 * Math.PI));
+      const steps = Math.max(1, Math.ceil(Math.abs(turn) / ARC_STEP));
+      for (let k = 0; k <= steps; k++) {
+        const a = a1 + turn * k / steps;
+        out.push([v[0] + rad * Math.cos(a), v[1] + rad * Math.sin(a)]);
+      }
+    });
+    return out;
+  }
+
+  // La parte del poligono con p·n ≤ lim
+  function cut(poly, n, lim) {
+    const side = p => p[0] * n[0] + p[1] * n[1] - lim;
+    const out = [];
+    poly.forEach((p, i) => {
+      const q = poly[(i + 1) % poly.length], sp = side(p), sq = side(q);
+      if (sp <= 0) out.push(p);
+      if ((sp <= 0) !== (sq <= 0)) {
+        const t = sp / (sp - sq);
+        out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
+      }
+    });
+    return out;
+  }
+
+  // Miglior asse separatore tra due poligoni convessi: {gap, n, from, to}, con
+  // n da a verso b, from = sporgenza massima di a lungo n, to = minima di b e
+  // gap = to − from (negativo se si sovrappongono; mai più della distanza vera)
+  function separation(a, b) {
+    let best = null;
+    [[a, b, 1], [b, a, -1]].forEach(([p, q, k]) => {
+      const s = Math.sign(signedArea(p)) || 1;
+      p.forEach((v, i) => {
+        const o = outward(v, p[(i + 1) % p.length], s);
+        const proj = pt => pt[0] * o[0] + pt[1] * o[1];
+        const gap = Math.min(...q.map(proj)) - Math.max(...p.map(proj));
+        if (best && gap <= best.gap) return;
+        const n = [k * o[0], k * o[1]];
+        const along = pt => pt[0] * n[0] + pt[1] * n[1];
+        best = { gap, n, from: Math.max(...a.map(along)), to: Math.min(...b.map(along)) };
+      });
+    });
+    return best;
+  }
+
+  // SAMPLES punti equidistanti sul contorno, sempre nello stesso verso e a
+  // partire da quello sopra il centro: nello scivolamento una zona si deforma
+  // nell'altra senza torcersi
+  function resample(poly) {
+    let pts = signedArea(poly) < 0 ? poly.slice().reverse() : poly;
+    const c = centroid(pts);
+    let start = 0, best = Infinity;
+    pts.forEach((p, i) => {
+      const a = Math.abs(Math.atan2(p[0] - c[0], c[1] - p[1]));
+      if (a < best) { best = a; start = i; }
+    });
+    pts = pts.slice(start).concat(pts.slice(0, start));
+    const lens = [0];
+    pts.forEach((p, i) => {
+      const q = pts[(i + 1) % pts.length];
+      lens.push(lens[i] + Math.hypot(q[0] - p[0], q[1] - p[1]));
+    });
+    const total = lens[pts.length], out = [];
+    let j = 0;
+    for (let k = 0; k < SAMPLES; k++) {
+      const at = total * k / SAMPLES;
+      while (j < pts.length - 1 && lens[j + 1] < at) j++;
+      const p = pts[j], q = pts[(j + 1) % pts.length], seg = lens[j + 1] - lens[j];
+      const t = seg ? (at - lens[j]) / seg : 0;
+      out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
+    }
+    return out;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Disegno e scivolamento
+  // ---------------------------------------------------------------------------
+
+  const collapsed = s => { const c = centroid(s.pts); return { pts: s.pts.map(() => c) }; };
+  const center = () => ({ pts: Array(SAMPLES).fill([window.innerWidth / 2, window.innerHeight / 2]) });
   const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
   const lerp = (a, b, t) => a + (b - a) * t;
-  const same = (a, b) => a.length === b.length && a.every((r, i) =>
-    Math.abs(r.x - b[i].x) < 1 && Math.abs(r.y - b[i].y) < 1 &&
-    Math.abs(r.w - b[i].w) < 1 && Math.abs(r.h - b[i].h) < 1);
+  const same = (a, b) => a.length === b.length && a.every((s, i) => s.pts.every((p, j) =>
+    Math.abs(p[0] - b[i].pts[j][0]) < 1 && Math.abs(p[1] - b[i].pts[j][1]) < 1));
+  const pathOf = pts => `M${pts.map(p => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join('L')}Z`;
 
-  function draw(rects) {
-    while (maskGroup.children.length < rects.length) {
-      const hole = document.createElementNS(SVG_NS, 'rect');
+  // Fermi si disegna il contorno fitto (poly), durante lo scivolamento i punti
+  // ricampionati
+  function draw(shapes) {
+    while (maskGroup.children.length < shapes.length) {
+      const hole = document.createElementNS(SVG_NS, 'path');
       hole.setAttribute('fill', 'black');
-      hole.setAttribute('rx', '10');
       maskGroup.appendChild(hole);
-      const ring = document.createElement('div');
-      ring.className = 'spotlight-ring';
+      const ring = document.createElementNS(SVG_NS, 'path');
+      ring.setAttribute('class', 'spotlight-ring');
       ringLayer.appendChild(ring);
     }
     [...maskGroup.children].forEach((hole, i) => {
-      const r = rects[i];
+      const s = shapes[i];
       const ring = ringLayer.children[i];
-      if (!r || r.w < 1 || r.h < 1) {
-        hole.setAttribute('width', '0');
-        hole.setAttribute('height', '0');
+      const pts = s && (s.poly || s.pts);
+      if (!pts || Math.abs(signedArea(pts)) < 1) {
+        hole.setAttribute('d', '');
+        ring.setAttribute('d', '');
         ring.style.display = 'none';
         return;
       }
-      hole.setAttribute('x', r.x);
-      hole.setAttribute('y', r.y);
-      hole.setAttribute('width', r.w);
-      hole.setAttribute('height', r.h);
-      Object.assign(ring.style, {
-        display: 'block', left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px`,
-      });
+      const d = pathOf(pts);
+      hole.setAttribute('d', d);
+      ring.setAttribute('d', d);
+      ring.style.display = '';
     });
   }
 
@@ -178,7 +377,7 @@ const Spotlight = (() => {
     for (let i = 0; i < n; i++) {
       const src = current[i] || current[current.length - 1];
       to.push(next[i] || collapsed(current[i]));
-      from.push(current[i] || (src ? { ...src } : collapsed(next[i] || center())));
+      from.push(current[i] || (src ? { pts: src.pts } : collapsed(next[i] || center())));
     }
     goal = next;
     if (!duration) {
@@ -191,8 +390,7 @@ const Spotlight = (() => {
       const t = Math.min(1, (now - t0) / duration);
       const k = ease(t);
       current = from.map((a, i) => ({
-        x: lerp(a.x, to[i].x, k), y: lerp(a.y, to[i].y, k),
-        w: lerp(a.w, to[i].w, k), h: lerp(a.h, to[i].h, k),
+        pts: a.pts.map((p, j) => [lerp(p[0], to[i].pts[j][0], k), lerp(p[1], to[i].pts[j][1], k)]),
       }));
       draw(current);
       if (t < 1) {
@@ -317,7 +515,7 @@ const Spotlight = (() => {
     const next = measure();
     if (!same(next, goal)) animateTo(next, instant ? 0 : DURATION);
     drawKeep();
-    placePanel(next);
+    placePanel(next.map(s => s.box));
   }
 
   function show(ids, panelEl, opts = {}) {
@@ -344,7 +542,7 @@ const Spotlight = (() => {
     const next = measure();
     animateTo(next, DURATION);
     drawKeep();
-    placePanel(next);
+    placePanel(next.map(s => s.box));
     // La transizione CSS del pannello parte solo dopo il primo piazzamento,
     // così non "vola" dall'angolo in alto a sinistra quando appare.
     if (panel) requestAnimationFrame(() => panel && panel.classList.add('spotlight-panel-placed'));
