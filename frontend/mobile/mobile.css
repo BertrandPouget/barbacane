@@ -1454,13 +1454,12 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
    riquadro marrone e il numero dentro un simbolo. Come renderDeck del desktop. */
 .card.deck {
   padding: 0;
-  border: none;
+  border: 1px solid rgba(214, 170, 60, 0.35);  /* bordino oro spento come le minicarte */
   border-radius: 6px;  /* in px: i cqw qui si misurerebbero sul contenitore esterno */
   background: transparent;
   overflow: hidden;
   position: relative;
   container-type: inline-size;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
 .deck-back {
   position: absolute;
@@ -1714,11 +1713,11 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   background: transparent;
   container-type: inline-size;  /* testi e simboli si misurano sulla larghezza della carta */
 }
-/* Nessun contorno a riposo: si vede solo la cornice stampata della carta (oro se evidenziata) */
+/* A riposo un bordino oro spento, per staccare la carta dal tavolo (oro pieno se evidenziata) */
 /* Sulla minicarta nessun bordo spesso dei tipi (es. Costruzione completata):
    tutte le carte hanno la stessa misura */
 .card.has-art[data-type] { border-width: 1px; }
-.card.has-art:not(:active):not(.selected):not(.peeked) { border-color: transparent; }
+.card.has-art:not(:active):not(.selected):not(.peeked) { border-color: rgba(214, 170, 60, 0.35); }
 .card.has-art > :not(.card-art):not(.card-cost-badge):not(.card-keep):not(.mc-under):not(.mc-back) { display: none; }
 /* La minicarta (.mc), disegnata in HTML: posizioni in % della carta (la
    minicarta è progettata a 280×400 con cornice di 13), testi in cqw (larghezza

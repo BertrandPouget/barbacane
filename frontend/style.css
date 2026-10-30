@@ -1320,8 +1320,10 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   white-space: pre-line;
   order: -2;
 }
-/* Nomi delle Regioni come i titoli del campo mobile (.ov-title) */
-#my-field .region::before {
+/* Nomi delle Regioni come i titoli del campo mobile (.ov-title); così anche Vite e Carte Attive */
+#my-field .region::before,
+#my-life-deck::before,
+#my-active-cards::before {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1557,7 +1559,12 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 .st-gem-act::before { inset: 2px; background: var(--hex-maga); }
 .st-gem-act b { color: #1d3f50; }
 
-/* Mazzo vite */
+/* Mazzo vite e Carte Attive: solo il dorso con l'etichetta, senza il riquadro delle Regioni */
+.region.life-deck,
+.region.active-cards {
+  border: none;
+  background: transparent;
+}
 .region.life-deck {
   position: absolute;
   left: 8px;
@@ -1645,7 +1652,8 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 }
 
 .card.in-field { cursor: default; }
-.card.in-field:hover { transform: none; }
+/* In campo niente salita né ombra: solo un contorno dorato sottile, come i mazzi (.card.deck) */
+.card.in-field:hover { transform: none; box-shadow: 0 0 0 1px var(--gold); }
 
 .card.ethereal {
   border-color: #ffffff !important;
@@ -1858,14 +1866,15 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   background: transparent;
   container-type: inline-size;  /* testi e simboli si misurano sulla larghezza della carta */
 }
-/* Nessun contorno a riposo: si vede solo la cornice stampata della carta (oro se evidenziata) */
+/* A riposo un bordino oro spento, per staccare la carta dal tavolo (oro pieno se evidenziata) */
 /* Sulla minicarta nessun bordo spesso dei tipi (es. Costruzione completata):
    tutte le carte hanno la stessa misura */
 .card.has-art[data-type] { border-width: 1px; }
-.card.has-art:not(:hover):not(.selected) { border-color: transparent; }
+.card.has-art:not(:hover):not(.selected) { border-color: rgba(214, 170, 60, 0.35); }
 /* Cornice oro uniforme: senza questa regola il bordo sinistro manterrebbe il
    colore del tipo (.card[data-type], più specifica di .card:hover) */
 .card.has-art[data-type]:hover { border-color: var(--gold); }
+.card.has-art.in-field[data-type]:hover { border-color: rgba(214, 170, 60, 0.35); }  /* in campo l'oro pieno è il contorno esterno */
 .card.has-art[data-type].selected { border-color: var(--gold-light); }
 .card.has-art > :not(.card-art):not(.card-cost-badge):not(.card-keep):not(.mc-under):not(.mc-back) { display: none; }
 /* La minicarta (.mc), disegnata in HTML: posizioni in % della carta (la
@@ -2156,21 +2165,17 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   width: var(--card-w-field);
   min-width: var(--card-w-field);
   height: var(--card-h-field);
-  /* Bordo trasparente come le minicarte: il dorso ha la misura della loro illustrazione */
+  /* Bordino oro spento come le minicarte: il dorso ha la misura della loro illustrazione */
   padding: 0;
-  border: 1px solid transparent;
+  border: 1px solid rgba(214, 170, 60, 0.35);
   border-radius: 6px;  /* in px: i cqw qui si misurerebbero sul contenitore esterno */
   background: transparent;
   overflow: hidden;
   container-type: inline-size;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
-.card.deck:hover { transform: none; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45); }
+/* Al passaggio del mouse come le carte in campo (.card.in-field:hover) */
+.card.deck:hover { transform: none; box-shadow: 0 0 0 1px var(--gold); }
 .card.deck.clickable { cursor: pointer; }
-.card.deck.clickable:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 0 0 1px var(--gold), 0 4px 12px rgba(0, 0, 0, 0.5);
-}
 .deck-back {
   position: absolute;
   inset: 0;
