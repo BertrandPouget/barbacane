@@ -189,9 +189,33 @@ const App = (() => {
           instanceMap[`${c.id}_${i}`] = c.id;
         }
       });
+      _linkRelatedCards();
     } catch (e) {
       console.error('Impossibile caricare cards.json', e);
     }
+  }
+
+  // def.related: le carte da conoscere per capire questa (Recluta ↔ Eroe, carte
+  // nominate nel testo, es. Cardo ↔ Decumano), mostrate accanto all'anteprima.
+  // Nomi dal più lungo, cancellati una volta trovati: «Giulio II» non conta anche «Giulio».
+  function _linkRelatedCards() {
+    const defs = Object.values(cardDefs);
+    const byName = defs.map(c => ({
+      id: c.id,
+      re: new RegExp(`(?<!\\p{L})${c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\p{L})`, 'gu'),
+      len: c.name.length,
+    })).sort((a, b) => b.len - a.len);
+    defs.forEach(c => {
+      const ids = [c.evolves_from, c.evolves_into].filter(Boolean);
+      let text = [c.base_effect, c.complete_effect, c.prodigy_effect, c.horde_effect].filter(Boolean).join(' ');
+      byName.forEach(n => {
+        if (!n.re.test(text)) return;
+        n.re.lastIndex = 0;
+        text = text.replace(n.re, ' ');
+        if (n.id !== c.id && !ids.includes(n.id)) ids.push(n.id);
+      });
+      c.related = ids;
+    });
   }
 
   // Link d'invito: si apre "Unisciti" con il codice già inserito

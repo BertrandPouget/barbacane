@@ -848,14 +848,17 @@ const Renderer = (() => {
   // Carta intera al centro dello schermo al passaggio del mouse sulle minicarte
   // (mano e campo). Passando da una carta all'altra cambia senza sparire: l'uscita
   // aspetta un attimo, e se si entra in un'altra carta viene annullata.
+  // Accanto, più piccole, le carte collegate (def.related, calcolato in app.js).
   const CardPreview = (() => {
     let node = null;
+    const relNodes = [];
     let hideTimer = null;
 
     function hide() {
       clearTimeout(hideTimer);
       hideTimer = null;
       if (node) node.hidden = true;
+      relNodes.forEach(n => { n.hidden = true; });
     }
 
     function show(cardEl, def) {
@@ -871,30 +874,55 @@ const Renderer = (() => {
       CardArt.showFull(node, def.id);
       node.alt = def.name;
       node.hidden = false;
-      place(cardEl);
+      const related = def.related || [];
+      while (relNodes.length < related.length) {
+        const n = el('img', { className: 'hand-preview hand-preview-related', alt: '' });
+        n.hidden = true;
+        document.body.appendChild(n);
+        relNodes.push(n);
+      }
+      relNodes.forEach((n, i) => {
+        n.hidden = i >= related.length;
+        if (!n.hidden) CardArt.showFull(n, related[i]);
+      });
+      place(cardEl, related.length);
     }
 
     // Carte in mano: al centro dello schermo, alzata quanto basta per non coprire
     // la carta (nel ventaglio quelle centrali stanno più in alto). Carte in campo:
     // accanto a quella sotto il mouse, a destra, o a sinistra se a destra non c'è
     // spazio; in altezza centrata sulla carta, dentro lo schermo
-    function place(cardEl) {
+    function place(cardEl, nRelated) {
       const GAP = 14, EDGE = 12;
       const vw = window.innerWidth, vh = window.innerHeight;
       const w = node.offsetWidth, h = w * 1040 / 744;  // l'immagine può non essere ancora caricata
       const r = cardEl.getBoundingClientRect();
+      let left, top, outward = true;  // outward: le collegate vanno dal lato opposto alla carta
       if (cardEl.closest('#hand-cards')) {
-        node.style.left = `${Math.round((vw - w) / 2)}px`;
-        node.style.top = `${Math.round(Math.max(EDGE, Math.min((vh - h) / 2, r.top - GAP - h)))}px`;
-        return;
+        left = (vw - w) / 2;
+        top = Math.max(EDGE, Math.min((vh - h) / 2, r.top - GAP - h));
+      } else {
+        const roomRight = vw - EDGE - (r.right + GAP), roomLeft = r.left - GAP - EDGE;
+        outward = roomRight >= w || roomRight >= roomLeft;
+        left = outward ? Math.min(r.right + GAP, vw - EDGE - w) : Math.max(EDGE, r.left - GAP - w);
+        top = Math.max(EDGE, Math.min(vh - h - EDGE, r.top + r.height / 2 - h / 2));
       }
-      const roomRight = vw - EDGE - (r.right + GAP), roomLeft = r.left - GAP - EDGE;
-      const left = roomRight >= w || roomRight >= roomLeft
-        ? Math.min(r.right + GAP, vw - EDGE - w)
-        : Math.max(EDGE, r.left - GAP - w);
-      const top = Math.max(EDGE, Math.min(vh - h - EDGE, r.top + r.height / 2 - h / 2));
       node.style.left = `${Math.round(left)}px`;
       node.style.top = `${Math.round(top)}px`;
+      if (!nRelated) return;
+
+      // Collegate in colonna accanto alla carta grande, allineate in alto
+      const rw = relNodes[0].offsetWidth, rh = rw * 1040 / 744;
+      const colH = nRelated * rh + (nRelated - 1) * GAP;
+      const right = left + w + GAP, leftSide = left - GAP - rw;
+      const fitsRight = right + rw <= vw - EDGE, fitsLeft = leftSide >= EDGE;
+      let x = outward ? (fitsRight || !fitsLeft ? right : leftSide) : (fitsLeft || !fitsRight ? leftSide : right);
+      x = Math.max(EDGE, Math.min(vw - EDGE - rw, x));
+      const y = Math.max(EDGE, Math.min(vh - EDGE - colH, top));
+      for (let i = 0; i < nRelated; i++) {
+        relNodes[i].style.left = `${Math.round(x)}px`;
+        relNodes[i].style.top = `${Math.round(y + i * (rh + GAP))}px`;
+      }
     }
 
     function bind(cardEl, def) {

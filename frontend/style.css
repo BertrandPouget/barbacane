@@ -2096,6 +2096,11 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   pointer-events: none;
   animation: hand-preview-in 0.14s ease-out;
 }
+/* Carte collegate (Recluta ↔ Eroe, Cardo ↔ Decumano…): accanto, più piccole */
+.hand-preview-related {
+  width: min(220px, calc(62vh * 744 / 1040 * 0.55), 45vw);
+  border-radius: 8px;
+}
 @keyframes hand-preview-in {
   from { opacity: 0; transform: scale(0.94); }
   to   { opacity: 1; transform: none; }
