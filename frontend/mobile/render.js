@@ -37,6 +37,7 @@ const Render = (() => {
   // ---------------------------------------------------------------------------
 
   const PHASES = ['action', 'schieramento', 'battaglia'];
+  const PHASE_NAMES = { action: 'Azioni', schieramento: 'Schieramento', battaglia: 'Battaglia' };
 
   function topbar(state) {
     $('tb-turn').textContent = `T${state.turn}`;
@@ -48,6 +49,7 @@ const Render = (() => {
       dot.classList.toggle('on', i === idx);
       dot.classList.toggle('done', idx >= 0 && i < idx);
     });
+    $('tb-phase-name').textContent = PHASE_NAMES[state.phase] || '';
   }
 
   function phaseDimmed(dimmed) {

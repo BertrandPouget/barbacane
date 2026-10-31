@@ -302,8 +302,9 @@ const Mob = (() => {
     $('over-scores').addEventListener('click', () => { haptic(); openStatsSheet(); });
 
     // Catalogo carte
-    $('btn-catalog').addEventListener('click', openCatalog);
-    $('cat-back').addEventListener('click', () => { haptic(); Screens.show('lobby'); });
+    $('btn-catalog').addEventListener('click', () => openCatalog());
+    $('tb-catalog').addEventListener('click', () => openCatalog(true));
+    $('cat-back').addEventListener('click', closeCatalog);
 
     // Tutorial
     $('btn-tutorial').addEventListener('click', startTutorial);
@@ -648,6 +649,7 @@ const Mob = (() => {
 
   let catalogList = [];      // definizioni in ordine di visualizzazione
   let catalogBuilt = false;
+  let catalogFromGame = false;  // «‹» torna alla partita invece che alla lobby
 
   const CATALOG_SECTIONS = [
     { type: 'warrior',  label: 'Guerrieri' },
@@ -655,10 +657,20 @@ const Mob = (() => {
     { type: 'building', label: 'Costruzioni' },
   ];
 
-  function openCatalog() {
+  function openCatalog(fromGame = false) {
     haptic();
+    catalogFromGame = fromGame;
     if (!catalogBuilt) buildCatalogGrid();
     Screens.show('catalog');
+  }
+
+  function closeCatalog() {
+    haptic();
+    if (!catalogFromGame) { Screens.show('lobby'); return; }
+    catalogFromGame = false;
+    Screens.show('game');
+    // A schermo nascosto il campo non si misura: ricalcola le misure ora
+    window.dispatchEvent(new Event('resize'));
   }
 
   function buildCatalogGrid() {
@@ -704,14 +716,6 @@ const Mob = (() => {
     catalogBuilt = true;
   }
 
-  function catalogSubtitle(def) {
-    if (def.type === 'warrior') {
-      return `${capitalize(def.species)} · ${def.subtype === 'hero' ? 'Eroe' : 'Recluta'}`;
-    }
-    if (def.type === 'spell') return `Magia · ${capitalize(def.school)}`;
-    return 'Costruzione';
-  }
-
   function showCatalogCard(idx) {
     const def = catalogList[idx];
     if (!def) return;
@@ -720,9 +724,10 @@ const Mob = (() => {
     if (catalogList[idx - 1]) Render.preloadCardImage(catalogList[idx - 1].id);
     if (catalogList[idx + 1]) Render.preloadCardImage(catalogList[idx + 1].id);
 
+    // Nome e tipo stanno già sulla carta: niente titolo, sotto le copie nel mazzo
     showCardNavSheet({
-      title: def.name,
-      subtitle: catalogSubtitle(def),
+      title: '',
+      note: `Copie nel mazzo: ${def.copies}`,
       def,
       ctx: {},
       pos: { idx, total: catalogList.length },
@@ -2099,8 +2104,9 @@ const Mob = (() => {
     return ` · 🗡️${w.att} 🏹${w.git} 🛡️${w.dif}`;
   }
 
-  function showCardNavSheet({ title, subtitle, def, ctx = {}, pos, onPrev, onNext, footer = [], refresh = null }) {
+  function showCardNavSheet({ title, subtitle, note, def, ctx = {}, pos, onPrev, onNext, footer = [], refresh = null }) {
     const body = [Render.cardViewNode(def, ctx)];
+    if (note) body.push(el('div', { className: 'card-note' }, [note]));
     if (onPrev || onNext) {
       const nav = el('div', { className: 'card-nav', style: 'justify-content:center' });
       // ︎ forza la resa testuale 2D (come ❤︎): i glifi ⮜⮞ non esistono nei font iOS
@@ -3198,10 +3204,10 @@ const Mob = (() => {
     const state = currentState;
     const list = Chronicle.entries(state);
     const opts = { cardDefs, myPlayerId };
-    // Turni dal più recente; dentro ogni turno, le mosse in ordine
+    // Dal più recente in cima: turni e, dentro ogni turno, mosse in ordine inverso
     const html = Chronicle.groupByTurn(list).reverse().map(g => {
       const head = g.header ? `<div class="log-turn">${Chronicle.toHTML(g.header.text, state, opts)}</div>` : '';
-      const rows = g.items.map(e =>
+      const rows = g.items.slice().reverse().map(e =>
         `<div class="log-row log-${e.kind}">${Chronicle.toHTML(e.text, state, opts)}</div>`).join('');
       return `<div class="log-group">${head}${rows}</div>`;
     }).join('');

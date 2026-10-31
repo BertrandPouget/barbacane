@@ -286,8 +286,9 @@ const App = (() => {
     });
 
     // Catalogo carte
-    document.getElementById('btn-catalog').addEventListener('click', openCatalog);
-    document.getElementById('btn-catalog-back').addEventListener('click', () => Renderer.showScreen('lobby'));
+    document.getElementById('btn-catalog').addEventListener('click', () => openCatalog());
+    document.getElementById('btn-game-catalog').addEventListener('click', () => openCatalog(true));
+    document.getElementById('btn-catalog-back').addEventListener('click', closeCatalog);
 
     // Tutorial
     document.getElementById('btn-tutorial').addEventListener('click', startTutorial);
@@ -653,11 +654,12 @@ const App = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Catalogo carte (consultabile dalla lobby, prima della partita)
+  // Catalogo carte (dalla lobby o dalla partita: «Indietro» torna da dove si è venuti)
   // ---------------------------------------------------------------------------
 
   let catalogList = [];      // definizioni in ordine di visualizzazione
   let catalogBuilt = false;
+  let catalogFromGame = false;
 
   const CATALOG_SECTIONS = [
     { type: 'warrior',  label: 'Guerrieri' },
@@ -665,9 +667,19 @@ const App = (() => {
     { type: 'building', label: 'Costruzioni' },
   ];
 
-  function openCatalog() {
+  function openCatalog(fromGame = false) {
+    catalogFromGame = fromGame;
+    if (fromGame) Renderer.closeChroniclePanel();
     if (!catalogBuilt) buildCatalogGrid();
     Renderer.showScreen('catalog');
+  }
+
+  function closeCatalog() {
+    if (!catalogFromGame) { Renderer.showScreen('lobby'); return; }
+    catalogFromGame = false;
+    Renderer.showScreen('game');
+    // A schermo nascosto fitCards non misura: ricalcola le carte ora
+    window.dispatchEvent(new Event('resize'));
   }
 
   function buildCatalogGrid() {
@@ -727,6 +739,7 @@ const App = (() => {
     const navOptions = {
       onPrev: idx > 0 ? () => showCatalogCard(idx - 1) : null,
       onNext: idx < catalogList.length - 1 ? () => showCatalogCard(idx + 1) : null,
+      note: `Copie nel mazzo: ${def.copies}`,
     };
     Renderer.showCardDetail(
       def.name,

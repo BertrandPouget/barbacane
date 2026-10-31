@@ -203,6 +203,7 @@
     <div class="header-right">
       <span id="hdr-deck" class="hdr-pill" title="Carte nel mazzo"><i class="deck-ico"></i><span id="hdr-deck-n">—</span></span>
       <div id="turn-timer-display" class="timer hidden"></div>
+      <button id="btn-game-catalog" class="btn btn-small btn-chronicle" title="Sfoglia tutte le carte del gioco">Catalogo</button>
       <button id="btn-chronicle" class="btn btn-small btn-chronicle" title="Tutto quello che è successo nella partita">Cronaca</button>
       <button id="btn-abandon" class="btn btn-small btn-abandon">Abbandona</button>
     </div>
@@ -339,6 +340,7 @@
       </div>
     </div>
     <div class="card-flip-hint">clicca la carta per girarla</div>
+    <div id="card-img-note" class="card-img-note hidden"></div>
     <div id="card-image-footer">
       <button id="card-img-prev"    class="btn btn-secondary card-nav-btn" style="visibility:hidden">‹</button>
       <div id="card-img-center">
@@ -375,7 +377,7 @@
 <aside id="chronicle-panel" class="hidden" aria-label="Cronaca della partita">
   <div class="chronicle-head">
     <h3>Cronaca della partita</h3>
-    <button id="chronicle-close" class="btn btn-secondary btn-small" aria-label="Chiudi la cronaca">✕</button>
+    <button id="chronicle-close" class="btn btn-secondary btn-small" aria-label="Chiudi la cronaca"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2L8 8M8 2L2 8"/></svg></button>
   </div>
   <div id="chronicle-body" class="chronicle-body"></div>
 </aside>

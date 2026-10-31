@@ -68,7 +68,7 @@ const Screens = {
 };
 
 // In partita, nel catalogo e nelle schermate di scelta il pulsante
-// musica vive nell'header della schermata (rispettivamente accanto a "Esci" e
+// musica vive nell'header della schermata (rispettivamente prima di "Esci" e
 // speculare a "←"); altrove resta fisso in alto a destra, come sul desktop.
 const MUSIC_HOME_CLASSES = ['in-header', 'in-catalog-header'];
 
@@ -99,7 +99,9 @@ function placeMusicToggle(name) {
   }
 
   if (target) {
-    if (btn.parentElement !== target) target.appendChild(btn);
+    // In partita «Esci» resta l'ultimo a destra
+    if (cls === 'in-header') target.insertBefore(btn, $('tb-leave'));
+    else if (btn.parentElement !== target) target.appendChild(btn);
     MUSIC_HOME_CLASSES.forEach(c => btn.classList.toggle(c, c === cls));
   } else if (MUSIC_HOME_CLASSES.some(c => btn.classList.contains(c))) {
     document.body.appendChild(btn);

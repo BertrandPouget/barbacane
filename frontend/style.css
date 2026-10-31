@@ -1131,7 +1131,7 @@ input:focus {
   text-align: center;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 1px;
   overflow: hidden;
   cursor: pointer;
@@ -1145,12 +1145,12 @@ input:focus {
   color: var(--text);
 }
 
-.battle-log-entry:not(:last-child) {
+.battle-log-entry:not(:first-child) {
   opacity: 0.5;
 }
 
 .battle-log-entry.chr-battle { color: #f0b8a0; }
-.battle-log-entry.fresh:last-child { animation: chr-fresh 0.9s ease; }
+.battle-log-entry.fresh:first-child { animation: chr-fresh 0.9s ease; }
 
 /* ==================== CRONACA ==================== */
 
@@ -1217,10 +1217,22 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   padding: 0;
   border-radius: 50%;
   border-color: var(--border-gold);
+  background: var(--bg-medium);
+  color: var(--gold-light);
+  opacity: 0.85;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+}
+/* ✕ disegnata in SVG: il glifo del font non sta al centro del tondo */
+#chronicle-close svg {
+  width: 10px;
+  height: 10px;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  fill: none;
 }
 
 .chronicle-body {
@@ -2738,6 +2750,8 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   font-style: italic;
   margin-top: -0.2rem;
 }
+/* Copie nel mazzo (catalogo): attaccata alla carta, staccata dalla barra delle frecce */
+.card-img-note { color: var(--gold-light); font-size: 0.9rem; margin: -0.3rem 0 0.5rem; }
 @media (prefers-reduced-motion: reduce) {
   .card-flip-inner { transition: none; }
 }

@@ -1092,7 +1092,7 @@ const Renderer = (() => {
    */
   function renderChronicle(state, myPlayerId, cardDefs, fresh = new Set()) {
     const opts = { cardDefs, myPlayerId };
-    const recent = Chronicle.entries(state).filter(e => e.kind !== 'turn').slice(-CHRONICLE_TICKER_ENTRIES);
+    const recent = Chronicle.entries(state).filter(e => e.kind !== 'turn').slice(-CHRONICLE_TICKER_ENTRIES).reverse();
     document.getElementById('battle-log').innerHTML = recent
       .map(e => _chronicleEntryHTML(e, state, opts, fresh, 'div', 'battle-log-entry'))
       .join('');
@@ -1101,23 +1101,25 @@ const Renderer = (() => {
     }
   }
 
-  function renderChroniclePanel(state, myPlayerId, cardDefs, fresh = new Set(), forceBottom = false) {
+  // Dal più recente in cima: turni e, dentro ogni turno, mosse in ordine inverso.
+  function renderChroniclePanel(state, myPlayerId, cardDefs, fresh = new Set(), forceTop = false) {
     const body = document.getElementById('chronicle-body');
-    const wasAtBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 48;
+    const wasAtTop = body.scrollTop < 48;
     const opts = { cardDefs, myPlayerId, interactive: true };
     const list = Chronicle.entries(state);
-    const groups = Chronicle.groupByTurn(list);
-    let html = list.length && list[0].id > 1
-      ? '<div class="chr-older">Le mosse più vecchie non sono più mostrate.</div>' : '';
-    html += groups.map(g => {
+    const groups = Chronicle.groupByTurn(list).reverse();
+    let html = groups.map(g => {
       const head = g.header
         ? `<div class="chr-turn">${Chronicle.toHTML(g.header.text, state, opts)}</div>` : '';
       return `<section class="chr-group">${head}`
-        + g.items.map(e => _chronicleEntryHTML(e, state, opts, fresh)).join('')
+        + g.items.slice().reverse().map(e => _chronicleEntryHTML(e, state, opts, fresh)).join('')
         + '</section>';
     }).join('');
+    if (list.length && list[0].id > 1) {
+      html += '<div class="chr-older">Le mosse più vecchie non sono più mostrate.</div>';
+    }
     body.innerHTML = html || '<div class="chr-older">Ancora nessuna mossa.</div>';
-    if (forceBottom || wasAtBottom) body.scrollTop = body.scrollHeight;
+    if (forceTop || wasAtTop) body.scrollTop = 0;
   }
 
   /** aboveOverlay: il pannello va sopra la schermata di fine partita. */
@@ -1264,6 +1266,12 @@ const Renderer = (() => {
 
       _fillExtraButtons('card-img-extra-btns');
       _setupNav('card-img-prev', 'card-img-next');
+
+      // Riga sotto la carta (nel catalogo: le copie nel mazzo)
+      const noteEl = document.getElementById('card-img-note');
+      const note = navOptions && navOptions.note;
+      noteEl.textContent = note || '';
+      noteEl.classList.toggle('hidden', !note);
 
       document.getElementById('card-img-close').onclick = () => overlay.classList.add('hidden');
       overlay.classList.remove('hidden');
@@ -1751,7 +1759,7 @@ const Renderer = (() => {
   }
 
   // In partita, nel catalogo e nelle schermate di scelta il pulsante
-  // musica vive nella barra dell'header (rispettivamente dopo "Esci" e accanto al
+  // musica vive nella barra dell'header (rispettivamente prima di "Abbandona" e accanto al
   // titolo); altrove resta fisso in alto a destra. Con la cronaca aperta sta
   // nella sua intestazione, accanto alla ✕ (il pannello copre l'header).
   const MUSIC_HOME_CLASSES = ['in-header', 'in-catalog-header', 'in-chronicle'];
@@ -1788,6 +1796,8 @@ const Renderer = (() => {
 
     if (target) {
       if (cls === 'in-chronicle') target.insertBefore(btn, document.getElementById('chronicle-close'));
+      // In partita «Abbandona» resta l'ultimo a destra
+      else if (cls === 'in-header') target.insertBefore(btn, document.getElementById('btn-abandon'));
       else if (btn.parentElement !== target) target.appendChild(btn);
       MUSIC_HOME_CLASSES.forEach(c => btn.classList.toggle(c, c === cls));
     } else if (MUSIC_HOME_CLASSES.some(c => btn.classList.contains(c))) {

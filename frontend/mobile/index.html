@@ -141,7 +141,7 @@
 <!-- ═══════════ SCHERMATA: CATALOGO CARTE ═══════════ -->
 <section id="scr-catalog" class="scr">
   <header id="cat-head" class="glass">
-    <button id="cat-back" class="tb-btn" aria-label="Torna alla lobby">‹</button>
+    <button id="cat-back" class="tb-btn" aria-label="Indietro">‹</button>
     <span class="cat-title">Catalogo</span>
   </header>
   <div id="cat-scroll">
@@ -190,12 +190,19 @@
     <div class="tb-row">
       <span id="tb-turn" class="tb-pill">T1</span>
       <span id="tb-deck" class="tb-pill" aria-label="Carte nel mazzo"><i class="tb-deck-ico"></i><span id="tb-deck-n">—</span></span>
+      <!-- Fase: tre pallini che si accendono in ordine, sotto il nome di quella in corso -->
       <div id="tb-phase" class="tb-phase" aria-label="Fase del turno">
-        <span class="ph-dot" data-ph="action"><i></i><em>Azioni</em></span>
-        <span class="ph-dot" data-ph="schieramento"><i></i><em>Schiera</em></span>
-        <span class="ph-dot" data-ph="battaglia"><i></i><em>Battaglia</em></span>
+        <span class="ph-dots">
+          <span class="ph-dot" data-ph="action"><i></i></span>
+          <span class="ph-dot" data-ph="schieramento"><i></i></span>
+          <span class="ph-dot" data-ph="battaglia"><i></i></span>
+        </span>
+        <em id="tb-phase-name"></em>
       </div>
       <div class="tb-right">
+        <button id="tb-catalog" class="tb-pill tb-catalog" type="button" aria-label="Catalogo delle carte">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.6C6 2.3 3.6 2.1 1.5 2.6v10c2.1-.5 4.5-.3 6.5 1 2-1.3 4.4-1.5 6.5-1v-10C12.4 2.1 10 2.3 8 3.6zM8 3.6v10"/></svg>
+        </button>
         <button id="st-fx" class="tb-pill tb-fx" type="button" hidden aria-label="Effetti attivi">✧ 0</button>
         <button id="tb-leave" class="tb-btn tb-leave" aria-label="Esci dalla partita">Esci</button>
       </div>

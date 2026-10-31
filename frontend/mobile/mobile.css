@@ -753,24 +753,21 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   border-radius: 1.5px;
 }
 
-/* Fasi del turno */
+/* Fase del turno: tre pallini equidistanti e, sotto, il nome della fase */
 .tb-phase {
   flex: 1;
   min-width: 0;
   display: flex;
-  justify-content: space-evenly;
-  align-items: center;
-  gap: 3px;
-}
-.ph-dot {
-  flex: 0 0 auto;
-  display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 2px 0;
-  border-radius: var(--r-sm);
 }
+.ph-dots {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ph-dot { display: flex; }
 .ph-dot i {
   width: 13px;
   height: 13px;
@@ -779,21 +776,19 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   border: 1px solid #5e3a19;
   transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
 }
-.ph-dot em {
-  font-size: clamp(0.6rem, 2.75vw, 0.72rem);  /* le tre fasi stanno tra mazzo e «Esci» */
+#tb-phase-name {
+  font-size: 0.72rem;
   font-style: italic;
-  color: #a88a5a;
+  font-weight: 700;
+  color: var(--gold-light);
   white-space: nowrap;
-  transition: color 0.3s;
 }
 .ph-dot.on i {
   background: var(--gold-light);
   border-color: #ffe48c;
   box-shadow: 0 0 8px rgba(255, 208, 66, 0.55);
 }
-.ph-dot.on em { color: var(--gold-light); font-weight: 700; }
 .ph-dot.done i { background: #7a5520; border-color: #8a6428; }
-.ph-dot.done em { opacity: 0.6; }
 .tb-phase.dimmed { opacity: 0.45; }
 
 .tb-right { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
@@ -901,6 +896,25 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
 .st-gem-act b { color: #1d3f50; }
 /* Effetti attivi: nell'intestazione, accanto a «Esci» */
 .tb-fx { padding: 0 6px; font-size: 0.85rem; color: var(--gold-light); }
+/* Catalogo: un libro aperto in un tondo gemello di quello della musica */
+.tb-catalog {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+  border-color: var(--border-gold);
+  background: #1a0d03;
+  color: var(--gold-light);
+}
+.tb-catalog svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
 .st-item.bump { animation: chip-bump 0.5s var(--ease-out); }
 @keyframes chip-bump {
   0%   { transform: none; }
@@ -2202,6 +2216,10 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   place-items: center;
 }
 .card-nav .nav-btn:disabled { opacity: 0.25; }
+/* Copie nel mazzo (catalogo): attaccata alla carta, staccata dalle frecce */
+.card-note { text-align: center; font-size: 0.85rem; color: var(--gold-light); margin: -2px 0 18px; }
+/* Sheet senza titolo né sottotitolo (carta del catalogo): niente intestazione vuota */
+.sheet-head:has(> .sheet-title:empty):has(> .sheet-sub:empty) { display: none; }
 .card-nav .nav-pos { font-size: 0.78rem; color: var(--text-dim); min-width: 52px; text-align: center; }
 
 /* stat colors — su fondo scuro (sheet, flashcard) */
