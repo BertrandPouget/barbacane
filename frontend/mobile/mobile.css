@@ -36,6 +36,7 @@
   /* Gemma del costo (un ottagono), come sulle carte stampate (card_factory/assets/esagono.png) */
   --hex-mana:   radial-gradient(closest-side, #fe8c16 0%, #fe9c1c 55%, #fed222 86%, #fee822 100%);
   --hex-maga:   radial-gradient(closest-side, #8fcde4 0%, #a3d7ed 60%, #d4eef8 100%);
+  --hex-act:    radial-gradient(closest-side, #ec5a24 0%, #f47e44 60%, #fbc6a2 100%);  /* rombo delle Azioni */
   --hex-border: #5a3518;
   --hex-ink:    #5a2d06;
   --card-ink:   #171009;   /* fondo su cui sono renderizzati i PNG delle carte */
@@ -890,10 +891,10 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   background: var(--hex-mana);
 }
 .st-gem b { text-shadow: none; font-size: 0.82rem; font-weight: 800; color: var(--hex-ink); padding-top: 1px; }
-/* Azioni: rombo azzurro come la stella delle Maghe */
+/* Azioni: rombo arancio, distinto dalla stella azzurra delle Maghe */
 .st-gem-act { --gem: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); width: 26px; height: 26px; }
-.st-gem-act::before { inset: 2px; background: var(--hex-maga); }
-.st-gem-act b { color: #1d3f50; }
+.st-gem-act::before { inset: 2px; background: var(--hex-act); }
+.st-gem-act b { color: #4a1405; }
 /* Effetti attivi: nell'intestazione, accanto a «Esci» */
 .tb-fx { padding: 0 6px; font-size: 0.85rem; color: var(--gold-light); }
 /* Catalogo: un libro aperto in un tondo gemello di quello della musica */

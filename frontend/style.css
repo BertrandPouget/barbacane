@@ -37,6 +37,7 @@
   /* Gemma del costo (un ottagono), come sulle carte stampate (card_factory/assets/esagono.png) */
   --hex-mana:   radial-gradient(closest-side, #fe8c16 0%, #fe9c1c 55%, #fed222 86%, #fee822 100%);
   --hex-maga:   radial-gradient(closest-side, #8fcde4 0%, #a3d7ed 60%, #d4eef8 100%);
+  --hex-act:    radial-gradient(closest-side, #ec5a24 0%, #f47e44 60%, #fbc6a2 100%);  /* rombo delle Azioni */
   --hex-border: #5a3518;
   --hex-ink:    #5a2d06;
   --card-ink:   #171009;   /* fondo su cui sono renderizzati i PNG delle carte */
@@ -1544,7 +1545,7 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
 #my-stats { font-size: 0.95rem; padding: 3px 14px; }
 .stat-gem-item { display: inline-flex; align-items: center; gap: 7px; }
 #my-mana    { color: var(--gold-light); }
-#my-actions { color: #8fcde4; }  /* l'azzurro della stella delle Maghe (--hex-maga) */
+#my-actions { color: #f47e44; }  /* l'arancio del rombo delle Azioni (--hex-act) */
 /* Mana: la gemma ottagonale delle carte stampate */
 .st-gem {
   --gem: polygon(29.3% 0, 70.7% 0, 100% 29.3%, 100% 70.7%, 70.7% 100%, 29.3% 100%, 0 70.7%, 0 29.3%);
@@ -1566,10 +1567,10 @@ body.chronicle-open #card-detail-overlay { z-index: 330; }
   background: var(--hex-mana);
 }
 .st-gem b { font-size: 0.88rem; font-weight: 800; color: var(--hex-ink); padding-top: 1px; }
-/* Azioni: rombo azzurro come la stella delle Maghe */
+/* Azioni: rombo arancio, distinto dalla stella azzurra delle Maghe */
 .st-gem-act { --gem: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); width: 28px; height: 28px; }
-.st-gem-act::before { inset: 2px; background: var(--hex-maga); }
-.st-gem-act b { color: #1d3f50; }
+.st-gem-act::before { inset: 2px; background: var(--hex-act); }
+.st-gem-act b { color: #4a1405; }
 
 /* Mazzo vite e Carte Attive: solo il dorso con l'etichetta, senza il riquadro delle Regioni */
 .region.life-deck,
