@@ -39,9 +39,6 @@ const Mob = (() => {
   // True mentre stiamo abbandonando la partita: ignora gli update in arrivo
   let leavingGame = false;
 
-  // Giocatore di cui si guarda il campo (occhio accanto al nome); null = il mio
-  let viewId = null;
-
   // Orda di Evelyn: base_card_id della Magia da rigiocare. Finché è valorizzato,
   // le sendAction('play_spell') diventano 'recast_spell' (stessa UI di targeting).
   let recastPending = null;
@@ -484,10 +481,12 @@ const Mob = (() => {
   }
 
   // Cosa il pannello del tutorial evita di coprire, oltre alle zone evidenziate:
-  // avversari, cronaca e Regioni del campo; ancora di più l'intestazione, le
-  // carte in mano e, sopra tutto, Vite, Azioni, Mana e i pulsanti sotto il campo
+  // avversari, cronaca e Regioni del campo (le mie e quelle del Manichino, di
+  // fronte); ancora di più l'intestazione, le carte in mano e, sopra tutto,
+  // Vite, Azioni, Mana e i pulsanti sotto il campo
   const TUTORIAL_AVOID = [
     '#opp-rail .opp-label', '#ticker', '#fld-vanguard', '#tw-village', '#tw-left', '#tw-right',
+    '#opp-bl', '#opp-br', '#opp-vl', '#opp-tl',
     ['#topbar', 3], ['#hand .card', 3], ['#dock', 3],
     ['#statusbar > *', 20], ['#dock .dk-btn', 20],
   ];
@@ -1020,7 +1019,6 @@ const Mob = (() => {
     gameId = gameId || state.game_id;
     currentState = state;
     rematchOffer = null;
-    viewId = null;
     chronicleSeenId = Chronicle.lastId(state);
     Dice.fromState(state, myPlayerId, cardDefs, { silent: true });
     CardArt.preload(Object.keys(cardDefs));
@@ -1028,7 +1026,7 @@ const Mob = (() => {
     connectGameWS();
     Screens.show('game');
     _lastTurnPlayer = state.current_player_id;
-    Render.game(state, myPlayerId, viewId);
+    Render.game(state, myPlayerId);
     applyWallFlips();
     refreshDock();
     _openPendingSheets(state);
@@ -1073,16 +1071,11 @@ const Mob = (() => {
 
     const turnChanged = prevTurnPlayer !== state.current_player_id && !state.winner_id;
     const myTurnStarts = turnChanged && state.current_player_id === myPlayerId;
-    // Si torna al proprio campo quando tocca a me, o se chi guardavo è uscito
-    if (viewId) {
-      const viewed = state.players.find(p => p.id === viewId);
-      if (myTurnStarts || !viewed || (viewed.lives ?? 0) <= 0) viewId = null;
-    }
 
     // Le carte si spostano con una transizione invece di ricomparire di colpo
     const screen = $('scr-game');
     const before = Motion.snapshot(screen);
-    Render.game(state, myPlayerId, viewId);
+    Render.game(state, myPlayerId);
     applyWallFlips();
     Motion.play(before, screen, _motionOptions(state));
 
@@ -1496,19 +1489,10 @@ const Mob = (() => {
       items.push(hint(canAttackNow() ? 'Scegli chi attaccare' : 'Nessun attacco possibile'));
     }
 
-    // Guardando il campo di un altro giocatore la riga serve a tornare al proprio
-    // (una risposta in sospeso resta più importante)
-    const viewed = viewId && currentState.players.find(p => p.id === viewId);
-    if (viewed && !myAnswerPending()) {
-      items.splice(0, items.length,
-        hint(`Campo di ${viewed.name}`),
-        mkBtn('‹ Il tuo campo', 'dk-gold', () => setView(null), false, 'dock-my-field'));
-    }
-
     dock.replaceChildren(...items);
   }
 
-  // -- Campo: Regioni toccate e campo degli altri giocatori ----------------------
+  // -- Campo: Regioni toccate -----------------------------------------------------
 
   // Tocco su una Regione: le mie si aprono come sempre (Guerrieri da spostare,
   // Muri, Costruzioni da completare), quelle degli altri in sola lettura
@@ -1520,21 +1504,6 @@ const Mob = (() => {
     if (region === 'vanguard') openVanguardSheet();
     else if (region === 'village') openVillageSheet();
     else openBastionSheet(region === 'bastion_left' ? 'left' : 'right');
-  }
-
-  // Guarda il campo di un altro giocatore dalla sua parte (pid null = il mio)
-  function setView(pid) {
-    const next = pid && pid !== myPlayerId ? pid : null;
-    if (next === viewId || !currentState) { viewId = next; return; }
-    viewId = next;
-    // Solo il campo: la mano resta com'è (si può star trascinando una carta)
-    Render.field(currentState, myPlayerId, viewId);
-    // La tavola ricompare dal nuovo punto di vista
-    const board = $('board');
-    board.classList.remove('switching');
-    void board.offsetWidth;
-    board.classList.add('switching');
-    refreshDock();
   }
 
   // Posso attaccare ora? (mio turno, Battaglia, attacchi rimasti, Guerrieri in Avanscoperta)
@@ -1599,11 +1568,6 @@ const Mob = (() => {
     return !!me() && isMyTurn() && currentState.phase === 'action';
   }
 
-  // Si gioca sempre sul proprio campo: trascinando una carta si torna lì
-  function backToMyField() {
-    if (viewId) setView(null);
-  }
-
   // Perché la carta ora non si può giocare (o null). Si trascina lo stesso, verso
   // il campo come una Magia, e al rilascio torna in mano con l'errore.
   function dragRefusal(iid, def, my, keys) {
@@ -1621,7 +1585,6 @@ const Mob = (() => {
     // Tutorial: una carta da spiegare non ancora letta apre la lettura invece di partire
     if (maybeReadCard(iid)) return false;
     const def = getCardDef(iid);
-    backToMyField();
     const keys = DragPlay.zonesFor(def, me(), getCardDef);
     // Verso il campo: la carta sopra la tavola, sotto i nomi degli avversari (le
     // Magie con bersaglio si giocano come le altre, il bersaglio si sceglie dopo)
@@ -2163,7 +2126,6 @@ const Mob = (() => {
       : !(my && (my.actions_remaining > 0 || my.wall_slots > 0)) ? 'Azioni esaurite per questo turno.'
       : null;
     if (err) { Toast.show(err, 'error'); return false; }
-    backToMyField();
     const iids = [card, ...extras].map(c => c.dataset.instanceId);
     const zones = ['left', 'right'].map(side => ({ ...dropZone(`bastion_${side}`), key: side }));
     DragPlay.start(card, x, y, {
@@ -3613,11 +3575,10 @@ const Mob = (() => {
     return {
       // Carte pescate: arrivano dal mazzo (contatore in alto)
       sourceFor: (iid, el) => (el.closest('#hand') ? $('tb-deck') : null),
-      // Carte giocate: verso la mia Regione (se sto guardando il mio campo);
+      // Carte giocate: verso la mia Regione;
       // Magie e scarti si dissolvono
       targetFor: (iid) => {
         const where = Motion.locate(state, myPlayerId, iid);
-        if (viewId && where !== 'life') return null;
         const id = MOTION_TILES[where];
         return id ? $(id) : null;
       },
@@ -3686,7 +3647,6 @@ const Mob = (() => {
     openBuildingSheet,
     openOpponentSheet,
     sendAction,
-    setView,
     canAttackNow,
     attackTargetKeys: targetKeys,
     isTutorial: () => isTutorial,

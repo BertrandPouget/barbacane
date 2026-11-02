@@ -133,11 +133,31 @@ _MOBILE_HIGHLIGHT_MAP: Dict[str, Union[str, List[str]]] = {
     "btn-end-turn": "st-next",
     "phase-bar": "tb-phase",
     "my-active-cards": "st-fx",
-    # I nomi degli avversari (solo dove ci sono) e i loro Bastioni esposti
+    # Il nome del Manichino (di fronte) e i suoi Bastioni
     "top-opponents": [">opp-rail", "opp-bl", "opp-br"],
-    # Solo mobile (sul desktop non c'è): Avanscoperte e Villaggi dei vicini ai lati
-    "opp-sides": ["opp-vl", "opp-vr", "opp-tl", "opp-tr"],
+    # Il campo del Manichino o una sola sua Regione (sul campo mobile le sue
+    # Regioni non hanno titolo): sul desktop valgono come "top-opponents"
+    # (_DESKTOP_ALIAS)
+    "dummy-field": "board-front-box",
+    "dummy-bastion-left": [">opp-rail", "opp-br"],
+    "dummy-vanguard": [">opp-rail", "opp-vl"],
 }
+
+# Id che sul desktop diventano un altro (il riquadro dell'avversario intero)
+_DESKTOP_ALIAS: Dict[str, str] = {
+    "dummy-field": "top-opponents",
+    "dummy-bastion-left": "top-opponents",
+    "dummy-vanguard": "top-opponents",
+}
+
+
+def _desktop_ids(ids: List[str]) -> List[str]:
+    out: List[str] = []
+    for hid in ids:
+        did = _DESKTOP_ALIAS.get(hid, hid)
+        if did not in out:
+            out.append(did)
+    return out
 
 
 def _mobile_ids(ids: List[str]) -> List[str]:
@@ -447,15 +467,10 @@ TUTORIAL_PARTITA = TutorialDef(
             highlight=["my-field"],
         ),
         TutorialStep(
-            "neighbors", "Benvenuto", "I vicini",
-            "Dall'Avanscoperta attacchi i Bastioni dei tuoi vicini, e loro i tuoi. Il Manichino è il tuo unico "
-            "avversario, quindi è tuo vicino da entrambi i lati: puoi attaccare tutti e due i suoi Bastioni, e "
-            "lui tutti e due i tuoi.",
-            # Sul campo a triangoli l'unico vicino compare su entrambi i lati
-            text_mobile="Dall'Avanscoperta attacchi i Bastioni dei tuoi vicini, e loro i tuoi. Il Manichino è il "
-                        "tuo unico avversario, quindi è tuo vicino da entrambi i lati. Per questo vedi alcune sue "
-                        "Regioni due volte, una per lato.",
-            highlight=["top-opponents", "opp-sides"],
+            "neighbors", "Benvenuto", "Gli avversari",
+            "In Barbacane puoi attaccare solo i due Bastioni avversari confinanti coi tuoi. Il Manichino è il "
+            "tuo unico avversario, quindi puoi attaccare entrambi i suoi Bastioni, e lui entrambi i tuoi.",
+            highlight=["dummy-field"],
         ),
         # --- Turno 1 ---
         TutorialStep(
@@ -495,7 +510,7 @@ TUTORIAL_PARTITA = TutorialDef(
                     hint="Trascina Ardolancio verso il campo e scegli il Bastione sinistro del Manichino.",
                     after=["evelyn"],
                     wait_hint="Per lanciare una Magia ti serve almeno una Maga in campo, quindi prima gioca Evelyn.",
-                    highlight=[">hand-cards", "top-opponents"],
+                    highlight=[">hand-cards", "my-field"],  # le Magie si lasciano sul mio campo
                 ),
             ],
         ),
@@ -541,7 +556,7 @@ TUTORIAL_PARTITA = TutorialDef(
                     hint="Trascina Cuordipietra verso il campo e scegli Reinhold, il difensore del Manichino.",
                     after=["araminta"],
                     wait_hint="Cuordipietra richiede 2 Maghe in campo, quindi prima gioca Araminta.",
-                    highlight=[">hand-cards", "top-opponents"],
+                    highlight=[">hand-cards", "my-field"],
                 ),
             ],
         ),
@@ -560,7 +575,7 @@ TUTORIAL_PARTITA = TutorialDef(
         TutorialStep(
             "dummy_2", "Turno del Manichino", "Un nuovo difensore",
             "Il Manichino ha schierato Joseph (DIF 3) nel Bastione sinistro, che ora è difeso anche da Patrizio.",
-            highlight=["top-opponents"],
+            highlight=["dummy-bastion-left"],
             setup=_setup_dummy_turn_2,
         ),
         # --- Turno 3 ---
@@ -582,7 +597,7 @@ TUTORIAL_PARTITA = TutorialDef(
                     hint="Trascina Velocemento dalla mano verso il campo.",
                     after=["madeleine"],
                     wait_hint="Velocemento richiede 3 Maghe in campo, quindi prima schiera Madeleine.",
-                    highlight=[">hand-cards"],
+                    highlight=[">hand-cards", "my-field"],
                     feedback="La Catapulta ora è Eterea (bordo bianco). Si gioca gratis e senza Azioni, ma "
                              "va giocata subito, altrimenti l'effetto svanisce. Tocca la Catapulta per scoprire "
                              "cosa fa, poi trascinala nel Villaggio.",
@@ -642,7 +657,7 @@ TUTORIAL_PARTITA = TutorialDef(
             "dummy_3", "Turno del Manichino", "Il contrattacco",
             "Orfeo (ATT 3) ha attaccato il tuo Bastione destro. Senza Guerrieri a difenderlo e con pochi Muri, "
             "hai perso una Vita.",
-            highlight=["my-bastion-right", "my-life-deck", "top-opponents"],
+            highlight=["my-bastion-right", "my-life-deck", "dummy-vanguard"],
             setup=_setup_dummy_turn_3,
         ),
         # --- Turno 4 ---
@@ -688,7 +703,7 @@ TUTORIAL_PARTITA = TutorialDef(
                     match={"defender_player_index": 1, "defender_bastion_side": "left"},
                     hint="Attacca il Bastione sinistro del Manichino.",
                     after=["to_battaglia"],
-                    highlight=["btn-battle", "top-opponents"],
+                    highlight=["btn-battle", "dummy-bastion-left"],
                 ),
             ],
             battle_diagram={
@@ -964,7 +979,7 @@ def public_view(state: GameState) -> Optional[dict]:
         "text_mobile": step.text_mobile,
         "feedback": tut.get("feedback"),
         "goals": [{"label": g.label, "done": g.goal_id in done} for g in step.goals],
-        "highlight": highlight,
+        "highlight": _desktop_ids(highlight),
         "highlight_mobile": _mobile_ids(highlight),
         "panel_center": step.panel_center,
         "battle_diagram": step.battle_diagram,

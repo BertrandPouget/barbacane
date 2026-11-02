@@ -13,21 +13,19 @@ const Render = (() => {
   const SPECIES_ICON = { elfo: '🌿', nano: '⛏️', maga: '🔮', umano: '🛡️' };
 
   const HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.6 1.1 4.6 2.6C12 6.1 13.6 5 15.6 5 19 5 21.1 8.4 19.6 11.8 17.5 16.4 12 21 12 21z"/></svg>';
-  const EYE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1.6 12S5.6 5.2 12 5.2 22.4 12 22.4 12 18.4 18.8 12 18.8 1.6 12 1.6 12z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.3" fill="currentColor"/></svg>';
 
   // ---------------------------------------------------------------------------
   // Render principale
   // ---------------------------------------------------------------------------
 
-  /** viewId: giocatore di cui si guarda il campo (null = il mio). */
-  function game(state, myId, viewId = null) {
+  function game(state, myId) {
     if (!state) return;
     topbar(state);
 
     const me = state.players.find(p => p.id === myId);
     if (!me) return;
 
-    field(state, myId, viewId);
+    field(state, myId);
     statusbar(me);
     hand(me);
   }
@@ -142,7 +140,7 @@ const Render = (() => {
   }
 
   // ---------------------------------------------------------------------------
-  // Campo — le Regioni del giocatore osservato e dei suoi vicini (board.js)
+  // Campo — le mie Regioni e quelle degli altri giocatori (board.js)
   // ---------------------------------------------------------------------------
 
   // Vicini vivi più prossimi a sinistra e a destra di un giocatore: gli
@@ -192,50 +190,67 @@ const Render = (() => {
     };
   }
 
-  function field(state, myId, viewId) {
-    const center = state.players.find(p => p.id === viewId) || state.players.find(p => p.id === myId);
-    const { left, right } = aliveNeighbors(state, center.id);
+  // Posti degli altri giocatori attorno a me (board.js): r a destra, t di
+  // fronte, l a sinistra, in ordine di posto: con tre vivi uno per posto, con
+  // due i vicini ai lati, con uno solo di fronte. Gli eliminati occupano i
+  // posti rimasti vuoti, col solo nome.
+  function seatsAround(state, myId) {
+    const ps = state.players;
+    const ci = Math.max(0, ps.findIndex(p => p.id === myId));
+    const others = ps.map((_, k) => ps[(ci + 1 + k) % ps.length]).filter(p => p.id !== myId);
+    const alive = others.filter(p => (p.lives ?? 0) > 0), dead = others.filter(p => (p.lives ?? 0) <= 0);
+    const order = alive.length === 1 ? ['t'] : alive.length === 2 ? ['r', 'l'] : ['r', 't', 'l'];
+    const seats = {};
+    alive.slice(0, 3).forEach((p, i) => { seats[order[i]] = p; });
+    ['r', 't', 'l'].filter(s => !seats[s]).forEach(s => { if (dead.length) seats[s] = dead.shift(); });
+    return seats;
+  }
+
+  function field(state, myId) {
+    const me = state.players.find(p => p.id === myId);
+    const { left, right } = aliveNeighbors(state, myId);
+    const seats = seatsAround(state, myId);
     const slots = {
-      c_vanguard: regionSlot(center, 'vanguard'),
-      c_village: regionSlot(center, 'village'),
-      c_bastion_left: regionSlot(center, 'bastion_left'),
-      c_bastion_right: regionSlot(center, 'bastion_right'),
-      // Il vicino di sinistra espone il suo Bastione destro, quello di destra il sinistro
-      l_bastion: left && regionSlot(left, 'bastion_right'),
-      l_vanguard: left && regionSlot(left, 'vanguard'),
-      l_village: left && regionSlot(left, 'village'),
-      r_bastion: right && regionSlot(right, 'bastion_left'),
-      r_vanguard: right && regionSlot(right, 'vanguard'),
-      r_village: right && regionSlot(right, 'village'),
+      c_vanguard: regionSlot(me, 'vanguard'),
+      c_village: regionSlot(me, 'village'),
+      c_bastion_left: regionSlot(me, 'bastion_left'),
+      c_bastion_right: regionSlot(me, 'bastion_right'),
     };
+    const vacant = new Set();
+    const seatOf = {};
+    ['r', 't', 'l'].forEach(s => {
+      const p = seats[s];
+      if (!p || (p.lives ?? 0) <= 0) { vacant.add(s); return; }
+      seatOf[p.id] = s;
+      ['vanguard', 'village', 'bastion_left', 'bastion_right'].forEach(r => { slots[`${s}_${r}`] = regionSlot(p, r); });
+    });
 
     const hot = new Set(), target = new Set(), quiet = new Set();
-    if (center.id === myId) {
-      // Nel mio turno le mie Regioni cambiano per le mie mosse: si illuminano
-      // quando ci arriva la carta (transizioni in app.js), non subito
-      if (state.current_player_id === myId) {
-        ['c_vanguard', 'c_village', 'c_bastion_left', 'c_bastion_right'].forEach(k => quiet.add(k));
-      }
-      // Schieramento: le mie Regioni con Guerrieri da spostare
-      if (state.current_player_id === myId && state.phase === 'schieramento') {
-        ['c_vanguard', 'c_bastion_left', 'c_bastion_right'].forEach(k => {
-          if (slots[k].data.species.length > 0) hot.add(k);
-        });
-      }
-      // Battaglia: i Bastioni esposti che posso attaccare ora
-      if (Mob.canAttackNow()) {
-        const keys = Mob.attackTargetKeys();
-        if (left && keys.has(`${left.id}:right`)) target.add('l_bastion');
-        if (right && keys.has(`${right.id}:left`)) target.add('r_bastion');
-      }
+    // Nel mio turno le mie Regioni cambiano per le mie mosse: si illuminano
+    // quando ci arriva la carta (transizioni in app.js), non subito
+    if (state.current_player_id === myId) {
+      ['c_vanguard', 'c_village', 'c_bastion_left', 'c_bastion_right'].forEach(k => quiet.add(k));
     }
-    Board.update(slots, { hot, target, quiet });
-    opponents(state, myId, center.id, left, right);
+    // Schieramento: le mie Regioni con Guerrieri da spostare
+    if (state.current_player_id === myId && state.phase === 'schieramento') {
+      ['c_vanguard', 'c_bastion_left', 'c_bastion_right'].forEach(k => {
+        if (slots[k].data.species.length > 0) hot.add(k);
+      });
+    }
+    // Battaglia: i Bastioni che posso attaccare ora. Il vicino di sinistra si
+    // attacca nel Bastione destro, quello di destra nel sinistro
+    if (Mob.canAttackNow()) {
+      const keys = Mob.attackTargetKeys();
+      if (left && seatOf[left.id] && keys.has(`${left.id}:right`)) target.add(`${seatOf[left.id]}_bastion_right`);
+      if (right && seatOf[right.id] && keys.has(`${right.id}:left`)) target.add(`${seatOf[right.id]}_bastion_left`);
+    }
+    Board.update(slots, { hot, target, quiet, vacant });
+    opponents(state, seats);
   }
 
   // ---------------------------------------------------------------------------
-  // Nomi degli altri giocatori sopra il campo: i vicini sopra i loro Bastioni,
-  // in alto al centro gli altri (e l'unico avversario di una partita a due)
+  // Nomi degli altri giocatori: chi sta di fronte sopra la tavola, chi sta di
+  // lato in verticale nella striscia ai lati. Nome e Vite su una riga
   // ---------------------------------------------------------------------------
 
   function heartsNode(lives, cls) {
@@ -246,96 +261,39 @@ const Render = (() => {
     return box;
   }
 
-  function opponentLabel(state, p, pos, myId) {
+  function opponentLabel(state, p, pos) {
     const dead = (p.lives ?? 0) <= 0;
-    const isMe = p.id === myId;
     const turn = p.id === state.current_player_id && !state.winner_id;
     const label = el('div', {
-      className: `opp-label ${pos}${turn ? ' turn' : ''}${dead ? ' dead' : ''}${isMe ? ' me' : ''}`,
+      className: `opp-label ${pos}${turn ? ' turn' : ''}${dead ? ' dead' : ''}`,
       dataset: { playerId: p.id },
     });
 
-    // Il nome apre la scheda del giocatore; il mio riporta al mio campo
+    // Il nome apre la scheda del giocatore
     const name = el('button', { className: 'opp-name', type: 'button' }, [p.name]);
-    name.addEventListener('click', () => {
-      haptic();
-      if (isMe) Mob.setView(null);
-      else Mob.openOpponentSheet(p.id);
-    });
+    name.addEventListener('click', () => { haptic(); Mob.openOpponentSheet(p.id); });
     label.appendChild(name);
 
-    const sub = el('div', { className: 'opp-sub' });
     if (dead) {
-      sub.appendChild(el('span', { className: 'opp-out' }, ['Eliminato']));
+      label.appendChild(el('span', { className: 'opp-out' }, ['Eliminato']));
     } else {
-      sub.appendChild(heartsNode(p.lives, 'opp-hearts'));
-      const fx = isMe ? 0 : activeEffectItems(p).length;
-      if (fx > 0) sub.appendChild(el('span', { className: 'opp-fx' }, [`✧${fx}`]));
-      // Occhio: il campo visto dalla sua parte (nel tutorial no: c'è un solo campo da seguire)
-      if (!Mob.isTutorial()) {
-        const eye = el('button', {
-          className: 'opp-eye', type: 'button',
-          'aria-label': isMe ? 'Torna al tuo campo' : `Guarda il campo di ${p.name}`,
-        });
-        eye.innerHTML = EYE_SVG;
-        eye.addEventListener('click', () => { haptic(); Mob.setView(isMe ? null : p.id); });
-        sub.appendChild(eye);
-      }
+      label.appendChild(heartsNode(p.lives, 'opp-hearts'));
+      const fx = activeEffectItems(p).length;
+      if (fx > 0) label.appendChild(el('span', { className: 'opp-fx' }, [`✧${fx}`]));
     }
-    label.appendChild(sub);
     return label;
   }
 
-  function opponents(state, myId, centerId, left, right) {
-    const single = !!left && !!right && left.id === right.id;
+  function opponents(state, seats) {
     const nodes = [];
-    if (!single) {
-      if (left) nodes.push(opponentLabel(state, left, 'pos-l', myId));
-      if (right) nodes.push(opponentLabel(state, right, 'pos-r', myId));
-    }
-    // In alto al centro: l'unico avversario di una partita a due, poi chi non
-    // confina (prima i vivi, in ordine di posto), poi gli eliminati
-    const ps = state.players;
-    const ci = Math.max(0, ps.findIndex(p => p.id === centerId));
-    const bySeat = ps.map((_, k) => ps[(ci + 1 + k) % ps.length]).filter(p => p.id !== centerId);
-    const sides = new Set(single ? [] : [left && left.id, right && right.id]);
-    const top = single ? [left] : [];
-    bySeat.filter(p => (p.lives ?? 0) > 0).forEach(p => { if (!sides.has(p.id) && !top.includes(p)) top.push(p); });
-    bySeat.forEach(p => { if (!sides.has(p.id) && !top.includes(p)) top.push(p); });
-    if (top.length) {
-      nodes.push(el('div', { className: 'opp-top' }, top.map(p => opponentLabel(state, p, 'pos-c', myId))));
-    }
-    // Con nomi al centro i vicini scendono di una riga e la fascia dei nomi
-    // sopra la tavola si allarga (CSS: #field.has-top)
-    $('field').classList.toggle('has-top', top.length > 0 && !single && !!(left || right));
-    $('opp-rail').replaceChildren(...nodes);
-    placeSideLabels();
-  }
-
-  // I nomi dei vicini centrati sulla parte visibile del loro Villaggio, così si
-  // capisce che tutta la fascia di lato è loro; spostati verso il centro solo
-  // quanto basta a restare dentro lo schermo
-  let sideResize = false;
-  function placeSideLabels() {
-    if (!sideResize) {
-      sideResize = true;
-      window.addEventListener('resize', placeSideLabels);
-    }
-    const rail = $('opp-rail'), scr = $('scr-game');
-    if (!rail || !scr) return;
-    const railR = rail.getBoundingClientRect(), scrR = scr.getBoundingClientRect();
-    if (!railR.width) return;
-    [['pos-l', 'l_village'], ['pos-r', 'r_village']].forEach(([cls, slot]) => {
-      const label = rail.querySelector(`.opp-label.${cls}`);
-      const shape = Board.shape(slot);
-      if (!label || !shape) return;
-      const v = shape.getBoundingClientRect();
-      const lo = Math.max(v.left, scrR.left), hi = Math.min(v.right, scrR.right);
-      const w = label.offsetWidth, m = 6;
-      const x = Math.max(scrR.left + m, Math.min(scrR.right - m - w, (lo + hi) / 2 - w / 2));
-      label.style.left = `${x - railR.left}px`;
-      label.style.right = 'auto';
+    ['l', 'r'].forEach(s => {
+      if (!seats[s]) return;
+      const label = opponentLabel(state, seats[s], `pos-${s}`);
+      label.style.cssText = Board.seatLabelStyle(s);
+      nodes.push(label);
     });
+    if (seats.t) nodes.push(opponentLabel(state, seats.t, 'pos-t'));
+    $('opp-rail').replaceChildren(...nodes);
   }
 
   function flashOpponent(playerId) {
