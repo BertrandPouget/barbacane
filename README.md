@@ -18,10 +18,9 @@ Il gioco è online su **[barbacane.quest](https://barbacane.quest)**: non serve 
 
 Dalla schermata iniziale si può scegliere tra:
 
-- **Giocatore Singolo** — una partita vera, in solitaria, contro 1–3 avversari controllati dal computer (i "Mecha-"), con tre livelli di difficoltà: Facile, Normale e Difficile.
-- **Multigiocatore** — si crea una lobby e si ottiene un codice da condividere con gli amici, che lo usano per unirsi. In Sala d'Attesa il creatore può riempire i posti liberi con dei Bot, sceglierne la difficoltà e decidere l'ordine dei posti al tavolo (che determina quali Bastioni confinano); al momento della creazione si può anche attivare un timer per turno.
+- **Gioca** — si crea una lobby e si ottiene un codice da condividere con gli amici, che lo usano per unirsi. In Sala d'Attesa il creatore può riempire i posti liberi con dei Bot, sceglierne la difficoltà e decidere l'ordine dei posti al tavolo (che determina quali Bastioni confinano); al momento della creazione si può anche attivare un timer per turno.
 - **Tutorial** — una breve partita guidata contro il Manichino, giocata con le Maghe: si impara facendo, e le carte nuove si spiegano la prima volta che le tocchi.
-- **Catalogo Carte** — tutte le carte del gioco, da sfogliare con calma.
+- **Catalogo** — tutte le carte del gioco, da sfogliare con calma.
 
 Il gioco è pensato sia per desktop che per telefono, con due interfacce dedicate.
 
@@ -32,7 +31,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Apri il browser su `http://localhost:8000` per accedere alla schermata di gioco. Per simulare una partita Multigiocatore basta aprire più finestre e unirsi alla stessa lobby; per giocare da soli c'è la modalità Giocatore Singolo.
+Apri il browser su `http://localhost:8000` per accedere alla schermata di gioco (`/m` per l'interfaccia mobile). Per simulare una partita con più giocatori basta aprire più finestre e unirsi alla stessa lobby; per giocare da soli basta aggiungere un Bot.
 
 In locale la persistenza usa un file SQLite (`barbacane.db`) creato automaticamente. Per usare Postgres anche in locale, imposta la variabile d'ambiente `DATABASE_URL` con una connection string Postgres prima di avviare il server.
 
@@ -67,7 +66,7 @@ I giocatori siedono in cerchio: il Bastione destro di ciascuno confina con il Ba
 
 - **Guerrieri** (Reclute ed Eroi): hanno ATT, GIT e DIF e una Specie; le Reclute evolvono negli Eroi corrispondenti, che ne ereditano l'effetto Orda
 - **Magie** (Anatemi, Sortilegi, Incantesimi): costo in Maghe anziché Mana; attivano il Prodigio se almeno una delle Maghe in campo è della stessa Scuola
-- **Costruzioni**: piazzate incomplete con effetto Base, completabili con un'azione aggiuntiva per sbloccare l'effetto Completo
+- **Costruzioni**: piazzate incomplete con effetto Base, completabili con un'Azione aggiuntiva e il Mana richiesto per sbloccare l'effetto Completo
 - **Muri**: qualsiasi carta può essere convertita in Muro per assorbire danni in Battaglia
 
 Alcune carte possono inoltre rendere **Eterea** un'altra carta in mano: una carta Eterea si gioca gratis e senza consumare un'Azione, ma la proprietà svanisce appena si fa qualcos'altro.
@@ -96,15 +95,20 @@ Le carte vivono tutte in un unico file, `data/cards.json`: è la fonte da cui le
 
    ```python
    @register_effect("ardolancio_effect")
-   def ardolancio_effect(state, player, prodigy=False, target_player_id=None, bastion_side=None, **kwargs):
-       damage = 4 if prodigy else 2
-       apply_damage_to_bastion(state, target_player_id, bastion_side, damage)
-       return {"damage": damage}
+   def ardolancio_effect(state, player, prodigy=False, target_player_id=None, target_bastion_side="left", **kwargs):
+       target = state.get_player(target_player_id)
+       bastion = target.field.bastion_left if target_bastion_side == "left" else target.field.bastion_right
+       max_walls = 4 if prodigy else 2
+       walls_to_remove = random.sample(bastion.walls, min(max_walls, len(bastion.walls)))
+       for wall in walls_to_remove:
+           bastion.walls.remove(wall)
+           state.discard_pile.append(wall.instance_id)
+       return {"walls_discarded": len(walls_to_remove)}
    ```
 
    Se la carta può essere giocata solo a certe condizioni (es. "devi avere una Costruzione in mano"), il controllo va fatto in `engine/actions.py`, prima che la carta venga tolta dalla mano: così, se le condizioni non sono rispettate, la carta resta in mano e l'Azione non viene consumata.
 
-3. **Aggiungere l'interfaccia**, se l'effetto richiede delle scelte al giocatore (un bastione bersaglio, un Guerriero, una carta da cercare...). Il gioco ha due interfacce separate, desktop (`frontend/app.js`) e mobile (`frontend/mobile/app.js`): la nuova scelta va costruita in entrambe. Gli effetti che si risolvono in due tempi (come cercare una carta nel mazzo, o la Biblioteca) mettono il gioco in attesa della risposta del giocatore, che arriva con un'azione dedicata.
+3. **Aggiungere l'interfaccia**, se l'effetto richiede delle scelte al giocatore (un bastione bersaglio, un Guerriero, una carta da cercare...). Il gioco ha due interfacce separate, desktop (`frontend/app.js`) e mobile (`frontend/mobile/app.js`): la nuova scelta va costruita in entrambe, con i selettori già pronti. Gli effetti che si risolvono in due tempi (come cercare una carta nel mazzo, o la Biblioteca) mettono il gioco in attesa della risposta del giocatore, che arriva con un'azione dedicata.
 
 4. **Insegnarla ai Bot**: in `engine/bot.py` si stabilisce quanto vale la carta e con quali bersagli giocarla. Se la carta introduce una nuova scelta in attesa di risposta, va gestita anche la risposta automatica dei Bot, altrimenti una partita contro di loro resterebbe bloccata.
 
@@ -112,11 +116,11 @@ Le carte vivono tutte in un unico file, `data/cards.json`: è la fonte da cui le
 
 6. **Provarla** con la Modalità Test: aggiungendo l'`id` della carta a `data/test_cards.json` e entrando con il nome `Test`, la si ritrova subito in mano.
 
-Se la carta cambia le regole generali, ricordarsi di aggiornare anche [`assets/rules.md`](assets/rules.md).
+Se la carta cambia le regole generali, ricordarsi di aggiornare anche [`assets/rules.md`](assets/rules.md). Se compare nel Tutorial, va ricontrollato anche quello.
 
 ## Stack Tecnologico
 
 - **Backend**: Python + FastAPI, WebSocket per gli aggiornamenti in tempo reale
 - **Frontend**: JavaScript vanilla, in due versioni (desktop e mobile), servite come file statici da FastAPI
-- **Persistenza**: PostgreSQL su Neon (free tier) in produzione, tramite variabile d'ambiente `DATABASE_URL`; SQLite in locale. Le partite finite o abbandonate vengono eliminate automaticamente.
+- **Persistenza**: PostgreSQL su Neon (free tier) in produzione, tramite variabile d'ambiente `DATABASE_URL`; SQLite in locale. Le partite ferme da più di 7 giorni, finite o no, vengono eliminate automaticamente.
 - **Deploy**: Render
