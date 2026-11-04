@@ -38,6 +38,8 @@ from engine.actions import (
     recast_spell,
     eracle_destroy,
     arena_activate,
+    decimo_take_fossato,
+    giulio_search,
     _apply_spell_post_effects,
 )
 from server.lobby import (
@@ -518,8 +520,8 @@ def _dispatch(state, player_id: str, action: str, params: dict) -> dict:
     if state.pending_search and action != "resolve_search":
         raise ActionError("C'è una ricerca in attesa di risoluzione.")
 
-    # Una ricerca in sospeso ha la precedenza sulle interazioni (es. Orda di Giulio
-    # e Biblioteca insieme a inizio turno): resolve_search non va bloccato da queste,
+    # Una ricerca in sospeso ha la precedenza sulle interazioni:
+    # resolve_search non va bloccato da queste,
     # altrimenti le due si bloccano a vicenda.
     if state.pending_interactions and not (state.pending_search and action == "resolve_search"):
         _pending_type = state.pending_interactions[0].get("type", "")
@@ -633,6 +635,13 @@ def _dispatch(state, player_id: str, action: str, params: dict) -> dict:
             params["target_warrior_iid"],
             params["target_player_id"],
         ),
+        "decimo_take_fossato": lambda: decimo_take_fossato(
+            state, player_id,
+            params["building_instance_id"],
+            params["target_player_id"],
+            params["bastion"],
+        ),
+        "giulio_search": lambda: giulio_search(state, player_id),
         "resolve_cardo_move": lambda: _resolve_cardo_move_action(
             state, player_id, params,
         ),

@@ -244,6 +244,15 @@ def _tell_log(state: GameState, entry: ActionLog) -> None:
     elif a == "arena_activate":
         _add(state, "action", pid, f"{who} usa l'{_c('arena')}.")
 
+    elif a == "giulio_search":
+        _add(state, "action", pid, f"Orda di {_c('giulio')}: {who} cerca nel mazzo.")
+
+    elif a == "decimo_take_fossato":
+        owner = "il suo" if d.get("from_player") == pid else f"quello di {_p(d.get('from_player'))}"
+        _add(state, "action", pid,
+             f"Orda di {_c('decimo')}: {who} prende un {_c('fossato')} ({owner}) "
+             f"e lo aggiunge ai Muri del Bastione {_SIDE.get(d.get('bastion'), '')}.")
+
     elif a == "eracle_destroy":
         _add(state, "action", pid,
              f"{who} distrugge {_c(d.get('building'))} di {_p(d.get('from_player'))} (Orda di {_c('eracle')}).")

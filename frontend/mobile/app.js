@@ -2253,6 +2253,15 @@ const Mob = (() => {
     const canMove = isMyTurn() && currentState.phase === 'schieramento';
 
     const footer = [];
+    const hordeButton = w.horde_active && def ? HORDE_BUTTONS[def.horde_effect_id] : null;
+    if (hordeButton) {
+      footer.push({
+        label: hordeButton.label,
+        className: 'mbtn-warn',
+        disabled: !hordeButton.ready(me()),
+        onClick: () => { Sheet.close(true); hordeButton.onClick(); },
+      });
+    }
     if (w.evolved_from) {
       footer.push({
         label: 'Recluta',
@@ -2769,6 +2778,47 @@ const Mob = (() => {
           }),
         });
       },
+    });
+  }
+
+  // -- Effetti Orda a pulsante -------------------------------------------------
+
+  // Il pulsante sta nello sheet del Guerriero con l'Orda attiva, ed è acceso quando
+  // il server lo dice (fase Azioni, non ancora usato). Parità con HORDE_BUTTONS desktop.
+  const HORDE_BUTTONS = {
+    decimo_horde: {
+      label: 'Prendi Fossato',
+      ready: (my) => my.decimo_take_ready,
+      onClick: () => openDecimoFlow(),
+    },
+    giulio_horde: {
+      label: 'Cerca Giulio II',
+      ready: (my) => my.giulio_search_ready,
+      onClick: () => sendAction('giulio_search', {}),
+    },
+  };
+
+  function openDecimoFlow() {
+    const my = me();
+    if (!my) return;
+    // Giocatori che hanno un Fossato in gioco, io per primo
+    const owners = playersFromMe()
+      .filter(p => (p.field.village.buildings || []).some(b => b.base_card_id === 'fossato'));
+    pickBuilding({
+      title: 'Orda di Decimo — scegli un Fossato',
+      subtitle: 'Diventa un tuo Muro. Non consuma Azioni',
+      players: owners,
+      filter: (b) => b.base_card_id === 'fossato',
+      empty: 'Nessun Fossato in gioco.',
+      onPick: (b, owner) => pickBastion({
+        title: 'Orda di Decimo — in quale Bastione?',
+        players: [my],
+        onPick: (_p, side) => sendAction('decimo_take_fossato', {
+          building_instance_id: b.instance_id,
+          target_player_id: owner.id,
+          bastion: side,
+        }),
+      }),
     });
   }
 

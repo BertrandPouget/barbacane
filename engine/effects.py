@@ -1609,9 +1609,8 @@ def orfeo_horde(state: GameState, player: Player, warrior_iid: Optional[str] = N
 
 @register_effect("giulio_horde")
 def giulio_horde(state: GameState, player: Player, **kwargs) -> dict:
-    """Attiva l'Orda di Giulio: finché resta attiva, a inizio di ogni turno del
-    giocatore la ricerca di Giulio II viene innescata da `_trigger_giulio_horde_start`
-    (engine/game.py), non da questo effetto."""
+    """Attiva l'Orda di Giulio: finché resta attiva, una volta per turno il giocatore
+    può cercare Giulio II (azione `giulio_search` in engine/actions.py)."""
     state.recent_events.append({
         "type": "horde", "card": "giulio",
         "player_id": player.id, "activated": True,
@@ -1675,16 +1674,13 @@ def polemarco_horde(state: GameState, player: Player, warrior_iid: Optional[str]
 
 @register_effect("decimo_horde")
 def decimo_horde(state: GameState, player: Player, warrior_iid: Optional[str] = None, **kwargs) -> dict:
-    """Se attacchi un avversario con un Fossato, raddoppia la GIT di quest'Orda per quella battaglia."""
-    player.active_effects.append({
-        "type": "decimo_anti_fossato",
-        "warrior_iid": warrior_iid,
-    })
+    """Attiva l'Orda di Decimo: finché resta attiva, una volta per turno il giocatore
+    può prendere un Fossato in gioco (azione `decimo_take_fossato` in engine/actions.py)."""
     state.recent_events.append({
         "type": "horde", "card": "decimo",
-        "player_id": player.id, "decimo_anti_fossato": True, "warrior": warrior_iid,
+        "player_id": player.id, "activated": True, "warrior": warrior_iid,
     })
-    return {"decimo_anti_fossato": True, "warrior": warrior_iid}
+    return {"activated": True, "warrior": warrior_iid}
 
 
 @register_effect("joseph_horde")

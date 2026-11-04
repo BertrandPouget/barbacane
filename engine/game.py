@@ -43,6 +43,8 @@ from engine.actions import (
     spell_prodigy_ready,
     hand_play_error,
     building_complete_error,
+    decimo_take_error,
+    giulio_search_error,
 )
 from engine.effects import _apply_scrigno_bonus, _d10_event
 from engine import chronicle
@@ -221,31 +223,6 @@ def _begin_turn(state: GameState) -> None:
 
     # Effetti differiti dal turno precedente (investimento prodigio, divinazione)
     _process_deferred_effects(state, player)
-
-    # Orda di Giulio già attiva: cerca Giulio II e aggiungilo alla mano
-    _trigger_giulio_horde_start(state, player)
-
-
-def _trigger_giulio_horde_start(state: GameState, player: Player) -> None:
-    """Se l'Orda di Giulio è già attiva (attivata in un turno precedente), a inizio
-    turno cerca Giulio II nel mazzo e lo aggiunge alla mano (state.pending_search)."""
-    if state.pending_search is not None:
-        return
-    for w in player.all_warriors():
-        if not w.horde_active:
-            continue
-        card = get_card(w.base_card_id)
-        if isinstance(card, WarriorCard) and card.horde_effect_id == "giulio_horde":
-            state.pending_search = {
-                "player_id": player.id,
-                "context": "giulio_horde",
-                "condition": {"type": "base_card_id", "value": "giulio_ii"},
-            }
-            state.recent_events.append({
-                "type": "search", "card": "giulio",
-                "player_id": player.id, "search_pending": True,
-            })
-            break
 
 
 def _trigger_building_start(state: GameState, player: Player) -> None:
@@ -672,6 +649,15 @@ def public_state(state: GameState, viewer_player_id: Optional[str] = None) -> di
             "wall_slots": open_wall_slots(state, p) if p.id == viewer_player_id else None,
             "hordes_activated_this_turn": p.hordes_activated_this_turn if p.id == viewer_player_id else None,
             "available_hordes": _available_hordes(p) if p.id == viewer_player_id else None,
+            # Effetti Orda a pulsante: accendono il pulsante nel dettaglio del Guerriero
+            "decimo_take_ready": (
+                decimo_take_error(state, p) is None
+                if p.id == viewer_player_id else None
+            ),
+            "giulio_search_ready": (
+                giulio_search_error(state, p) is None
+                if p.id == viewer_player_id else None
+            ),
             "active_effects": p.active_effects if p.id == viewer_player_id else [
                 e for e in p.active_effects
                 if e.get("type") in {

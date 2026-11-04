@@ -63,6 +63,10 @@ from engine.actions import (
     evolve_warrior,
     reposition_warrior,
     eracle_destroy,
+    decimo_take_error,
+    decimo_take_fossato,
+    giulio_search,
+    giulio_search_error,
 )
 from engine.battle import (
     adjacent_bastions,
@@ -113,6 +117,11 @@ def run_bot_turn(state: GameState, difficulty: str = "normal", on_step=None) -> 
     player_id = state.current_player.id
     deadline = time.monotonic() + HARD_THINK_SECONDS if difficulty == "hard" else None
     threat = _ThreatModel(state, player_id) if difficulty == "hard" else None
+    # Effetti Orda a pulsante: solo prima dello Schieramento, e prima delle Azioni
+    # perché Giulio II appena preso si possa già giocare
+    _bot_take_fossati(state, player_id)
+    _bot_search_giulio(state, player_id)
+    step()
     _play_actions(state, player_id, difficulty, threat, deadline, step)
     _maybe_fucina_bonus_action(state, player_id, difficulty, threat, deadline, step)
     if threat is not None:
@@ -1260,6 +1269,38 @@ def _bot_eracle_destroy(state: GameState, player_id: str, battle_result: dict) -
         eracle_destroy(state, player_id, choice["instance_id"], defender.id)
     except ActionError:
         pass
+
+
+def _bot_take_fossati(state: GameState, player_id: str) -> None:
+    """Orda di Decimo: toglie agli avversari i Fossati più alti e li mette nel
+    Bastione con meno Muri. I propri Fossati difendono il Bot: non li tocca."""
+    player = state.get_player(player_id)
+    while decimo_take_error(state, player) is None:
+        fossati = [
+            (b, opponent) for opponent in _opponents(state, player_id)
+            for b in opponent.field.village.buildings if b.base_card_id == "fossato"
+        ]
+        if not fossati:
+            return
+        building, owner = max(fossati, key=lambda item: item[0].completed)
+        side = "left" if len(player.field.bastion_left.walls) <= len(player.field.bastion_right.walls) else "right"
+        decimo_take_fossato(state, player_id, building.instance_id, owner.id, side)
+
+
+def _bot_search_giulio(state: GameState, player_id: str) -> None:
+    """Orda di Giulio: prende Giulio II dal mazzo, se c'è. La ricerca si chiude
+    qui perché il turno del Bot è calcolato tutto di fila."""
+    player = state.get_player(player_id)
+    while giulio_search_error(state, player) is None:
+        giulio_search(state, player_id)
+        state.pending_search = None
+        match = next((iid for iid in state.deck if get_base_card_id(iid) == "giulio_ii"), None)
+        if match is None:
+            return
+        state.deck.remove(match)
+        random.shuffle(state.deck)
+        player.hand.append(match)
+        state.add_log(player_id, "search", card=match)
 
 
 def _opponents(state: GameState, player_id: str) -> List[Player]:

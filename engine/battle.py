@@ -102,9 +102,8 @@ def get_valid_attack_targets(state: GameState) -> List[Tuple[int, str]]:
                 continue
             if p.turns_completed < 1:
                 continue
-            git_vs = attacker_git_vs(attacker, p, att_git)
             for side in ["left", "right"]:
-                if not _fossato_blocks(p, side, git_vs):
+                if not _fossato_blocks(p, side, att_git):
                     targets.append((i, side))
         return targets
 
@@ -117,32 +116,11 @@ def get_valid_attack_targets(state: GameState) -> List[Tuple[int, str]]:
             continue
         if defender.turns_completed < 1:
             continue
-        # Verifica Fossato (con l'eventuale raddoppio GIT dell'Orda di Decimo)
-        if _fossato_blocks(defender, side, attacker_git_vs(attacker, defender, att_git)):
+        # Verifica Fossato
+        if _fossato_blocks(defender, side, att_git):
             continue
         targets.append((defender_index, side))
     return targets
-
-
-def attacker_git_vs(attacker: Player, defender: Player, attacker_git: int) -> int:
-    """
-    GIT dell'attaccante contro un difensore specifico.
-
-    Orda di Decimo (`decimo_anti_fossato`): se il difensore ha un Fossato, la GIT
-    dell'Orda raddoppia — anche ai fini del controllo che il Fossato blocchi o
-    meno l'attacco, quindi va applicata prima di `_fossato_blocks`.
-    """
-    has_decimo = any(
-        eff.get("type") == "decimo_anti_fossato"
-        for eff in attacker.active_effects
-    )
-    if not has_decimo:
-        return attacker_git
-    has_fossato = any(
-        b.base_card_id == "fossato"
-        for b in defender.field.village.buildings
-    )
-    return attacker_git * 2 if has_fossato else attacker_git
 
 
 def _fossato_blocks(defender: Player, bastion_side: str, attacker_git: int) -> bool:
@@ -176,8 +154,7 @@ def fossato_block_message(state: GameState, defender_index: int, side: str) -> O
     adjacent = (defender_index, side) in adjacent_bastions(attacker_index, state.players).values()
     if not (guerremoto or adjacent):
         return None
-    _, att_git = attacker_stats(attacker)
-    git = attacker_git_vs(attacker, defender, att_git)
+    _, git = attacker_stats(attacker)
     thresholds = [
         3 if b.completed else 1
         for b in defender.field.village.buildings if b.base_card_id == "fossato"
@@ -405,9 +382,6 @@ def resolve_battle(
 
     # Statistiche attaccante
     att_att, att_git = attacker_stats(attacker)
-
-    # Orda di Decimo: se il difensore ha un Fossato, la GIT raddoppia
-    att_git = attacker_git_vs(attacker, defender, att_git)
 
     # Verifica Fossato: blocca l'attacco se il GIT è insufficiente
     if _fossato_blocks(defender, defender_bastion_side, att_git):

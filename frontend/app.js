@@ -1549,6 +1549,50 @@ const App = (() => {
     });
   }
 
+  // Effetti Orda a pulsante: il pulsante sta nel dettaglio del Guerriero con l'Orda
+  // attiva, ed è acceso quando il server lo dice (fase Azioni, non ancora usato).
+  const HORDE_BUTTONS = {
+    decimo_horde: {
+      label: 'Prendi Fossato',
+      ready: (me) => me.decimo_take_ready,
+      onClick: () => _showDecimoFlow(),
+    },
+    giulio_horde: {
+      label: 'Cerca Giulio II',
+      ready: (me) => me.giulio_search_ready,
+      onClick: () => sendAction('giulio_search', {}),
+    },
+  };
+
+  function _hordeButton(warrior, def) {
+    return warrior && warrior.horde_active && def ? HORDE_BUTTONS[def.horde_effect_id] || null : null;
+  }
+
+  function _showDecimoFlow() {
+    const me = currentState.players.find(p => p.id === myPlayerId);
+    if (!me) return;
+    // Giocatori che hanno un Fossato in gioco, io per primo
+    const owners = currentState.players
+      .filter(p => (p.field.village.buildings || []).some(b => b.base_card_id === 'fossato'))
+      .sort((a, b) => (b.id === myPlayerId) - (a.id === myPlayerId));
+    Renderer.showBuildingPicker(currentState, {
+      title: 'Orda di Decimo — scegli un Fossato',
+      subtitle: 'Diventa un tuo Muro. Non consuma Azioni.',
+      players: owners,
+      filter: (b) => b.base_card_id === 'fossato',
+      empty: 'Nessun Fossato in gioco.',
+      onPick: (b, owner) => Renderer.showBastionPicker(currentState, {
+        title: 'Orda di Decimo — in quale Bastione?',
+        players: [me],
+        onPick: (_p, side) => sendAction('decimo_take_fossato', {
+          building_instance_id: b.instance_id,
+          target_player_id: owner.id,
+          bastion: side,
+        }),
+      }),
+    });
+  }
+
   function _showBanner(player) {
     const maxActions = (player.name === 'Test' || player.name === 'Test2') ? 5 : 2;
     const actNum = maxActions - player.actions_remaining + 1;
@@ -1671,7 +1715,7 @@ const App = (() => {
 
   // Le carte si giocano e si spostano trascinandole, e si guardano passandoci
   // sopra: il clic apre il dettaglio solo dove ha pulsanti propri (Attiva Arena,
-  // Completa, carte assegnate, Recluta sotto l'Eroe). Nella mano solo il tutorial lo usa,
+  // Completa, effetti Orda a pulsante, carte assegnate, Recluta sotto l'Eroe). Nella mano solo il tutorial lo usa,
   // per la lettura delle carte (onCardClick). I mazzi (Vite, Muri…) hanno i loro clic.
   function cardHasDetail(instanceId, source) {
     if (source === 'hand') return isTutorial;
@@ -1686,7 +1730,8 @@ const App = (() => {
     }
     for (const p of currentState.players) {
       const w = _getAllWarriors(p).find(x => x.instance_id === instanceId);
-      if (w) return (w.assigned_cards || []).length > 0 || !!w.evolved_from;
+      if (w) return (w.assigned_cards || []).length > 0 || !!w.evolved_from
+        || (source === 'field' && !!_hordeButton(w, def));
     }
     return false;
   }
@@ -2089,6 +2134,18 @@ const App = (() => {
           sendAction('complete_building', { building_instance_id: instanceId });
         };
       }
+    }
+
+    // Effetto Orda a pulsante (Decimo, Giulio): visibile sempre, acceso solo se usabile
+    const hordeButton = source === 'field' && fieldWarriorOwnerId === myPlayerId ? _hordeButton(fieldWarrior, def) : null;
+    if (hordeButton) {
+      const me = currentState.players.find(p => p.id === myPlayerId);
+      extraButtons.push({
+        label: hordeButton.label,
+        className: 'btn-warning',
+        disabled: !hordeButton.ready(me),
+        onClick: () => { Renderer.closeCardDetail(); hordeButton.onClick(); },
+      });
     }
 
     // Recluta sotto l'Eroe: l'Eroe ne conserva l'effetto Orda, ma la sua carta

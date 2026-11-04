@@ -1031,6 +1031,108 @@ def arena_activate(
 
 
 # ---------------------------------------------------------------------------
+# Effetti Orda a pulsante: Decimo e Giulio (non consumano Azioni)
+# ---------------------------------------------------------------------------
+
+def _horde_button_error(state: GameState, player: Player, effect_id: str) -> Optional[str]:
+    """Perché ora l'effetto Orda a pulsante non si può usare (None se si può).
+    Solo in fase Azioni: nello Schieramento l'Orda può cambiare effetto, e dallo
+    stesso gruppo se ne userebbero due in un turno. Ogni Orda attiva con questo
+    effetto concede un uso per turno."""
+    if state.winner_id or state.current_player.id != player.id:
+        return "Non è il tuo turno."
+    if state.phase != "action":
+        return "Puoi usare questo effetto solo prima dello Schieramento."
+    active = sum(
+        1 for w in player.all_warriors()
+        if w.horde_active and getattr(get_card(w.base_card_id), "horde_effect_id", None) == effect_id
+    )
+    if not active:
+        return "Quest'Orda non è attiva."
+    used = sum(1 for e in player.active_effects if e.get("type") == f"{effect_id}_used")
+    if used >= active:
+        return "Hai già usato questo effetto in questo turno."
+    return None
+
+
+def _mark_horde_button_used(player: Player, effect_id: str) -> None:
+    player.active_effects.append({"type": f"{effect_id}_used", "expires": "end_of_turn"})
+
+
+def decimo_take_error(state: GameState, player: Player) -> Optional[str]:
+    """Perché ora il giocatore non può prendere un Fossato (None se può)."""
+    error = _horde_button_error(state, player, "decimo_horde")
+    if error:
+        return error
+    if not any(b.base_card_id == "fossato" for p in state.players for b in p.field.village.buildings):
+        return "Non ci sono Fossati in gioco."
+    return None
+
+
+def giulio_search_error(state: GameState, player: Player) -> Optional[str]:
+    """Perché ora il giocatore non può cercare Giulio II (None se può). Si può
+    anche se nel mazzo non ce ne sono: chi gioca non lo sa finché non guarda."""
+    return _horde_button_error(state, player, "giulio_horde")
+
+
+def giulio_search(state: GameState, player_id: str) -> dict:
+    """Apre la ricerca di Giulio II nel mazzo: l'uso è consumato anche se poi il
+    giocatore esce senza prendere nulla."""
+    player = _require_current_player(state, player_id)
+    error = giulio_search_error(state, player)
+    if error:
+        raise ActionError(error)
+    _mark_horde_button_used(player, "giulio_horde")
+    state.pending_search = {
+        "player_id": player.id,
+        "context": "giulio_horde",
+        "condition": {"type": "base_card_id", "value": "giulio_ii"},
+    }
+    state.recent_events.append({
+        "type": "search", "card": "giulio",
+        "player_id": player.id, "search_pending": True,
+    })
+    state.add_log(player_id, "giulio_search")
+    return {"search_pending": True}
+
+
+def decimo_take_fossato(
+    state: GameState,
+    player_id: str,
+    building_instance_id: str,
+    target_player_id: str,
+    bastion: str,
+) -> dict:
+    """Sposta un Fossato di un giocatore qualsiasi (anche tuo) nei tuoi Muri."""
+    player = _require_current_player(state, player_id)
+    error = decimo_take_error(state, player)
+    if error:
+        raise ActionError(error)
+    if bastion not in ("left", "right"):
+        raise ActionError(f"Bastione non valido: {bastion}.")
+
+    target = state.get_player(target_player_id)
+    if target is None:
+        raise ActionError("Giocatore bersaglio non trovato.")
+    fossato = next(
+        (b for b in target.field.village.buildings
+         if b.instance_id == building_instance_id and b.base_card_id == "fossato"),
+        None,
+    )
+    if fossato is None:
+        raise ActionError("Fossato non trovato nel Villaggio.")
+
+    target.field.village.buildings.remove(fossato)
+    dest = player.field.bastion_left if bastion == "left" else player.field.bastion_right
+    dest.walls.append(make_wall_instance(fossato.instance_id))
+    _mark_horde_button_used(player, "decimo_horde")
+
+    state.add_log(player_id, "decimo_take_fossato", building=fossato.instance_id,
+                  from_player=target_player_id, bastion=bastion)
+    return {"building": fossato.instance_id, "from_player": target_player_id, "bastion": bastion}
+
+
+# ---------------------------------------------------------------------------
 # Helper per effetti che piazzano costruzioni gratis
 # ---------------------------------------------------------------------------
 
