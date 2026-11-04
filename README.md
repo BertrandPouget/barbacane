@@ -12,7 +12,7 @@ Il mondo di Barbacane è popolato da Umani, Elfi, Nani e Maghe — tutti, inspie
 
 ## Come Provarlo
 
-Il gioco è online su **[barbacane-online.onrender.com](https://barbacane-online.onrender.com)**: non serve installare nulla, basta un browser.
+Il gioco è online su **[barbacane.quest](https://barbacane.quest)**: non serve installare nulla, basta un browser.
 
 ### Modalità di Gioco
 
