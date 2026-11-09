@@ -10,7 +10,7 @@ import os
 import re
 from fastapi import FastAPI, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from db.storage import init_db, cleanup_games
@@ -27,6 +27,23 @@ app = FastAPI(
 # Comprime al volo le risposte di testo (HTML, JS, CSS, JSON): la banda in uscita
 # di Render è limitata. Immagini e audio sono già compressi e non ci guadagnano.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Il sito risponde sia sul dominio sia sull'indirizzo di Render: le pagine
+# aperte da onrender.com vengono rimandate a barbacane.quest, così Google
+# indicizza un solo indirizzo. /health resta raggiungibile su entrambi
+# (lo chiamano il cron-job esterno che tiene sveglio Render e i client).
+_CANONICAL_HOST = "barbacane.quest"
+
+
+@app.middleware("http")
+async def _redirect_to_canonical_host(request: Request, call_next):
+    host = request.headers.get("host", "").split(":")[0]
+    if (host.endswith(".onrender.com") and request.method in ("GET", "HEAD")
+            and request.url.path != "/health"):
+        url = request.url.replace(scheme="https", hostname=_CANONICAL_HOST, port=None)
+        return RedirectResponse(str(url), status_code=301)
+    return await call_next(request)
+
 
 _CLEANUP_INTERVAL_SECONDS = 5 * 60
 
@@ -130,7 +147,7 @@ class _RevalidatingStatic(StaticFiles):
 # Espone /data/ al frontend (cards.json)
 app.mount("/data", _RevalidatingStatic(directory=_DATA_DIR), name="data")
 
-# Espone /assets/ al frontend (logo.png, ecc.)
+# Espone /assets/ al frontend (logos/, ecc.)
 app.mount("/assets", _RevalidatingStatic(directory=_ASSETS_DIR), name="assets")
 
 # Espone le immagini delle carte (card_factory/output/) se disponibili
