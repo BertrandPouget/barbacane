@@ -227,6 +227,7 @@ def _begin_turn(state: GameState) -> None:
 
 def _trigger_building_start(state: GameState, player: Player) -> None:
     """Attiva gli effetti di Costruzione che si attivano a inizio turno."""
+    trono_done: set = set()  # più Troni sullo stesso Guerriero: l'effetto si applica una volta
     for b_inst in player.field.village.buildings:
         base_id = b_inst.base_card_id
         card = get_card(base_id)
@@ -245,7 +246,9 @@ def _trigger_building_start(state: GameState, player: Player) -> None:
         elif base_id == "fucina" and b_inst.completed:
             # Fucina completata: 3a Azione garantita ogni turno
             player.actions_remaining += 1
-        elif base_id == "trono" and b_inst.completed and b_inst.assigned_warrior:
+        elif base_id == "trono" and b_inst.completed and b_inst.assigned_warrior \
+                and b_inst.assigned_warrior not in trono_done:
+            trono_done.add(b_inst.assigned_warrior)
             # Trono completo: l'effetto Orda del Guerriero assegnato è sempre
             # attivo, si ri-attiva automaticamente a ogni inizio turno (indipendente
             # dalla persistenza normale delle Orde: qui si pulisce e riapplica sempre,

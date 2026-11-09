@@ -222,17 +222,54 @@ class Player(BaseModel):
         for eff in to_remove:
             self.active_effects.remove(eff)
 
-    def release_trono(self, warrior_iid: Optional[str]) -> None:
-        """Il Trono assegnato a `warrior_iid` lascia il campo: l'effetto Orda
-        sempre attivo finisce. Il fulmine si spegne (un Guerriero con Trono non
-        può essere la carta scelta di un'Orda normale, vedi activate_horde)."""
+    def release_trono(self, warrior_iid: Optional[str], leaving_trono_iid: Optional[str] = None) -> None:
+        """Il Trono `leaving_trono_iid` assegnato a `warrior_iid` lascia il campo:
+        l'effetto Orda sempre attivo finisce, a meno che il Guerriero non abbia
+        un altro Trono completo (l'effetto è attivo o no, non si somma). Il
+        fulmine si spegne (un Guerriero con Trono non può essere la carta scelta
+        di un'Orda normale, vedi activate_horde)."""
         if not warrior_iid:
+            return
+        if any(
+            b.base_card_id == "trono" and b.completed and b.assigned_warrior == warrior_iid
+            and b.instance_id != leaving_trono_iid
+            for b in self.field.village.buildings
+        ):
             return
         self.clear_trono_horde_effects(warrior_iid)
         for w in self.all_warriors():
             if w.instance_id == warrior_iid:
                 w.horde_active = False
                 break
+
+    def yield_horde_to_trono(self, warrior: "WarriorInstance") -> None:
+        """`warrior` era la carta scelta della sua Orda e ora un Trono ne rende
+        sempre attivo l'effetto: l'effetto dell'Orda si toglie, perché un effetto
+        Orda è attivo o no e non si somma. L'Orda resta libera di attivare
+        l'effetto di un altro Guerriero."""
+        from engine.cards import CARD_REGISTRY
+        zone_map = {
+            "vanguard": self.field.vanguard,
+            "bastion_left": self.field.bastion_left.warriors,
+            "bastion_right": self.field.bastion_right.warriors,
+        }
+        zone = next((z for z, ws in zone_map.items() if warrior in ws), None)
+        if zone is None:
+            return
+        horde_key = f"{zone}:{CARD_REGISTRY[warrior.base_card_id].species}"
+        if horde_key not in self.hordes_activated_this_turn:
+            return
+        self.hordes_activated_this_turn.remove(horde_key)
+        for eff in [e for e in self.active_effects if e.get("from_horde_key") == horde_key]:
+            if eff.get("type") == "horde_stat_bonus":
+                for w in zone_map[zone]:
+                    if w.instance_id == eff.get("warrior_iid"):
+                        for stat in ("att", "git", "dif"):
+                            bonus = eff.get(stat, 0)
+                            if bonus:
+                                w.temp_modifiers[stat] = max(0, w.temp_modifiers.get(stat, 0) - bonus)
+                        break
+            self.active_effects.remove(eff)
 
     def retag_trono_effects(self, old_iid: str, new_iid: str) -> None:
         """Il Guerriero col Trono cambia istanza (evoluzione o Eroe scartato che

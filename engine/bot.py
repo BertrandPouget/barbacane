@@ -613,8 +613,13 @@ def _best_trono_target(player: Player) -> Optional[str]:
     effetto Orda, quindi ha senso solo su un Guerriero che un effetto Orda ce
     l'ha. A parità, il più forte (è anche quello che si vuole tenere in campo).
     Ritorna None se nessun Guerriero è idoneo."""
+    # Un secondo Trono sullo stesso Guerriero non aggiunge nulla (l'effetto non si somma)
+    with_trono = {b.assigned_warrior for b in player.field.village.buildings
+                  if b.base_card_id == "trono" and b.assigned_warrior}
     best, best_value = None, float("-inf")
     for w in player.all_warriors():
+        if w.instance_id in with_trono:
+            continue
         try:
             card = get_card(w.base_card_id)
         except KeyError:

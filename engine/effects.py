@@ -161,7 +161,7 @@ def _discard_assigned_cards(state: GameState, player: Player, assigned_cards: Li
         b_inst = next((b for b in player.field.village.buildings if b.instance_id == ac_iid), None)
         if b_inst:
             if b_inst.base_card_id == "trono":
-                player.release_trono(b_inst.assigned_warrior)
+                player.release_trono(b_inst.assigned_warrior, b_inst.instance_id)
             player.field.village.buildings.remove(b_inst)
         state.discard_pile.append(ac_iid)
 
@@ -172,7 +172,7 @@ def _unassign_building(player: Player, b_inst: BuildingInstance) -> None:
     if not b_inst.assigned_warrior:
         return
     if b_inst.base_card_id == "trono":
-        player.release_trono(b_inst.assigned_warrior)
+        player.release_trono(b_inst.assigned_warrior, b_inst.instance_id)
     for w in player.all_warriors():
         if b_inst.instance_id in w.assigned_cards:
             w.assigned_cards.remove(b_inst.instance_id)
@@ -500,6 +500,17 @@ def trono_effect(
             # a ogni inizio turno del giocatore (vedi _trigger_building_start).
             # Gli effetti vanno taggati con trono_warrior come in _trigger_building_start,
             # altrimenti _clear_trono_horde_effects non li rimuove e il bonus si raddoppia.
+            # Un effetto Orda è attivo o no, non si somma: si toglie prima quello
+            # già dato da un altro Trono o, se era la carta scelta, dalla sua Orda.
+            had_trono = any(
+                b.base_card_id == "trono" and b.completed and b.assigned_warrior == target_warrior_iid
+                and b.instance_id != building_instance_id
+                for b in player.field.village.buildings
+            )
+            if had_trono:
+                player.clear_trono_horde_effects(target_warrior_iid)
+            elif target_w.horde_active:
+                player.yield_horde_to_trono(target_w)
             target_w.horde_active = True
             effects_count_before = len(player.active_effects)
             horde_result = apply_effect(card.horde_effect_id, state, player, warrior_iid=target_warrior_iid)
@@ -753,7 +764,7 @@ def regicidio_effect(
         if assigned_warrior_iid:
             break
 
-    target.release_trono(trono.assigned_warrior or assigned_warrior_iid)
+    target.release_trono(trono.assigned_warrior or assigned_warrior_iid, trono.instance_id)
     trono.assigned_warrior = None
     target.field.village.buildings.remove(trono)
     state.discard_pile.append(trono.instance_id)

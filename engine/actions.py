@@ -945,9 +945,13 @@ def activate_horde(
     # stessa carta: con due Patrizio nell'Orda il fulmine (e l'effetto, es.
     # "Questa carta ottiene +2 GIT") va solo a quello selezionato. Senza
     # istanza indicata si prende la prima copia della carta nell'Orda.
+    # Un Guerriero col Trono ha già l'effetto attivo e non si somma: non può essere scelto.
     chosen = next((w for w in horde["warriors"]
                    if w.instance_id == warrior_instance_id and w.base_card_id == horde_card_id), None) \
-        or next(w for w in horde["warriors"] if w.base_card_id == horde_card_id)
+        or next((w for w in horde["warriors"]
+                 if w.base_card_id == horde_card_id and not player.has_active_trono(w.instance_id)), None)
+    if chosen is None:
+        raise ActionError("L'effetto Orda di questa carta è già sempre attivo grazie al Trono.")
 
     # Segna visivamente la carta al centro dell'Orda (solo nella zona attivata).
     # I Guerrieri con Trono sempre attivo mantengono il proprio fulmine invariato.
