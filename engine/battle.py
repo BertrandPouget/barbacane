@@ -6,11 +6,6 @@ Flusso:
 2. Si calcolano ATT/GIT dell'attaccante e DIF/GIT del difensore.
 3. Si calcolano i danni.
 4. Si applicano i danni al Bastione (rimozione Muri → perdita Vita).
-
-Fossato (REGOLE CORRETTE):
-- Base: "Non puoi essere bersaglio di attacchi con meno di 1 GIT."
-- Complete: "Non puoi essere bersaglio di attacchi con meno di 3 GIT."
-  Se l'ATT GIT è inferiore alla soglia, l'attacco è BLOCCATO.
 """
 
 from __future__ import annotations
