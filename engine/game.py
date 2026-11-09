@@ -285,24 +285,8 @@ def _trigger_building_end(state: GameState, player: Player) -> int:
 def _clear_trono_horde_effects(player: Player, warrior_iid: str) -> None:
     """Rimuove gli effetti Orda generati dal Trono per questo Guerriero nel turno
     precedente, prima di riapplicarli: l'effetto Orda del Trono si ri-attiva ogni
-    inizio turno (a differenza delle Orde normali, che restano attive finché non
-    si dividono o il giocatore ne sceglie un'altra), quindi va pulito e riapplicato
-    per evitare che i bonus si accumulino."""
-    to_remove = []
-    for eff in player.active_effects:
-        if eff.get("trono_warrior") != warrior_iid:
-            continue
-        if eff.get("type") == "horde_stat_bonus":
-            for w in player.all_warriors():
-                if w.instance_id == warrior_iid:
-                    for stat in ("att", "git", "dif"):
-                        bonus = eff.get(stat, 0)
-                        if bonus:
-                            w.temp_modifiers[stat] = max(0, w.temp_modifiers.get(stat, 0) - bonus)
-                    break
-        to_remove.append(eff)
-    for eff in to_remove:
-        player.active_effects.remove(eff)
+    inizio turno, quindi va pulito e riapplicato per evitare che i bonus si accumulino."""
+    player.clear_trono_horde_effects(warrior_iid)
 
 
 def _process_deferred_effects(state: GameState, player: Player) -> None:

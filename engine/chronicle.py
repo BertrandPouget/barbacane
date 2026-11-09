@@ -255,7 +255,7 @@ def _tell_log(state: GameState, entry: ActionLog) -> None:
 
     elif a == "eracle_destroy":
         _add(state, "action", pid,
-             f"{who} distrugge {_c(d.get('building'))} di {_p(d.get('from_player'))} (Orda di {_c('eracle')}).")
+             f"{who} scarta {_c(d.get('building'))} di {_p(d.get('from_player'))} (Orda di {_c('eracle')}).")
 
     elif a == "battle":
         _tell_battle(state, pid, d)

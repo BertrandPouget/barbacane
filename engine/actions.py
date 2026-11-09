@@ -1185,7 +1185,7 @@ def recast_spell(
 
 
 # ---------------------------------------------------------------------------
-# 10. Distruggi Costruzione (Orda Eracle)
+# 10. Scarta Costruzione (Orda Eracle)
 # ---------------------------------------------------------------------------
 
 def eracle_destroy(
@@ -1195,7 +1195,7 @@ def eracle_destroy(
     target_player_id: str,
 ) -> dict:
     """
-    Distrugge una Costruzione avversaria dopo una vittoria in battaglia (Orda Eracle).
+    Scarta una Costruzione avversaria dopo una vittoria in battaglia (Orda Eracle).
     Consuma l'effetto Eracle attivo.
     """
     player = _require_current_player(state, player_id)

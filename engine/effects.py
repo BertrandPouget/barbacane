@@ -148,6 +148,8 @@ def _reassign_buildings(player: Player, new_warrior_iid: str, assigned_cards: Li
     for ac_iid in assigned_cards:
         for b in player.field.village.buildings:
             if b.instance_id == ac_iid:
+                if b.assigned_warrior and b.assigned_warrior != new_warrior_iid:
+                    player.retag_trono_effects(b.assigned_warrior, new_warrior_iid)
                 b.assigned_warrior = new_warrior_iid
                 break
 
@@ -158,6 +160,8 @@ def _discard_assigned_cards(state: GameState, player: Player, assigned_cards: Li
     for ac_iid in assigned_cards:
         b_inst = next((b for b in player.field.village.buildings if b.instance_id == ac_iid), None)
         if b_inst:
+            if b_inst.base_card_id == "trono":
+                player.release_trono(b_inst.assigned_warrior)
             player.field.village.buildings.remove(b_inst)
         state.discard_pile.append(ac_iid)
 
@@ -167,6 +171,8 @@ def _unassign_building(player: Player, b_inst: BuildingInstance) -> None:
     (usato quando la Costruzione viene rimossa dal campo direttamente, es. Trono scartato)."""
     if not b_inst.assigned_warrior:
         return
+    if b_inst.base_card_id == "trono":
+        player.release_trono(b_inst.assigned_warrior)
     for w in player.all_warriors():
         if b_inst.instance_id in w.assigned_cards:
             w.assigned_cards.remove(b_inst.instance_id)
@@ -747,6 +753,8 @@ def regicidio_effect(
         if assigned_warrior_iid:
             break
 
+    target.release_trono(trono.assigned_warrior or assigned_warrior_iid)
+    trono.assigned_warrior = None
     target.field.village.buildings.remove(trono)
     state.discard_pile.append(trono.instance_id)
     result: dict = {"trono_discarded": trono.instance_id, "from_player": target.id}
@@ -1710,7 +1718,7 @@ def madeleine_horde(state: GameState, player: Player, **kwargs) -> dict:
 
 @register_effect("eracle_horde")
 def eracle_horde(state: GameState, player: Player, **kwargs) -> dict:
-    """Se vinci una battaglia con almeno 3 Danni, puoi distruggere una Costruzione del difensore."""
+    """Se vinci una battaglia con almeno 3 Danni, puoi scartare una Costruzione del difensore."""
     player.active_effects.append({
         "type": "eracle_destroy_building",
         "min_damage": 3,

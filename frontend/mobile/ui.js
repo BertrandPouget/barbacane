@@ -180,12 +180,15 @@ const Sheet = (() => {
 
   function _bindDrag() {
     const sheet = sheetEl();
-    const body = () => $('sheet-body');
+    // Zone che scorrono: il corpo e la fascia dei pulsanti (quando sono tanti)
+    const scroller = (target) =>
+      ['sheet-body', 'sheet-foot'].map($).find(el => el && el.contains(target)) || null;
 
     const start = (y, target) => {
       if (_locked) return;
-      dragFromBody = body().contains(target);
-      if (dragFromBody && body().scrollTop > 0) return;
+      const sc = scroller(target);
+      dragFromBody = !!sc;
+      if (sc && sc.scrollTop > 0) return;
       dragStartY = y;
       dragDelta = 0;
       dragging = false;

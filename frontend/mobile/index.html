@@ -82,10 +82,15 @@
         <span>Il tuo nome</span>
         <input type="text" id="in-create-name" placeholder="Nome giocatore" maxlength="20" autocomplete="nickname" />
       </label>
-      <label class="fld">
-        <span>Timer turno — secondi, 0 = nessuno</span>
-        <input type="number" id="in-create-timer" value="0" min="0" max="600" inputmode="numeric" />
-      </label>
+      <!-- Timer del turno: interruttore + secondi nello stesso riquadro (altezza fissa) -->
+      <div class="fld">
+        <span>Timer turno</span>
+        <div class="timer-box" id="in-create-timer-box">
+          <input type="checkbox" id="in-create-timer-on" class="switch" role="switch" aria-label="Attiva il timer del turno" />
+          <span class="timer-off">Nessun limite di tempo</span>
+          <span class="timer-on"><span id="in-create-timer" class="timer-val" aria-live="polite">120</span> secondi<span class="timer-steps"><button type="button" class="timer-step up" data-step="30" aria-label="30 secondi in più"></button><button type="button" class="timer-step down" data-step="-30" aria-label="30 secondi in meno"></button></span></span>
+        </div>
+      </div>
       <button id="btn-create" class="cta cta-gold">Crea lobby</button>
     </div>
 

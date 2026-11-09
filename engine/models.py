@@ -203,6 +203,46 @@ class Player(BaseModel):
             for b in self.field.village.buildings
         )
 
+    def clear_trono_horde_effects(self, warrior_iid: str) -> None:
+        """Rimuove gli effetti Orda generati dal Trono per questo Guerriero
+        (taggati `trono_warrior`), togliendo anche i bonus stat dal Guerriero."""
+        to_remove = []
+        for eff in self.active_effects:
+            if eff.get("trono_warrior") != warrior_iid:
+                continue
+            if eff.get("type") == "horde_stat_bonus":
+                for w in self.all_warriors():
+                    if w.instance_id == warrior_iid:
+                        for stat in ("att", "git", "dif"):
+                            bonus = eff.get(stat, 0)
+                            if bonus:
+                                w.temp_modifiers[stat] = max(0, w.temp_modifiers.get(stat, 0) - bonus)
+                        break
+            to_remove.append(eff)
+        for eff in to_remove:
+            self.active_effects.remove(eff)
+
+    def release_trono(self, warrior_iid: Optional[str]) -> None:
+        """Il Trono assegnato a `warrior_iid` lascia il campo: l'effetto Orda
+        sempre attivo finisce. Il fulmine si spegne (un Guerriero con Trono non
+        può essere la carta scelta di un'Orda normale, vedi activate_horde)."""
+        if not warrior_iid:
+            return
+        self.clear_trono_horde_effects(warrior_iid)
+        for w in self.all_warriors():
+            if w.instance_id == warrior_iid:
+                w.horde_active = False
+                break
+
+    def retag_trono_effects(self, old_iid: str, new_iid: str) -> None:
+        """Il Guerriero col Trono cambia istanza (evoluzione o Eroe scartato che
+        lascia la Recluta): gli effetti del Trono seguono il nuovo Guerriero."""
+        for eff in self.active_effects:
+            if eff.get("trono_warrior") == old_iid:
+                eff["trono_warrior"] = new_iid
+                if eff.get("warrior_iid") == old_iid:
+                    eff["warrior_iid"] = new_iid
+
     def check_horde_with_zones(self) -> List[Dict]:
         """Ritorna le Orde attive per zona: [{zone, species, warriors}].
         Un'Orda richiede almeno 3 Guerrieri della stessa Specie nella STESSA Zona."""

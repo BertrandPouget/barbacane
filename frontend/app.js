@@ -240,6 +240,28 @@ const App = (() => {
 
   function bindLobbyUI() {
     document.getElementById('btn-create').addEventListener('click', onCreateLobby);
+    // Timer del turno: l'interruttore mostra i secondi al posto di «Nessun limite»
+    const timerOn = document.getElementById('create-timer-on');
+    timerOn.addEventListener('change', () => {
+      document.getElementById('create-timer-box').classList.toggle('on', timerOn.checked);
+    });
+    document.querySelector('#create-timer-box .timer-off').addEventListener('click', () => {
+      timerOn.checked = true;
+      timerOn.dispatchEvent(new Event('change'));
+    });
+    // Freccette: ±30 secondi, da 30 a 600
+    const timerVal = document.getElementById('create-timer');
+    const timerSteps = document.querySelectorAll('#create-timer-box .timer-step');
+    const syncTimerSteps = () => {
+      const v = parseInt(timerVal.textContent, 10);
+      timerSteps.forEach(b => { b.disabled = Number(b.dataset.step) < 0 ? v <= 30 : v >= 600; });
+    };
+    timerSteps.forEach(b => b.addEventListener('click', () => {
+      const v = parseInt(timerVal.textContent, 10) + Number(b.dataset.step);
+      timerVal.textContent = Math.min(600, Math.max(30, v));
+      syncTimerSteps();
+    }));
+    syncTimerSteps();
     document.getElementById('btn-join').addEventListener('click', onJoinLobby);
     document.getElementById('btn-start').addEventListener('click', onStartGame);
     document.querySelectorAll('#waiting-bot-controls .wait-diff-btn').forEach(btn => {
@@ -752,8 +774,10 @@ const App = (() => {
 
   async function onCreateLobby() {
     const name = document.getElementById('create-name').value.trim();
-    const rawTimer = parseInt(document.getElementById('create-timer').value, 10);
-    const timer = Number.isFinite(rawTimer) && rawTimer > 0 ? rawTimer : 0;
+    // Timer spento = 0; acceso senza un numero valido = 120 secondi
+    const rawTimer = parseInt(document.getElementById('create-timer').textContent, 10);
+    const timer = !document.getElementById('create-timer-on').checked ? 0
+      : rawTimer > 0 ? rawTimer : 120;
     if (!name) { Renderer.toast('Inserisci il tuo nome', 'error'); return; }
     PlayerName.set(name);
     try {
@@ -1062,14 +1086,14 @@ const App = (() => {
         }
       }
 
-      // Eracle: distruggi una costruzione avversaria
+      // Eracle: scarta una Costruzione avversaria
       if (action === 'battle' && result.eracle_destroy_triggered && result.eracle_targets && result.eracle_targets.length > 0
           && state.current_player_id === myPlayerId) {
         const defender = state.players.find(p => p.id === result.defender_id);
         const targetIds = new Set(result.eracle_targets.map(b => b.instance_id));
         Renderer.showBuildingPicker(state, {
-          title: 'Orda di Eracle — distruggi una Costruzione',
-          subtitle: 'Hai inflitto almeno 3 Danni: scegli una Costruzione del difensore da distruggere.',
+          title: 'Orda di Eracle — scarta una Costruzione',
+          subtitle: 'Hai inflitto almeno 3 Danni: scegli una Costruzione del difensore da scartare.',
           players: defender ? [defender] : [],
           filter: (b) => targetIds.has(b.instance_id),
           onPick: (b) => sendAction('eracle_destroy', {

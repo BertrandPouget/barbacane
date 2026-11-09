@@ -336,6 +336,92 @@ input {
   transition: border-color 0.2s;
 }
 .fld input:focus { border-color: var(--gold); }
+/* Timer del turno (creazione lobby): un riquadro come i campi di testo, con
+   l'interruttore a sinistra; spento dice «Nessun limite», acceso mostra i secondi */
+.timer-box {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 48px;
+  padding: 0 14px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  transition: border-color 0.2s;
+}
+.timer-box.on { border-color: var(--border-gold); }
+/* Stesso corpo del campo del nome (.fld input); tutto nel colore del testo scritto */
+.fld .timer-box .timer-off,
+.fld .timer-box .timer-on { font-size: 1rem; color: var(--text); text-transform: none; letter-spacing: 0; }
+.timer-box .timer-off { flex: 1; cursor: pointer; font-style: italic; }
+.fld .timer-box .timer-on { flex: 1; display: none; align-items: center; gap: 0.3em; color: var(--text); }
+.timer-box.on .timer-off { display: none; }
+.fld .timer-box.on .timer-on { display: flex; }
+/* Numero dei secondi, in grassetto dentro la scritta «N secondi» */
+.fld .timer-box .timer-val {
+  font-size: inherit;  /* scavalca .fld span */
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+/* Freccette su/giù affiancate in fondo a destra: solo i triangoli dorati */
+.timer-steps { margin-left: auto; display: inline-flex; gap: 2px; }
+.fld .timer-step {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  cursor: pointer;
+}
+/* Triangolo disegnato coi bordi (i glifi ▲▼ su iOS diventano emoji) */
+.fld .timer-step::before {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  transform: translate(-50%, -50%);
+  transition: border-color 0.15s;
+}
+.fld .timer-step.up::before { border-bottom: 9px solid var(--gold); }
+.fld .timer-step.down::before { border-top: 9px solid var(--gold); }
+.fld .timer-step.up:active:not(:disabled)::before { border-bottom-color: var(--gold-light); }
+.fld .timer-step.down:active:not(:disabled)::before { border-top-color: var(--gold-light); }
+.fld .timer-step:disabled { opacity: 0.25; cursor: default; }
+/* Interruttore a pillola */
+.fld input.switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-light);
+  box-shadow: none;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.fld input.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition: transform 0.2s, background 0.2s;
+}
+.fld input.switch:hover,
+.fld input.switch:focus { border-color: var(--border-gold); box-shadow: none; }
+.fld input.switch:checked { background: var(--gold); border-color: var(--gold); }
+.fld input.switch:checked::after { transform: translateX(18px); background: var(--bg-dark); }
 #in-join-code { text-transform: uppercase; letter-spacing: 0.14em; }
 
 .cta {
@@ -1970,14 +2056,21 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
 }
+/* Con molti pulsanti vanno a capo (al massimo 3 per riga); se sono ancora
+   troppi per lo schermo la fascia scorre, invece di schiacciarli */
 .sheet-foot {
   flex: 0 0 auto;
   display: flex;
+  flex-wrap: wrap;
   gap: 9px;
+  max-height: 40dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   padding: 10px 16px calc(var(--sab) + 14px);
 }
 .sheet-foot:empty { display: none; }
-.sheet-foot .mbtn { flex: 1; padding: 13px; font-size: 0.9rem; }
+.sheet-foot .mbtn { flex: 1 1 0; min-width: 28%; padding: 13px; font-size: 0.9rem; }
 
 /* Righe-opzione (come le .modal-option del desktop) */
 .opt-row {

@@ -1241,7 +1241,7 @@ def _bot_battle(state: GameState, player_id: str, smart: bool = False) -> None:
             _bot_eracle_destroy(state, player_id, result)
 
 
-# Costruzioni avversarie da distruggere con l'Orda di Eracle, dalla più
+# Costruzioni avversarie da scartare con l'Orda di Eracle, dalla più
 # pericolosa per il Bot: prima i bonus di Battaglia e le difese, poi l'economia.
 _ERACLE_PRIORITY = (
     "catapulta", "ariete", "fossato", "saracinesca", "trono", "fucina",
@@ -1252,7 +1252,7 @@ _ERACLE_PRIORITY = (
 
 def _bot_eracle_destroy(state: GameState, player_id: str, battle_result: dict) -> None:
     """Il Bot sfrutta l'Orda di Eracle: senza questa scelta la battaglia
-    segnala i bersagli ma nessuna Costruzione viene mai distrutta."""
+    segnala i bersagli ma nessuna Costruzione viene mai scartata."""
     targets = battle_result.get("eracle_targets") or []
     if not targets:
         return

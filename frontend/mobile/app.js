@@ -279,6 +279,28 @@ const Mob = (() => {
     goToMultiPage = setupPager($('multi-pager'), $('multi-dots'));
 
     $('btn-create').addEventListener('click', onCreateLobby);
+    // Timer del turno: l'interruttore mostra i secondi al posto di «Nessun limite»
+    $('in-create-timer-on').addEventListener('change', () => {
+      haptic();
+      $('in-create-timer-box').classList.toggle('on', $('in-create-timer-on').checked);
+    });
+    document.querySelector('#in-create-timer-box .timer-off').addEventListener('click', () => {
+      $('in-create-timer-on').checked = true;
+      $('in-create-timer-on').dispatchEvent(new Event('change'));
+    });
+    // Freccette: ±30 secondi, da 30 a 600
+    const timerSteps = document.querySelectorAll('#in-create-timer-box .timer-step');
+    const syncTimerSteps = () => {
+      const v = parseInt($('in-create-timer').textContent, 10);
+      timerSteps.forEach(b => { b.disabled = Number(b.dataset.step) < 0 ? v <= 30 : v >= 600; });
+    };
+    timerSteps.forEach(b => b.addEventListener('click', () => {
+      haptic();
+      const v = parseInt($('in-create-timer').textContent, 10) + Number(b.dataset.step);
+      $('in-create-timer').textContent = Math.min(600, Math.max(30, v));
+      syncTimerSteps();
+    }));
+    syncTimerSteps();
     $('btn-join').addEventListener('click', onJoinLobby);
     $('btn-start').addEventListener('click', onStartGame);
     document.querySelectorAll('.wait-diff-btn').forEach(btn => {
@@ -737,7 +759,9 @@ const Mob = (() => {
 
   async function onCreateLobby() {
     const name = $('in-create-name').value.trim();
-    const timer = parseInt($('in-create-timer').value) || 0;
+    // Timer spento = 0; acceso senza un numero valido = 120 secondi
+    const rawTimer = parseInt($('in-create-timer').textContent, 10);
+    const timer = !$('in-create-timer-on').checked ? 0 : (rawTimer > 0 ? rawTimer : 120);
     if (!name) { Toast.show('Inserisci il tuo nome', 'error'); return; }
     PlayerName.set(name);
     try {
@@ -1104,14 +1128,14 @@ const Mob = (() => {
         }
       }
 
-      // Eracle: distruggi una costruzione avversaria
+      // Eracle: scarta una Costruzione avversaria
       if (action === 'battle' && result.eracle_destroy_triggered &&
           result.eracle_targets && result.eracle_targets.length > 0 &&
           state.current_player_id === myPlayerId) {
         const defender = state.players.find(p => p.id === result.defender_id);
         const targetIds = new Set(result.eracle_targets.map(b => b.instance_id));
         pickBuilding({
-          title: 'Orda di Eracle — distruggi una Costruzione',
+          title: 'Orda di Eracle — scarta una Costruzione',
           subtitle: 'Hai inflitto almeno 3 Danni: scegli una Costruzione del difensore',
           players: defender ? [defender] : [],
           filter: (b) => targetIds.has(b.instance_id),
