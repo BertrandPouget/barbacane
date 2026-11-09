@@ -654,8 +654,8 @@
       "school": "anatema",
       "cost": 2,
       "cost_type": "maga",
-      "base_effect": "Infliggi Danni a un Bastione a tua scelta pari al numero di Guerrieri presso di esso.",
-      "prodigy_effect": "Infliggi Danni a un Bastione a tua scelta pari al numero di Guerrieri presso i Bastioni dell'avversario.",
+      "base_effect": "Scegli un Bastione avversario. Scarta da esso tanti Muri casuali quanti sono i Guerrieri presso di esso.",
+      "prodigy_effect": "Scegli un Bastione avversario. Scarta da esso tanti Muri casuali quanti sono i Guerrieri presso i Bastioni dell'avversario.",
       "prodigy_is_additive": false,
       "effect_id": "incendifesa_effect",
       "copies": 3

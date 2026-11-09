@@ -453,7 +453,7 @@ def _tell_horde(state: GameState, ev: Dict[str, Any]) -> None:
 def _tell_effect(state: GameState, ev: Dict[str, Any]) -> None:
     card, pid = ev.get("card"), ev.get("player_id")
     who = _p(pid)
-    if card == "ardolancio":
+    if card in ("ardolancio", "incendifesa"):
         n = ev.get("walls_discarded", 0)
         side = _SIDE.get(ev.get("target_bastion_side"), "")
         target = _p(ev.get("target_player_id"))

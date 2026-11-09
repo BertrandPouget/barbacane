@@ -350,7 +350,7 @@ def apply_damage_to_bastion(
         lost_card = defender.life_cards.pop(0)
         state.discard_pile.append(lost_card)
         life_lost = 1
-        # Ultima Vita (Battaglia o Incendifesa): eliminato, le sue carte tornano
+        # Ultima Vita: eliminato, le sue carte tornano
         # in gioco. In Battaglia succede prima dell'Orda di Eracle, che così non
         # trova Costruzioni da distruggere
         if not defender.is_alive:

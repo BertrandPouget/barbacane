@@ -804,13 +804,13 @@ _NEW_HORDE_VALUE = 3.0    # Orda che si forma riposizionando (attivata subito do
 
 # Carte in mano all'avversario che cambiano il suo attacco del prossimo turno
 _THREAT_BUILDINGS = {"ariete": ("att", 1), "catapulta": ("git", 1)}
-_THREAT_SPELLS = {"ardolancio", "guerremoto"}
+_THREAT_SPELLS = {"ardolancio", "guerremoto", "incendifesa"}
 
 
 def _hit_value(damage: int, durabilities: List[int], lives: int, strip: int = 0) -> float:
     """Perdita (in punti di valutazione) di un Bastione che subisce `damage`
     Danni, dopo che `strip` Muri sono stati scartati da effetti (Ardolancio,
-    Guerremoto prodigio). Rispecchia apply_damage_to_bastion: i Muri
+    Guerremoto prodigio, Incendifesa). Rispecchia apply_damage_to_bastion: i Muri
     assorbono secondo la loro durabilità, se non bastano si perde UNA Vita."""
     stripped = min(strip, len(durabilities))
     value = stripped * _WALL_VALUE
@@ -836,18 +836,19 @@ def _fossato_threshold(player: Player) -> int:
     return threshold
 
 
-def _side_defense(warriors: List[WarriorInstance], bastion, bonus: Dict[str, int]) -> Tuple[int, int, List[int]]:
-    """(DIF, GIT, durabilità dei Muri) di un Bastione con i Guerrieri dati:
-    stesso calcolo di defender_stats, ma su una disposizione ipotetica."""
+def _side_defense(warriors: List[WarriorInstance], bastion, bonus: Dict[str, int]) -> Tuple[int, int, List[int], int]:
+    """(DIF, GIT, durabilità dei Muri, numero di Guerrieri) di un Bastione con
+    i Guerrieri dati: stesso calcolo di defender_stats, ma su una disposizione
+    ipotetica. Il numero di Guerrieri serve a stimare Incendifesa."""
     durabilities = [w.durability for w in bastion.walls]
     if not warriors:
-        return bastion.dif_bonus, 0, durabilities
+        return bastion.dif_bonus, 0, durabilities, 0
     dif = max(w.effective_dif() for w in warriors) + bastion.dif_bonus + bonus["dif"]
     git = max(w.effective_git() for w in warriors) + bonus["git"]
-    return dif, git, durabilities
+    return dif, git, durabilities, len(warriors)
 
 
-def _player_defense(player: Player) -> List[Tuple[int, int, List[int]]]:
+def _player_defense(player: Player) -> List[Tuple[int, int, List[int], int]]:
     bonus = battle_building_bonus(player)
     return [
         _side_defense(player.field.bastion_left.warriors, player.field.bastion_left, bonus),
@@ -903,11 +904,12 @@ class _ThreatModel:
         return model
 
     def expected_loss(self, state: GameState, player: Player,
-                      defense: Optional[List[Tuple[int, int, List[int]]]] = None) -> float:
+                      defense: Optional[List[Tuple[int, int, List[int], int]]] = None) -> float:
         """Perdita attesa di `player` ai prossimi turni dei suoi vicini in
         `state`, con la difesa data (di default quella attuale del campo)."""
         if defense is None:
             defense = _player_defense(player)
+        bastion_warriors = sum(d[3] for d in defense)
         idx = next(i for i, p in enumerate(state.players) if p.id == player.id)
         adj = adjacent_bastions(idx, state.players)
         # Il vicino di sinistra minaccia il mio Bastione sinistro (defense[0]),
@@ -920,7 +922,8 @@ class _ThreatModel:
             opponent = state.players[opp_idx]
             if opp_idx == idx or not opponent.is_alive:
                 continue
-            total += self._model(opponent.id).expected_loss(player, opponent, [defense[s] for s in sides])
+            total += self._model(opponent.id).expected_loss(
+                player, opponent, [defense[s] for s in sides], bastion_warriors)
         return total
 
 
@@ -933,7 +936,7 @@ class _OpponentThreat:
     campiona SAMPLES possibili con la dimensione pubblica della mano, e per
     ognuna calcola il miglior attacco disponibile all'avversario col Mana del
     suo prossimo turno (Guerrieri o Evoluzioni da schierare, Ariete/Catapulta,
-    Ardolancio/Guerremoto per scartare Muri prima della Battaglia), sapendo
+    Ardolancio/Guerremoto/Incendifesa per scartare Muri prima della Battaglia), sapendo
     che potrà riposizionare in Avanscoperta tutti i Guerrieri che ha in campo.
     La perdita attesa è la media, sui campioni, del suo attacco migliore
     contro il più conveniente dei miei Bastioni esposti a lui."""
@@ -962,7 +965,9 @@ class _OpponentThreat:
 
     def _options(self, opponent: Player) -> list:
         """Ritorna (attacchi, campioni): `attacchi` è la lista degli attacchi
-        possibili distinti (ATT, GIT, Muri scartati), `campioni` associa a
+        possibili distinti (ATT, GIT, Muri scartati, Incendifese base,
+        Incendifese prodigio: i Muri che queste scartano dipendono dai miei
+        Guerrieri nei Bastioni, noti solo in expected_loss), `campioni` associa a
         ogni mano campionata (con il suo peso) le posizioni dei suoi attacchi
         non dominati. ATT = -1: nessun Guerriero, nessuna Battaglia."""
         field = opponent.all_warriors()
@@ -989,7 +994,7 @@ class _OpponentThreat:
         index: Dict[tuple, int] = {}
         result = []
         for hand, weight in self.hands:
-            # (costo Mana, ATT, GIT, +ATT, +GIT, Muri scartati)
+            # (costo Mana, ATT, GIT, +ATT, +GIT, Muri scartati, Incendifese base, Incendifese prodigio)
             items = []
             for base_id in hand:
                 card = get_card(base_id)
@@ -998,15 +1003,19 @@ class _OpponentThreat:
                         continue
                     if card.subtype == "hero" and card.evolves_from not in on_field:
                         continue
-                    items.append((card.cost, card.att, card.git, 0, 0, 0))
+                    items.append((card.cost, card.att, card.git, 0, 0, 0, 0, 0))
                 elif base_id in _THREAT_BUILDINGS:
                     if card.cost <= self.mana:
                         stat, amount = _THREAT_BUILDINGS[base_id]
-                        items.append((card.cost, -1, -1, amount if stat == "att" else 0, amount if stat == "git" else 0, 0))
+                        items.append((card.cost, -1, -1, amount if stat == "att" else 0,
+                                      amount if stat == "git" else 0, 0, 0, 0))
                 elif base_id == "ardolancio" and n_mages >= card.cost:
-                    items.append((0, -1, -1, 0, 0, 4 if anatema >= card.cost else 2))
+                    items.append((0, -1, -1, 0, 0, 4 if anatema >= card.cost else 2, 0, 0))
                 elif base_id == "guerremoto" and anatema >= card.cost:
-                    items.append((0, -1, -1, 0, 0, 2))
+                    items.append((0, -1, -1, 0, 0, 2, 0, 0))
+                elif base_id == "incendifesa" and n_mages >= card.cost:
+                    prodigy = anatema >= card.cost
+                    items.append((0, -1, -1, 0, 0, 0, 0 if prodigy else 1, 1 if prodigy else 0))
 
             options = set()
             for r in (0, 1, 2):
@@ -1015,16 +1024,16 @@ class _OpponentThreat:
                         continue
                     att = max([field_att] + [i[1] for i in combo])
                     git = max([field_git] + [i[2] for i in combo])
-                    strip = sum(i[5] for i in combo)
+                    strips = tuple(sum(i[k] for i in combo) for k in (5, 6, 7))
                     if att < 0 and git < 0:
-                        options.add((-1, -1, strip))
+                        options.add((-1, -1) + strips)
                         continue
                     att += bonus["att"] + sum(i[3] for i in combo)
                     git += bonus["git"] + sum(i[4] for i in combo)
-                    options.add((att, git, strip))
+                    options.add((att, git) + strips)
             pareto = [
                 o for o in options
-                if not any(p != o and p[0] >= o[0] and p[1] >= o[1] and p[2] >= o[2] for p in options)
+                if not any(p != o and all(a >= b for a, b in zip(p, o)) for p in options)
             ]
             result.append((tuple(index.setdefault(o, len(index)) for o in pareto), weight))
 
@@ -1033,19 +1042,21 @@ class _OpponentThreat:
         return cached
 
     def expected_loss(self, player: Player, opponent: Player,
-                      defense: List[Tuple[int, int, List[int]]]) -> float:
+                      defense: List[Tuple[int, int, List[int], int]], bastion_warriors: int) -> float:
         """Perdita attesa di `player` al prossimo turno di `opponent`, sui
-        Bastioni esposti a lui (`defense`)."""
+        Bastioni esposti a lui (`defense`). `bastion_warriors`: i Guerrieri di
+        `player` in entrambi i Bastioni (Muri scartati da Incendifesa prodigio)."""
         fossato = _fossato_threshold(player)
         lives = player.lives
         options, samples = self._options(opponent)
         losses = []
-        for att, git, strip in options:
+        for att, git, strip, inc_base, inc_prodigy in options:
             can_battle = att >= 0 and git >= fossato
             worst = 0.0
-            for dif, dgit, durabilities in defense:
+            for dif, dgit, durabilities, n_warriors in defense:
                 damage = max(att - dif, 0) + max(git - dgit, 0) if can_battle else 0
-                worst = max(worst, _hit_value(damage, durabilities, lives, strip))
+                side_strip = strip + inc_base * n_warriors + inc_prodigy * bastion_warriors
+                worst = max(worst, _hit_value(damage, durabilities, lives, side_strip))
             losses.append(worst)
         total = sum(max(losses[i] for i in idxs) * weight for idxs, weight in samples if idxs)
         return total / self.SAMPLES

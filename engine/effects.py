@@ -1310,13 +1310,12 @@ def incendifesa_effect(
     **kwargs,
 ) -> dict:
     """
-    Base: danni a un Bastione pari al numero di Guerrieri presso di esso.
-    Prodigio (sostituisce): danni pari al totale dei Guerrieri in tutti i Bastioni dell'avversario.
+    Base: scarta da un Bastione avversario tanti Muri casuali quanti sono i Guerrieri presso di esso.
+    Prodigio (sostituisce): tanti quanti sono i Guerrieri in entrambi i Bastioni dell'avversario.
     """
-    from engine.battle import apply_damage_to_bastion
     target = state.get_player(target_player_id) if target_player_id else None
-    if target is None:
-        return {"error": "Bersaglio non valido"}
+    if target is None or target.id == player.id:
+        return {"error": "Devi scegliere un Bastione avversario"}
 
     if _is_spell_immune(target):
         state.recent_events.append({
@@ -1325,25 +1324,23 @@ def incendifesa_effect(
         })
         return {"blocked_by": "magiscudo", "blocked_player": target.id}
 
+    bastion = target.field.bastion_left if target_bastion_side == "left" else target.field.bastion_right
     if prodigy:
-        damage = (
-            len(target.field.bastion_left.warriors) +
-            len(target.field.bastion_right.warriors)
-        )
+        max_walls = len(target.field.bastion_left.warriors) + len(target.field.bastion_right.warriors)
     else:
-        if target_bastion_side == "left":
-            damage = len(target.field.bastion_left.warriors)
-        else:
-            damage = len(target.field.bastion_right.warriors)
-
-    result = apply_damage_to_bastion(state, target, target_bastion_side, damage)
+        max_walls = len(bastion.warriors)
+    walls_to_remove = random.sample(bastion.walls, min(max_walls, len(bastion.walls)))
+    for wall in walls_to_remove:
+        bastion.walls.remove(wall)
+        state.discard_pile.append(wall.instance_id)
+    walls_discarded = len(walls_to_remove)
     state.recent_events.append({
-        "type": "damage", "card": "incendifesa",
+        "type": "effect", "card": "incendifesa",
         "player_id": player.id, "prodigy": prodigy,
         "target_player_id": target_player_id, "target_bastion_side": target_bastion_side,
-        "damage": damage, **result,
+        "walls_discarded": walls_discarded,
     })
-    return {"damage": damage, **result}
+    return {"walls_discarded": walls_discarded}
 
 
 @register_effect("dazipazzi_effect")
