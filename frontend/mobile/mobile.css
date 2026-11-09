@@ -2056,8 +2056,9 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
 }
-/* Con molti pulsanti vanno a capo (al massimo 3 per riga); se sono ancora
-   troppi per lo schermo la fascia scorre, invece di schiacciarli */
+/* Con molti pulsanti vanno a capo: ognuno è largo quanto la sua scritta e poi
+   si allarga a riempire la riga; se sono ancora troppi per lo schermo la
+   fascia scorre, invece di schiacciarli */
 .sheet-foot {
   flex: 0 0 auto;
   display: flex;
@@ -2070,7 +2071,7 @@ button.home-resume.menu-frame:active { --frame-fill: rgba(251, 196, 2, 0.2); }
   padding: 10px 16px calc(var(--sab) + 14px);
 }
 .sheet-foot:empty { display: none; }
-.sheet-foot .mbtn { flex: 1 1 0; min-width: 28%; padding: 13px; font-size: 0.9rem; }
+.sheet-foot .mbtn { flex: 1 1 auto; max-width: 100%; padding: 13px 16px; font-size: 0.9rem; white-space: normal; }
 
 /* Righe-opzione (come le .modal-option del desktop) */
 .opt-row {

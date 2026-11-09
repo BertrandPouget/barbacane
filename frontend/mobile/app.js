@@ -2082,14 +2082,16 @@ const Mob = (() => {
     });
   }
 
-  // Sheet carta con navigazione precedente/successiva
-  // Valori attuali di un Guerriero in campo, se diversi da quelli stampati
-  // (bonus e malus): prima stavano sul retro testuale della carta.
-  function liveStatsLabel(def, w) {
-    if (!def || def.type !== 'warrior' || !w) return '';
-    if (w.att === def.att && w.git === def.git && w.dif === def.dif) return '';
-    return ` · 🗡️${w.att} 🏹${w.git} 🛡️${w.dif}`;
+  // Corpo degli sheet di una sola carta: come nel catalogo niente intestazione
+  // (nome e tipo stanno già sulla carta), solo una nota sotto se serve
+  // (Costruzioni: Costruzione Completa / Incompleta).
+  function cardSheetBody(def, ctx, note = '') {
+    const body = [Render.cardViewNode(def, ctx)];
+    if (note) body.push(el('div', { className: 'card-note' }, [note]));
+    return body;
   }
+
+  // Sheet carta con navigazione precedente/successiva
 
   function showCardNavSheet({ title, subtitle, note, def, ctx = {}, pos, onPrev, onNext, footer = [], refresh = null }) {
     const body = [Render.cardViewNode(def, ctx)];
@@ -2272,7 +2274,7 @@ const Mob = (() => {
   function openFieldWarriorSheet(iid) {
     const found = findMyWarrior(iid);
     if (!found) return;
-    const { warrior: w, zone, zoneLabel } = found;
+    const { warrior: w, zone } = found;
     const def = getCardDef(iid);
     const canMove = isMyTurn() && currentState.phase === 'schieramento';
 
@@ -2320,10 +2322,7 @@ const Mob = (() => {
     footer.push({ label: 'Chiudi', onClick: () => Sheet.close() });
 
     Sheet.open({
-      title: w.name || iid,
-      subtitle: `${zoneLabel}${w.horde_active ? ' · ⚡ Orda attiva' : ''}${liveStatsLabel(def, w)}` +
-        (canMove ? '' : ' — spostabile nella fase Schieramento'),
-      body: Render.cardViewNode(def, { att: w.att, git: w.git, dif: w.dif, instanceId: iid }),
+      body: cardSheetBody(def, { att: w.att, git: w.git, dif: w.dif, instanceId: iid }),
       footer,
       refresh: () => openFieldWarriorSheet(iid),
     });
@@ -2433,9 +2432,8 @@ const Mob = (() => {
     footer.push({ label: 'Chiudi', onClick: () => Sheet.close() });
 
     Sheet.open({
-      title: def ? def.name : iid,
-      subtitle: b.completed ? '✓ Completata' : 'Incompleta — effetto Base attivo',
-      body: Render.cardViewNode(def, { completed: b.completed, completionCostLabel: completionLabel, instanceId: iid }),
+      body: cardSheetBody(def, { completed: b.completed, completionCostLabel: completionLabel, instanceId: iid },
+        b.completed ? 'Costruzione Completa' : 'Costruzione Incompleta'),
       footer,
       refresh: () => openBuildingSheet(iid),
     });
@@ -2948,9 +2946,7 @@ const Mob = (() => {
       row.addEventListener('click', () => {
         haptic();
         Sheet.open({
-          title: def ? def.name : b.instance_id,
-          subtitle: `${p.name} — ${b.completed ? '✓ Completata' : 'Incompleta'}`,
-          body: Render.cardViewNode(def, { completed: b.completed }),
+          body: cardSheetBody(def, { completed: b.completed }, b.completed ? 'Costruzione Completa' : 'Costruzione Incompleta'),
           footer: [{ label: '‹ Indietro', onClick: () => openOpponentSheet(playerId) }],
         });
       });
@@ -3003,9 +2999,7 @@ const Mob = (() => {
         mini.addEventListener('click', () => {
           haptic();
           Sheet.open({
-            title: def ? def.name : b.instance_id,
-            subtitle: `${p.name} — ${b.completed ? '✓ Completata' : 'Incompleta'}`,
-            body: Render.cardViewNode(def, { completed: b.completed }),
+            body: cardSheetBody(def, { completed: b.completed }, b.completed ? 'Costruzione Completa' : 'Costruzione Incompleta'),
             footer: [{ label: '‹ Indietro', onClick: reopen }],
           });
         });
@@ -3077,9 +3071,7 @@ const Mob = (() => {
     }
     footer.push({ label: '‹ Indietro', onClick: back });
     Sheet.open({
-      title: w.name || w.instance_id,
-      subtitle: `di ${owner.name}${liveStatsLabel(def, w)}`,
-      body: Render.cardViewNode(def, { att: w.att, git: w.git, dif: w.dif }),
+      body: cardSheetBody(def, { att: w.att, git: w.git, dif: w.dif }),
       footer,
       // Il Guerriero si ritrova per instance id nel campo attuale del proprietario
       refresh: () => {
@@ -3100,9 +3092,7 @@ const Mob = (() => {
   function openRecruitSheet(recruitIid, heroName, onBack) {
     const def = getCardDef(recruitIid);
     Sheet.open({
-      title: def ? def.name : recruitIid,
-      subtitle: `Recluta di ${heroName}`,
-      body: Render.cardViewNode(def, { instanceId: recruitIid }),
+      body: cardSheetBody(def, { instanceId: recruitIid }),
       footer: [
         { label: 'Eroe', onClick: () => { Sheet.close(true); if (onBack) onBack(); } },
         { label: 'Chiudi', onClick: () => Sheet.close() },
