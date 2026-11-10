@@ -1,14 +1,28 @@
-# 🧱 Barbacane
+<p align="center">
+  <img src="assets/logos/logo.png" alt="Logo di Barbacane" width="360">
+</p>
 
-![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)
-![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black)
-![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white)
-![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat)
+<p align="center">
+  <em>Uno dei giochi fantasy di tutti i tempi.</em>
+</p>
+
+<p align="center">
+  <a href="https://barbacane.quest"><strong>Gioca Ora</strong></a> ·
+  <a href="assets/rules.md">Regolamento Completo</a> ·
+  <a href="card_factory/README.md">Card Factory</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black" alt="JavaScript">
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white" alt="PostgreSQL">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat" alt="Licenza MIT"></a>
+</p>
 
 Barbacane è un gioco di carte fantasy, ora in versione digitale multiplayer.
 
-Il mondo di Barbacane è popolato da Umani, Elfi, Nani e Maghe — tutti, inspiegabilmente, di sangue Goblin. Turno dopo turno, ogni giocatore deve potenziare il proprio campo di gioco schierando Guerrieri, erigendo Costruzioni e scagliando Magie contro gli avversari. Niente alleanze, niente tregue: ne resterà soltanto uno.
+Il mondo di Barbacane è popolato da Umani, Elfi, Nani e Maghe, che per motivi mai chiariti sono tutti di sangue Goblin. Turno dopo turno, ogni giocatore deve potenziare il proprio campo di gioco schierando Guerrieri, erigendo Costruzioni e scagliando Magie contro gli avversari. Niente alleanze, niente tregue: ne resterà soltanto uno.
 
 ## Come Provarlo
 
@@ -41,7 +55,7 @@ Entrando con il nome `Test` o `Test2`, le carte elencate in `data/test_cards.jso
 
 ## Come si Gioca
 
-Ecco una breve introduzione al gioco e alle sue meccaniche principali. Per il regolamento completo, consigliamo comunque di vedere [`assets/rules.md`](assets/rules.md), oppure di giocare il tutorial.
+Ecco una breve introduzione al gioco e alle sue meccaniche principali. Per tutti i dettagli, consigliamo comunque di leggere il [regolamento completo](assets/rules.md), oppure di giocare il tutorial.
 
 ### Campo di Gioco
 
@@ -75,8 +89,8 @@ Alcune carte possono inoltre rendere **Eterea** un'altra carta in mano: una cart
 
 Il danno inflitto a un Bastione è calcolato così:
 
-```
-Danno = max(ATT_att − DIF_dif, 0) + max(GIT_att − GIT_dif, 0)
+```math
+\text{Danno} = \max(\text{ATT}_\text{att} - \text{DIF}_\text{dif},\ 0) + \max(\text{GIT}_\text{att} - \text{GIT}_\text{dif},\ 0)
 ```
 
 dove ATT e GIT dell'attaccante sono i valori più alti tra i suoi Guerrieri in Avanscoperta, e DIF e GIT del difensore i più alti tra i Guerrieri nel Bastione attaccato. Il Bastione perde Muri pari al Danno. Se il Danno supera i Muri disponibili, il difensore perde 1 Vita. Non si può attaccare un giocatore che non ha ancora giocato il suo primo turno.
@@ -123,4 +137,4 @@ Se la carta cambia le regole generali, ricordarsi di aggiornare anche [`assets/r
 - **Backend**: Python + FastAPI, WebSocket per gli aggiornamenti in tempo reale
 - **Frontend**: JavaScript vanilla, in due versioni (desktop e mobile), servite come file statici da FastAPI
 - **Persistenza**: PostgreSQL su Neon (free tier) in produzione, tramite variabile d'ambiente `DATABASE_URL`; SQLite in locale. Le partite ferme da più di 7 giorni, finite o no, vengono eliminate automaticamente.
-- **Deploy**: Render
+- **Deploy**: Render, con dominio [barbacane.quest](https://barbacane.quest)

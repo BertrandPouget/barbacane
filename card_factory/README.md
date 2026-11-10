@@ -13,6 +13,7 @@ lib/            ← libreria condivisa: cards_data.py, image_ops.py, render.py, 
 assets/
   card.html     ← il renderer: unica fonte di verità per la grafica delle carte
   sfondo.png, esagono*.png, stella*.png, spade.png, logo.png  ← texture/icone usate da card.html
+  fonts/        ← vuota: serve solo per generare offline con il font Caudex (vedi il suo README)
 ```
 
 Gli script numerati (`1_prepare_images.py`, `2_generate_cards.py`, `3_make_print_pdf.py`, `4_make_previews.py`) sono CLI sottili: la logica di image processing e rendering vive in `lib/`.
@@ -67,7 +68,7 @@ Rinomina poi i PNG con l'`id` della carta (es. `images/patrizio.png`) prima di p
 ```bash
 python 2_generate_cards.py                    # tutte le carte di ../data/cards.json
 python 2_generate_cards.py faust joseph        # solo gli id indicati
-python 2_generate_cards.py --scale 2           # 2x risoluzione (default 1 → 744×1039px, ~300 DPI)
+python 2_generate_cards.py --scale 2           # 2x risoluzione (default 1 → 744×1040px, ~300 DPI)
 ```
 
 Apre `assets/card.html` in un browser headless (Playwright), gli passa i dati di ogni

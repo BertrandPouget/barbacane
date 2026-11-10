@@ -1,4 +1,6 @@
-barbacane: s. m. [etimo incerto, prob. di origine orientale]. – In genere, qualsiasi struttura di rinforzo a costruzioni, e in partic. i rinforzi delle fortificazioni militari, sia di muratura, sia di materiali provvisori come puntelli o terrapieni; nelle opere difensive del passato indicò anche altri elementi protettivi (speroni, muraglie, scarpate, ecc.).
+# Regolamento
+
+> *__barbacane__: s. m. [etimo incerto, prob. di origine orientale]. – In genere, qualsiasi struttura di rinforzo a costruzioni, e in partic. i rinforzi delle fortificazioni militari, sia di muratura, sia di materiali provvisori come puntelli o terrapieni; nelle opere difensive del passato indicò anche altri elementi protettivi (speroni, muraglie, scarpate, ecc.).*
 
 ## Introduzione
 Benvenuti alla vostra prima partita di Barbacane!
@@ -11,7 +13,7 @@ In dotazione troverete anche un D10, che svolge due funzioni: tiene traccia del 
 
 Durante la partita pescherete e giocherete varie carte. Sulla base della posizione e dell’orientamento di tali carte si andrà a formare pian piano il campo da gioco. L’obiettivo sarà quindi quello di creare Bastioni e Guerrieri in grado di difendere il vostro nucleo e allo stesso tempo distruggere quello degli altri.
 
-Il vostro nucleo ha originariamente tre Vite, esse possono aumentare e ovviamente diminuire. Quando un giocatore perde la sua terza vita, viene eliminato: tutte le sue carte, in mano e in campo, finiscono negli scarti. Come potete immaginare, vince l’ultimo a restare in vita.
+Il vostro nucleo ha originariamente tre Vite, esse possono aumentare e ovviamente diminuire. Quando un giocatore perde la sua ultima Vita, viene eliminato: tutte le sue carte, in mano e in campo, finiscono negli scarti. Come potete immaginare, vince l’ultimo a restare in vita.
 
 Nelle prossime sezioni entreremo più nel dettaglio sulle singole regole del gioco, su come si struttura un turno e come posizionare le vostre carte per formare il miglior campo da gioco possibile.
 
@@ -29,6 +31,35 @@ Le Costruzioni rappresentano effetti che restano nel tempo. Quando vengono gioca
 Qualsiasi carta può essere inoltre utilizzata come Muro tramite un’Azione. In quel caso perde ogni altra funzione e viene considerata solo come difesa.
 
 Infine, alcune carte possono conferire a un'altra carta in mano la proprietà Eterea. Una carta Eterea può essere giocata immediatamente senza pagarne il costo (in Mana o in Maghe) e senza consumare un'Azione. La proprietà decade non appena si compie un'altra Azione (anche se, per effetto di una carta, questa non viene consumata), si dichiara Battaglia o si termina il turno.
+
+### Esempio di Guerriero
+Questo è come si presenta una carta Guerriero.
+
+<p align="center"><img src="rules/evelyn.webp" alt="Evelyn, Guerriero Recluta" width="240"></p>
+
+In cima, nel nastro, c'è il nome della carta; il costo in Mana, in questo caso 2, è il valore contenuto nell'esagono in alto a destra. Sotto al nome è indicata la tipologia, seguita dalla sottocategoria: in questo caso Recluta.
+
+Sotto all'illustrazione sono presenti le Caratteristiche (Attacco, Gittata e Difesa) e altre informazioni utili quali la Specie, la Scuola e la linea evolutiva.
+
+Infine, l'ultima sezione, identificata dal simbolo delle tre spade, contiene l'effetto Orda.
+
+### Esempio di Magia
+Questo è come si presenta una carta Magia.
+
+<p align="center"><img src="rules/bastioncontrario.webp" alt="Bastioncontrario, Magia Sortilegio" width="240"></p>
+
+In cima, nel nastro, c'è il nome della carta, e sotto di esso la tipologia seguita dalla sottocategoria, in questo caso Sortilegio. Il costo non è in Mana ma, come per tutte le Magie, in numero di Maghe necessarie. Questa differenza è anche resa esplicita dal fatto che esso non sia contenuto in un esagono ma in una stella.
+
+La sezione identificata dalla stella vuota rappresenta l'effetto Base, mentre quella sotto la stella piena descrive invece l'effetto Prodigio.
+
+### Esempio di Costruzione
+Questo è come si presenta una carta Costruzione.
+
+<p align="center"><img src="rules/estrattore.webp" alt="Estrattore, Costruzione" width="240"></p>
+
+In cima, nel nastro, c'è il nome della carta, e sotto di esso la tipologia. Il costo in Mana, in questo caso 3, è il valore contenuto nell'esagono in alto a destra.
+
+La sezione identificata dalla torre rappresenta l'effetto Base, mentre quella sotto il secondo esagono descrive invece l'effetto Completo: il valore nell'esagono è il costo di completamento.
 
 ## Campo di Gioco
 Il campo da gioco di ogni giocatore è diviso in quattro Regioni: Avanscoperta, Bastione sinistro, Bastione destro e Villaggio.
@@ -70,26 +101,30 @@ Per iniziare la Battaglia, l’attaccante sceglie uno dei Bastioni avversari adi
 
 Si determinano quindi i valori in campo. L’attaccante utilizza il valore più alto di ATT tra i Guerrieri in Avanscoperta e il valore più alto di GIT tra le stesse carte. Il difensore utilizza il valore più alto di DIF tra i Guerrieri presenti nel Bastione bersaglio e il valore più alto di GIT tra quelle carte.
 
-Si procede quindi al calcolo dei danni:  
-· il Danno da Attacco è dato da: ATT attaccante - DIF difensore (minimo 0)  
-· il Danno da Gittata è dato da: GIT attaccante - GIT difensore (minimo 0)  
+Si procede quindi al calcolo dei danni:
+- il Danno da Attacco è dato da: ATT attaccante - DIF difensore (minimo 0)
+- il Danno da Gittata è dato da: GIT attaccante - GIT difensore (minimo 0)
 
-Il Danno Totale è la somma dei due valori.
+Il Danno Totale è la somma dei due valori:
+
+```math
+\text{Danno} = \max(\text{ATT}_\text{att} - \text{DIF}_\text{dif},\ 0) + \max(\text{GIT}_\text{att} - \text{GIT}_\text{dif},\ 0)
+```
 
 Il difensore perde un numero di Muri nel Bastione pari al Danno Totale. Se il Danno Totale è maggiore di zero ma i Muri presenti non sono sufficienti ad assorbirlo interamente, il difensore perde una Vita; eventuali danni residui vengono ignorati.
 
 ### Esempio di Battaglia
 Il giocatore A siede alla destra del giocatore B e decide di attaccarne il Bastione sinistro, che attualmente possiede solo 1 Muro. Occorre notare che non avrebbe potuto attaccare il Bastione destro perché non sarebbe stato adiacente a uno dei propri.
 
-In Avanscoperta, il giocatore A ha:  
-· San Patrizio (ATT 4, GIT 3)  
-· Giulio (ATT 1, GIT 2)  
+In Avanscoperta, il giocatore A ha:
+- San Patrizio (ATT 4, GIT 3)
+- Giulio (ATT 1, GIT 1)
 
 Il valore di ATT dell’attaccante è 4, mentre la sua GIT è 3.
 
-Nel Bastione bersaglio, il giocatore B ha:  
-· Von Reinhold (DIF 5, GIT 0)  
-· Evelyn (DIF 3, GIT 0)  
+Nel Bastione bersaglio, il giocatore B ha:
+- Von Reinhold (DIF 5, GIT 0)
+- Evelyn (DIF 3, GIT 0)
 
 Il valore di DIF del difensore è 5, mentre la sua GIT è 0.
 
@@ -123,12 +158,12 @@ La partita termina quando solo uno dei giocatori ha ancora almeno una Vita. Tale
 **Magia**: Tipologia di carta. Fanno parte delle Magie, gli Anatemi, i Sortilegi e gli Incantesimi. Per giocare una carta Magia, il giocatore deve avere in campo un numero di Maghe pari a quello richiesto dalla carta, indipendentemente dalla loro Scuola. Se almeno una di tali Maghe è inoltre della stessa Scuola della Magia giocata, si sblocca l’effetto Prodigio.  
 **Mana**: Costo per giocare o completare carte che non siano Magie. È indicato sulla carta stessa, in alto a destra.  
 **Muro**: Singola carta parte di un Bastione. Qualsiasi carta può essere resa Muro tramite un’Azione Aggiungere fino a 3 Muri. Tale Azione permette aggiungere le carte ai Bastioni in qualsiasi combinazione.  
-**Orda**: Insieme di tre Guerrieri della stessa Specie nella stessa regione. A fine turno, per ogni Orda che ha in campo, sia essa presso un Bastione o in Avanscoperta, il giocatore può attivare uno degli effetti Orda posseduti dai Guerrieri che ne fanno parte.  
+**Orda**: Insieme di tre Guerrieri della stessa Specie nella stessa Regione. A fine turno, per ogni Orda che ha in campo, sia essa presso un Bastione o in Avanscoperta, il giocatore può attivare uno degli effetti Orda posseduti dai Guerrieri che ne fanno parte.  
 **(Effetto) Orda**: Effetto proprio di ogni Guerriero, che si applica quando viene attivato. L'effetto Orda di un Guerriero può essere solo attivo o non attivo: anche se più carte o Orde lo attivano contemporaneamente, i suoi effetti non si sommano.  
 **(Effetto) Prodigio**: Effetto secondario di una Magia, che si attiva quando almeno una delle Maghe che il giocatore ha in campo è della Scuola corretta. Se la descrizione inizia con una ‘&’ significa che esso va aggiunto all’effetto Base, altrimenti lo sostituisce.  
 **Recluta**: Guerriero che evolve in Eroe. Ha delle Caratteristiche limitate rispetto al suo Eroe e un effetto Orda.  
 **Regione**: Una delle 4 aree che compongono il campo di gioco di un giocatore. Le Regioni sono Avanscoperta, Bastioni (destro e sinistro) e Villaggio.  
-**Schieramento**: Fase di gioco in cui il giocatore posiziona i propri Guerrieri tra le sue Regioni e seleziona gli eventuali effetti Orda.
+**Schieramento**: Fase di gioco in cui il giocatore posiziona i propri Guerrieri tra le sue Regioni e seleziona gli eventuali effetti Orda.  
 **Scuola**: Tipologia di Magia e di Maga. Le possibili Scuole sono Anatemi, Sortilegi ed Incantesimi.  
 **Sortilegio**: Magia appartenente all'omonima Scuola. Ha effetti manipolativi: agisce su Muri, Costruzioni, Bastioni o Vite.  
 **Specie**: Tipologia assegnata a ogni Guerriero. Le possibili Specie sono Elfi, Nani, Umani e Maghe. Sulla base della Specie, si può formare un’Orda.  
