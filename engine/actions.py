@@ -961,13 +961,14 @@ def activate_horde(
         w.horde_active = (w.instance_id == chosen.instance_id)
 
     # Snapshot per taggare i nuovi effetti con horde_key (usato da deactivate_broken_horde)
-    effects_count_before = len(player.active_effects)
+    before = {id(e) for e in player.active_effects}
 
     result = apply_effect(horde_effect_id, state, player,
                           warrior_iid=chosen.instance_id, **kwargs)
 
-    for eff in player.active_effects[effects_count_before:]:
-        eff["from_horde_key"] = horde_key
+    for eff in player.active_effects:
+        if id(eff) not in before:
+            eff["from_horde_key"] = horde_key
 
     player.hordes_activated_this_turn.append(horde_key)
     state.add_log(player_id, "activate_horde", species=species, zone=horde_zone,

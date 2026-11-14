@@ -126,20 +126,35 @@ def _discard_warrior_from_player(state: GameState, player: Player, warrior_iid: 
                 region.remove(w)
                 player.deactivate_broken_horde(w, region_name)
                 if w.evolved_from:
-                    from engine.deck import get_base_card_id as _get_base
-                    recruit_inst = WarriorInstance(
-                        instance_id=w.evolved_from,
-                        base_card_id=_get_base(w.evolved_from),
-                        assigned_cards=list(w.assigned_cards),
-                        temp_modifiers={},
-                    )
-                    region.append(recruit_inst)
-                    _reassign_buildings(player, recruit_inst.instance_id, w.assigned_cards)
+                    _recruit_returns(player, w, region)
                 else:
                     _discard_assigned_cards(state, player, w.assigned_cards)
                 state.discard_pile.append(w.instance_id)
                 return True
     return False
+
+
+def _recruit_returns(player: Player, hero: WarriorInstance, region: List[WarriorInstance]) -> WarriorInstance:
+    """L'Eroe `hero` ha lasciato il campo (già tolto da `region`, Orda già
+    sciolta): la sua Recluta torna in `region` con le carte assegnate. Le
+    Caratteristiche ripartono da ciò che le carte assegnate le danno ancora:
+    +1 GIT per ogni Muro di Arrampicarta e l'effetto Orda di un Trono."""
+    from engine.deck import get_base_card_id as _get_base
+    recruit = WarriorInstance(
+        instance_id=hero.evolved_from,
+        base_card_id=_get_base(hero.evolved_from),
+        assigned_cards=list(hero.assigned_cards),
+    )
+    region.append(recruit)
+    _reassign_buildings(player, recruit.instance_id, hero.assigned_cards)
+    buildings = {b.instance_id for b in player.field.village.buildings}
+    mods = player.horde_stat_bonuses(recruit.instance_id)
+    walls = sum(1 for iid in recruit.assigned_cards if iid not in buildings)
+    if walls:
+        mods["git"] = mods.get("git", 0) + walls
+    recruit.temp_modifiers = mods
+    recruit.horde_active = player.has_active_trono(recruit.instance_id)
+    return recruit
 
 
 def _reassign_buildings(player: Player, new_warrior_iid: str, assigned_cards: List[str]) -> None:
@@ -512,10 +527,11 @@ def trono_effect(
             elif target_w.horde_active:
                 player.yield_horde_to_trono(target_w)
             target_w.horde_active = True
-            effects_count_before = len(player.active_effects)
+            before = {id(e) for e in player.active_effects}
             horde_result = apply_effect(card.horde_effect_id, state, player, warrior_iid=target_warrior_iid)
-            for eff in player.active_effects[effects_count_before:]:
-                eff["trono_warrior"] = target_warrior_iid
+            for eff in player.active_effects:
+                if id(eff) not in before:
+                    eff["trono_warrior"] = target_warrior_iid
             result["horde_always_active"] = card.horde_effect_id
             result["horde_effect_result"] = horde_result
 
@@ -1016,18 +1032,11 @@ def cuordipietra_effect(
 
     if warrior_to_move.evolved_from:
         # Regola standard: se l'Eroe lascia il campo, la Recluta torna in campo con le carte assegnate.
-        from engine.deck import get_base_card_id as _get_base_id
-        recruit_inst = WarriorInstance(
-            instance_id=warrior_to_move.evolved_from,
-            base_card_id=_get_base_id(warrior_to_move.evolved_from),
-            assigned_cards=list(warrior_to_move.assigned_cards),
-            temp_modifiers={},
-        )
-        source_region.append(recruit_inst)
+        _recruit_returns(target, warrior_to_move, source_region)
     else:
-        # Diventando Muro, il Guerriero perde ogni altra funzione: le carte assegnate vanno negli scarti.
-        for ac_iid in warrior_to_move.assigned_cards:
-            state.discard_pile.append(ac_iid)
+        # Diventando Muro, il Guerriero perde ogni altra funzione: le carte assegnate vanno negli scarti
+        # (un Trono lascia anche il Villaggio).
+        _discard_assigned_cards(state, target, warrior_to_move.assigned_cards)
 
     from engine.deck import make_wall_instance
     wall = make_wall_instance(warrior_to_move.instance_id)
@@ -1563,13 +1572,26 @@ def plasmarmo_effect(
 # EFFETTI ORDA
 # ---------------------------------------------------------------------------
 
+def _grant_horde_stats(player: Player, w: WarriorInstance, **stats: int) -> None:
+    """Dà a `w` il bonus alle Caratteristiche del suo effetto Orda. Un effetto
+    Orda è attivo o non attivo: se il Guerriero ne ha già uno (altra Orda,
+    Trono) quello vecchio viene tolto prima, così i bonus non si sommano mai."""
+    for eff in [e for e in player.active_effects
+                if e.get("type") == "horde_stat_bonus" and e.get("warrior_iid") == w.instance_id]:
+        player.drop_stat_bonus(eff)
+        player.active_effects.remove(eff)
+    stats = {k: v for k, v in stats.items() if v}
+    for stat, bonus in stats.items():
+        w.temp_modifiers[stat] = w.temp_modifiers.get(stat, 0) + bonus
+    player.active_effects.append({"type": "horde_stat_bonus", "warrior_iid": w.instance_id, **stats})
+
+
 @register_effect("patrizio_horde")
 def patrizio_horde(state: GameState, player: Player, warrior_iid: Optional[str] = None, **kwargs) -> dict:
     """Questa carta ottiene +2 GIT."""
     w = _find_warrior(player, warrior_iid)
     if w:
-        w.temp_modifiers["git"] = w.temp_modifiers.get("git", 0) + 2
-        player.active_effects.append({"type": "horde_stat_bonus", "warrior_iid": w.instance_id, "git": 2})
+        _grant_horde_stats(player, w, git=2)
         state.recent_events.append({
             "type": "horde", "card": "patrizio",
             "player_id": player.id, "target": w.instance_id, "git_bonus": 2,
@@ -1612,9 +1634,7 @@ def orfeo_horde(state: GameState, player: Player, warrior_iid: Optional[str] = N
     """Questa carta ottiene +1 ATT e +1 DIF."""
     w = _find_warrior(player, warrior_iid)
     if w:
-        w.temp_modifiers["att"] = w.temp_modifiers.get("att", 0) + 1
-        w.temp_modifiers["dif"] = w.temp_modifiers.get("dif", 0) + 1
-        player.active_effects.append({"type": "horde_stat_bonus", "warrior_iid": w.instance_id, "att": 1, "dif": 1})
+        _grant_horde_stats(player, w, att=1, dif=1)
         state.recent_events.append({
             "type": "horde", "card": "orfeo",
             "player_id": player.id, "target": w.instance_id, "att_bonus": 1, "dif_bonus": 1,
@@ -1673,8 +1693,7 @@ def polemarco_horde(state: GameState, player: Player, warrior_iid: Optional[str]
 
     w = _find_warrior(player, warrior_iid)
     if w:
-        w.temp_modifiers["att"] = w.temp_modifiers.get("att", 0) + umani
-        player.active_effects.append({"type": "horde_stat_bonus", "warrior_iid": w.instance_id, "att": umani})
+        _grant_horde_stats(player, w, att=umani)
         state.recent_events.append({
             "type": "horde", "card": "polemarco",
             "player_id": player.id, "target": w.instance_id,

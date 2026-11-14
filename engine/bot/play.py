@@ -126,13 +126,13 @@ class Profile:
 
 
 PROFILES: Dict[str, Profile] = {
-    "easy": Profile(depth=1, beam1=0, beam2=0, noise=1.8, layout_noise=0.9,
+    "easy": Profile(depth=1, beam1=0, beam2=0, noise=1.5, layout_noise=0.75,
                     spells=_SIMPLE_SPELLS, extras=False, counter=0.3),
     "normal": Profile(depth=2, beam1=3, beam2=4, noise=0.5, layout_noise=0.25, counter=0.7),
     "hard": Profile(depth=2, beam1=8, beam2=8, noise=0.0, layout_noise=0.0),
 }
-# Taratura (bot_factory/train.py arena, 330 partite a 2): hard batte normal ~2 volte su
-# 3, normal batte easy ~5 su 6, easy batte 'random' (mosse utili a caso) ~2 su 3.
+# Taratura (bot_factory/train.py arena, 330 partite a 2): hard batte normal ~7 volte su
+# 10, normal batte easy ~5 su 6, easy batte 'random' (mosse utili a caso) ~2 su 3.
 # Dopo un riaddestramento vanno rimisurati: il rumore è in logit del modello.
 # Partite salvate prima del passaggio da 4 a 3 livelli
 _LEGACY_DIFFICULTY = {"expert": "hard"}

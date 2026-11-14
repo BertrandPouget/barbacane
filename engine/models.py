@@ -203,23 +203,44 @@ class Player(BaseModel):
             for b in self.field.village.buildings
         )
 
+    def drop_stat_bonus(self, eff: Dict[str, Any], gone: Optional["WarriorInstance"] = None) -> None:
+        """Toglie dal Guerriero le Caratteristiche date da un effetto
+        `horde_stat_bonus`. Va chiamata ogni volta che uno di questi effetti
+        esce da active_effects: il bonus vive in temp_modifiers e, se resta lì
+        senza il suo effetto, diventa permanente e si somma alla riattivazione.
+        `gone`: Guerriero appena uscito dalla zona (o dal campo)."""
+        iid = eff.get("warrior_iid")
+        pool = self.all_warriors()
+        if gone is not None:
+            pool.append(gone)
+        for w in pool:
+            if w.instance_id == iid:
+                for stat in ("att", "git", "dif"):
+                    bonus = eff.get(stat, 0)
+                    if bonus:
+                        left = w.temp_modifiers.get(stat, 0) - bonus
+                        if left:
+                            w.temp_modifiers[stat] = left
+                        else:
+                            w.temp_modifiers.pop(stat, None)
+                break
+
+    def horde_stat_bonuses(self, warrior_iid: str) -> Dict[str, int]:
+        """Somma dei bonus `horde_stat_bonus` attivi su un Guerriero."""
+        total: Dict[str, int] = {}
+        for eff in self.active_effects:
+            if eff.get("type") == "horde_stat_bonus" and eff.get("warrior_iid") == warrior_iid:
+                for stat in ("att", "git", "dif"):
+                    if eff.get(stat, 0):
+                        total[stat] = total.get(stat, 0) + eff[stat]
+        return total
+
     def clear_trono_horde_effects(self, warrior_iid: str) -> None:
         """Rimuove gli effetti Orda generati dal Trono per questo Guerriero
         (taggati `trono_warrior`), togliendo anche i bonus stat dal Guerriero."""
-        to_remove = []
-        for eff in self.active_effects:
-            if eff.get("trono_warrior") != warrior_iid:
-                continue
+        for eff in [e for e in self.active_effects if e.get("trono_warrior") == warrior_iid]:
             if eff.get("type") == "horde_stat_bonus":
-                for w in self.all_warriors():
-                    if w.instance_id == warrior_iid:
-                        for stat in ("att", "git", "dif"):
-                            bonus = eff.get(stat, 0)
-                            if bonus:
-                                w.temp_modifiers[stat] = max(0, w.temp_modifiers.get(stat, 0) - bonus)
-                        break
-            to_remove.append(eff)
-        for eff in to_remove:
+                self.drop_stat_bonus(eff)
             self.active_effects.remove(eff)
 
     def release_trono(self, warrior_iid: Optional[str], leaving_trono_iid: Optional[str] = None) -> None:
@@ -262,13 +283,7 @@ class Player(BaseModel):
         self.hordes_activated_this_turn.remove(horde_key)
         for eff in [e for e in self.active_effects if e.get("from_horde_key") == horde_key]:
             if eff.get("type") == "horde_stat_bonus":
-                for w in zone_map[zone]:
-                    if w.instance_id == eff.get("warrior_iid"):
-                        for stat in ("att", "git", "dif"):
-                            bonus = eff.get(stat, 0)
-                            if bonus:
-                                w.temp_modifiers[stat] = max(0, w.temp_modifiers.get(stat, 0) - bonus)
-                        break
+                self.drop_stat_bonus(eff)
             self.active_effects.remove(eff)
 
     def retag_trono_effects(self, old_iid: str, new_iid: str) -> None:
@@ -334,37 +349,21 @@ class Player(BaseModel):
         if removed_warrior is not None and not self.has_active_trono(removed_warrior.instance_id):
             removed_warrior.horde_active = False
 
-        # Rimuovi i bonus stat dell'Orda da active_effects (non quelli da Trono sempre attivo)
-        to_remove = []
-        for eff in self.active_effects:
+        # Rimuovi gli effetti di questa Orda (taggati `from_horde_key`: bonus alle
+        # Caratteristiche, reinhold_discount, araminta_return...). Il bonus si toglie
+        # anche al Guerriero appena uscito: resta in campo, altrove, e senza questo
+        # se lo terrebbe per sempre. Gli effetti dei Troni non hanno questo tag.
+        for eff in [e for e in self.active_effects if e.get("from_horde_key") == horde_key]:
             if eff.get("type") == "horde_stat_bonus":
-                w_iid = eff.get("warrior_iid")
-                if self.has_active_trono(w_iid):
-                    continue
-                if removed_warrior is not None and w_iid == removed_warrior.instance_id:
-                    # Il guerriero rimosso: i suoi bonus spariscono con lui
-                    to_remove.append(eff)
-                else:
-                    for w in zone_warriors:
-                        if w.instance_id == w_iid:
-                            for stat in ("att", "git", "dif"):
-                                bonus = eff.get(stat, 0)
-                                if bonus:
-                                    w.temp_modifiers[stat] = max(0, w.temp_modifiers.get(stat, 0) - bonus)
-                            to_remove.append(eff)
-                            break
-            elif eff.get("from_horde_key") == horde_key:
-                # Effetto non-stat aggiunto da questa Orda (es. reinhold_discount, araminta_return)
-                to_remove.append(eff)
-        for eff in to_remove:
-            if eff in self.active_effects:
-                self.active_effects.remove(eff)
+                self.drop_stat_bonus(eff, removed_warrior)
+            self.active_effects.remove(eff)
 
     def deactivate_broken_horde(self, warrior: "WarriorInstance", source_region: str) -> bool:
         """
         Da chiamare DOPO aver rimosso `warrior` da `source_region`.
         Se l'orda di quella zona era attiva e ora è rotta (<3 della stessa specie),
-        disattiva i flag e i bonus stat. Ritorna True se un'orda è stata disattivata.
+        o se `warrior` ne era la carta scelta, disattiva i flag e gli effetti.
+        Ritorna True se un'orda è stata disattivata.
         """
         from engine.cards import CARD_REGISTRY, WarriorCard
         card = CARD_REGISTRY.get(warrior.base_card_id)
@@ -387,7 +386,10 @@ class Player(BaseModel):
             and CARD_REGISTRY[w.base_card_id].species == species
         )
         if same_species_remaining >= 3:
-            return False
+            # Il gruppo regge, ma se a uscire è la carta scelta il suo effetto
+            # finisce con lei (l'Orda resta libera di attivarne un altro).
+            if not warrior.horde_active or self.has_active_trono(warrior.instance_id):
+                return False
 
         self._deactivate_horde_effects(horde_key, species, source_list, removed_warrior=warrior)
         return True

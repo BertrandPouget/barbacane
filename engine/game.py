@@ -262,10 +262,11 @@ def _trigger_building_start(state: GameState, player: Player) -> None:
                 if isinstance(w_card, WarriorCard) and w_card.horde_effect_id:
                     _clear_trono_horde_effects(player, target_w.instance_id)
                     target_w.horde_active = True
-                    effects_count_before = len(player.active_effects)
+                    before = {id(e) for e in player.active_effects}
                     apply_effect(w_card.horde_effect_id, state, player, warrior_iid=target_w.instance_id)
-                    for eff in player.active_effects[effects_count_before:]:
-                        eff["trono_warrior"] = target_w.instance_id
+                    for eff in player.active_effects:
+                        if id(eff) not in before:
+                            eff["trono_warrior"] = target_w.instance_id
 
 
 def _trigger_building_end(state: GameState, player: Player) -> int:

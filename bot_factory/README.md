@@ -33,27 +33,28 @@ Le carte che il Bot non può vedere vengono rimescolate prima di ogni ricerca (u
 
 ### La funzione di valore
 
-La posizione a fine turno (dopo Schieramento e Battaglia, prima della pesca) è descritta da 254 caratteristiche: Vite e Muri di ciascuno, Guerrieri in campo per carta e per Specie, Costruzioni complete e non, mano e Mana del turno dopo, e il bilancio dei Danni, cioè quanto posso colpire io e quanto può colpire il vicino al turno dopo. Il target è la probabilità di vincere la partita.
+La posizione a fine turno (dopo Schieramento e Battaglia, prima della pesca) è descritta da 256 caratteristiche: Vite e Muri di ciascuno, Guerrieri in campo per carta e per Specie, Costruzioni complete e non, mano e Mana del turno dopo, e il bilancio dei Danni, cioè quanto posso colpire io e quanto può colpire il vicino al turno dopo. Il target è la probabilità di vincere la partita.
 
 I modelli sono due, addestrati sugli stessi dati:
 
 - **Regressione logistica**, lineare nelle caratteristiche.
-- **MLP 254 → 32 → 1** (ReLU), che coglie le interazioni che il lineare non vede: quanto pesa un Bastione scoperto dipende dalle Vite rimaste, per esempio.
+- **MLP 256 → 32 → 1** (ReLU), che coglie le interazioni che il lineare non vede: quanto pesa un Bastione scoperto dipende dalle Vite rimaste, per esempio.
 
-Servono entrambi per un motivo di costo. Lo Schieramento è la parte cara: con *n* Guerrieri ci sono 3ⁿ disposizioni, più le Orde da attivare e il bersaglio. Le caratteristiche si dividono quindi in **STATIC** (209, indipendenti dalla disposizione) e **DYN** (45: Vite e Muri dell'avversario dopo la Battaglia, esposizione dei propri Bastioni, forze in campo, Orde attive). Con un modello lineare il punteggio è la somma dei due contributi, e quello STATIC è una costante: le disposizioni si enumerano in pura aritmetica, senza copiare lo stato né chiamare il motore. Lo spazio si pota con la struttura delle regole, perché in Battaglia contano solo i massimi:
+Servono entrambi per un motivo di costo. Lo Schieramento è la parte cara: con *n* Guerrieri ci sono 3ⁿ disposizioni, più le Orde da attivare e il bersaglio. Le caratteristiche si dividono quindi in **STATIC** (210, indipendenti dalla disposizione) e **DYN** (46: Vite e Muri dell'avversario dopo la Battaglia, esposizione dei propri Bastioni, forze in campo, Orde attive). Con un modello lineare il punteggio è la somma dei due contributi, e quello STATIC è una costante: le disposizioni si enumerano in pura aritmetica, senza copiare lo stato né chiamare il motore. Lo spazio si pota con la struttura delle regole, perché in Battaglia contano solo i massimi:
 
 - in Avanscoperta bastano nessuno, un solo Guerriero non dominato, o la coppia (miglior ATT, miglior GIT);
 - per la difesa decidono i due Guerrieri con più DIF e i due con più GIT, da distribuire sui due Bastioni;
-- le Orde sono configurazioni che vincolano le zone, provate una Specie alla volta.
+- le Orde sono configurazioni che vincolano le zone, provate una Specie alla volta; un'Orda impegna tre Guerrieri (quello scelto e i due più deboli), gli altri della Specie restano liberi;
+- a parità di attacco, di Orde e di forze in campo, una disposizione che difende peggio entrambi i Bastioni è **dominata** e viene scartata prima del giudizio. Non è un'ottimizzazione ma una garanzia: con tanti Muri il modello dà alla difesa un peso quasi nullo, e da solo manderebbe in Avanscoperta Guerrieri che non aggiungono nulla all'attacco (è successo: cinque Maghe in Avanscoperta per un'Orda che in un Bastione dava lo stesso effetto).
 
 Il lineare propone i candidati migliori (3 per ogni posizione provata durante la ricerca, 12 per lo Schieramento vero) e la rete sceglie tra quelli.
 
 ```mermaid
 flowchart LR
-    P["Posizione simulata"] --> ST["209 caratteristiche STATIC"]
+    P["Posizione simulata"] --> ST["210 caratteristiche STATIC"]
     P --> EN["Enumerazione aritmetica<br/>di Schieramento e Battaglia (lineare)"]
-    EN --> CA["Candidati migliori<br/>con le loro 45 caratteristiche DYN"]
-    ST --> NN["Rete 254 → 32 → 1"]
+    EN --> CA["Candidati migliori<br/>con le loro 46 caratteristiche DYN"]
+    ST --> NN["Rete 256 → 32 → 1"]
     CA --> NN
     NN --> V["P(vittoria)"]
 ```
@@ -86,7 +87,7 @@ python -m bot_factory.train selfplay --games 4000 --out bot_factory/lab/d2.npz -
 # --weights: pesi con cui gioca (default: engine/bot/weights.json); --league: pesi di giri precedenti, come avversari
 ```
 
-Gioca partite a 2, 3 e 4 giocatori (70/15/15) su tutti i core e registra ogni posizione di fine turno con le sue 254 caratteristiche. L'etichetta è l'esito della partita: 1 per chi vince, 0 per gli altri; una partita che non finisce entro 240 turni vale 0 per tutti, così il modello non impara che murarsi a oltranza conviene.
+Gioca partite a 2, 3 e 4 giocatori (70/15/15) su tutti i core e registra ogni posizione di fine turno con le sue 256 caratteristiche. L'etichetta è l'esito della partita: 1 per chi vince, 0 per gli altri; una partita che non finisce entro 240 turni vale 0 per tutti, così il modello non impara che murarsi a oltranza conviene.
 
 Gli avversari non sono tutti copie del Bot: circa il 15% usa i pesi dei giri precedenti (`--league`), il 25% lo stesso modello con una preferenza aggiunta ai logit (gli **stili** in `STYLES`: aggressivo, difensivo, costruttore, a caccia di Orde), il resto sono copie di sé stesso con rumore crescente, le più rumorose in minoranza. Senza varietà il Bot migliora contro se stesso e si ferma lì (vedi sotto).
 
@@ -134,20 +135,22 @@ I tre livelli di `PROFILES` (in `engine/bot/play.py`) usano gli stessi pesi e di
 | | Facile | Normale | Difficile |
 |---|---|---|---|
 | Ricerca | un'azione alla volta | due azioni, 3 × 4 alternative | due azioni, 8 × 8 alternative |
-| Rumore sul giudizio (logit) | 1,8 | 0,5 | 0 |
+| Rumore sul giudizio (logit) | 1,5 | 0,5 | 0 |
 | Magie | solo le senza bersagli complessi | tutte | tutte |
 | Arena, Cardo + Decumano | no | sì | sì |
 | Magiscudo in risposta | 30% delle volte | 70% | sempre |
 
-L'imprecisione è rumore casuale sul valore delle mosse, non una regola sbagliata: ogni partita sbaglia in punti diversi. Percentuale di vittorie contro il livello sotto (330–440 partite a 2 giocatori):
+L'imprecisione è rumore casuale sul valore delle mosse, non una regola sbagliata: ogni partita sbaglia in punti diversi. Percentuale di vittorie contro il livello sotto (330 partite a 2 giocatori):
 
 ```
-Difficile contro Normale   ██████████████░░░░░░  68%
-Normale   contro Facile    █████████████████░░░  85%
-Facile    contro random    █████████████░░░░░░░  64%
+Difficile contro Normale   ██████████████░░░░░░  71%
+Normale   contro Facile    █████████████████░░░  83%
+Facile    contro random    ██████████████░░░░░░  69%
 ```
 
-A 4 giocatori un Difficile contro tre Normali vince il 39% delle partite (a parità sarebbe il 25%). Contro il vecchio Difficile, a 4 secondi di tempo, il nuovo vince il 66% (130 su 198).
+A 4 giocatori un Difficile contro tre Normali vince il 29% delle partite (a parità sarebbe il 25%), il 33% di quelle che arrivano in fondo: 30 su 220 non finiscono entro il limite di turni.
+
+Gli ultimi pesi (tre giri dopo la correzione del bonus delle Orde, che i precedenti avevano imparato a sfruttare) sono alla pari con i precedenti a 2 giocatori (172 a 156) e vincono il 32% da soli contro tre a 4 giocatori.
 
 Tempi su una macchina scarica: il Difficile impiega in media 25 ms a turno a 2 giocatori (p95 49 ms) e 62 ms a 4 (p95 149 ms, massimo 440 ms). Per i casi estremi il turno ha un tetto di 3 secondi per la ricerca in profondità e di 6 in totale.
 
@@ -159,6 +162,6 @@ Tempi su una macchina scarica: il Difficile impiega in media 25 ms a turno a 2 g
 - **Il self-play puro si siede.** Il Bot migliorava contro se stesso e restava intorno al 60% contro il vecchio Difficile. Il salto al 70% è arrivato introducendo insieme avversari più vari (stili, versioni precedenti, meno rumore) e caratteristiche per carta e per Specie (a un passo da un'Orda, Recluta che aspetta il suo Eroe); i giri successivi, a parità del resto, non hanno aggiunto nulla (49–54% sul giro precedente).
 - **Le etichette sono ritorni Monte Carlo puri**, quindi molto rumorose: una posizione a metà partita riceve l'esito di tutto quello che succede dopo. Bastano comunque per questo gioco, dove una partita dura in media una dozzina di turni.
 
-**Limiti noti:** le misure sono tutte Bot contro Bot, nessuna contro giocatori umani; a 3–4 giocatori il valore è dal punto di vista di un solo giocatore e non modella coalizioni; in partite di soli Bot a 3–4 giocatori circa l'1% delle partite non finisce entro il limite di turni.
+**Limiti noti:** le misure sono tutte Bot contro Bot, nessuna contro giocatori umani; a 3–4 giocatori il valore è dal punto di vista di un solo giocatore e non modella coalizioni; in partite di soli Bot a 4 giocatori circa un quarto delle partite non finisce entro il limite di 240 turni (26 su 110 con gli ultimi pesi, 7 su 110 con i precedenti e lo stesso codice): i Bot si murano a vicenda. Con un umano al tavolo non è misurato.
 
 **Idee non provate:** target TD(λ) al posto dei ritorni Monte Carlo; mediare il valore su più determinizzazioni invece di una; una testa di policy come prior sulle mosse, per ampliare il beam a parità di tempo.

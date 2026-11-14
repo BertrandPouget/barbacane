@@ -56,14 +56,14 @@ _STAT_EFFECTS = {"patrizio_horde": (0, 2, 0), "orfeo_horde": (1, 0, 1), "polemar
 
 _OPP = ["op_l1", "op_l2", "op_l3", "op_l4", "op_walls_min", "op_walls_sum", "n_opp2", "n_opp3"]
 _DEF = ["breach_l1", "breach_l2", "breach_l3", "slack0", "slack1", "slack2", "wall_loss",
-        "breach_both", "safe_bastions", "def_att_margin", "def_git_margin"]
+        "breach_both", "safe_bastions", "def_att_margin", "def_git_margin", "slack_n"]
 _ROSTER = ["me_n", "me_att", "me_git", "me_d1", "me_d2", "me_g2", "off_att", "off_git",
            "off_blocked", "me_hordes", "off_dmg", "off_dmg7", "def_dmg", "def_dmg7"]     + [f"me_h_{e}" for e in EFFECTS]
 _N_ROSTER_BASE = 14
 DYN = _OPP + _DEF + _ROSTER
 
 STATIC = (
-    ["bias", "me_l1", "me_l2", "me_l3", "me_l4", "me_walls_min", "me_walls_sum",
+    ["bias", "me_l1", "me_l2", "me_l3", "me_l4", "me_walls_min", "me_walls_sum", "me_walls_big",
      "op_n", "op_att", "op_git", "op_d1", "op_d2", "op_g2", "op_mages", "op_hordes", "op_hand", "op_immune",
      "me_mages", "me_anatema", "me_sortilegio", "me_incantesimo", "me_heroes", "me_immune",
      "mana_next", "mana_extra", "turn",
@@ -377,6 +377,7 @@ class Ctx:
         self._dfn: Dict[Tuple[int, int, int, int], float] = {} if memo is None else memo.setdefault(("dfn", dkey), {})
         self._dfh: Dict[Tuple[int, int, int, int], List[float]] = {} if memo is None else memo.setdefault(("dfh", dkey), {})
         self._base_opp: Optional[tuple] = None
+        self._hand: Optional[set] = None
 
     def _threat(self, idx: int, slot: Dict[int, int]) -> Tuple[int, int]:
         if idx not in slot:
@@ -401,6 +402,9 @@ class Ctx:
         f[S["me_l1"] + min(me.lives, 4) - 1] = 1.0
         f[S["me_walls_min"]] = min(me.wl, me.wr, 8) / 6.0
         f[S["me_walls_sum"]] = min(me.wl + me.wr, 18) / 12.0
+        # oltre i 18 Muri: senza, per il modello i Muri in più non valgono
+        # nulla e perderne dieci a turno non gli costa
+        f[S["me_walls_big"]] = min(max(me.wl + me.wr - 18, 0), 24) / 24.0
 
         opps = self.opps
         n = len(opps) or 1
@@ -477,13 +481,21 @@ class Ctx:
         me = self.me
         if isinstance(card, WarriorCard):
             if card.subtype == "hero":
-                if any(u.base == card.evolves_from for u in me.units):
+                # giocabile anche se la Recluta è ancora in mano: murare l'Eroe
+                # ora vuol dire rinunciarci proprio mentre sta per servire
+                if any(u.base == card.evolves_from for u in me.units) or card.evolves_from in self._hand_bases():
                     return "hand_hero"
                 return "hand_hero_dead"
             return "hand_recruit" if card.cost <= mana_next else None
         if isinstance(card, SpellCard):
             return "hand_spell" if me.mages >= card.cost else "hand_spell_dead"
         return "hand_building"
+
+    def _hand_bases(self) -> set:
+        bases = self._hand
+        if bases is None:
+            bases = self._hand = {get_base_card_id(iid) for iid in self.me.player.hand}
+        return bases
 
     def hand_value(self, base: str) -> float:
         """Quanto vale tenere in mano questa carta (per scegliere cosa
@@ -538,6 +550,8 @@ class Ctx:
         f[8] = ((dmg_l == 0) + (dmg_r == 0)) / 2.0
         f[9] = _clip4(min(dl - al if al >= 0 else 4, dr - ar if ar >= 0 else 4))
         f[10] = _clip4(min(gl - agl if al >= 0 else 4, gr - agr if ar >= 0 else 4))
+        # Muri che restano al Bastione più debole dopo l'attacco atteso
+        f[11] = min(max(worst, 0), 12) / 12.0
         return f
 
     def _defense(self, dl: int, gl: int, dr: int, gr: int) -> float:
@@ -685,8 +699,9 @@ class Ctx:
     def _horde_options(self):
         """Orde possibili. Ritorna (caratteristiche dei Guerrieri senza bonus
         d'Orda, effetti sempre attivi per i Troni, opzioni), con un'opzione
-        per Specie che ha almeno 3 Guerrieri: (specie, indici, indice del
-        Guerriero scelto, effetto, bonus alle sue Caratteristiche o None)."""
+        per Specie che ha almeno 3 Guerrieri: (specie, indici dei tre che la
+        formano, indice del Guerriero scelto, effetto, bonus alle sue
+        Caratteristiche o None)."""
         units = self.me.units
         stats0: List[Tuple[int, int, int]] = []
         perm = set()
@@ -727,7 +742,11 @@ class Ctx:
                 if pick is not None:  # None: nessun effetto attivabile (tutti col Trono)
                     _, e, i = pick
                     delta = (_STAT_EFFECTS[e] or (umani, 0, 0)) if e in _STAT_EFFECTS else None
-                    options.append((sp, idxs, i, e, delta))
+                    # L'Orda impegna tre Guerrieri: quello scelto e i due più
+                    # deboli. Gli altri della Specie restano liberi di andare
+                    # dove servono (un quarto nella stessa zona non dà nulla).
+                    mates = sorted((j for j in idxs if j != i), key=lambda j: sum(stats0[j]))[:2]
+                    options.append((sp, [i] + mates, i, e, delta))
         return stats0, frozenset(perm), options
 
     @staticmethod
@@ -785,6 +804,7 @@ class Ctx:
             stats, fixed, hordes, flags = config
             roster = self._roster_feats(stats, flags)
             rs = _dot(roster, w_roster)
+            rkey = tuple(roster)
             fz: List[List[int]] = [[], [], []]
             stay_fixed = 0
             for i, z in fixed.items():
@@ -802,6 +822,7 @@ class Ctx:
                 else:
                     ag = (-1, -1)
                 a_score = attack(ag[0], ag[1])[0]
+                crowd = 3e-4 * len(vg)
                 rest = [i for i in free if i not in vset] if vset else free
                 # Solo i 2 con più DIF e i 2 con più GIT possono decidere la
                 # difesa dei due Bastioni: gli altri restano dove sono (o a sinistra).
@@ -852,14 +873,15 @@ class Ctx:
                     d_score = dfn.get(dkey)
                     if d_score is None:
                         d_score = defense(dl, gl, dr, gr)
-                    # a parità, la disposizione che sposta meno Guerrieri
-                    total = rs + a_score + d_score + 1e-4 * stay
+                    # a parità, meno Guerrieri in Avanscoperta (chi non alza
+                    # l'attacco non ha motivo di starci), poi meno spostamenti
+                    total = rs + a_score + d_score + 1e-4 * stay - crowd
                     if total > best:
                         best = total
                     key = (ci, ag, dkey)
                     old = found.get(key)
                     if old is None or total > old[0]:
-                        found[key] = (total, config, roster, ag, dkey, vset, keys, mask, fill)
+                        found[key] = (total, config, roster, ag, dkey, vset, keys, mask, fill, rkey)
             return best
 
         # Senza Orde; poi ogni Specie da sola, in ognuna delle tre zone; infine,
@@ -880,15 +902,29 @@ class Ctx:
         if len(winners) > 1:
             evaluate(self._horde_config(stats0, perm, winners), ci + 1)
 
-        if top == 1:
-            picks = [max(found.values(), key=lambda c: c[0])]
-        else:
-            picks = sorted(found.values(), key=lambda c: c[0], reverse=True)[:top]
+        # Via gli Schieramenti dominati: a parità di attacco, di Orde e di forze
+        # in campo, più DIF e GIT su un Bastione non possono far danno. Il
+        # modello non lo sa da solo (con tanti Muri dà alla difesa un peso quasi
+        # nullo, a volte del segno sbagliato) e lascerebbe i Bastioni sguarniti
+        # per mandare in Avanscoperta Guerrieri che non aggiungono nulla.
+        groups: Dict[tuple, List[tuple]] = {}
+        for c in found.values():
+            groups.setdefault((c[9], c[3]), []).append(c[4])
+        picks = []
+        for c in sorted(found.values(), key=lambda c: c[0], reverse=True):
+            dl, gl, dr, gr = d = c[4]
+            for o in groups[(c[9], c[3])]:
+                if o[0] >= dl and o[1] >= gl and o[2] >= dr and o[3] >= gr and o != d:
+                    break
+            else:
+                picks.append(c)
+                if len(picks) >= top:
+                    break
         out = []
         model = self.model
         parts: dict = {}
         def_parts = self._dfh
-        for total, config, roster, ag, dkey, vset, keys, mask, fill in picks:
+        for total, config, roster, ag, dkey, vset, keys, mask, fill, _ in picks:
             _, fixed, hordes, _ = config
             zones: Dict[str, int] = {}
             for i, z in fixed.items():
