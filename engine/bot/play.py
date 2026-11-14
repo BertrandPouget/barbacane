@@ -146,8 +146,6 @@ RECORDER: Optional[Callable[[GameState, int], None]] = None
 def _profile(state: GameState, player_id: str, difficulty=None) -> Profile:
     if player_id in PLAYER_PROFILES:
         return PLAYER_PROFILES[player_id]
-    if isinstance(difficulty, Profile):
-        return difficulty
     name = difficulty or state.bot_difficulty
     return PROFILES.get(_LEGACY_DIFFICULTY.get(name, name), PROFILES["normal"])
 
