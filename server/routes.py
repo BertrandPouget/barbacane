@@ -24,7 +24,7 @@ from engine.game import (
     game_mode,
 )
 from engine import chronicle
-from engine.bot import run_bot_turn
+from engine.bot import run_bot_turn, settle_pending, waiting_for_human
 from engine.actions import (
     ActionError,
     play_warrior,
@@ -40,7 +40,6 @@ from engine.actions import (
     arena_activate,
     decimo_take_fossato,
     giulio_search,
-    _apply_spell_post_effects,
 )
 from server.lobby import (
     create_lobby,
@@ -57,6 +56,15 @@ from server.lobby import (
     leave_lobby,
 )
 from server.ws_manager import manager
+from engine.pending import (
+    resolve_search as _resolve_search_action,
+    resolve_biblioteca as _resolve_biblioteca_action,
+    resolve_agilpesca as _resolve_agilpesca_action,
+    resolve_velocemento as _resolve_velocemento_action,
+    resolve_cardo_move as _resolve_cardo_move_action,
+    resolve_magiscudo_counter as _resolve_magiscudo_counter_action,
+    resolve_malcomune as _resolve_malcomune_action,
+)
 from engine.tutorial import (
     DEFAULT_TUTORIAL_ID,
     create_tutorial_game,
@@ -693,7 +701,7 @@ def _dispatch(state, player_id: str, action: str, params: dict) -> dict:
     # lo avvia _schedule_bot_turn dopo il salvataggio, così il giocatore
     # vede prima il passaggio di turno e poi le mosse del Bot.
     if state.bot_player_ids and not state.winner_id:
-        _auto_resolve_bot_pending(state)
+        settle_pending(state)
 
     return result
 
@@ -734,6 +742,10 @@ def _schedule_bot_turn(state) -> None:
         return
     if not state.is_bot(state.current_player.id) or state.game_id in _bot_turns_running:
         return
+    # Una Magia del Bot aspetta la risposta di un umano (Magiscudo, Malcomune):
+    # il turno riprende da qui quando avrà risposto.
+    if waiting_for_human(state):
+        return
     # Senza nessun umano connesso i Bot non giocano da soli tra loro: la
     # partita riprende dal punto in cui era alla riconnessione.
     if not manager.connected_players(state.game_id):
@@ -769,9 +781,10 @@ async def _play_bot_turn(game_id: str) -> None:
             if len(state.chronicle) > told:
                 steps.append(state.model_copy(deep=True))
 
-        # Il calcolo gira in un thread: 'hard' può impiegare qualche secondo
-        # e non deve bloccare il server per le altre partite.
-        await asyncio.to_thread(_run_bot_turn, state, state.current_player.id, on_step)
+        # Il calcolo gira in un thread, per non bloccare il server per le
+        # altre partite. Risolve anche le interazioni che genera, sue o degli
+        # altri Bot; se ne resta una per un umano, il turno rimane aperto.
+        await asyncio.to_thread(run_bot_turn, state, state.bot_difficulty, on_step)
         chronicle.sync(state)
 
         # Lo stato finale si salva subito: il racconto qui sotto invia solo
@@ -812,238 +825,6 @@ async def _play_bot_turn(game_id: str) -> None:
             _schedule_bot_turn(latest)
 
 
-def _run_bot_turn(state, bot_id: str, on_step=None) -> None:
-    """Gioca l'intero turno del Bot (partita di pratica), risolvendo anche
-    eventuali interazioni pendenti che genera, sue o degli altri Bot."""
-    guard = 0
-    while state.current_player.id == bot_id and not state.winner_id and guard < 20:
-        guard += 1
-        run_bot_turn(state, state.bot_difficulty, on_step=on_step)
-        _auto_resolve_bot_pending(state)
-
-
-def _auto_resolve_bot_pending(state) -> None:
-    """Risolve automaticamente qualsiasi pending_search o pending_interactions
-    che riguardi un Bot, con scelte semplici di default, così una partita di
-    pratica non resta mai bloccata in attesa di un input che il Bot non può dare."""
-    from engine.cards import get_card, WarriorCard
-
-    guard = 0
-    while guard < 20:
-        guard += 1
-
-        search_owner = state.pending_search.get("player_id") if state.pending_search else None
-        if search_owner and state.is_bot(search_owner):
-            # Prende la prima carta che soddisfa la ricerca (es. Giulio II per
-            # l'Orda di Giulio); annulla solo se nel mazzo non ce n'è nessuna.
-            from engine.game import _search_deck_view
-            match = next(
-                (c["instance_id"] for c in _search_deck_view(state, state.pending_search["condition"])
-                 if c["matches"]),
-                None,
-            )
-            _resolve_search_action(state, search_owner, match)
-            continue
-
-        pending_owner = state.pending_interactions[0].get("player_id") if state.pending_interactions else None
-        if pending_owner and state.is_bot(pending_owner):
-            bot_id = pending_owner
-            pending = state.pending_interactions[0]
-            ptype = pending.get("type")
-            player = state.get_player(bot_id)
-
-            if ptype == "biblioteca_discard":
-                iid = player.hand[0] if player.hand else None
-                _resolve_biblioteca_action(state, bot_id, {"discard_iid": iid})
-            elif ptype == "biblioteca_wall":
-                iid = player.hand[0] if player.hand else None
-                params = {"wall_card_iid": iid, "wall_bastion_side": "left"} if iid else {}
-                _resolve_biblioteca_action(state, bot_id, params)
-            elif ptype == "agilpesca_discard":
-                iid = player.hand[0] if player.hand else None
-                if iid:
-                    _resolve_agilpesca_action(state, bot_id, {"discard_iid": iid})
-                else:
-                    state.pending_interactions.pop(0)
-            elif ptype == "cardo_move":
-                _resolve_cardo_move_action(state, bot_id, {})
-            elif ptype == "magiscudo_counter":
-                _resolve_magiscudo_counter_action(state, bot_id, {"accept": False})
-            elif ptype == "malcomune_discard":
-                species = pending.get("species")
-                warrior = next(
-                    (w for w in player.all_warriors()
-                     if isinstance(get_card(w.base_card_id), WarriorCard)
-                     and get_card(w.base_card_id).species == species),
-                    None,
-                )
-                if warrior:
-                    _resolve_malcomune_action(state, bot_id, {"warrior_iid": warrior.instance_id})
-                else:
-                    state.pending_interactions.pop(0)
-            else:
-                state.pending_interactions.pop(0)
-            continue
-
-        break
-
-
-def _resolve_search_action(state, player_id: str, chosen_iid: Optional[str]) -> dict:
-    ps = state.pending_search
-    if not ps:
-        raise ActionError("Nessuna ricerca in corso.")
-    if ps["player_id"] != player_id:
-        raise ActionError("Non è la tua ricerca.")
-    if not chosen_iid:
-        import random as _random
-        _random.shuffle(state.deck)
-        state.pending_search = None
-        return {"cancelled": True}
-
-    if chosen_iid not in state.deck:
-        raise ActionError("La carta scelta non è nel mazzo.")
-
-    from engine.deck import get_base_card_id
-    from engine.cards import CARD_REGISTRY
-    from engine.models import WarriorCard
-
-    base_id = get_base_card_id(chosen_iid)
-    card = CARD_REGISTRY.get(base_id)
-    condition = ps["condition"]
-    ctype = condition.get("type")
-    cvalue = condition.get("value")
-
-    if ctype == "subtype":
-        if not (isinstance(card, WarriorCard) and card.subtype == cvalue):
-            raise ActionError("La carta scelta non soddisfa la condizione di ricerca.")
-    elif ctype == "base_card_id":
-        if base_id != cvalue:
-            raise ActionError("La carta scelta non soddisfa la condizione di ricerca.")
-
-    import random as _random
-    state.deck.remove(chosen_iid)
-    _random.shuffle(state.deck)
-
-    player = state.get_player(player_id)
-    context = ps["context"]
-    result: dict = {"resolved_search": chosen_iid, "context": context}
-
-    if context == "cercapersone_base":
-        player.hand.append(chosen_iid)
-        state.add_log(player_id, "search", card=chosen_iid)
-        result["added_to_hand"] = chosen_iid
-
-    elif context == "cercapersone_prodigio":
-        player.hand.append(chosen_iid)
-        player.ethereal_card = chosen_iid
-        state.add_log(player_id, "search", card=chosen_iid)
-        result["added_to_hand"] = chosen_iid
-        result["ethereal"] = chosen_iid
-
-    elif context == "giulio_horde":
-        player.hand.append(chosen_iid)
-        state.add_log(player_id, "search", card=chosen_iid)
-        result["added_to_hand"] = chosen_iid
-
-    state.pending_search = None
-    return result
-
-
-def _resolve_biblioteca_action(state, player_id: str, params: dict) -> dict:
-    if not state.pending_interactions:
-        raise ActionError("Nessuna interazione Biblioteca in corso.")
-    pending = state.pending_interactions[0]
-    if pending["player_id"] != player_id:
-        raise ActionError("Non è la tua interazione.")
-
-    player = state.get_player(player_id)
-    result: dict = {}
-
-    if pending["type"] == "biblioteca_discard":
-        discard_iid = params.get("discard_iid")
-        if not discard_iid and not player.hand:
-            # Mano vuota: nessuna carta da scartare, interazione risolta automaticamente
-            state.pending_interactions.pop(0)
-            return {"skipped": True, "reason": "mano vuota"}
-        if not discard_iid:
-            raise ActionError("Devi scegliere una carta da scartare.")
-        if discard_iid not in player.hand:
-            raise ActionError("La carta scelta non è in mano.")
-        player.hand.remove(discard_iid)
-        state.discard_pile.append(discard_iid)
-        state.add_log(player_id, "biblioteca_discard", card=discard_iid)
-        result["discarded"] = discard_iid
-
-    elif pending["type"] == "biblioteca_wall":
-        wall_card_iid = params.get("wall_card_iid")
-        wall_bastion_side = params.get("wall_bastion_side")
-        if not wall_card_iid and not player.hand:
-            state.pending_interactions.pop(0)
-            return {"skipped": True, "reason": "mano vuota"}
-        if not wall_card_iid or not wall_bastion_side:
-            raise ActionError("Devi scegliere una carta e un Bastione.")
-        if wall_card_iid not in player.hand:
-            raise ActionError("La carta scelta non è in mano.")
-        if wall_bastion_side not in ("left", "right"):
-            raise ActionError("Bastione non valido.")
-        from engine.deck import make_wall_instance
-        player.hand.remove(wall_card_iid)
-        bastion = player.field.bastion_left if wall_bastion_side == "left" else player.field.bastion_right
-        bastion.walls.append(make_wall_instance(wall_card_iid))
-        state.add_log(player_id, "biblioteca_wall", card=wall_card_iid, bastion=wall_bastion_side)
-        result["wall_added"] = wall_card_iid
-        result["bastion"] = wall_bastion_side
-
-    state.pending_interactions.pop(0)
-    return result
-
-
-def _resolve_agilpesca_action(state, player_id: str, params: dict) -> dict:
-    if not state.pending_interactions:
-        raise ActionError("Nessuna interazione Agilpesca in corso.")
-    pending = state.pending_interactions[0]
-    if pending.get("type") != "agilpesca_discard":
-        raise ActionError("L'interazione in attesa non è Agilpesca.")
-    if pending["player_id"] != player_id:
-        raise ActionError("Non è la tua interazione.")
-
-    player = state.get_player(player_id)
-    discard_iid = params.get("discard_iid")
-    if not discard_iid:
-        raise ActionError("Devi scegliere una carta da scartare.")
-    if discard_iid not in player.hand:
-        raise ActionError("La carta scelta non è in mano.")
-
-    player.hand.remove(discard_iid)
-    state.discard_pile.append(discard_iid)
-    state.add_log(player_id, "agilpesca_discard", card=discard_iid)
-    state.pending_interactions.pop(0)
-    return {"discarded": discard_iid}
-
-
-def _resolve_velocemento_action(state, player_id: str, params: dict) -> dict:
-    """Il giocatore sceglie quale Costruzione in mano rendere Eterea dopo aver giocato Velocemento."""
-    player = state.get_player(player_id)
-    if not player or not player.pending_velocemento_buildings:
-        raise ActionError("Nessuna scelta Velocemento in attesa.")
-
-    building_iid = params.get("building_instance_id")
-    if not building_iid:
-        raise ActionError("Parametro building_instance_id mancante.")
-    if building_iid not in player.pending_velocemento_buildings:
-        raise ActionError("Costruzione non valida per Velocemento.")
-    if building_iid not in player.hand:
-        raise ActionError("La carta non è più in mano.")
-
-    player.pending_velocemento_buildings = []
-    player.ethereal_card = building_iid
-    if player.pending_velocemento_prodigy:
-        player.ethereal_complete = building_iid
-        player.pending_velocemento_prodigy = False
-    state.add_log(player_id, "velocemento_ethereal", building=building_iid)
-    return {"ethereal_card": building_iid, "ethereal_complete": player.ethereal_complete}
-
-
 def _next_phase_action(state, player_id: str) -> dict:
     if state.current_player.id != player_id:
         raise ActionError("Non è il tuo turno.")
@@ -1063,122 +844,6 @@ def _end_turn_action(state, player_id: str) -> dict:
     if any(i.get("type") == "cardo_move" for i in state.pending_interactions):
         return {"cardo_move_pending": True}
     return {"turn_ended": True}
-
-
-def _resolve_cardo_move_action(state, player_id: str, params: dict) -> dict:
-    if not state.pending_interactions:
-        raise ActionError("Nessuna interazione Cardo in corso.")
-    pending = state.pending_interactions[0]
-    if pending.get("type") != "cardo_move":
-        raise ActionError("L'interazione in attesa non è Cardo.")
-    if pending["player_id"] != player_id:
-        raise ActionError("Non è la tua interazione.")
-
-    state.pending_interactions.pop(0)
-
-    # Marca che il movimento Cardo è stato risolto questo turno (evita re-trigger in end_turn)
-    player = state.get_player(player_id)
-    player.active_effects.append({"type": "cardo_move_done", "expires": "end_of_turn"})
-
-    warrior_iid = params.get("warrior_iid")
-    destination = params.get("destination")
-    result: dict = {}
-
-    if warrior_iid and destination:
-        reposition_warrior(state, player_id, warrior_iid, destination)
-        result["moved"] = warrior_iid
-        result["destination"] = destination
-    else:
-        result["skipped"] = True
-
-    end_turn(state)
-    result["turn_ended"] = True
-    return result
-
-
-def _resolve_magiscudo_counter_action(state, player_id: str, params: dict) -> dict:
-    if not state.pending_interactions:
-        raise ActionError("Nessuna interazione Magiscudo in corso.")
-    pending = state.pending_interactions[0]
-    if pending.get("type") != "magiscudo_counter":
-        raise ActionError("L'interazione in attesa non è Magiscudo.")
-    if pending["player_id"] != player_id:
-        raise ActionError("Non è la tua scelta.")
-
-    from engine.effects import apply_effect
-    from engine.deck import get_base_card_id
-
-    state.pending_interactions.pop(0)
-    accept = params.get("accept", False)
-    defender = state.get_player(player_id)
-
-    if accept:
-        magiscudo_iid = next(
-            (iid for iid in defender.hand if get_base_card_id(iid) == "magiscudo"),
-            None,
-        )
-        if not magiscudo_iid:
-            raise ActionError("Non hai Magiscudo in mano.")
-        defender.hand.remove(magiscudo_iid)
-        state.discard_pile.append(magiscudo_iid)
-        apply_effect("magiscudo_effect", state, defender, prodigy=True)
-        state.recent_events.append({
-            "type": "magiscudo_blocked",
-            "card": get_base_card_id(pending["spell_iid"]),
-            "player_id": pending["caster_id"],
-            "blocked_player": player_id,
-        })
-        state.add_log(player_id, "magiscudo_counter", spell=pending["spell_iid"])
-        return {"magiscudo_used": True, "spell_blocked": pending["spell_iid"]}
-
-    # Bersaglio declina: applica l'effetto originale della magia
-    caster = state.get_player(pending["caster_id"])
-    if not caster:
-        return {"declined": True}
-    result = apply_effect(
-        pending["effect_id"], state, caster,
-        prodigy=pending["prodigy"], **pending.get("kwargs", {}),
-    )
-    _apply_spell_post_effects(
-        state, caster,
-        pending["spell_cost"], pending["spell_school"],
-        pending["spell_base_id"], pending["spell_iid"],
-        result,
-    )
-    state.add_log(player_id, "magiscudo_counter_declined", spell=pending["spell_iid"])
-    return {"declined": True, "effect": result}
-
-
-def _resolve_malcomune_action(state, player_id: str, params: dict) -> dict:
-    if not state.pending_interactions:
-        raise ActionError("Nessuna interazione Malcomune in corso.")
-    pending = state.pending_interactions[0]
-    if pending.get("type") != "malcomune_discard":
-        raise ActionError("L'interazione in attesa non è Malcomune.")
-    if pending["player_id"] != player_id:
-        raise ActionError("Non è la tua scelta.")
-
-    from engine.effects import _discard_warrior_from_player, _find_warrior_in_all
-    from engine.cards import get_card, WarriorCard
-
-    player = state.get_player(player_id)
-    warrior_iid = params.get("warrior_iid")
-    species = pending["species"]
-    w = _find_warrior_in_all(player, warrior_iid) if warrior_iid else None
-    card = get_card(w.base_card_id) if w else None
-    if not w or not isinstance(card, WarriorCard) or card.species != species:
-        raise ActionError("Devi scegliere un tuo Guerriero della Specie richiesta.")
-
-    state.pending_interactions.pop(0)
-    _discard_warrior_from_player(state, player, warrior_iid)
-    state.recent_events.append({
-        "type": "warrior_discarded", "card": "malcomune",
-        "player_id": pending["caster_id"],
-        "species": species,
-        "enemies_discarded": [{"player": player_id, "warrior": warrior_iid}],
-    })
-    state.add_log(player_id, "malcomune_discard", warrior=warrior_iid)
-    return {"discarded": warrior_iid}
 
 
 # ---------------------------------------------------------------------------

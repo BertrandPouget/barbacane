@@ -13,3 +13,6 @@ graphify-out/.graphify_root
 
 # graphify - cache (regenerabile, può contenere path assoluti)
 graphify-out/cache/
+
+# Bot: partite e pesi intermedi dell'addestramento
+bot_factory/lab/

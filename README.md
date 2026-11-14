@@ -124,7 +124,7 @@ Le carte vivono tutte in un unico file, `data/cards.json`: è la fonte da cui le
 
 3. **Aggiungere l'interfaccia**, se l'effetto richiede delle scelte al giocatore (un bastione bersaglio, un Guerriero, una carta da cercare...). Il gioco ha due interfacce separate, desktop (`frontend/app.js`) e mobile (`frontend/mobile/app.js`): la nuova scelta va costruita in entrambe, con i selettori già pronti. Gli effetti che si risolvono in due tempi (come cercare una carta nel mazzo, o la Biblioteca) mettono il gioco in attesa della risposta del giocatore, che arriva con un'azione dedicata.
 
-4. **Insegnarla ai Bot**: in `engine/bot.py` si stabilisce quanto vale la carta e con quali bersagli giocarla. Se la carta introduce una nuova scelta in attesa di risposta, va gestita anche la risposta automatica dei Bot, altrimenti una partita contro di loro resterebbe bloccata.
+4. **Insegnarla ai Bot**: in `engine/bot/play.py` si stabilisce con quali bersagli giocarla; quanto vale lo imparano da soli, riaddestrando il modello con la [Bot Factory](bot_factory/README.md) (partite dei Bot contro se stessi, in locale). Se la carta introduce una nuova scelta in attesa di risposta, va gestita anche la risposta automatica dei Bot, altrimenti una partita contro di loro resterebbe bloccata.
 
 5. **Generare la grafica** con la [Card Factory](card_factory/README.md): si aggiunge l'illustrazione in `card_factory/images/<id>.png` e si lancia `python card_factory/2_generate_cards.py <id>`. La carta finita compare in `card_factory/output/full/` (con anteprima e minicarta in `output/preview/` e `output/mini/`) e da lì viene mostrata nel gioco.
 

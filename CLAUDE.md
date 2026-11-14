@@ -37,11 +37,13 @@ engine/
   effects.py       EFFECT_REGISTRY: Magie, Costruzioni, Orde
   battle.py        Adiacenza, statistiche con bonus, danni, resolve_battle
   game.py          create_game/create_practice_game, _begin_turn, end_turn, public_state, simulate_game
-  bot.py           IA dei Bot (docstring in testa: easy/normal/hard), run_bot_turn
+  pending.py       resolve_*: chiusura di pending_search / pending_interactions / Velocemento
   tutorial.py      Tutorial: partita scriptata di 4 turni a obiettivi
   chronicle.py     Cronaca (log/eventi → frasi) e statistiche di fine partita
+  bot/             IA dei Bot in partita: play.py (turno, ricerca, livelli), eval.py (modello appreso,
+                   Schieramento), weights.json (i pesi)
 server/
-  routes.py        REST + WebSocket, _dispatch_action, timer, turni Bot, handler resolve_*
+  routes.py        REST + WebSocket, _dispatch_action, timer, turni Bot
   lobby.py         Lobby in memoria, Bot in lobby, rivincita multigiocatore
   ws_manager.py    Connessioni, broadcast, timer turno
 db/storage.py      Postgres (DATABASE_URL) o SQLite
@@ -50,6 +52,7 @@ frontend/          Desktop (app.js, renderer.js) + moduli condivisi col mobile: 
                    drag (giocare le carte trascinandole in campo)
 frontend/mobile/   Client mobile (modulo Mob), ui.js (sheet, toast), board.js (campo a triangoli)
 card_factory/      Grafica carte (vedi suo README) → output/full, output/preview, output/mini, serviti su /card_images
+bot_factory/       Addestramento e misura dei Bot (vedi suo README): produce i pesi di engine/bot/weights.json
 ```
 
 ## Flusso di un'azione
@@ -57,7 +60,7 @@ card_factory/      Grafica carte (vedi suo README) → output/full, output/previ
 Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_action`, che: gestisce `leave_game`; valida il copione nei tutorial; azzera l'eterea (`_ETHEREAL_BREAKING`); **blocca tutto se c'è un `pending_search` o una `pending_interactions[0]`** (ammette solo il `resolve_*` corrispondente); controlla la fase (`_PHASE_REQUIRED`); chiama l'handler (elenco in `handlers`); Fucina; fine turno automatica dopo l'ultima battaglia (non nei tutorial); risolve i pending dei Bot; `chronicle.sync`. Poi salva, manda a ognuno il proprio `public_state` e schedula il turno Bot. Errori di regola = `ActionError` → `{type: "error"}` solo a chi ha agito.
 
 - Fasi: `action` → `schieramento` → `battaglia` (azione `next_phase`); `end` a partita finita.
-- **Interazioni pendenti**: un effetto che chiede una scelta imposta `pending_search` o accoda `{type, player_id, ...}` in `pending_interactions` (alcune le risolve il bersaglio fuori turno). Possono coesistere: il `pending_search` ha la precedenza, anche nei client (prima la ricerca, poi l'interazione). **Un nuovo tipo va aggiunto in tre posti**: mappa in `_dispatch_action`, `_auto_resolve_bot_pending` (altrimenti le partite con Bot si bloccano), UI di entrambi i client.
+- **Interazioni pendenti**: un effetto che chiede una scelta imposta `pending_search` o accoda `{type, player_id, ...}` in `pending_interactions` (alcune le risolve il bersaglio fuori turno). Possono coesistere: il `pending_search` ha la precedenza, anche nei client (prima la ricerca, poi l'interazione). **Un nuovo tipo va aggiunto in tre posti**: mappa in `_dispatch_action` (+ `resolve_*` in `engine/pending.py`), `_settle_interaction` in `engine/bot/play.py` (altrimenti le partite con Bot si bloccano), UI di entrambi i client.
 - `end_turn` può fermarsi su `cardo_move` e riprendere dopo `resolve_cardo_move`.
 - Orde attive finché il gruppo regge; gli Eroi ereditano l'Orda della Recluta (`<recluta>_horde`).
 
@@ -65,7 +68,8 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 
 - **Multigiocatore**: le lobby vivono **solo in memoria** (un riavvio perde le sale d'attesa, non le partite avviate). Ordine della lobby = ordine di `state.players` = adiacenza. I Bot non hanno riga in `players`.
 - **Giocatore Singolo** (schermata `bot-difficulty`, non più raggiungibile dalla home): game_id `vs-…`, umano primo, timer disattivato.
-- **Bot**: girano in background **solo se almeno un umano è connesso**; il turno è calcolato tutto, salvato, poi raccontato al tavolo mossa per mossa (`bot_step`). Un turno da 3–4 s è accettabile: non sacrificare la forza per la velocità. Magie non gestite: `_SPELL_EFFECT_EXCLUDE`.
+- **Bot**: girano in background **solo se almeno un umano è connesso**; il turno è calcolato tutto, salvato, poi raccontato al tavolo mossa per mossa (`bot_step`). Un turno da 3–4 s è accettabile: non sacrificare la forza per la velocità. Se una Magia del Bot aspetta la risposta di un umano (Magiscudo, Malcomune) `run_bot_turn` ritorna a turno aperto e riprende alla chiamata successiva: tutto ciò che fa dev'essere ripetibile.
+- **Forza dei Bot**: non è scritta a mano, sta nei pesi di `engine/bot/weights.json` (un modello lineare e una piccola rete, addestrati in self-play con `python -m bot_factory.train`; numpy/scipy solo in locale: il server valuta in Python puro, `requirements.txt` non cambia). Dopo aver cambiato carte, regole o le caratteristiche di `engine/bot/eval.py` i pesi vanno riaddestrati e i tre livelli (`PROFILES`) rimisurati con `arena`: ricetta e trappole dell'addestramento in `bot_factory/README.md`. I livelli differiscono per ampiezza di ricerca e rumore sul giudizio, mai per un errore fisso.
 - **Cronaca**: le informazioni coperte (pescate, Muri, scarti dalla mano) vanno in `private_text`, mai nel testo pubblico. Una carta nuova che produce eventi/log merita una frase in `_tell_log`/`_tell_event`.
 - **Tutorial**: copione a obiettivi con numeri tarati sulle carte vere (Mana, ATT/DIF, Muri): cambiare una carta usata può rompere i conti, ricontrollarli giocandolo. Il turno del Manichino è il `setup` dello step dopo «Fine Turno». `CARD_READS` (lettura delle carte al primo tocco) usa rettangoli in % sull'immagine della carta: se cambia il layout di `card.html` vanno ritarati. Selettori mobile in `_MOBILE_HIGHLIGHT_MAP`.
 - **Modalità Test**: nome `Test`/`Test2` → carte di `data/test_cards.json` in cima al mazzo, 10 Mana e 5 Azioni a turno.
@@ -89,7 +93,7 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 1. `data/cards.json`.
 2. Effetto in `effects.py` (+ pre-validazione in `actions.py`, + passiva/trigger in `game.py`/`battle.py`).
 3. Targeting in **entrambi** i client, sempre con i **selettori comuni** (desktop `Renderer.show*Picker`, mobile `pick*`), mai liste fatte a mano.
-4. Bot: `_default_spell_kwargs`, `_card_value`, `_SPELL_EFFECT_EXCLUDE` in `bot.py`; nuovo pending → `_auto_resolve_bot_pending`.
+4. Bot (`engine/bot/play.py`): bersagli di una Magia in `_spell_options` (senza, il Bot non la gioca), nuovo modo di giocare una carta in `_candidates`, nuovo pending in `_settle_interaction`; poi riaddestrare i pesi.
 5. Tutorial: la carta compare negli script?
 6. Grafica: `card_factory/images/<id>.png` → `python card_factory/2_generate_cards.py <id>` (genera full, preview, mini; tutto committato).
 7. Regola cambiata → `assets/rules.md`.
@@ -107,8 +111,8 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 
 - **Adiacenza**: il Bastione destro confina col sinistro del primo giocatore **vivo** a destra. Logica duplicata in `battle.py`, `frontend/renderer.js`, `frontend/mobile/render.js`, `frontend/mobile/app.js`: cambiarla ovunque.
 - **Massimo 2 Azioni** è scritto anche lato client (`maxActions` in `app.js`).
-- **Regola del Prodigio**: `_prodigy_active` in `actions.py` (usata anche da `bot.py`), ricopiata nei client per il targeting (`_computeSpellProdigy` desktop, `computeSpellProdigy` mobile). La stella delle minicarte usa invece `prodigy_ready` dal server.
-- **Giocate senza Azioni** (eterea, Orde di Madeleine/Faust/Joseph, Cardo+Decumano): regola in `actions.py`, ricopiata in `bot._is_free_action` e nei client (`_isFreePlay`/`_isFreeComplete` desktop, `isFreePlay`/`isFreeComplete` mobile), che con 0 Azioni lasciano attive solo quelle.
+- **Regola del Prodigio**: `_prodigy_active` in `actions.py`, ricopiata nei client per il targeting (`_computeSpellProdigy` desktop, `computeSpellProdigy` mobile). La stella delle minicarte usa invece `prodigy_ready` dal server.
+- **Giocate senza Azioni** (eterea, Orde di Madeleine/Faust/Joseph, Cardo+Decumano): regola in `actions.py`, ricopiata in `_is_free` di `engine/bot/play.py` e nei client (`_isFreePlay`/`_isFreeComplete` desktop, `isFreePlay`/`isFreeComplete` mobile), che con 0 Azioni lasciano attive solo quelle.
 - **Muri a riprese**: i client mandano un `add_wall` per carta (girata col doppio clic/tocco); i successivi, fino a 3, sono gratis finché `len(state.log)` non cambia (`open_wall_slots` in `actions.py`). Un'azione nuova che non scrive nel log lascerebbe aperta l'Azione dei Muri.
 - Nessun salto turno automatico per disconnessione: solo con timer di lobby (`turn_timer > 0`).
 - Partite `vs-…` e tutorial hanno una sola riga in `players` (`player_1`).
@@ -120,3 +124,4 @@ Client → WebSocket `{type: "action", action, params}` → `routes._dispatch_ac
 - **Campo mobile** (`board.js`): Regioni come sagome SVG in unità di tavola (geometria fissa in `SHAPES`, disegno costruito una volta sola). Gli id delle sagome (`fld-vanguard`, `tw-*`, `opp-b*`) li usano il tutorial (`_MOBILE_HIGHLIGHT_MAP`), le transizioni (`MOTION_TILES`) e il trascinamento (`Board.contains`): rinominarli ovunque. Il campo può mostrare un altro giocatore (occhio, `viewId` in `app.js`): mano e azioni restano sempre mie.
 - **Regioni dipinte sul desktop**: palette copiata da `PALETTE` di `board.js` in `--rg-*` di `style.css`, simboli `.ov-*` copiati da `mobile.css`. La pittura (lati frastagliati) è un figlio `.rg-paint` rimesso da `paintRegions()` dopo `render()`: chi ridisegna una Regione fuori da `render()` deve richiamarla; bordi ed evidenziazioni si danno con `--rg-line`, non con `border`/`background`.
 - `game.py` contiene ancora un bot casuale (`random_bot_turn`) per `simulate_game`: non è il Bot delle partite reali.
+- **Bot e regole delle route**: i Bot chiamano il motore senza passare da `_dispatch_action`, quindi ciò che fanno solo le route (decadenza dell'Eterea, Fucina dopo l'ultima Azione) è ricopiato in `_apply_spec`/`run_bot_turn`. `engine/bot/eval.py` calcola Danni, Orde e Fossato in aritmetica, senza il motore: una regola di Battaglia o un effetto Orda cambiati vanno cambiati anche lì.
