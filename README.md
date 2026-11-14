@@ -8,8 +8,7 @@
 
 <p align="center">
   <a href="https://barbacane.quest"><strong>Gioca Ora</strong></a> ·
-  <a href="assets/rules.md">Regolamento Completo</a> ·
-  <a href="card_factory/README.md">Card Factory</a>
+  <a href="assets/rules.md">Regolamento Completo</a>
 </p>
 
 <p align="center">
